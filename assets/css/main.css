@@ -2517,7 +2517,6 @@ input, select, textarea {
 			position: absolute;
 			left: 0;
 			top: 0;
-			background-image: url("images/overlay.png");
 			width: 100%;
 			height: 100%;
 			z-index: 1;
@@ -3593,10 +3592,10 @@ ul.small_actions {
 		}
 
 		#banner:after {
-			background-image: -moz-linear-gradient(top, rgba(23, 24, 32, 0.95), rgba(23, 24, 32, 0.95)), url("images/overlay.png");;
-			background-image: -webkit-linear-gradient(top, rgba(23, 24, 32, 0.95), rgba(23, 24, 32, 0.95)), url("images/overlay.png");;
-			background-image: -ms-linear-gradient(top, rgba(23, 24, 32, 0.95), rgba(23, 24, 32, 0.95)), url("images/overlay.png");;
-			background-image: linear-gradient(top, rgba(23, 24, 32, 0.95), rgba(23, 24, 32, 0.95)), url("images/overlay.png");;
+			background-image: -moz-linear-gradient(top, rgba(0, 0, 0, 0.80), rgba(32, 32, 32, 0.80)), url("images/overlay.png");;
+			background-image: -webkit-linear-gradient(top, rgba(0, 0, 0, 0.80), rgba(36, 35, 35, 0.80)), url("images/overlay.png");;
+			background-image: -ms-linear-gradient(top, rgba(0, 0, 0, 0.80), rgba(36, 35, 35, 0.80)), url("images/overlay.png");;
+			background-image: linear-gradient(top, rgba(0, 0, 0, 0.80), rgba(44, 44, 44, 0.80)), url("images/overlay.png");;
 			content: '';
 			display: block;
 			height: 100%;
