@@ -3637,11 +3637,11 @@ ul.small_actions {
 				height: 18em;
 				margin-left: 3em;
 				vertical-align: middle;
-				width: 18em;
+				width: 13em;
 			}
 
 				#banner .content .image img {
-					border-radius: 100%;
+					border-radius: 50%;
 					display: block;
 					width: 100%;
 				}
