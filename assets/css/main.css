@@ -2657,8 +2657,20 @@ input[type="radio"] + label:before {
   margin: 0 0 2em 0;
   width: 100%;
 }
+.image.fit2 {
+  display: block;
+  margin: 0 0 2em 0;
+  width: 50%;
+  -moz-transform: translate(50%, 0);
+  -webkit-transform: translate(50%, 0);
+  -ms-transform: translate(50%, 0);
+  transform: translate(50%, 0);
+}
 
 .image.fit img {
+  width: 100%;
+}
+.image.fit2 img {
   width: 100%;
 }
 
