@@ -1,7 +1,5 @@
 $(window).on("load", () => {
-  $(".load-wrapper")
-    .delay(800)
-    .fadeOut("slow");
+  $(".load-wrapper").fadeOut("slow");
 });
 
 $(document).ready(function() {
