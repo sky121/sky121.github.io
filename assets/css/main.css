@@ -12,7 +12,7 @@
 }
 .fa a {
   width: 50px;
-  font-size: 30px;
+  font-size: 2vw;
 }
 
 .fa:hover {
@@ -26,6 +26,7 @@ nav {
   background-image: none;
   box-shadow: none;
   position: absolute !important;
+  width: 100vw !important;
 }
 .navbar-brand,
 .nav-link {
@@ -58,7 +59,6 @@ nav {
   background-image: url("../../images/banner.jpg");
   background-position: center center;
   background-size: cover;
-  box-shadow: 0 0.25em 0.5em 0 rgba(0, 0, 0, 0.25);
   min-height: 100vh;
   position: relative;
   text-align: right;
@@ -68,7 +68,8 @@ nav {
 }
 
 .header-descript {
-  font-size: 20px;
+  font-size: 2vh;
+  padding-right: 5%;
   display: inline-block;
   vertical-align: middle;
 }
@@ -85,8 +86,8 @@ nav {
 /*top profile picture*/
 .prof-pic {
   object-fit: cover;
-  width: 200px;
-  height: 200px;
+  width: 13vw;
+  height: 13vw;
   border-radius: 50%;
   overflow: hidden;
   position: absolute;
@@ -176,26 +177,26 @@ nav {
   background-position: center center;
   position: relative;
   vertical-align: middle;
-  padding-top: 20%;
+  padding-top: 30vh;
 }
 
 .about-descript {
   background-color: rgba(0, 0, 0, 0.8);
   width: 100%;
-  height: 635px;
+  height: 70vh;
   padding-left: 17%;
   padding-top: 4%;
 }
 .about-column {
   float: left;
   width: 28%;
-  font-size: 18px;
+  font-size: 1.1vw;
   vertical-align: center;
 
   color: #c4c4c4;
-  padding: 10px;
+  padding: 1%;
   font-family: Arial, Helvetica, sans-serif;
-  font-weight: 100;
+  font-weight: 100%;
 }
 
 /*resume section*/
@@ -222,10 +223,10 @@ nav {
 }
 
 .resume-sideT header h2 {
-  font-size: 50px;
+  font-size: 3vw;
 }
 .resume-sideT header p {
-  font-size: 25px;
+  font-size: 100%;
 }
 
 /*linkedin section*/
@@ -253,10 +254,10 @@ nav {
 }
 
 .linkedIn-sideT header h2 {
-  font-size: 50px;
+  font-size: 3vw;
 }
 .linkedIn-sideT header p {
-  font-size: 25px;
+  font-size: 100%;
 }
 
 /*projects*/
@@ -273,63 +274,67 @@ nav {
 }
 
 .project-cards {
-  padding-top: 50px;
+  padding-top: 5%;
 }
-
+.card-body {
+  font-size: 1vw !important;
+  width: 30vw;
+}
 .project-header {
   vertical-align: center;
   text-align: center;
   color: #c4c4c4;
-  font-size: 22px;
-  margin-top: 100px;
-  padding-bottom: 100px;
+  font-size: 1.5vw;
+  margin-top: 5%;
+  padding-bottom: 50%;
 
-  height: 100px;
+  height: 20%;
   width: auto;
   margin-left: 50%;
   transform: translate(-50%, 0%);
-  padding-bottom: 200px;
+  padding-bottom: 10%;
 }
 
 .project-header h2 {
-  font-size: 45px;
+  font-size: 2vw;
   color: #f0f0f0;
 }
 
 .anim-rect {
   margin-left: 50%;
   transform: translate(-50%, 0%);
-  width: 200px;
-  height: 10px;
+  width: 10%;
+  height: 1vw;
   background-color: #77f8ff;
   animation: expand 10s infinite;
 }
 @keyframes expand {
   0% {
-    width: 200px;
+    width: 35%;
   }
   50% {
-    width: 400px;
+    width: 70%;
   }
   100% {
-    width: 200px;
+    width: 35%;
   }
 }
 .card-deck {
-  padding-top: 100px;
+  padding-top: 100%;
   max-width: 100vh !important;
 }
+
 /*fade animation */
 
 .hideme {
   opacity: 0;
 }
-
+/*project cards*/
 .card-img-top {
   border-radius: 50%;
-  height: 100px;
-  width: 100px;
-  margin-left: 50%;
+  height: 10vh;
+  width: 10vh;
+  margin-left: 15vw;
   transform: translate(-50%);
 }
 
@@ -342,7 +347,7 @@ body {
   background-color: #262627;
 }
 
-/*projects*/
+/*projects pages*/
 .projects {
   color: white;
   text-align: center;
@@ -363,7 +368,7 @@ body {
 .proj-sec {
   width: 50%;
   margin-left: 50%;
-  margin-top: 20%;
+  margin-top: 300px;
   transform: translate(-50%);
 }
 .proj-sec img {
