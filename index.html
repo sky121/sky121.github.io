@@ -22,7 +22,10 @@
     />
 
     <link rel="stylesheet" href="assets/css/main.css" />
-
+    <style>
+      @import url("./assets/css/base.css");
+      @import url("./assets/css/basic-grid.css");
+    </style>
     <title>Skylar Hoffman's Portfolio</title>
   </head>
   <body>
@@ -94,7 +97,7 @@
       <section class="hideme">
         <header class="about-descript">
           <div class="about-column">
-            <header>
+            <header class="about-header">
               <h2>A Little About Myself</h2>
             </header>
             <p>
@@ -190,182 +193,169 @@
     </div>
 
     <div class="projects-div">
-      <header class="projects-descript"></header>
       <section class="hideme">
-        <div class="project-cards">
-          <div class="project-header">
-            <h2>My Projects</h2>
-            <p>
-              I worked in many different areas of computer science including
-              Javascript, Html, Css, Python, C++, ReactJs, and more
-            </p>
-            <div class="anim-rect"></div>
+        <div class="project-header">
+          <h2>My Projects</h2>
+          <p>
+            I worked in many different areas of computer science including
+            Javascript, Html, Css, Python, C++, ReactJs, and more
+          </p>
+          <div class="anim-rect"></div>
+        </div>
+        <div class="basic-grid">
+          <div class="pcard bg-transparent text-white">
+            <img
+              src="images/skybackground.jpg"
+              class="card-img-top"
+              alt="..."
+            />
+            <div class="card-body">
+              <h5 class="card-title">SkyProject</h5>
+              <p class="card-text">
+                Interactive website that allows users to view the weather in any
+                place around the globe. Built using Reactjs and various API's
+                including Google's Map Api and a Weather Forecasting Api. Helped
+                me learn Reactjs and practice my web development skills using
+                the Reactjs library.
+              </p>
+
+              <a type="button" class="btn btn-outline-light" href="SkyProject">
+                learn more
+              </a>
+            </div>
+          </div>
+          <div class="pcard bg-transparent text-white">
+            <img src="images/column.png" class="card-img-top" alt="..." />
+            <div class="card-body">
+              <h5 class="card-title">
+                Python Projects: Columns Game and Ball Simulator
+              </h5>
+              <p class="card-text">
+                Built a game similar to Tetris called columns using Pygame to
+                implement the physics and graphical interface of the software.
+                Also worked with Tkinter to develop a ball simulator using
+                various objects and inheritence to create an interesting,
+                interactive simulation.
+              </p>
+              <a
+                type="button"
+                class="btn btn-outline-light"
+                href="PythonProjects.html"
+              >
+                learn more
+              </a>
+            </div>
+          </div>
+          <div class="pcard bg-transparent text-white">
+            <img src="images/uci.png" class="card-img-top" alt="..." />
+            <div class="card-body">
+              <h5 class="card-title">Class Alert</h5>
+              <p class="card-text">
+                A Python script created with a friend to detect and alert us by
+                text message if a class opened up that we wanted to take.
+              </p>
+              <a
+                type="button"
+                class="btn btn-outline-light"
+                href="ClassChecker.html"
+              >
+                learn more
+              </a>
+            </div>
           </div>
 
-          <div class="card-columns">
-            <div class="card bg-transparent text-white">
-              <img
-                src="images/skybackground.jpg"
-                class="card-img-top"
-                alt="..."
-              />
-              <div class="card-body">
-                <h5 class="card-title">SkyProject</h5>
-                <p class="card-text">
-                  Interactive website that allows users to view the weather in
-                  any place around the globe. Built using Reactjs and various
-                  API's including Google's Map Api and a Weather Forecasting
-                  Api. Helped me learn Reactjs and practice my web development
-                  skills using the Reactjs library.
-                </p>
+          <div class="pcard bg-transparent text-white">
+            <img src="images/LyffeStyle.png" class="card-img-top" alt="..." />
+            <div class="card-body">
+              <h5 class="card-title">Lyffe Style</h5>
+              <p class="card-text">
+                Lyffe Style is a Chrome extension that takes the style of one
+                image and transplants it onto any image you mouse over while
+                browsing Google. For example, you can input the URL of Vincent
+                Van Gogh's The Starry Night and move your mouse over the Google
+                Image search results of "dog," and see pictures of dogs that
+                look like they were painted with that iconic blue swirl look.
+              </p>
+              <a
+                type="button"
+                class="btn btn-outline-light"
+                href="https://devpost.com/software/lyffe-style"
+              >
+                learn more
+              </a>
+            </div>
+          </div>
+          <div class="pcard bg-transparent text-white">
+            <img src="images/cpp.png" class="card-img-top" alt="..." />
+            <div class="card-body">
+              <h5 class="card-title">C++ Projects</h5>
+              <p class="card-text">
+                Built a simple text editor using C++ as well as designed and
+                implemented various data types and structures such as Maps,
+                Equivalence Classes, Sets, and Graphs using Hash tables and
+                various of data types built into C++
+              </p>
+              <a
+                type="button"
+                class="btn btn-outline-light"
+                href="Cprojects.html"
+              >
+                learn more
+              </a>
+            </div>
+          </div>
+          <div class="pcard bg-transparent text-white">
+            <img src="images/icon-gaz512.png" class="card-img-top" alt="..." />
+            <div class="card-body">
+              <h5 class="card-title">Lavamind Games</h5>
+              <p class="card-text">
+                Learned Adobe Flash Builder action script and mxml to
+                redistribute the Gazillionaire, Zapitalism, and Profitania onto
+                steam and develop it into a desktop application that can be
+                played solely offline.
+              </p>
+              <a
+                type="button"
+                class="btn btn-outline-light"
+                href="https://www.lavamind.com/"
+              >
+                learn more
+              </a>
+            </div>
+          </div>
+          <div class="pcard bg-transparent text-white">
+            <img src="images/asteroid.png" class="card-img-top" alt="..." />
+            <div class="card-body">
+              <h5 class="card-title">Mini Java Projects</h5>
+              <p class="card-text">
+                Used Java to create small fun projects that tested my skills and
+                helped me learn the dynamic capabilities of the Language.
+              </p>
+              <a
+                type="button"
+                class="btn btn-outline-light"
+                href="JavaProjects.html"
+              >
+                learn more
+              </a>
+            </div>
+          </div>
 
-                <a
-                  type="button"
-                  class="btn btn-outline-light"
-                  href="SkyProject"
-                >
-                  learn more
-                </a>
-              </div>
-            </div>
-            <div class="card bg-transparent text-white">
-              <img src="images/column.png" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">
-                  Python Projects: Columns Game and Ball Simulator
-                </h5>
-                <p class="card-text">
-                  Built a game similar to Tetris called columns using Pygame to
-                  implement the physics and graphical interface of the software.
-                  Also worked with Tkinter to develop a ball simulator using
-                  various objects and inheritence to create an interesting,
-                  interactive simulation.
-                </p>
-                <a
-                  type="button"
-                  class="btn btn-outline-light"
-                  href="PythonProjects.html"
-                >
-                  learn more
-                </a>
-              </div>
-            </div>
-            <div class="card bg-transparent text-white">
-              <img src="images/uci.png" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">Class Alert</h5>
-                <p class="card-text">
-                  A Python script created with a friend to detect and alert us
-                  by text message if a class opened up that we wanted to take.
-                </p>
-                <a
-                  type="button"
-                  class="btn btn-outline-light"
-                  href="ClassChecker.html"
-                >
-                  learn more
-                </a>
-              </div>
-            </div>
-
-            <div class="card bg-transparent text-white">
-              <img src="images/LyffeStyle.png" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">Lyffe Style</h5>
-                <p class="card-text">
-                  Lyffe Style is a Chrome extension that takes the style of one
-                  image and transplants it onto any image you mouse over while
-                  browsing Google. For example, you can input the URL of Vincent
-                  Van Gogh's The Starry Night and move your mouse over the
-                  Google Image search results of "dog," and see pictures of dogs
-                  that look like they were painted with that iconic blue swirl
-                  look.
-                </p>
-                <a
-                  type="button"
-                  class="btn btn-outline-light"
-                  href="https://devpost.com/software/lyffe-style"
-                >
-                  learn more
-                </a>
-              </div>
-            </div>
-            <div class="card bg-transparent text-white">
-              <img src="images/cpp.png" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">C++ Projects</h5>
-                <p class="card-text">
-                  Built a simple text editor using C++ as well as designed and
-                  implemented various data types and structures such as Maps,
-                  Equivalence Classes, Sets, and Graphs using Hash tables and
-                  various of data types built into C++
-                </p>
-                <a
-                  type="button"
-                  class="btn btn-outline-light"
-                  href="Cprojects.html"
-                >
-                  learn more
-                </a>
-              </div>
-            </div>
-            <div class="card bg-transparent text-white">
-              <img
-                src="images/icon-gaz512.png"
-                class="card-img-top"
-                alt="..."
-              />
-              <div class="card-body">
-                <h5 class="card-title">Lavamind Games</h5>
-                <p class="card-text">
-                  Learned Adobe Flash Builder action script and mxml to
-                  redistribute the Gazillionaire, Zapitalism, and Profitania
-                  onto steam and develop it into a desktop application that can
-                  be played solely offline.
-                </p>
-                <a
-                  type="button"
-                  class="btn btn-outline-light"
-                  href="https://www.lavamind.com/"
-                >
-                  learn more
-                </a>
-              </div>
-            </div>
-            <div class="card bg-transparent text-white">
-              <img src="images/asteroid.png" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">Mini Java Projects</h5>
-                <p class="card-text">
-                  Used Java to create small fun projects that tested my skills
-                  and helped me learn the dynamic capabilities of the Language.
-                </p>
-                <a
-                  type="button"
-                  class="btn btn-outline-light"
-                  href="JavaProjects.html"
-                >
-                  learn more
-                </a>
-              </div>
-            </div>
-
-            <div class="card bg-transparent text-white">
-              <img src="images/sunbasket.jpeg" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">Sun Basket</h5>
-                <p class="card-text">
-                  Instagram Tv Series that I created and edited while interning
-                  at Sun Basket.
-                </p>
-                <a
-                  type="button"
-                  class="btn btn-outline-light"
-                  href="SunBasket.html"
-                >
-                  learn more
-                </a>
-              </div>
+          <div class="pcard bg-transparent text-white">
+            <img src="images/sunbasket.jpeg" class="card-img-top" alt="..." />
+            <div class="card-body">
+              <h5 class="card-title">Sun Basket</h5>
+              <p class="card-text">
+                Instagram Tv Series that I created and edited while interning at
+                Sun Basket.
+              </p>
+              <a
+                type="button"
+                class="btn btn-outline-light"
+                href="SunBasket.html"
+              >
+                learn more
+              </a>
             </div>
           </div>
         </div>

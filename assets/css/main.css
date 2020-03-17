@@ -190,7 +190,7 @@ nav {
 .about-column {
   float: left;
   width: 28%;
-  font-size: 1.1vw;
+  font-size: 18px;
   vertical-align: center;
 
   color: #c4c4c4;
@@ -199,6 +199,46 @@ nav {
   font-weight: 100%;
 }
 
+@media (max-width: 1600px) {
+  .about-column {
+    font-size: 0.95em;
+  }
+  .about-header h2 {
+    font-size: 0.95em;
+  }
+}
+@media (max-width: 1000px) {
+  .about-column {
+    font-size: 0.8em;
+  }
+  .about-header h2 {
+    font-size: 0.8em;
+  }
+}
+@media (max-width: 900px) {
+  .about-column {
+    font-size: 0.7em;
+  }
+  .about-header h2 {
+    font-size: 0.6em;
+  }
+}
+@media (max-width: 700px) {
+  .about-column {
+    font-size: 0.6em;
+  }
+  .about-header h2 {
+    font-size: 0.5em;
+  }
+}
+@media (max-width: 500px) {
+  .about-column {
+    font-size: 0.4em;
+  }
+  .about-header h2 {
+    font-size: 0.3em;
+  }
+}
 /*resume section*/
 
 .resume-div {
@@ -261,25 +301,7 @@ nav {
 }
 
 /*projects*/
-.projects-div {
-  width: 100%;
-  min-height: 100vh;
-  background-attachment: fixed;
-  background-size: cover;
-  background-position: center center;
-  background-color: #1d1d1d;
-  position: relative;
-  vertical-align: middle;
-  margin-top: 0;
-}
 
-.project-cards {
-  padding-top: 5%;
-}
-.card-body {
-  font-size: 1vw !important;
-  width: 30vw;
-}
 .project-header {
   vertical-align: center;
   text-align: center;
@@ -319,10 +341,6 @@ nav {
     width: 35%;
   }
 }
-.card-deck {
-  padding-top: 100%;
-  max-width: 100vh !important;
-}
 
 /*fade animation */
 
@@ -338,9 +356,8 @@ nav {
   transform: translate(-50%);
 }
 
-.card {
-  min-width: 50vh;
-  max-width: 50vh;
+.card-text {
+  font-size: small;
 }
 
 body {
