@@ -352,8 +352,6 @@ nav {
   border-radius: 50%;
   height: 10vh;
   width: 10vh;
-  margin-left: 15vw;
-  transform: translate(-50%);
 }
 
 .card-text {
