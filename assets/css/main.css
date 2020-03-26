@@ -1,13 +1,30 @@
 /*social media links*/
 /* footer */
+
+:root {
+  --bg: #272833;
+  --bg-opacity: rgb(0, 0, 0, 0.8);
+  --text: white;
+  --loading: black;
+  --sub-text: #c4c4c4;
+  --bg-opposite: white;
+  --nav: rgb(0, 0, 0, 0.3);
+  --lblue: #77f8ff;
+  --bg-projects: black;
+}
+body {
+  background-color: var(--bg);
+  transition: background 500ms ease-in-out, color 1000ms ease-in-out !important;
+}
+
 #footer {
-  background: #272833;
+  background: var(--bg);
   padding: 3em 0;
   text-align: center;
 }
 
 .fa {
-  color: white;
+  color: var(--text);
   transition: color 1s !important;
 }
 .fa a {
@@ -16,17 +33,18 @@
 }
 
 .fa:hover {
-  color: #77f8ff;
+  color: var(--lblue);
 }
 
 /*navigation bar*/
 nav {
-  background-color: transparent !important;
+  background-color: var(--nav) !important;
   border-color: transparent;
   background-image: none;
   box-shadow: none;
   position: absolute !important;
   width: 100vw !important;
+  transition: background 500ms ease-in-out;
 }
 .navbar-brand,
 .nav-link {
@@ -36,21 +54,21 @@ nav {
 
 .navbar-brand:hover,
 .nav-link:hover {
-  color: #77f8ff !important;
+  color: var(--lblue) !important;
 }
 .nav-item.dropdown div {
-  background-color: transparent;
-  border-color: #272833;
+  background-color: var(--bg-opacity);
+  border-color: var(--bg);
 }
 .nav-item.dropdown div a {
-  color: white;
+  color: var(--text);
   transition: color 1s !important;
   transition: background-color 1s;
 }
 
 .nav-item.dropdown div a:hover {
-  background-color: #262627;
-  color: #77f8ff;
+  background-color: var(--bg);
+  color: var(--lblue);
 }
 
 /*header*/
@@ -98,7 +116,7 @@ nav {
   position: absolute;
   height: 100%;
   width: 100%;
-  background-color: black;
+  background-color: var(--loading);
   top: 0;
   left: 0;
   z-index: 10001;
@@ -181,11 +199,12 @@ nav {
 }
 
 .about-descript {
-  background-color: rgba(0, 0, 0, 0.8);
+  background-color: var(--bg-opacity);
   width: 100%;
   height: 70vh;
   padding-left: 17%;
   padding-top: 4%;
+  transition: background 500ms ease-in-out;
 }
 .about-column {
   float: left;
@@ -193,50 +212,70 @@ nav {
   font-size: 18px;
   vertical-align: center;
 
-  color: #c4c4c4;
+  color: var(--sub-text);
   padding: 1%;
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 100%;
 }
 
 @media (max-width: 1600px) {
+  .about-descript {
+    padding-left: 16%;
+  }
   .about-column {
     font-size: 0.95em;
+    width: 32%;
   }
   .about-header h2 {
     font-size: 0.95em;
   }
 }
 @media (max-width: 1000px) {
+  .about-descript {
+    padding-left: 13%;
+  }
   .about-column {
     font-size: 0.8em;
+    width: 33%;
   }
   .about-header h2 {
     font-size: 0.8em;
   }
 }
 @media (max-width: 900px) {
+  .about-descript {
+    padding-left: 10%;
+  }
   .about-column {
-    font-size: 0.7em;
+    font-size: 0.8em;
+    width: 33%;
   }
   .about-header h2 {
-    font-size: 0.6em;
+    font-size: 0.7em;
   }
 }
 @media (max-width: 700px) {
+  .about-descript {
+    padding-left: 9%;
+  }
   .about-column {
-    font-size: 0.6em;
+    font-size: 0.8em;
+    width: 33%;
   }
   .about-header h2 {
-    font-size: 0.5em;
+    font-size: 0.7em;
   }
 }
-@media (max-width: 500px) {
+@media (max-width: 540px) {
+  .about-descript {
+    padding-left: 5%;
+  }
   .about-column {
-    font-size: 0.4em;
+    font-size: 0.7em;
+    width: 33%;
   }
   .about-header h2 {
-    font-size: 0.3em;
+    font-size: 0.6em;
   }
 }
 /*resume section*/
@@ -254,12 +293,13 @@ nav {
 }
 
 .resume-sideT {
-  background-color: rgba(0, 0, 0, 0.8);
+  background-color: var(--bg-opacity);
   width: 30%;
   height: 100vh;
-  color: #c4c4c4;
+  color: var(--sub-text);
   padding: 4%;
   padding-top: 5%;
+  transition: background 500ms ease-in-out, color 1000ms ease-in-out !important;
 }
 
 .resume-sideT header h2 {
@@ -284,13 +324,14 @@ nav {
 }
 
 .linkedIn-sideT {
-  background-color: rgba(0, 0, 0, 0.8);
+  background-color: var(--bg-opacity);
   width: 30%;
   height: 100vh;
-  color: #c4c4c4;
+  color: var(--sub-text);
   padding: 4%;
   padding-top: 5%;
   float: right;
+  transition: background 500ms ease-in-out, color 1000ms ease-in-out !important;
 }
 
 .linkedIn-sideT header h2 {
@@ -305,9 +346,10 @@ nav {
 .project-header {
   vertical-align: center;
   text-align: center;
-  color: #c4c4c4;
+  color: var(--sub-text);
   font-size: 1.5vw;
-  margin-top: 5%;
+  padding-top: 5%;
+  margin-top: 0%;
   padding-bottom: 50%;
 
   height: 20%;
@@ -315,11 +357,12 @@ nav {
   margin-left: 50%;
   transform: translate(-50%, 0%);
   padding-bottom: 10%;
+  transition: background 500ms ease-in-out, color 1000ms ease-in-out !important;
 }
 
 .project-header h2 {
   font-size: 2vw;
-  color: #f0f0f0;
+  color: var(--sub-text);
 }
 
 .anim-rect {
@@ -327,7 +370,7 @@ nav {
   transform: translate(-50%, 0%);
   width: 10%;
   height: 1vw;
-  background-color: #77f8ff;
+  background-color: var(--lblue);
   animation: expand 10s infinite;
 }
 @keyframes expand {
@@ -348,32 +391,35 @@ nav {
   opacity: 0;
 }
 /*project cards*/
+.projects-div {
+  background-color: var(--bg-projects) !important;
+  transition: background 500ms ease-in-out, color 1000ms ease-in-out !important;
+}
 .card-img-top {
   border-radius: 50%;
   height: 10vh;
   width: 10vh;
 }
-
+.card-body {
+  color: var(--text) !important;
+}
 .card-text {
   font-size: small;
 }
 
-body {
-  background-color: #262627;
-}
-
 /*projects pages*/
 .projects {
-  color: white;
+  color: var(--text);
   text-align: center;
   width: 80%;
   margin-left: 50%;
   margin-top: 10%;
   transform: translate(-50%);
+  transition: background 500ms ease-in-out, color 1000ms ease-in-out !important;
 }
 .projects .descript h2 {
   font-size: 50px;
-  text-shadow: 1px 1px #77f8ff;
+  text-shadow: 1px 1px var(--lblue);
 }
 
 .projects .descript p {
@@ -395,4 +441,57 @@ body {
 .proj-sec a {
   text-align: left;
   float: left;
+}
+/*theme changer*/
+
+#theme {
+  text-decoration: none;
+  position: fixed;
+  z-index: 2;
+  width: 10%;
+  height: 3%;
+  background-color: var(--loading);
+  text-align: center;
+  color: var(--bg-opposite);
+  border-top-right-radius: 8px;
+  border-top-left-radius: 8px;
+  margin-top: 100vh;
+  transform: translateY(-100%);
+  transition: color 1s ease-in-out !important;
+  transition: background-color 1s ease-in-out !important;
+}
+#theme:hover {
+  background-color: var(--lblue);
+  color: black;
+  transition: color 1s ease-in-out !important;
+  transition: background-color 1s ease-in-out !important;
+}
+
+.light {
+  --bg: rgb(231, 230, 231);
+  --bg-opacity: rgb(255, 255, 255, 0.8);
+  --text: black;
+  --loading: white;
+  --sub-text: black;
+  --bg-opposite: #272833;
+  --nav: rgb(255, 255, 255, 0.1);
+  --bg-projects: white;
+}
+.dark {
+  --bg: #272833;
+  --bg-opacity: rgb(0, 0, 0, 0.8);
+  --text: white;
+  --loading: black;
+  --sub-text: #c4c4c4;
+  --bg-opposite: white;
+  --nav: rgb(0, 0, 0, 0.3);
+  --bg-projects: black;
+}
+
+#dark::before {
+  background: #2a2e35;
+}
+
+#light::before {
+  background: #ffffff;
 }

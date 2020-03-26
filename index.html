@@ -27,8 +27,10 @@
       @import url("./assets/css/basic-grid.css");
     </style>
     <title>Skylar Hoffman's Portfolio</title>
+    <script defer src="./assets/js/theme.js"></script>
   </head>
-  <body>
+  <body class = "dark">
+    <a type="button" id="theme">Light Theme<a>
     <nav class="navbar navbar-expand fixed-top py-3">
       <a class="navbar-brand" href="index.html">Skylar Hoffman's Portfolio</a>
 
@@ -73,6 +75,9 @@
               >
               <a class="dropdown-item" href="JavaProjects.html"
                 >Mini Java Projects</a
+              >
+              <a class="dropdown-item" href="https://devpost.com/software/syrup-n0ictq"
+                >Syrup</a
               >
               <a class="dropdown-item" href="ClassChecker.html">Class Alert</a>
               <a class="dropdown-item" href="SunBasket.html">Sun Basket</a>
@@ -160,7 +165,7 @@
           </p>
           <a
             type="button"
-            class="btn btn-outline-light"
+            class="btn btn-outline-dark shift-button"  
             href="https://drive.google.com/file/d/1gJUAADLChqBZuIPiO79VgF-aBf22u9WT/view?usp=sharing"
           >
             learn more
@@ -182,7 +187,7 @@
           </p>
           <a
             type="button"
-            class="btn btn-outline-light"
+            class="btn btn-outline-dark shift-button"  
             href="https://www.linkedin.com/in/skylar-hoffman-58755015a/"
           >
             learn more
@@ -203,7 +208,7 @@
           <div class="anim-rect"></div>
         </div>
         <div class="basic-grid">
-          <div class="pcard bg-transparent text-white">
+          <div class="pcard bg-transparent  text-white card-shift">
             <img
               src="images/skybackground.jpg"
               class="card-img-top"
@@ -219,12 +224,12 @@
                 the Reactjs library.
               </p>
 
-              <a type="button" class="btn btn-outline-light" href="SkyProject">
+              <a type="button" class="btn btn-outline-dark shift-button"   href="SkyProject">
                 learn more
               </a>
             </div>
           </div>
-          <div class="pcard bg-transparent text-white">
+          <div class="pcard bg-transparent  text-white card-shift">
             <img src="images/column.png" class="card-img-top" alt="..." />
             <div class="card-body">
               <h5 class="card-title">
@@ -239,14 +244,14 @@
               </p>
               <a
                 type="button"
-                class="btn btn-outline-light"
+                class="btn btn-outline-dark shift-button"  
                 href="PythonProjects.html"
               >
                 learn more
               </a>
             </div>
           </div>
-          <div class="pcard bg-transparent text-white">
+          <div class="pcard bg-transparent  text-white card-shift">
             <img src="images/uci.png" class="card-img-top" alt="..." />
             <div class="card-body">
               <h5 class="card-title">Class Alert</h5>
@@ -256,7 +261,7 @@
               </p>
               <a
                 type="button"
-                class="btn btn-outline-light"
+                class="btn btn-outline-dark shift-button"  
                 href="ClassChecker.html"
               >
                 learn more
@@ -264,7 +269,7 @@
             </div>
           </div>
 
-          <div class="pcard bg-transparent text-white">
+          <div class="pcard bg-transparent  text-white card-shift">
             <img src="images/LyffeStyle.png" class="card-img-top" alt="..." />
             <div class="card-body">
               <h5 class="card-title">Lyffe Style</h5>
@@ -278,7 +283,7 @@
               </p>
               <a
                 type="button"
-                class="btn btn-outline-light"
+                class="btn btn-outline-dark shift-button"  
                 href="https://devpost.com/software/lyffe-style"
               >
                 learn more
@@ -286,7 +291,7 @@
             </div>
           </div>
 
-          <div class="pcard bg-transparent text-white">
+          <div class="pcard bg-transparent  text-white card-shift">
             <img src="images/syrup.jpg" class="card-img-top" alt="..." />
             <div class="card-body">
               <h5 class="card-title">Syrup</h5>
@@ -303,7 +308,7 @@
               </p>
               <a
                 type="button"
-                class="btn btn-outline-light"
+                class="btn btn-outline-dark shift-button"  
                 href="https://devpost.com/software/syrup-n0ictq"
               >
                 learn more
@@ -311,7 +316,7 @@
             </div>
           </div>
 
-          <div class="pcard bg-transparent text-white">
+          <div class="pcard bg-transparent  text-white card-shift">
             <img src="images/cpp.png" class="card-img-top" alt="..." />
             <div class="card-body">
               <h5 class="card-title">C++ Projects</h5>
@@ -323,14 +328,14 @@
               </p>
               <a
                 type="button"
-                class="btn btn-outline-light"
+                class="btn btn-outline-dark shift-button"  
                 href="Cprojects.html"
               >
                 learn more
               </a>
             </div>
           </div>
-          <div class="pcard bg-transparent text-white">
+          <div class="pcard bg-transparent  text-white card-shift">
             <img src="images/icon-gaz512.png" class="card-img-top" alt="..." />
             <div class="card-body">
               <h5 class="card-title">Lavamind Games</h5>
@@ -342,14 +347,14 @@
               </p>
               <a
                 type="button"
-                class="btn btn-outline-light"
+                class="btn btn-outline-dark shift-button"  
                 href="https://www.lavamind.com/"
               >
                 learn more
               </a>
             </div>
           </div>
-          <div class="pcard bg-transparent text-white">
+          <div class="pcard bg-transparent  text-white card-shift">
             <img src="images/asteroid.png" class="card-img-top" alt="..." />
             <div class="card-body">
               <h5 class="card-title">Mini Java Projects</h5>
@@ -359,7 +364,7 @@
               </p>
               <a
                 type="button"
-                class="btn btn-outline-light"
+                class="btn btn-outline-dark shift-button"  
                 href="JavaProjects.html"
               >
                 learn more
@@ -367,17 +372,18 @@
             </div>
           </div>
 
-          <div class="pcard bg-transparent text-white">
+          <div class="pcard bg-transparent  text-white card-shift">
             <img src="images/sunbasket.jpeg" class="card-img-top" alt="..." />
             <div class="card-body">
               <h5 class="card-title">Sun Basket</h5>
               <p class="card-text">
                 Instagram Tv Series that I created and edited while interning at
-                Sun Basket.
+                Sun Basket. Receiving thousands of views, my projects were
+                broadcasted on Sun Basket's Instagram T.V.
               </p>
               <a
                 type="button"
-                class="btn btn-outline-light"
+                class="btn btn-outline-dark shift-button"  
                 href="SunBasket.html"
               >
                 learn more
