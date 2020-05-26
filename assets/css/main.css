@@ -19,7 +19,13 @@ body {
   background-color: var(--bg);
   transition: background 500ms ease-in-out, color 1000ms ease-in-out !important;
 }
-
+canvas{
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100em;
+  height: 100em;
+}
 #footer {
   background: var(--bg);
   padding: 3em 0;
@@ -412,12 +418,17 @@ nav {
 
 .hideme {
   opacity: 0;
+  
 }
+
 /*project cards*/
 .projects-div {
+  
   background-color: var(--bg-projects) !important;
   padding-bottom: 10%;
   transition: background 500ms ease-in-out, color 1000ms ease-in-out !important;
+  
+  
 }
 .card-img-top {
   border-radius: 50%;

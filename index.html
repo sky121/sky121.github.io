@@ -1,455 +1,524 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, shrink-to-fit=no"
-    />
 
-    <!-- Bootstrap CSS -->
-    <link
-      rel="stylesheet"
-      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
-      integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
-      crossorigin="anonymous"
-    />
-    <!-- Add icon library -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
-    />
+<head>
+  <!-- Required meta tags -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
 
-    <link rel="stylesheet" href="assets/css/main.css" />
-    <style>
-      @import url("./assets/css/base.css");
-      @import url("./assets/css/basic-grid.css");
-    </style>
-    <title>Skylar Hoffman's Portfolio</title>
-    <script defer src="./assets/js/theme.js"></script>
-  </head>
-  <body class = "dark">
-    <a type="button" id="theme">Dark Theme<a>
-    <nav class="navbar navbar-expand fixed-top py-3">
-      <a class="navbar-brand" href="index.html">Skylar Hoffman's Portfolio</a>
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+    integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous" />
+  <!-- Add icon library -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
 
-      <div class="collapse navbar-collapse" id="navbarSupportedContent">
-        <ul class="navbar-nav ml-auto ">
-          <li class="nav-item active">
-            <a class="nav-link" href="index.html"
-              >Home <span class="sr-only">(current)</span></a
-            >
-          </li>
+  <link rel="stylesheet" href="assets/css/main.css" />
+  <style>
+    @import url("./assets/css/base.css");
+    @import url("./assets/css/basic-grid.css");
+  </style>
+  <title>Skylar Hoffman's Portfolio</title>
+  <script defer src="./assets/js/theme.js"></script>
+</head>
 
-          <li class="nav-item dropdown">
-            <a
-              class="nav-link dropdown-toggle"
-              href="#"
-              id="navbarDropdown"
-              role="button"
-              data-toggle="dropdown"
-              aria-haspopup="true"
-              aria-expanded="false"
-            >
-              Projects
-            </a>
-            <div
-              class="dropdown-menu dropdown-menu-right"
-              aria-labelledby="navbarDropdown"
-            >
-              <a class="dropdown-item" href="SkyProject">SkyProject</a>
-              <a class="dropdown-item" href="https://www.lavamind.com/"
-                >Lavamind Games</a
-              >
+<body class="dark">
 
-              <a
-                class="dropdown-item"
-                href="https://devpost.com/software/lyffe-style"
-                >Lyffe Style</a
-              >
+  <a type="button" id="theme">Dark Theme<a>
+      <nav class="navbar navbar-expand fixed-top py-3">
+        <a class="navbar-brand" href="index.html">Skylar Hoffman's Portfolio</a>
 
-              <a class="dropdown-item" href="Cprojects.html">C++ Projects</a>
-              <a class="dropdown-item" href="PythonProjects.html"
-                >Python Projects</a
-              >
-              <a class="dropdown-item" href="JavaProjects.html"
-                >Mini Java Projects</a
-              >
-              <a class="dropdown-item" href="https://devpost.com/software/syrup-n0ictq"
-                >Syrup</a
-              >
-              <a class="dropdown-item" href="ClassChecker.html">Class Alert</a>
-              <a class="dropdown-item" href="SunBasket.html">Sun Basket</a>
-            </div>
-          </li>
-        </ul>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav ml-auto ">
+            <li class="nav-item active">
+              <a class="nav-link" href="index.html">Home <span class="sr-only">(current)</span></a>
+            </li>
+
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
+                aria-haspopup="true" aria-expanded="false">
+                Projects
+              </a>
+              <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
+                <a class="dropdown-item" href="SkyProject">SkyProject</a>
+                <a class="dropdown-item" href="https://www.lavamind.com/">Lavamind Games</a>
+
+                <a class="dropdown-item" href="https://devpost.com/software/lyffe-style">Lyffe Style</a>
+
+                <a class="dropdown-item" href="Cprojects.html">C++ Projects</a>
+                <a class="dropdown-item" href="PythonProjects.html">Python Projects</a>
+                <a class="dropdown-item" href="JavaProjects.html">Mini Java Projects</a>
+                <a class="dropdown-item" href="https://devpost.com/software/syrup-n0ictq">Syrup</a>
+                <a class="dropdown-item" href="ClassChecker.html">Class Alert</a>
+                <a class="dropdown-item" href="SunBasket.html">Sun Basket</a>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </nav>
+
+      <div class="header-div">
+        <header class="header-descript">
+          <h2>Skylar Hoffman</h2>
+          <p>
+            Computer Science Major at <a class="lblue-link" href="https://uci.edu/">University of California,
+              Irvine</a><br />
+            From San Francisco, Bay Area
+          </p>
+        </header>
+        <span><a href="#about"><img class="prof-pic" src="images/prof_pic1.jpg" alt="" /></a></span>
       </div>
-    </nav>
+      <div id="about" class="about-div">
+        <section class="hideme">
+          <header class="about-descript">
+            <div class="about-column">
+              <header class="about-header">
+                <h2>A Little About Myself</h2>
+              </header>
+              <p>
+                <br />
+                My name is Skylar Hoffman and I am a Computer Sciene Major at UC
+                Irvine. I love creating and developing unique ideas and solving
+                complex problems. As a programmmer I have always excelled in
+                persistantly tackling bugs and errors without hesistating or
+                giving up. I love the feeling of solving a difficult, challenging
+                issue with a program and viewing the completion and full
+                compilation of its code. I am never just focused on completing a
+                programming assignment, I always push myself to go above and
+                beyond to try and solve the problem in the best way possible.
+              </p>
+            </div>
+            <div class="about-column">
+              <p>
+                <br />
+                <br />
+                <br />
+                I have studied many languages of computer science including
+                experience with Sql, Python, Web Development(Html, Css, Js, React,
+                Jquery), C++, C, Action Script, and Java. I have a passion for
+                front end developement as well as software design. In my freetime,
+                I enjoy many activities such as creating and listening to music.
+                Over the last two summers, I have taught myself how to play guitar
+                and was able to tap into my creative nature with music. Another
+                love of mine is bowling. Because of the enthralling competitive
+                nature of bowling, I have always found great joy in pushing myself
+                to new limits.
+              </p>
+            </div>
+            <div class="about-column">
+              <p>
+                <br />
+                <br />
+                <br />
+                I truly aspire to fully develop my programming experiece while
+                exploring the immense world of technology where I hope to learn
+                and create new ways to better improve this world. I want to use
+                the knowledge I learn to create or help develop a piece of
+                software that will make this world a more advanced and peaceful
+                place to live.
+              </p>
+            </div>
+          </header>
+        </section>
+      </div>
 
-    <div class="header-div">
-      <header class="header-descript">
-        <h2>Skylar Hoffman</h2>
-        <p>
-          Computer Science Major at <a class = "lblue-link" href="https://uci.edu/">University of California, Irvine</a><br />
-          From San Francisco, Bay Area
-        </p>
-      </header>
-      <span><a href="#about"><img class="prof-pic" src="images/prof_pic1.jpg" alt=""/></a></span>
-    </div>
-    <div id = "about" class="about-div">
-      <section class="hideme">
-        <header class="about-descript">
-          <div class="about-column">
-            <header class="about-header">
-              <h2>A Little About Myself</h2>
+      <div class="resume-div">
+        <section class="hideme">
+          <div class="resume-sideT">
+            <header>
+              <h2>Resume</h2>
+              <p>GPA, Job Experience, Schooling, Activities</p>
             </header>
             <p>
-              <br />
-              My name is Skylar Hoffman and I am a Computer Sciene Major at UC
-              Irvine. I love creating and developing unique ideas and solving
-              complex problems. As a programmmer I have always excelled in
-              persistantly tackling bugs and errors without hesistating or
-              giving up. I love the feeling of solving a difficult, challenging
-              issue with a program and viewing the completion and full
-              compilation of its code. I am never just focused on completing a
-              programming assignment, I always push myself to go above and
-              beyond to try and solve the problem in the best way possible.
+              Click here to learn more about my Gpa, classes I have taken,
+              programming experience, past Jobs I have worked at, and more...
             </p>
+            <a type="button" class="btn btn-outline-dark shift-button"
+              href="https://drive.google.com/file/d/15WCJBI668Cl77Po93ELHHLKB7pX-cKeC/view?usp=sharing">
+              learn more
+            </a>
           </div>
-          <div class="about-column">
-            <p>
-              <br />
-              <br />
-              <br />
-              I have studied many languages of computer science including
-              experience with Sql, Python, Web Development(Html, Css, Js, React,
-              Jquery), C++, C, Action Script, and Java. I have a passion for
-              front end developement as well as software design. In my freetime,
-              I enjoy many activities such as creating and listening to music.
-              Over the last two summers, I have taught myself how to play guitar
-              and was able to tap into my creative nature with music. Another
-              love of mine is bowling. Because of the enthralling competitive
-              nature of bowling, I have always found great joy in pushing myself
-              to new limits.
-            </p>
-          </div>
-          <div class="about-column">
-            <p>
-              <br />
-              <br />
-              <br />
-              I truly aspire to fully develop my programming experiece while
-              exploring the immense world of technology where I hope to learn
-              and create new ways to better improve this world. I want to use
-              the knowledge I learn to create or help develop a piece of
-              software that will make this world a more advanced and peaceful
-              place to live.
-            </p>
-          </div>
-        </header>
-      </section>
-    </div>
-
-    <div class="resume-div">
-      <section class="hideme">
-        <div class="resume-sideT">
-          <header>
-            <h2>Resume</h2>
-            <p>GPA, Job Experience, Schooling, Activities</p>
-          </header>
-          <p>
-            Click here to learn more about my Gpa, classes I have taken,
-            programming experience, past Jobs I have worked at, and more...
-          </p>
-          <a
-            type="button"
-            class="btn btn-outline-dark shift-button"  
-            href="https://drive.google.com/file/d/15WCJBI668Cl77Po93ELHHLKB7pX-cKeC/view?usp=sharing"
-          >
-            learn more
-          </a>
-        </div>
-      </section>
-      <header class="resume-descript"></header>
-    </div>
-    <div class="linkedin-div">
-      <section class="hideme">
-        <div class="linkedIn-sideT">
-          <header>
-            <h2>Me, Myself, and I</h2>
-            <p>Check out my LinkedIn profile!</p>
-          </header>
-          <p>
-            Here you will be able to see more about me, from my skill sets to
-            job interests and past job experiences.
-          </p>
-          <a
-            type="button"
-            class="btn btn-outline-dark shift-button"  
-            href="https://www.linkedin.com/in/skylar-hoffman-58755015a/"
-          >
-            learn more
-          </a>
-        </div>
-      </section>
-      <header class="linkedin-descript"></header>
-    </div>
-
-    <div class="projects-div">
-      <section class="hideme">
-        <div class="project-header">
-          <h2>My Projects</h2>
-          <p>
-            I worked in many different areas of computer science including
-            Javascript, Html, Css, Python, C++, ReactJs, and more
-          </p>
-          <div class="anim-rect"></div>
-        </div>
-        <div class="basic-grid">
-          <div class="pcard bg-transparent  text-white card-shift">
-            <img
-              src="images/skybackground.jpg"
-              class="card-img-top"
-              alt="..."
-            />
-            <div class="card-body">
-              <h5 class="card-title">SkyProject</h5>
-              <p class="card-text">
-                Interactive website that allows users to view the weather in any
-                place around the globe. Built using Reactjs and various API's
-                including Google's Map Api and a Weather Forecasting Api. Helped
-                me learn Reactjs and practice my web development skills using
-                the Reactjs library.
-              </p>
-
-              <a type="button" class="btn btn-outline-dark shift-button"   href="SkyProject">
-                learn more
-              </a>
-            </div>
-          </div>
-          <div class="pcard bg-transparent  text-white card-shift">
-            <img src="images/column.png" class="card-img-top" alt="..." />
-            <div class="card-body">
-              <h5 class="card-title">
-                Python Projects: Columns Game and Ball Simulator
-              </h5>
-              <p class="card-text">
-                Built a game similar to Tetris called columns using Pygame to
-                implement the physics and graphical interface of the software.
-                Also worked with Tkinter to develop a ball simulator using
-                various objects and inheritence to create an interesting,
-                interactive simulation.
-              </p>
-              <a
-                type="button"
-                class="btn btn-outline-dark shift-button"  
-                href="PythonProjects.html"
-              >
-                learn more
-              </a>
-            </div>
-          </div>
-          <div class="pcard bg-transparent  text-white card-shift">
-            <img src="images/uci.png" class="card-img-top" alt="..." />
-            <div class="card-body">
-              <h5 class="card-title">Class Alert</h5>
-              <p class="card-text">
-                A Python script created with a friend to detect and alert us by
-                text message if a class opened up that we wanted to take.
-              </p>
-              <a
-                type="button"
-                class="btn btn-outline-dark shift-button"  
-                href="ClassChecker.html"
-              >
-                learn more
-              </a>
-            </div>
-          </div>
-
-          <div class="pcard bg-transparent  text-white card-shift">
-            <img src="images/LyffeStyle.png" class="card-img-top" alt="..." />
-            <div class="card-body">
-              <h5 class="card-title">Lyffe Style</h5>
-              <p class="card-text">
-                Lyffe Style is a Chrome extension that takes the style of one
-                image and transplants it onto any image you mouse over while
-                browsing Google. For example, you can input the URL of Vincent
-                Van Gogh's The Starry Night and move your mouse over the Google
-                Image search results of "dog," and see pictures of dogs that
-                look like they were painted with that iconic blue swirl look.
-              </p>
-              <a
-                type="button"
-                class="btn btn-outline-dark shift-button"  
-                href="https://devpost.com/software/lyffe-style"
-              >
-                learn more
-              </a>
-            </div>
-          </div>
-          <div class="pcard bg-transparent  text-white card-shift">
-            <img src="images/musick.jpeg" class="card-img-top" alt="..." />
-            <div class="card-body">
-              <h5 class="card-title">The Musick Space</h5>
-              <p class="card-text">
-                The Musick Space is a thorough and functional musical collaboration application providing super-low-latency audio to ensure usability for musical performances. Listening to music offers a powerful feeling of togetherness, and in today's #quarantinelife, that sense of connectedness is more important than ever. Though platforms like Spotify and Apple Music make it easy to enjoy our favorite tunes anywhere, obeying social distancing rules makes it really hard to create your own music with friends.
-              </p>
-              <a
-                type="button"
-                class="btn btn-outline-dark shift-button"  
-                href="https://devpost.com/software/musick"
-              >
-                learn more
-              </a>
-            </div>
-          </div>
-          <div class="pcard bg-transparent  text-white card-shift">
-            <img src="images/syrup.jpg" class="card-img-top" alt="..." />
-            <div class="card-body">
-              <h5 class="card-title">Syrup</h5>
-              <p class="card-text">
-                Syrup is a chrome extension designed for Ebay allowing you
-                create a bidding queue of similar listings of an item you want.
-                With this bidding queue, Syrup automatically finds the lowest
-                priced item in the list and bids for you (not exceeding your
-                maximum of course). When you've been outbid, Syrup goes through
-                the list for the best possible deal and bids on that item
-                instead. Syrup was built for HackTech, a coding competition
-                hosted by CalTech University. Our project won for best use of
-                MongoDB, a nonSQL database program hosted on the cloud.
-              </p>
-              <a
-                type="button"
-                class="btn btn-outline-dark shift-button"  
-                href="https://devpost.com/software/syrup-n0ictq"
-              >
-                learn more
-              </a>
-            </div>
-          </div>
-
-          <div class="pcard bg-transparent  text-white card-shift">
-            <img src="images/cpp.png" class="card-img-top" alt="..." />
-            <div class="card-body">
-              <h5 class="card-title">C++ Projects</h5>
-              <p class="card-text">
-                Built a simple text editor using C++ as well as designed and
-                implemented various data types and structures such as Maps,
-                Equivalence Classes, Sets, and Graphs using Hash tables and
-                various of data types built into C++
-              </p>
-              <a
-                type="button"
-                class="btn btn-outline-dark shift-button"  
-                href="Cprojects.html"
-              >
-                learn more
-              </a>
-            </div>
-          </div>
-          <div class="pcard bg-transparent  text-white card-shift">
-            <img src="images/icon-gaz512.png" class="card-img-top" alt="..." />
-            <div class="card-body">
-              <h5 class="card-title">Lavamind Games</h5>
-              <p class="card-text">
-                Learned Adobe Flash Builder action script and mxml to
-                redistribute the Gazillionaire, Zapitalism, and Profitania onto
-                steam and develop it into a desktop application that can be
-                played solely offline.
-              </p>
-              <a
-                type="button"
-                class="btn btn-outline-dark shift-button"  
-                href="https://www.lavamind.com/"
-              >
-                learn more
-              </a>
-            </div>
-          </div>
-          <div class="pcard bg-transparent  text-white card-shift">
-            <img src="images/asteroid.png" class="card-img-top" alt="..." />
-            <div class="card-body">
-              <h5 class="card-title">Mini Java Projects</h5>
-              <p class="card-text">
-                Used Java to create small fun projects that tested my skills and
-                helped me learn the dynamic capabilities of the Language.
-              </p>
-              <a
-                type="button"
-                class="btn btn-outline-dark shift-button"  
-                href="JavaProjects.html"
-              >
-                learn more
-              </a>
-            </div>
-          </div>
-
-          <div class="pcard bg-transparent  text-white card-shift">
-            <img src="images/sunbasket.jpeg" class="card-img-top" alt="..." />
-            <div class="card-body">
-              <h5 class="card-title">Sun Basket</h5>
-              <p class="card-text">
-                Instagram Tv Series that I created and edited while interning at
-                Sun Basket. Receiving thousands of views, my projects were
-                broadcasted on Sun Basket's Instagram T.V.
-              </p>
-              <a
-                type="button"
-                class="btn btn-outline-dark shift-button"  
-                href="SunBasket.html"
-              >
-                learn more
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-
-    <div>
-      <footer id="footer">
-        <div class="fa">
-          <a
-            href="https://www.facebook.com/skylar.hoffman.75"
-            class="fa fa-facebook-f"
-          >
-          </a>
-          <a href="https://github.com/sky121/" class="fa fa-github"> </a>
-          <a href="mailto:skylar.j.hoffman@gmail.com" class="fa fa-envelope">
-          </a>
-        </div>
-      </footer>
-    </div>
-
-    <!-- Optional JavaScript -->
-    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
-    <script
-      src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
-      integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
-      integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
-      integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
-      crossorigin="anonymous"
-    ></script>
-    <!--jquery-->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-    <script src="assets/js/main.js"></script>
-    <div class="load-wrapper">
-      <div class="box">
-        <div class="b b1"></div>
-        <div class="b b2"></div>
-        <div class="b b3"></div>
-        <div class="b b4"></div>
+        </section>
+        <header class="resume-descript"></header>
       </div>
-    </div>
-  </body>
+      <div class="linkedin-div">
+        <section class="hideme">
+          <div class="linkedIn-sideT">
+            <header>
+              <h2>Me, Myself, and I</h2>
+              <p>Check out my LinkedIn profile!</p>
+            </header>
+            <p>
+              Here you will be able to see more about me, from my skill sets to
+              job interests and past job experiences.
+            </p>
+            <a type="button" class="btn btn-outline-dark shift-button"
+              href="https://www.linkedin.com/in/skylar-hoffman-58755015a/">
+              learn more
+            </a>
+          </div>
+        </section>
+        <header class="linkedin-descript"></header>
+      </div>
+
+      <div class="projects-div">
+        <script type="text/javascript" src="assets/js/sketch.js"></script>
+        <script>
+
+          // ----------------------------------------
+          // Particle
+          // ----------------------------------------
+
+          function Particle(x, y, radius) {
+            this.init(x, y, radius);
+          }
+
+          Particle.prototype = {
+
+            init: function (x, y, radius) {
+
+              this.alive = true;
+
+              this.radius = radius || 10;
+              this.wander = 0.15;
+              this.theta = random(TWO_PI);
+              this.drag = 0.92;
+              this.color = '#fff';
+
+              this.x = x || 0.0;
+              this.y = y || 0.0;
+
+              this.vx = 0.0;
+              this.vy = 0.0;
+            },
+
+            move: function () {
+
+              this.x += this.vx;
+              this.y += this.vy;
+
+              this.vx *= this.drag;
+              this.vy *= this.drag;
+
+              this.theta += random(-0.5, 0.5) * this.wander;
+              this.vx += sin(this.theta) * 0.1;
+              this.vy += cos(this.theta) * 0.1;
+
+              this.radius *= 0.96;
+              this.alive = this.radius > 0.5;
+            },
+
+            draw: function (ctx) {
+
+              ctx.beginPath();
+              ctx.arc(this.x, this.y, this.radius, 0, TWO_PI);
+              ctx.fillStyle = this.color;
+              ctx.fill();
+            }
+          };
+
+          // ----------------------------------------
+          // Example
+          // ----------------------------------------
+
+          var MAX_PARTICLES = 280;
+          var COLOURS = ['#6600ff', '#00f2ff', '#ff00dd', '#fff'];
+
+          var particles = [];
+          var pool = [];
+
+          var demo = Sketch.create({
+            container: document.getElementById('proj'),
+            retina: 'auto'
+          });
+
+          demo.setup = function () {
+
+            // Set off some initial particles.
+            var i, x, y;
+
+            for (i = 0; i < 20; i++) {
+              x = (demo.width * 0.5) + random(-1, 1);
+              y = (demo.height * 0.5) + random(-1, 1);
+              demo.spawn(x, y);
+            }
+          };
+
+          demo.spawn = function (x, y) {
+
+            var particle, theta, force;
+
+            if (particles.length >= MAX_PARTICLES)
+              pool.push(particles.shift());
+
+            particle = pool.length ? pool.pop() : new Particle();
+            particle.init(x, y, random(5, 10));
+
+            particle.wander = random(0.5, 2.0);
+            particle.color = random(COLOURS);
+            particle.drag = random(0.9, 0.99);
+
+            theta = random(TWO_PI);
+            force = random(2, 3);
+
+            particle.vx = sin(theta) * force;
+            particle.vy = cos(theta) * force;
+
+            particles.push(particle);
+          };
+
+          demo.update = function () {
+
+            var i, particle;
+
+            for (i = particles.length - 1; i >= 0; i--) {
+
+              particle = particles[i];
+
+              if (particle.alive) particle.move();
+              else pool.push(particles.splice(i, 1)[0]);
+            }
+          };
+
+          demo.draw = function () {
+
+            demo.globalCompositeOperation = 'lighter';
+
+            for (var i = particles.length - 1; i >= 0; i--) {
+              particles[i].draw(demo);
+            }
+          };
+
+          demo.mousemove = function () {
+
+            var particle, theta, force, touch, max, i, j, n;
+
+            for (i = 0, n = demo.touches.length; i < n; i++) {
+
+              touch = demo.touches[i], max = random(1, 4);
+              for (j = 0; j < max; j++) {
+                demo.spawn(touch.x, touch.y);
+              }
+
+            }
+          };
+
+        </script>
+        <section class="hideme" id="proj">
+          <div class="project-header">
+            <h2>My Projects</h2>
+
+            <p>
+              I worked in many different areas of computer science including
+              Javascript, Html, Css, Python, C++, ReactJs, and more
+            </p>
+            <div class="anim-rect"></div>
+          </div>
+          <div class="basic-grid">
+            <div class="pcard bg-transparent  text-white card-shift">
+              <img src="images/skybackground.jpg" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">SkyProject</h5>
+                <p class="card-text">
+                  Interactive website that allows users to view the weather in any
+                  place around the globe. Built using Reactjs and various API's
+                  including Google's Map Api and a Weather Forecasting Api. Helped
+                  me learn Reactjs and practice my web development skills using
+                  the Reactjs library.
+                </p>
+
+                <a type="button" class="btn btn-outline-dark shift-button" href="SkyProject">
+                  learn more
+                </a>
+              </div>
+            </div>
+            <div class="pcard bg-transparent  text-white card-shift">
+              <img src="images/column.png" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">
+                  Python Projects: Columns Game and Ball Simulator
+                </h5>
+                <p class="card-text">
+                  Built a game similar to Tetris called columns using Pygame to
+                  implement the physics and graphical interface of the software.
+                  Also worked with Tkinter to develop a ball simulator using
+                  various objects and inheritence to create an interesting,
+                  interactive simulation.
+                </p>
+                <a type="button" class="btn btn-outline-dark shift-button" href="PythonProjects.html">
+                  learn more
+                </a>
+              </div>
+            </div>
+            <div class="pcard bg-transparent  text-white card-shift">
+              <img src="images/uci.png" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Class Alert</h5>
+                <p class="card-text">
+                  A Python script created with a friend to detect and alert us by
+                  text message if a class opened up that we wanted to take.
+                </p>
+                <a type="button" class="btn btn-outline-dark shift-button" href="ClassChecker.html">
+                  learn more
+                </a>
+              </div>
+            </div>
+
+            <div class="pcard bg-transparent  text-white card-shift">
+              <img src="images/LyffeStyle.png" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Lyffe Style</h5>
+                <p class="card-text">
+                  Lyffe Style is a Chrome extension that takes the style of one
+                  image and transplants it onto any image you mouse over while
+                  browsing Google. For example, you can input the URL of Vincent
+                  Van Gogh's The Starry Night and move your mouse over the Google
+                  Image search results of "dog," and see pictures of dogs that
+                  look like they were painted with that iconic blue swirl look.
+                </p>
+                <a type="button" class="btn btn-outline-dark shift-button"
+                  href="https://devpost.com/software/lyffe-style">
+                  learn more
+                </a>
+              </div>
+            </div>
+            <div class="pcard bg-transparent  text-white card-shift">
+              <img src="images/musick.jpeg" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">The Musick Space</h5>
+                <p class="card-text">
+                  The Musick Space is a thorough and functional musical collaboration application providing
+                  super-low-latency audio to ensure usability for musical performances. Listening to music offers a
+                  powerful feeling of togetherness, and in today's #quarantinelife, that sense of connectedness is more
+                  important than ever. Though platforms like Spotify and Apple Music make it easy to enjoy our favorite
+                  tunes anywhere, obeying social distancing rules makes it really hard to create your own music with
+                  friends.
+                </p>
+                <a type="button" class="btn btn-outline-dark shift-button" href="https://devpost.com/software/musick">
+                  learn more
+                </a>
+              </div>
+            </div>
+            <div class="pcard bg-transparent  text-white card-shift">
+              <img src="images/syrup.jpg" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Syrup</h5>
+                <p class="card-text">
+                  Syrup is a chrome extension designed for Ebay allowing you
+                  create a bidding queue of similar listings of an item you want.
+                  With this bidding queue, Syrup automatically finds the lowest
+                  priced item in the list and bids for you (not exceeding your
+                  maximum of course). When you've been outbid, Syrup goes through
+                  the list for the best possible deal and bids on that item
+                  instead. Syrup was built for HackTech, a coding competition
+                  hosted by CalTech University. Our project won for best use of
+                  MongoDB, a nonSQL database program hosted on the cloud.
+                </p>
+                <a type="button" class="btn btn-outline-dark shift-button"
+                  href="https://devpost.com/software/syrup-n0ictq">
+                  learn more
+                </a>
+              </div>
+            </div>
+
+            <div class="pcard bg-transparent  text-white card-shift">
+              <img src="images/cpp.png" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">C++ Projects</h5>
+                <p class="card-text">
+                  Built a simple text editor using C++ as well as designed and
+                  implemented various data types and structures such as Maps,
+                  Equivalence Classes, Sets, and Graphs using Hash tables and
+                  various of data types built into C++
+                </p>
+                <a type="button" class="btn btn-outline-dark shift-button" href="Cprojects.html">
+                  learn more
+                </a>
+              </div>
+            </div>
+            <div class="pcard bg-transparent  text-white card-shift">
+              <img src="images/icon-gaz512.png" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Lavamind Games</h5>
+                <p class="card-text">
+                  Learned Adobe Flash Builder action script and mxml to
+                  redistribute the Gazillionaire, Zapitalism, and Profitania onto
+                  steam and develop it into a desktop application that can be
+                  played solely offline.
+                </p>
+                <a type="button" class="btn btn-outline-dark shift-button" href="https://www.lavamind.com/">
+                  learn more
+                </a>
+              </div>
+            </div>
+            <div class="pcard bg-transparent  text-white card-shift">
+              <img src="images/asteroid.png" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Mini Java Projects</h5>
+                <p class="card-text">
+                  Used Java to create small fun projects that tested my skills and
+                  helped me learn the dynamic capabilities of the Language.
+                </p>
+                <a type="button" class="btn btn-outline-dark shift-button" href="JavaProjects.html">
+                  learn more
+                </a>
+              </div>
+            </div>
+
+            <div class="pcard bg-transparent  text-white card-shift">
+              <img src="images/sunbasket.jpeg" class="card-img-top" alt="..." />
+              <div class="card-body">
+                <h5 class="card-title">Sun Basket</h5>
+                <p class="card-text">
+                  Instagram Tv Series that I created and edited while interning at
+                  Sun Basket. Receiving thousands of views, my projects were
+                  broadcasted on Sun Basket's Instagram T.V.
+                </p>
+                <a type="button" class="btn btn-outline-dark shift-button" href="SunBasket.html">
+                  learn more
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <div>
+        <footer id="footer">
+          <div class="fa">
+            <a href="https://www.facebook.com/skylar.hoffman.75" class="fa fa-facebook-f">
+            </a>
+            <a href="https://github.com/sky121/" class="fa fa-github"> </a>
+            <a href="mailto:skylar.j.hoffman@gmail.com" class="fa fa-envelope">
+            </a>
+          </div>
+        </footer>
+      </div>
+
+      <!-- Optional JavaScript -->
+      <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+
+      <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+        integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+        crossorigin="anonymous"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+        integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+        crossorigin="anonymous"></script>
+      <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
+        integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
+        crossorigin="anonymous"></script>
+      <!--jquery-->
+      <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+      <script src="assets/js/main.js"></script>
+
+      <div class="load-wrapper">
+        <div class="box">
+          <div class="b b1"></div>
+          <div class="b b2"></div>
+          <div class="b b3"></div>
+          <div class="b b4"></div>
+        </div>
+      </div>
+</body>
+
 </html>
