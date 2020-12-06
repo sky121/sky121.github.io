@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>
+    .circle{
+      width: 20px;
+      height: 20px;
+ 
+      position: absolute;
+      border-radius: 100%;
+    }
+  </style>
+</head>
+<body>
+<script type="text/javascript">
+  document.onmousemove = animateCircles;
+  function randomColor(){
+    let alphabet = "ABCDEF0123456789";
+    let colors = '#';
+    for (let i = 0; i<6; i++){
+      colors+=alphabet[Math.floor(Math.random()*16)];
+    }
+    return colors
+  }
+  function animateCircles (event) {
+    var circle = document.createElement("div");
+    circle.setAttribute("class", "circle");
+    document.body.appendChild(circle);
+
+    circle.style.backgroundColor = randomColor();
+    let neg_pos = Math.round(Math.random()) ? 1 : -1;
+    circle.style.left = event.clientX+ 'px';
+    circle.style.top = event.clientY+ 'px';
+
+
+    circle.style.transition = "all 0.5s linear 0s";
+
+    circle.style.left = circle.offsetLeft - Math.random()*100*neg_pos + 'px';
+    circle.style.top = circle.offsetTop - Math.random()*100*neg_pos + 'px';
+    circle.style.width = "0px";
+    circle.style.height = "0px";
+    
+    
+   
+   
+    
+    setTimeout(() => {
+                circle.remove();
+            }, 500);
+  }
+
+</script>
+</body>
+</html>

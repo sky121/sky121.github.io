@@ -2,14 +2,14 @@
 <html lang="en">
 
 <head>
-  <!-- Required meta tags -->
+
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
 
-  <!-- Bootstrap CSS -->
+
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
     integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous" />
-  <!-- Add icon library -->
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
 
   <link rel="stylesheet" href="assets/css/main.css" />
@@ -19,6 +19,63 @@
   </style>
   <title>Skylar Hoffman's Portfolio</title>
   <script defer src="./assets/js/theme.js"></script>
+  <script type="text/javascript">
+    var xpos = 0;
+    var ypos = 0;
+    var scrolledLeft = 0;
+    var scrolledTop = 0;
+    document.onmousemove = animateCircles;
+    window.scroll((event) => {
+      if(scrolledLeft != document.scrollLeft()){
+        xpos -= scrolledLeft;
+        scrolledLeft = document.scrollLeft();
+        xpos += scrolledLeft;
+      }
+      if(scrolledTop != document.scrollTop()){
+        ypos -= scrolledTop;
+        scrolledTop = document.scrollTop();
+        ypos += scrolledTop;
+      }
+    })
+    function randomColor(){
+    let alphabet = "ABCDEF0123456789";
+    let colors = '#';
+    for (let i = 0; i<6; i++){
+      colors+=alphabet[Math.floor(Math.random()*16)];
+    }
+    return colors
+  }
+  function animateCircles (event) {
+    xpos = event.pageX;
+    ypos = event.pageY;
+
+    var circle = document.createElement("div");
+    circle.setAttribute("class", "circle");
+    document.body.appendChild(circle);
+
+    circle.style.backgroundColor = randomColor();
+    let neg_pos = Math.round(Math.random()) ? 1 : -1;
+    circle.style.left = xpos+ 'px';
+    circle.style.top = ypos+ 'px';
+
+
+    circle.style.transition = "all 0.5s linear 0s";
+
+    circle.style.left = circle.offsetLeft - Math.random()*100*neg_pos + 'px';
+    circle.style.top = circle.offsetTop - Math.random()*100*neg_pos + 'px';
+    circle.style.width = "0px";
+    circle.style.height = "0px";
+    
+    
+   
+   
+    
+    setTimeout(() => {
+                circle.remove();
+            }, 500);
+  }
+
+  </script>
 </head>
 
 <body class="dark">
@@ -77,31 +134,12 @@
               <p>
                 <br />
                 My name is Skylar Hoffman and I am a Computer Sciene Major at UC
-                Irvine. I love creating and developing unique ideas and solving
-                complex problems. As a programmmer I have always excelled in
-                persistantly tackling bugs and errors without hesistating or
-                giving up. I love solving difficult, challenging
-                problems and the gratification that comes with viewing the completion and full
-                compilation of its code. I am never just focused on completing a
-                programming assignment, I always push myself to go above and
-                beyond to try and solve the problem in the best way possible.
-              </p>
-            </div>
-            <div class="about-column">
-              <p>
-                <br />
-                <br />
-                <br />
-                I have studied many computer science topics and languages including
-                experience with Sql, Python, Web Development(Html, Css, Js, React,
+                Irvine graduating in 2021. I will be a pursuing a Masters in Computer Science
+                in the Fall of 2021.  I have studied many computer science topics and languages 
+                including experience with Sql, Python, Web Development(Html, Css, Js, React,
                 Jquery), C++, C, Action Script, and Java. I have a passion for
-                front end developement as well as software design. In my freetime,
-                I enjoy many activities such as creating and listening to music.
-                Over the last two summers, I have taught myself how to play guitar
-                where I tap into my creative nature with music. Another
-                love of mine is bowling. Because of the enthralling competitive
-                nature of bowling, I have always found great joy in pushing myself
-                to new limits.
+                AI and machine learning as well as full stack developement. In my freetime,
+                
               </p>
             </div>
             <div class="about-column">
@@ -109,12 +147,23 @@
                 <br />
                 <br />
                 <br />
-                I truly aspire to fully develop my programming experiece while
-                exploring the immense and exciting world of technology where I hope to learn
-                and create new ways to better improve this world. I want to use
-                the knowledge I learn to create or help develop a piece of
-                software that will make this world a more advanced and peaceful
-                place to live.
+                I enjoy many activities such as creating and listening to music. I love 
+                playing guitar as well as bowling and archery. Because of the enthralling competitive
+                nature of bowling, I have always found great joy in pushing myself
+                to new limits. I also really enjoy entering hackathons and meeting new people.
+                
+               
+              </p>
+            </div>
+            <div class="about-column">
+              <p>
+                <br />
+                <br />
+                <br />
+                I am currently looking for Computer Science internship 
+                positions for either the Spring of 2021 or the Summer of 2021. 
+                
+                
               </p>
             </div>
           </header>
@@ -161,146 +210,8 @@
       </div>
 
       <div class="projects-div">
-        <script type="text/javascript" src="assets/js/sketch.js"></script>
+       
         <script>
-
-          // ----------------------------------------
-          // Particle
-          // ----------------------------------------
-
-          function Particle(x, y, radius) {
-            this.init(x, y, radius);
-          }
-
-          Particle.prototype = {
-
-            init: function (x, y, radius) {
-
-              this.alive = true;
-
-              this.radius = radius || 10;
-              this.wander = 0.15;
-              this.theta = random(TWO_PI);
-              this.drag = 0.92;
-              this.color = '#fff';
-
-              this.x = x || 0.0;
-              this.y = y || 0.0;
-
-              this.vx = 0.0;
-              this.vy = 0.0;
-            },
-
-            move: function () {
-
-              this.x += this.vx;
-              this.y += this.vy;
-
-              this.vx *= this.drag;
-              this.vy *= this.drag;
-
-              this.theta += random(-0.5, 0.5) * this.wander;
-              this.vx += sin(this.theta) * 0.1;
-              this.vy += cos(this.theta) * 0.1;
-
-              this.radius *= 0.96;
-              this.alive = this.radius > 0.5;
-            },
-
-            draw: function (ctx) {
-
-              ctx.beginPath();
-              ctx.arc(this.x, this.y, this.radius, 0, TWO_PI);
-              ctx.fillStyle = this.color;
-              ctx.fill();
-            }
-          };
-
-          // ----------------------------------------
-          // Example
-          // ----------------------------------------
-
-          var MAX_PARTICLES = 280;
-          var COLOURS = ['#6600ff', '#00f2ff', '#ff00dd', '#fff'];
-
-          var particles = [];
-          var pool = [];
-
-          var demo = Sketch.create({
-            container: document.getElementById('proj'),
-            retina: 'auto'
-          });
-
-          demo.setup = function () {
-
-            // Set off some initial particles.
-            var i, x, y;
-
-            for (i = 0; i < 20; i++) {
-              x = (demo.width * 0.5) + random(-1, 1);
-              y = (demo.height * 0.5) + random(-1, 1);
-              demo.spawn(x, y);
-            }
-          };
-
-          demo.spawn = function (x, y) {
-
-            var particle, theta, force;
-
-            if (particles.length >= MAX_PARTICLES)
-              pool.push(particles.shift());
-
-            particle = pool.length ? pool.pop() : new Particle();
-            particle.init(x, y, random(5, 10));
-
-            particle.wander = random(0.5, 2.0);
-            particle.color = random(COLOURS);
-            particle.drag = random(0.9, 0.99);
-
-            theta = random(TWO_PI);
-            force = random(2, 3);
-
-            particle.vx = sin(theta) * force;
-            particle.vy = cos(theta) * force;
-
-            particles.push(particle);
-          };
-
-          demo.update = function () {
-
-            var i, particle;
-
-            for (i = particles.length - 1; i >= 0; i--) {
-
-              particle = particles[i];
-
-              if (particle.alive) particle.move();
-              else pool.push(particles.splice(i, 1)[0]);
-            }
-          };
-
-          demo.draw = function () {
-
-            demo.globalCompositeOperation = 'lighter';
-
-            for (var i = particles.length - 1; i >= 0; i--) {
-              particles[i].draw(demo);
-            }
-          };
-
-          demo.mousemove = function () {
-
-            var particle, theta, force, touch, max, i, j, n;
-
-            for (i = 0, n = demo.touches.length; i < n; i++) {
-
-              touch = demo.touches[i], max = random(1, 4);
-              for (j = 0; j < max; j++) {
-                demo.spawn(touch.x, touch.y);
-              }
-
-            }
-          };
 
         </script>
         <section class="hideme" id="proj">
@@ -495,8 +406,7 @@
         </footer>
       </div>
 
-      <!-- Optional JavaScript -->
-      <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+     
 
       <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
         integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
@@ -507,7 +417,7 @@
       <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
         integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
         crossorigin="anonymous"></script>
-      <!--jquery-->
+
       <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
       <script src="assets/js/main.js"></script>
 

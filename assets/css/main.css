@@ -533,3 +533,12 @@ nav {
 #light::before {
   background: #ffffff;
 }
+
+/*bubbles*/
+.circle{
+  width: 20px;
+  height: 20px;
+
+  position: absolute;
+  border-radius: 100%;
+}
