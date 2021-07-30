@@ -38,41 +38,36 @@
       }
     })
     function randomColor(){
-    let alphabet = "ABCDEF0123456789";
-    let colors = '#';
-    for (let i = 0; i<6; i++){
-      colors+=alphabet[Math.floor(Math.random()*16)];
+      let alphabet = "ABCDEF0123456789";
+      let colors = '#';
+      for (let i = 0; i<6; i++){
+        colors+=alphabet[Math.floor(Math.random()*16)];
+      }
+      
+      return colors
     }
-    return colors
-  }
-  function animateCircles (event) {
-    xpos = event.pageX;
-    ypos = event.pageY;
+    function animateCircles (event) {
+      console.log('mouse move')
+      xpos = event.pageX;
+      ypos = event.pageY;
 
-    var circle = document.createElement("div");
-    circle.setAttribute("class", "circle");
-    document.body.appendChild(circle);
+      var circle = document.createElement("span");
+      circle.setAttribute("class", "circle");
+      document.body.appendChild(circle);
+      circle.style.left = xpos+ 'px';
+      circle.style.top = ypos+ 'px';
+      circle.style.backgroundColor = randomColor();
+      let neg_pos = Math.round(Math.random()) ? 1 : -1;
+      circle.style.transition = "all 0.5s linear 0s";
 
-    circle.style.backgroundColor = randomColor();
-    let neg_pos = Math.round(Math.random()) ? 1 : -1;
-    circle.style.left = xpos+ 'px';
-    circle.style.top = ypos+ 'px';
-
-
-    circle.style.transition = "all 0.5s linear 0s";
-
-    circle.style.left = circle.offsetLeft - Math.random()*100*neg_pos + 'px';
-    circle.style.top = circle.offsetTop - Math.random()*100*neg_pos + 'px';
-    circle.style.width = "0px";
-    circle.style.height = "0px";
-    
-    
-   
-   
-    
-    circle.remove();
-            
-  }
+      circle.style.left = circle.offsetLeft - Math.random()*100*neg_pos + 'px';
+      circle.style.top = circle.offsetTop - Math.random()*100*neg_pos + 'px';
+      circle.style.width = "0px";
+      circle.style.height = "0px";
+      setTimeout(()=>{
+        circle.remove();
+      },200)      
+    }
 
   </script>
 </head>
@@ -116,8 +111,7 @@
         <header class="header-descript">
           <h2>Skylar Hoffman</h2>
           <p>
-            Computer Science Major at <a class="lblue-link" href="https://uci.edu/">University of California,
-              Irvine</a><br />
+            Masters of Engineering Computer Science Major at <a class="lblue-link" href="https://www.cornell.edu/">Cornell University</a><br />
             From San Francisco, Bay Area
           </p>
         </header>
@@ -132,9 +126,8 @@
               </header>
               <p>
                 <br />
-                My name is Skylar Hoffman and I am a Computer Sciene Major at UC
-                Irvine graduating in 2021. I will be a pursuing a Masters in Computer Science
-                in the Fall of 2021.  
+                My name is Skylar Hoffman and I received a Bachelors of Science from UC Irvine majoring in Computer Science.
+                 I am currently studying at Cornell University in the Masters of Engineering in Computer Science program.
               </p>
             </div>
             <div class="about-column">
@@ -214,7 +207,7 @@
 
             <p>
               I worked in many different areas of computer science including
-              Javascript, Html, Css, Python, C++, React, and more
+              JavaScript, Html, Css, Python, C++, React, and more
             </p>
             <div class="anim-rect"></div>
           </div>
