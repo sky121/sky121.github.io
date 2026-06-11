@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>No. 404 — Untitled (Lost Work) · Skylar Hoffman</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Karla:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f6f1e7;
+    --ink: #2e3a48;
+    --ink-soft: rgba(46, 58, 72, 0.62);
+    --pond: #7fa8c9;
+    --wisteria: #a292c4;
+    --frame-wood: #d8cdbb;
+    --frame-wood-deep: #c4b69f;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Karla", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 300;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    min-height: 100svh;
+    padding: clamp(1.5rem, 4vw, 3rem) 1.25rem;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* ---------- Watercolor washes drifting behind the wall ---------- */
+  .wash {
+    position: fixed;
+    border-radius: 50%;
+    mix-blend-mode: multiply;
+    pointer-events: none;
+    z-index: 0;
+    filter: blur(2px);
+  }
+  .wash--pond {
+    width: clamp(22rem, 55vw, 42rem);
+    height: clamp(22rem, 55vw, 42rem);
+    top: -12%;
+    left: -10%;
+    background:
+      radial-gradient(circle at 38% 35%, rgba(127, 168, 201, 0.30) 0%, rgba(127, 168, 201, 0.16) 42%, rgba(127, 168, 201, 0) 68%),
+      radial-gradient(circle at 62% 60%, rgba(127, 168, 201, 0.18) 0%, rgba(127, 168, 201, 0) 60%),
+      radial-gradient(circle at 50% 50%, rgba(110, 152, 186, 0.10) 0%, rgba(110, 152, 186, 0) 72%);
+    animation: drift-a 38s ease-in-out infinite alternate;
+  }
+  .wash--wisteria {
+    width: clamp(20rem, 50vw, 38rem);
+    height: clamp(20rem, 50vw, 38rem);
+    bottom: -16%;
+    right: -12%;
+    background:
+      radial-gradient(circle at 55% 45%, rgba(162, 146, 196, 0.26) 0%, rgba(162, 146, 196, 0.13) 44%, rgba(162, 146, 196, 0) 70%),
+      radial-gradient(circle at 35% 65%, rgba(162, 146, 196, 0.15) 0%, rgba(162, 146, 196, 0) 58%),
+      radial-gradient(circle at 60% 30%, rgba(141, 124, 178, 0.10) 0%, rgba(141, 124, 178, 0) 65%);
+    animation: drift-b 46s ease-in-out infinite alternate;
+  }
+  .wash--mist {
+    width: clamp(18rem, 42vw, 32rem);
+    height: clamp(18rem, 42vw, 32rem);
+    top: 45%;
+    left: 58%;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(127, 168, 201, 0.14) 0%, rgba(162, 146, 196, 0.10) 45%, rgba(162, 146, 196, 0) 70%);
+    animation: drift-c 54s ease-in-out infinite alternate;
+  }
+
+  @keyframes drift-a {
+    from { transform: translate(0, 0) scale(1); }
+    to   { transform: translate(4rem, 2.5rem) scale(1.08); }
+  }
+  @keyframes drift-b {
+    from { transform: translate(0, 0) scale(1.05); }
+    to   { transform: translate(-3.5rem, -2rem) scale(0.97); }
+  }
+  @keyframes drift-c {
+    from { transform: translate(0, 0); }
+    to   { transform: translate(-5rem, 3rem); }
+  }
+
+  /* ---------- Paper-grain noise overlay ---------- */
+  .grain {
+    position: fixed;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 240px 240px;
+  }
+
+  /* ---------- Gallery content ---------- */
+  main {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    max-width: 34rem;
+    width: 100%;
+  }
+
+  .gallery-name {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-weight: 500;
+    font-size: clamp(0.95rem, 2.5vw, 1.1rem);
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: clamp(2rem, 6vh, 3.5rem);
+  }
+  .gallery-name::after {
+    content: "";
+    display: block;
+    width: 2.5rem;
+    height: 1px;
+    background: rgba(46, 58, 72, 0.25);
+    margin: 0.9rem auto 0;
+  }
+
+  /* ---------- The empty frame ---------- */
+  .hanging {
+    transform-origin: top center;
+    animation: swing 9s ease-in-out infinite;
+    will-change: transform;
+  }
+  @keyframes swing {
+    0%   { transform: rotate(0.6deg); }
+    50%  { transform: rotate(-0.6deg); }
+    100% { transform: rotate(0.6deg); }
+  }
+
+  .nail {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #8b8377, #4d473e 70%);
+    margin: 0 auto 0.4rem;
+    box-shadow: 0 1px 2px rgba(46, 58, 72, 0.35);
+  }
+
+  .frame {
+    width: min(78vw, 21rem);
+    aspect-ratio: 4 / 5;
+    margin: 0 auto;
+    background: linear-gradient(160deg, var(--frame-wood) 0%, var(--frame-wood-deep) 100%);
+    border: 3px double rgba(46, 58, 72, 0.55);
+    outline: 1px solid rgba(46, 58, 72, 0.18);
+    outline-offset: 4px;
+    padding: clamp(0.9rem, 3vw, 1.3rem);
+    box-shadow:
+      0 22px 38px -18px rgba(46, 58, 72, 0.38),
+      0 8px 16px -8px rgba(46, 58, 72, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  }
+
+  .mat {
+    width: 100%;
+    height: 100%;
+    background: #fbf8f1;
+    border: 1px solid rgba(46, 58, 72, 0.14);
+    padding: clamp(1.1rem, 4vw, 1.75rem);
+    box-shadow: inset 0 1px 6px rgba(46, 58, 72, 0.10);
+    display: flex;
+  }
+
+  .void {
+    flex: 1;
+    border: 1px solid rgba(46, 58, 72, 0.16);
+    background:
+      radial-gradient(ellipse at 50% 38%, rgba(127, 168, 201, 0.07) 0%, rgba(127, 168, 201, 0) 65%),
+      var(--paper);
+    box-shadow: inset 0 2px 10px rgba(46, 58, 72, 0.10);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .void span {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(0.8rem, 2.4vw, 0.95rem);
+    letter-spacing: 0.08em;
+    color: rgba(46, 58, 72, 0.34);
+  }
+
+  /* ---------- The placard ---------- */
+  .placard {
+    margin-top: clamp(1.75rem, 5vh, 2.75rem);
+    background: #fbf8f1;
+    border: 1px solid rgba(46, 58, 72, 0.16);
+    box-shadow:
+      0 10px 22px -14px rgba(46, 58, 72, 0.30),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    padding: clamp(1.2rem, 4vw, 1.6rem) clamp(1.4rem, 5vw, 2.2rem);
+    max-width: 26rem;
+    width: 100%;
+  }
+
+  .placard .number {
+    font-family: "Karla", sans-serif;
+    font-weight: 500;
+    font-size: 0.72rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 0.55rem;
+  }
+
+  .placard h1 {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-weight: 600;
+    font-style: italic;
+    font-size: clamp(1.55rem, 5.5vw, 1.95rem);
+    line-height: 1.15;
+    color: var(--ink);
+    margin-bottom: 0.45rem;
+  }
+
+  .placard .medium {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(0.95rem, 3vw, 1.05rem);
+    color: var(--ink-soft);
+    margin-bottom: 1rem;
+  }
+
+  .placard .medium::after {
+    content: "";
+    display: block;
+    width: 2rem;
+    height: 1px;
+    background: rgba(46, 58, 72, 0.22);
+    margin: 1rem auto 0;
+  }
+
+  .placard p.note {
+    font-size: clamp(0.86rem, 2.8vw, 0.95rem);
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+  }
+
+  /* ---------- Return link ---------- */
+  .return {
+    display: inline-block;
+    margin-top: clamp(1.6rem, 4.5vh, 2.4rem);
+    font-family: "Karla", sans-serif;
+    font-weight: 400;
+    font-size: 0.9rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(46, 58, 72, 0.35);
+    padding-bottom: 0.3rem;
+    transition: color 0.3s ease, border-color 0.3s ease;
+  }
+  .return:hover,
+  .return:focus-visible {
+    color: var(--pond);
+    border-color: var(--pond);
+  }
+  .return:focus-visible {
+    outline: 2px solid var(--pond);
+    outline-offset: 4px;
+  }
+
+  /* ---------- Reduced motion ---------- */
+  @media (prefers-reduced-motion: reduce) {
+    .hanging,
+    .wash--pond,
+    .wash--wisteria,
+    .wash--mist {
+      animation: none;
+    }
+    .return {
+      transition: none;
+    }
+  }
+
+  /* ---------- Small screens ---------- */
+  @media (max-width: 26rem) {
+    .frame { width: min(86vw, 18rem); }
+  }
+</style>
+</head>
+<body>
+
+  <div class="wash wash--pond" aria-hidden="true"></div>
+  <div class="wash wash--wisteria" aria-hidden="true"></div>
+  <div class="wash wash--mist" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <main>
+    <p class="gallery-name">Skylar Hoffman</p>
+
+    <div class="hanging" aria-hidden="true">
+      <div class="nail"></div>
+      <div class="frame">
+        <div class="mat">
+          <div class="void"><span>on loan, indefinitely</span></div>
+        </div>
+      </div>
+    </div>
+
+    <section class="placard" aria-label="Exhibition placard">
+      <p class="number">No. 404</p>
+      <h1>&ldquo;Untitled (Lost Work)&rdquo;</h1>
+      <p class="medium">Missing media on unprimed canvas</p>
+      <p class="note">This piece is not part of the current exhibition.</p>
+    </section>
+
+    <a class="return" href="/">&larr; Return to the gallery</a>
+  </main>
+
+</body>
+</html>
