@@ -1,434 +1,307 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-
-
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
-    integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous" />
-
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
-
-  <link rel="stylesheet" href="assets/css/main.css" />
-  <style>
-    @import url("./assets/css/base.css");
-    @import url("./assets/css/basic-grid.css");
-  </style>
-  <title>Skylar Hoffman's Portfolio</title>
-  <script defer src="./assets/js/theme.js"></script>
-  <script type="text/javascript">
-    var xpos = 0;
-    var ypos = 0;
-    var scrolledLeft = 0;
-    var scrolledTop = 0;
-    document.onmousemove = animateCircles;
-    window.scroll((event) => {
-      if(scrolledLeft != document.scrollLeft()){
-        xpos -= scrolledLeft;
-        scrolledLeft = document.scrollLeft();
-        xpos += scrolledLeft;
-      }
-      if(scrolledTop != document.scrollTop()){
-        ypos -= scrolledTop;
-        scrolledTop = document.scrollTop();
-        ypos += scrolledTop;
-      }
-    })
-    function randomColor(){
-      let alphabet = "ABCDEF0123456789";
-      let colors = '#';
-      for (let i = 0; i<6; i++){
-        colors+=alphabet[Math.floor(Math.random()*16)];
-      }
-      
-      return colors
-    }
-    function animateCircles (event) {
-      console.log('mouse move')
-      xpos = event.pageX;
-      ypos = event.pageY;
-
-      var circle = document.createElement("span");
-      circle.setAttribute("class", "circle");
-      document.body.appendChild(circle);
-      circle.style.left = xpos+ 'px';
-      circle.style.top = ypos+ 'px';
-      circle.style.backgroundColor = randomColor();
-      let neg_pos = Math.round(Math.random()) ? 1 : -1;
-      circle.style.transition = "all 0.5s linear 0s";
-
-      circle.style.left = circle.offsetLeft - Math.random()*100*neg_pos + 'px';
-      circle.style.top = circle.offsetTop - Math.random()*100*neg_pos + 'px';
-      circle.style.width = "0px";
-      circle.style.height = "0px";
-      setTimeout(()=>{
-        circle.remove();
-      },200)      
-    }
-
-  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Skylar Hoffman — Software Engineer &amp; Builder</title>
+  <meta name="description" content="The portfolio of Skylar Hoffman — software engineer painting with code. AI &amp; machine learning, Python, C++, and web. A watercolor exhibition in the spirit of Monet." />
+  <meta property="og:title" content="Skylar Hoffman — Software Engineer &amp; Builder" />
+  <meta property="og:description" content="A watercolor exhibition of selected works: reinforcement learning in Minecraft, neural style transfer, real-time audio, and more." />
+  <meta property="og:type" content="website" />
+  <script>document.documentElement.classList.add('js');</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Karla:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/gallery.css" />
 </head>
+<body>
 
-<body class="dark">
+  <!-- Watercolor displacement filters -->
+  <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+    <defs>
+      <filter id="wc-rough" x="-30%" y="-30%" width="160%" height="160%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.012 0.05" numOctaves="3" seed="7" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="38" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+      <filter id="wc-soft" x="-20%" y="-20%" width="140%" height="140%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.02 0.06" numOctaves="2" seed="13" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="12" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
 
-  <a type="button" id="theme">Dark Theme<a>
-      <nav class="navbar navbar-expand fixed-top py-3">
-        <a class="navbar-brand" href="index.html">Skylar Hoffman's Portfolio</a>
+  <!-- Intro loader -->
+  <div id="loader" aria-hidden="true">
+    <div class="loader-blob"></div>
+    <span class="loader-monogram">S.H.</span>
+  </div>
 
-        <div class="collapse navbar-collapse" id="navbarSupportedContent">
-          <ul class="navbar-nav ml-auto ">
-            <li class="nav-item active">
-              <a class="nav-link" href="index.html">Home <span class="sr-only">(current)</span></a>
-            </li>
+  <!-- Drifting watercolor washes -->
+  <div class="wash-field" aria-hidden="true">
+    <div class="wash wash--pond"></div>
+    <div class="wash wash--wisteria"></div>
+    <div class="wash wash--sage"></div>
+    <div class="wash wash--rose"></div>
+    <div class="wash wash--gold"></div>
+    <div class="wash wash--pond wash--alt"></div>
+    <div class="wash wash--wisteria wash--alt"></div>
+  </div>
 
-            <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown"
-                aria-haspopup="true" aria-expanded="false">
-                Projects
-              </a>
-              <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
-                <a class="dropdown-item" href="SkyProject">SkyProject</a>
-                <a class="dropdown-item" href="#lavamind">Lavamind Games</a>
+  <!-- Paper grain -->
+  <div class="grain" aria-hidden="true"></div>
 
-                <a class="dropdown-item" href="https://devpost.com/software/lyffe-style">Lyffe Style</a>
+  <!-- Cursor watercolor canvas (painted by gallery.js) -->
+  <canvas id="paint-canvas" aria-hidden="true"></canvas>
 
-                <a class="dropdown-item" href="Cprojects.html">C++ Projects</a>
-                <a class="dropdown-item" href="PythonProjects.html">Python Projects</a>
-                <a class="dropdown-item" href="JavaProjects.html">Mini Java Projects</a>
-                <a class="dropdown-item" href="https://devpost.com/software/syrup-n0ictq">Syrup</a>
-                <a class="dropdown-item" href="ClassChecker.html">Class Alert</a>
-                <a class="dropdown-item" href="SunBasket.html">Sun Basket</a>
-              </div>
-            </li>
-          </ul>
-        </div>
-      </nav>
+  <nav id="nav" aria-label="Exhibition rooms">
+    <a class="monogram" href="#hero" aria-label="Skylar Hoffman — back to the entrance">S.H.</a>
+    <ul class="nav-links">
+      <li><a href="#artist">The Artist</a></li>
+      <li><a href="#palette">The Palette</a></li>
+      <li><a href="#gallery">The Gallery</a></li>
+      <li><a href="#studies">Studies</a></li>
+      <li><a href="#contact">Correspondence</a></li>
+    </ul>
+  </nav>
 
-      <div class="header-div">
-        <header class="header-descript">
-          <h2>Skylar Hoffman</h2>
-          <p>
-            Masters of Engineering in Computer Science at <a class="lblue-link" href="https://www.cornell.edu/">Cornell University</a><br />
-            From San Francisco, Bay Area
-          </p>
-        </header>
-        <span><a href="#about"><img class="prof-pic" src="images/prof_pic1.jpg" alt="" /></a></span>
-      </div>
-      <div id="about" class="about-div">
-        <section class="hideme">
-          <header class="about-descript">
-            <div class="about-column">
-              <header class="about-header">
-                <h2>A Little About Myself</h2>
-              </header>
-              <p>
-                <br />
-                My name is Skylar Hoffman and I received a Bachelors of Science from UC Irvine majoring in Computer Science.
-                 I am currently studying at Cornell University in the Masters of Engineering Computer Science program.
-              </p>
-            </div>
-            <div class="about-column">
-              <p>
-                <br />
-                <br />
-                <br />
-                I have studied many computer science topics and languages 
-                including experience with SQL, Python, Web Development(Html, Css, Javasscript, React), C++, and C. 
-                I have a passion for AI and Machine Learning and have been specializing in intelligent systems during studies. 
-              </p>
-            </div>
-            <div class="about-column">
-              <p>
-                <br />
-                <br />
-                <br />
-                In my freetime, I enjoy many activities including bowling, archery, and music. I love 
-                playing guitar and listening to music. I also really enjoy entering hackathons and meeting new people.
-              </p>
-            </div>
-          </header>
-        </section>
-      </div>
+  <main>
 
-      <div class="resume-div">
-        <section class="hideme">
-          <div class="resume-sideT">
-            <header>
-              <h2>Resume</h2>
-              <p>GPA, Job Experience, Schooling, Activities</p>
-            </header>
-            <p>
-              Click here to learn more about my gpa, classes I have taken,
-              programming experience, past jobs I have worked at, and more...
-            </p>
-            <a type="button" class="btn btn-outline-light shift-button"
-              href="https://docs.google.com/document/d/1sORC4MnmEsyLdWJN7OWDsUmDmhcvYyQymyc4wpjhEyE/edit?usp=sharing">
-              learn more
-            </a>
-          </div>
-        </section>
-        <header class="resume-descript"></header>
-      </div>
-      <div class="linkedin-div">
-        <section class="hideme">
-          <div class="linkedIn-sideT">
-            <header>
-              <h2>Me, Myself, and I</h2>
-              <p>Check out my LinkedIn profile!</p>
-            </header>
-            <p>
-              Here you will be able to see more about me, from my skill sets to
-              job interests and past job experiences.
-            </p>
-            <a type="button" class="btn btn-outline-light shift-button"
-              href="https://www.linkedin.com/in/skylar-hoffman-58755015a/">
-              learn more
-            </a>
-          </div>
-        </section>
-        <header class="linkedin-descript"></header>
-      </div>
+    <!-- ENTRANCE -->
+    <header id="hero">
+      <p class="room-label">Exhibition · Est. San Francisco</p>
+      <h1 class="hero-name">
+        <span class="hero-word">Skylar</span>
+        <span class="hero-word hero-word--second">Hoffman</span>
+      </h1>
+      <div class="hero-stroke" aria-hidden="true"></div>
+      <p class="hero-subtitle">Software engineer painting with code — <em>M.Eng Computer Science, Cornell University</em></p>
+      <p class="hero-hint"><em>psst — your cursor is a brush. paint the walls.</em></p>
 
-      <div class="projects-div">
-       
-        <script>
+      <aside class="placard hero-placard">
+        <p class="placard-no">No. 1</p>
+        <h2 class="placard-title">“Self-Portrait in Code”</h2>
+        <p class="placard-medium">Mixed media: Python, C++, neural networks</p>
+      </aside>
 
-        </script>
-        <section class="hideme" id="proj">
-          <div class="project-header">
-            <h2>My Projects</h2>
+      <a class="scroll-cue" href="#artist">Begin the tour <span aria-hidden="true">↓</span></a>
+    </header>
 
-            <p>
-              I worked in many different areas of computer science including
-              JavaScript, Html, Css, Python, C++, React, and more
-            </p>
-            <div class="anim-rect"></div>
-          </div>
-          <div class="basic-grid">
-            <div class="pcard bg-transparent  text-white card-shift">
-              <img src="images/mooglemaps.png" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">Moogle Maps</h5>
-                <p class="card-text">
-                  A Minecraft AI built using reinforcement learning. The Minecraft Agent 
-                  is taught to travel across complex terrain in order to reach a destination. 
-                  </p>
+    <div class="divider divider--pond" aria-hidden="true"></div>
 
-                <a type="button" class="btn btn-outline-light shift-button" href="Moogle-Maps">
-                  learn more
-                </a>
-              </div>
-            </div>
-            
-            <div class="pcard bg-transparent  text-white card-shift">
-              <img src="images/LyffeStyle.png" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">Lyffe Style</h5>
-                <p class="card-text">
-                  Lyffe Style is a Chrome extension that takes the style of one
-                  image and transplants it onto any image you mouse over while
-                  browsing Google. For example, you can input the URL of Vincent
-                  Van Gogh's The Starry Night and move your mouse over the Google
-                  Image search results of "dog," and see pictures of dogs that
-                  look like they were painted with that iconic blue swirl look.
-                </p>
-                <a type="button" class="btn btn-outline-light shift-button"
-                  href="https://devpost.com/software/lyffe-style">
-                  learn more
-                </a>
-              </div>
-            </div>
-
-            <div class="pcard bg-transparent  text-white card-shift">
-              <img src="images/musick.jpeg" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">The Musick Space</h5>
-                <p class="card-text">
-                  The Musick Space is a thorough and functional musical collaboration application providing
-                  super-low-latency audio to ensure usability for musical performances. Listening to music offers a
-                  powerful feeling of togetherness, and in today's #quarantinelife, that sense of connectedness is more
-                  important than ever. Though platforms like Spotify and Apple Music make it easy to enjoy our favorite
-                  tunes anywhere, obeying social distancing rules makes it really hard to create your own music with
-                  friends.
-                </p>
-                <a type="button" class="btn btn-outline-light shift-button" href="https://devpost.com/software/musick">
-                  learn more
-                </a>
-              </div>
-            </div>
-
-
-            <div class="pcard bg-transparent  text-white card-shift">
-              <img src="images/syrup.jpg" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">Syrup</h5>
-                <p class="card-text">
-                  Syrup is a chrome extension designed for Ebay allowing you
-                  create a bidding queue of similar listings of an item you want.
-                  With this bidding queue, Syrup automatically finds the lowest
-                  priced item in the list and bids for you (not exceeding your
-                  maximum of course). When you've been outbid, Syrup goes through
-                  the list for the best possible deal and bids on that item
-                  instead. Syrup was built for HackTech, a coding competition
-                  hosted by CalTech University. Our project won for best use of
-                  MongoDB, a nonSQL database program hosted on the cloud.
-                </p>
-                <a type="button" class="btn btn-outline-light shift-button"
-                  href="https://devpost.com/software/syrup-n0ictq">
-                  learn more
-                </a>
-              </div>
-            </div>
-
-            <div class="pcard bg-transparent  text-white card-shift">
-              <img src="images/skybackground.jpg" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">SkyProject</h5>
-                <p class="card-text">
-                  Interactive website that allows users to view the weather in any
-                  place around the globe. Built using React and various API's
-                  including Google's Map Api and a Weather Forecasting Api. Helped
-                  me learn React and practice my web development skills using
-                  the React library.
-                </p>
-
-                <a type="button" class="btn btn-outline-light shift-button" href="SkyProject">
-                  learn more
-                </a>
-              </div>
-            </div>
-            <div class="pcard bg-transparent  text-white card-shift">
-              <img src="images/column.png" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">
-                  Python Projects: Columns Game and Ball Simulator
-                </h5>
-                <p class="card-text">
-                  Built a game similar to Tetris called columns using Pygame to
-                  implement the physics and graphical interface of the software.
-                  Also worked with Tkinter to develop a ball simulator using
-                  various objects and inheritence to create an interesting,
-                  interactive simulation.
-                </p>
-                <a type="button" class="btn btn-outline-light shift-button" href="PythonProjects.html">
-                  learn more
-                </a>
-              </div>
-            </div>
-            <div class="pcard bg-transparent  text-white card-shift">
-              <img src="images/uci.png" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">Class Alert</h5>
-                <p class="card-text">
-                  A Python script created to detect and alert by
-                  text message if a specified class opened up for enrollment.
-                </p>
-                <a type="button" class="btn btn-outline-light shift-button" href="ClassChecker.html">
-                  learn more
-                </a>
-              </div>
-            </div>
-
-            
-            <div class="pcard bg-transparent  text-white card-shift">
-              <img src="images/cpp.png" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">C++ Projects</h5>
-                <p class="card-text">
-                  Built a simple text editor using C++ as well as designed and
-                  implemented various data types and structures such as Maps,
-                  Equivalence Classes, Sets, and Graphs using Hash tables and
-                  various of data types built into C++
-                </p>
-                <a type="button" class="btn btn-outline-light shift-button" href="Cprojects.html">
-                  learn more
-                </a>
-              </div>
-            </div>
-            <div class="pcard bg-transparent  text-white card-shift">
-              <img id="lavamind" src="images/icon-gaz512.png" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title" >Lavamind Games</h5>
-                <p class="card-text">
-                  Learned Adobe Flash Builder action script and mxml to
-                  redistribute the Gazillionaire, Zapitalism, and Profitania onto
-                  Steam and develop it into a desktop application that can be
-                  played solely offline.
-                </p>
-                <a type="button" class="btn btn-outline-light shift-button" href="https://www.lavamind.com/">
-                  learn more
-                </a>
-              </div>
-            </div>
-            <div class="pcard bg-transparent  text-white card-shift">
-              <img src="images/asteroid.png" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">Mini Java Projects</h5>
-                <p class="card-text">
-                  Used Java to create small fun projects that tested my skills and
-                  helped me learn the dynamic capabilities of the Language.
-                </p>
-                <a type="button" class="btn btn-outline-light shift-button" href="JavaProjects.html">
-                  learn more
-                </a>
-              </div>
-            </div>
-
-            <div class="pcard bg-transparent  text-white card-shift">
-              <img src="images/sunbasket.jpeg" class="card-img-top" alt="..." />
-              <div class="card-body">
-                <h5 class="card-title">Sun Basket</h5>
-                <p class="card-text">
-                  Instagram Tv Series that I created and edited while interning at
-                  Sun Basket. Receiving thousands of views, my projects were
-                  broadcasted on Sun Basket's Instagram T.V.
-                </p>
-                <a type="button" class="btn btn-outline-light shift-button" href="SunBasket.html">
-                  learn more
-                </a>
-              </div>
-            </div>
-          </div>
-        </section>
-
-      </div>
-
-      <div>
-        <footer id="footer">
-          <div class="fa">
-            <a href="https://github.com/sky121/" class="fa fa-github"> </a>
-            <a href="mailto:skylar.j.hoffman@gmail.com" class="fa fa-envelope">
-            </a>
-          </div>
-        </footer>
-      </div>
-
-     
-
-      <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
-        integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
-        crossorigin="anonymous"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
-        integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
-        crossorigin="anonymous"></script>
-      <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
-        integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
-        crossorigin="anonymous"></script>
-
-      <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-      <script src="assets/js/main.js"></script>
-
-      <div class="load-wrapper">
-        <div class="box">
-          <div class="b b1"></div>
-          <div class="b b2"></div>
-          <div class="b b3"></div>
-          <div class="b b4"></div>
+    <!-- ROOM I — THE ARTIST -->
+    <section id="artist" aria-labelledby="artist-heading">
+      <header class="section-head reveal">
+        <p class="room-label">Room I</p>
+        <h2 id="artist-heading" class="section-title">The Artist</h2>
+      </header>
+      <div class="artist-layout">
+        <figure class="artist-portrait reveal">
+          <div class="portrait-wash" aria-hidden="true"></div>
+          <img src="images/prof_pic1.jpg" alt="Portrait of Skylar Hoffman" />
+        </figure>
+        <div class="artist-prose reveal">
+          <p>Skylar Hoffman works in two studios at once — the <strong>San Francisco Bay Area</strong>, where he grew up, and the quiet discipline of the machine. He took his <strong>B.S. in Computer Science from UC Irvine</strong> and is completing his <strong>M.Eng in Computer Science at Cornell University</strong>, where his fascination with <strong>AI and machine learning</strong> deepened into a practice: building intelligent systems that learn, adapt, and occasionally surprise their maker.</p>
+          <p>His pigments of choice are <strong>Python, C++, C, and SQL</strong>, with a full wash of web work — HTML, CSS, JavaScript, and React — when a piece needs to live in the browser. When he steps away from the easel he bowls, shoots archery, plays guitar, and chases the particular joy of a hackathon weekend, where rough sketches become finished works before sunrise.</p>
+          <p class="pull-quote"><em>“Every system is a composition — I just choose the colors.”</em></p>
         </div>
       </div>
+    </section>
+
+    <div class="divider divider--wisteria" aria-hidden="true"></div>
+
+    <!-- ROOM II — THE PALETTE -->
+    <section id="palette" aria-labelledby="palette-heading">
+      <header class="section-head reveal">
+        <p class="room-label">Room II</p>
+        <h2 id="palette-heading" class="section-title">The Palette</h2>
+        <p class="section-subtitle"><em>Pigments mixed over eight years of making.</em></p>
+      </header>
+      <div class="pigment-cluster reveal" role="group" aria-label="Skills">
+        <button class="pigment" style="--c:var(--pond)" type="button">Python</button>
+        <button class="pigment" style="--c:var(--pond-deep)" type="button">C++</button>
+        <button class="pigment" style="--c:var(--wisteria)" type="button">Machine Learning</button>
+        <button class="pigment" style="--c:var(--sage)" type="button">React</button>
+        <button class="pigment" style="--c:var(--gold)" type="button">JavaScript</button>
+        <button class="pigment" style="--c:var(--rose)" type="button">SQL</button>
+        <button class="pigment" style="--c:var(--ink-soft)" type="button">C</button>
+        <button class="pigment pigment--mix" type="button">HTML &amp; CSS</button>
+      </div>
+    </section>
+
+    <div class="divider divider--sage" aria-hidden="true"></div>
+
+    <!-- ROOM III — THE GALLERY -->
+    <section id="gallery" aria-labelledby="gallery-heading">
+      <header class="section-head reveal">
+        <p class="room-label">Room III</p>
+        <h2 id="gallery-heading" class="section-title">The Gallery</h2>
+        <p class="section-subtitle"><em>Selected works, hung with care.</em></p>
+      </header>
+
+      <article class="work reveal">
+        <div class="frame" data-tilt>
+          <img src="images/mooglemaps.png" alt="Moogle Maps — a Minecraft agent navigating terrain it learned to cross" />
+        </div>
+        <div class="placard work-placard">
+          <p class="placard-no">No. 2</p>
+          <h3 class="placard-title">Moogle Maps</h3>
+          <p class="placard-medium">Reinforcement learning · Python · Minecraft</p>
+          <p class="placard-year">2021</p>
+          <p class="placard-desc">A Minecraft AI taught with reinforcement learning to traverse complex terrain and find its way to a destination — a small pathfinder that learned the landscape brushstroke by brushstroke.</p>
+          <a class="placard-link" href="Moogle-Maps">View work <span aria-hidden="true">→</span></a>
+        </div>
+      </article>
+
+      <article class="work work--flip reveal">
+        <div class="frame" data-tilt>
+          <img src="images/LyffeStyle.png" alt="Lyffe Style — a browser image repainted with neural style transfer" />
+        </div>
+        <div class="placard work-placard">
+          <p class="placard-no">No. 3</p>
+          <h3 class="placard-title">Lyffe Style</h3>
+          <p class="placard-medium">Neural style transfer · Chrome extension</p>
+          <p class="placard-year">2020</p>
+          <p class="placard-desc">Hover over any image while browsing and watch it repainted in the style of a chosen artwork — give Google Images the brush of Van Gogh's <em>Starry Night</em>.</p>
+          <a class="placard-link" href="https://devpost.com/software/lyffe-style">View work <span aria-hidden="true">→</span></a>
+        </div>
+      </article>
+
+      <article class="work reveal">
+        <div class="frame" data-tilt>
+          <img src="images/musick.jpeg" alt="The Musick Space — a real-time online musical collaboration room" />
+        </div>
+        <div class="placard work-placard">
+          <p class="placard-no">No. 4</p>
+          <h3 class="placard-title">The Musick Space</h3>
+          <p class="placard-medium">Real-time audio · Web</p>
+          <p class="placard-year">2020</p>
+          <p class="placard-desc">A super-low-latency musical collaboration space, built so friends could keep making music together through quarantine — a duet across the wire.</p>
+          <a class="placard-link" href="https://devpost.com/software/musick">View work <span aria-hidden="true">→</span></a>
+        </div>
+      </article>
+
+      <article class="work work--flip reveal">
+        <div class="frame" data-tilt>
+          <img src="images/syrup.jpg" alt="Syrup — an eBay auto-bidding queue interface" />
+        </div>
+        <div class="placard work-placard">
+          <p class="placard-no">No. 5</p>
+          <h3 class="placard-title">Syrup</h3>
+          <p class="placard-medium">Auto-bidding · MongoDB · Chrome extension</p>
+          <p class="placard-year">2020</p>
+          <p class="placard-desc">An eBay bidding queue that always chases the best deal for you. Awarded <em>Best Use of MongoDB</em> at Caltech's HackTech.</p>
+          <a class="placard-link" href="https://devpost.com/software/syrup-n0ictq">View work <span aria-hidden="true">→</span></a>
+        </div>
+      </article>
+
+      <article class="work reveal">
+        <div class="frame" data-tilt>
+          <img src="images/skybackground.jpg" alt="SkyProject — an interactive world weather atlas over a sky backdrop" />
+        </div>
+        <div class="placard work-placard">
+          <p class="placard-no">No. 6</p>
+          <h3 class="placard-title">SkyProject</h3>
+          <p class="placard-medium">React · Google Maps API · Weather API</p>
+          <p class="placard-year">2020</p>
+          <p class="placard-desc">An interactive atlas of weather anywhere on Earth — point to a coastline, a mountain, a city, and read its sky.</p>
+          <a class="placard-link" href="SkyProject">View work <span aria-hidden="true">→</span></a>
+        </div>
+      </article>
+    </section>
+
+    <div class="divider divider--rose" aria-hidden="true"></div>
+
+    <!-- ANNEX — STUDIES & SKETCHES -->
+    <section id="studies" aria-labelledby="studies-heading">
+      <header class="section-head reveal">
+        <p class="room-label">Annex</p>
+        <h2 id="studies-heading" class="section-title">Studies &amp; Sketches</h2>
+        <p class="section-subtitle"><em>Smaller pieces from the flat files.</em></p>
+      </header>
+      <div class="studies-grid">
+        <article class="study reveal">
+          <div class="frame frame--small">
+            <img src="images/column.png" alt="Columns, a Tetris-like puzzle game built in Pygame" />
+          </div>
+          <div class="placard study-placard">
+            <h3 class="placard-title">Python Studies</h3>
+            <p class="placard-desc">Columns — a Tetris-like game in Pygame — and a Tkinter ball-physics simulator.</p>
+            <a class="placard-link" href="PythonProjects.html">View work <span aria-hidden="true">→</span></a>
+          </div>
+        </article>
+        <article class="study reveal">
+          <div class="frame frame--small">
+            <img src="images/cpp.png" alt="C++ studies — text editor and hand-built data structures" />
+          </div>
+          <div class="placard study-placard">
+            <h3 class="placard-title">C++ Studies</h3>
+            <p class="placard-desc">A text editor, plus hand-built Maps, Sets, and Graphs.</p>
+            <a class="placard-link" href="Cprojects.html">View work <span aria-hidden="true">→</span></a>
+          </div>
+        </article>
+        <article class="study reveal">
+          <div class="frame frame--small">
+            <img src="images/asteroid.png" alt="Asteroids arcade game recreated in Java" />
+          </div>
+          <div class="placard study-placard">
+            <h3 class="placard-title">Java Sketches</h3>
+            <p class="placard-desc">Small experiments, including a take on Asteroids.</p>
+            <a class="placard-link" href="JavaProjects.html">View work <span aria-hidden="true">→</span></a>
+          </div>
+        </article>
+        <article class="study reveal">
+          <div class="frame frame--small">
+            <img src="images/uci.png" alt="UC Irvine seal — Class Alert enrollment notifier" />
+          </div>
+          <div class="placard study-placard">
+            <h3 class="placard-title">Class Alert</h3>
+            <p class="placard-desc">A Python script that texts you the moment a full class opens.</p>
+            <a class="placard-link" href="ClassChecker.html">View work <span aria-hidden="true">→</span></a>
+          </div>
+        </article>
+        <article class="study reveal">
+          <div class="frame frame--small">
+            <img src="images/icon-gaz512.png" alt="Gazillionaire game icon — Lavamind Steam ports" />
+          </div>
+          <div class="placard study-placard">
+            <h3 class="placard-title">Lavamind Games</h3>
+            <p class="placard-desc">Ported Gazillionaire, Zapitalism &amp; Profitania to Steam.</p>
+            <a class="placard-link" href="https://www.lavamind.com/">View work <span aria-hidden="true">→</span></a>
+          </div>
+        </article>
+        <article class="study reveal">
+          <div class="frame frame--small">
+            <img src="images/sunbasket.jpeg" alt="Sun Basket — Instagram TV cooking series" />
+          </div>
+          <div class="placard study-placard">
+            <h3 class="placard-title">Sun Basket</h3>
+            <p class="placard-desc">An Instagram TV series created &amp; edited in-house — thousands of views.</p>
+            <a class="placard-link" href="SunBasket.html">View work <span aria-hidden="true">→</span></a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="divider divider--gold" aria-hidden="true"></div>
+
+  </main>
+
+  <!-- THE LAST ROOM — CORRESPONDENCE -->
+  <footer id="contact" aria-labelledby="contact-heading">
+    <header class="section-head reveal">
+      <p class="room-label">The Last Room</p>
+      <h2 id="contact-heading" class="section-title">Correspondence</h2>
+      <p class="section-subtitle"><em>The artist is in — say hello.</em></p>
+    </header>
+    <ul class="contact-links">
+      <li class="reveal"><a class="contact-link" href="mailto:skylar.j.hoffman@gmail.com">skylar.j.hoffman@gmail.com</a></li>
+      <li class="reveal"><a class="contact-link" href="https://github.com/sky121/">GitHub</a></li>
+      <li class="reveal"><a class="contact-link" href="https://www.linkedin.com/in/skylar-hoffman-58755015a/">LinkedIn</a></li>
+      <li class="reveal"><a class="contact-link" href="https://docs.google.com/document/d/1sORC4MnmEsyLdWJN7OWDsUmDmhcvYyQymyc4wpjhEyE/edit?usp=sharing">Résumé</a></li>
+    </ul>
+    <p class="colophon">Hung with care · San Francisco → Ithaca · © 2026 Skylar Hoffman</p>
+  </footer>
+
+  <script defer src="assets/js/gallery.js"></script>
 </body>
-
 </html>
