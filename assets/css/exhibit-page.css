@@ -1,0 +1,525 @@
+/* ==========================================================================
+   exhibit-page.css — shared stylesheet for the museum "exhibit room" subpages
+   Watercolor art-museum design language (Monet-inspired).
+   Self-sufficient: these pages rely on no other CSS file.
+   ========================================================================== */
+
+:root {
+  --paper: #f6f1e7;
+  --paper-deep: #efe7d8;
+  --ink: #2e3a48;
+  --ink-soft: #5b6b7a;
+  --pond: #7fa8c9;
+  --pond-deep: #4a7299;
+  --wisteria: #a292c4;
+  --sage: #93b48b;
+  --rose: #d98ba0;
+  --gold: #cdb878;
+
+  --font-display: "Cormorant Garamond", "Garamond", "Georgia", serif;
+  --font-body: "Karla", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ---------- Reset & base ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  position: relative;
+  min-height: 100vh;
+  background-color: var(--paper);
+  background-image: linear-gradient(
+    180deg,
+    var(--paper) 0%,
+    var(--paper-deep) 58%,
+    var(--paper) 100%
+  );
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: var(--pond-deep);
+}
+
+::selection {
+  background: var(--pond);
+  color: var(--paper);
+}
+
+/* Visible focus states */
+a:focus-visible {
+  outline: 2px solid var(--pond-deep);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+/* ---------- Paper grain (SVG feTurbulence noise overlay) ---------- */
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.4'/%3E%3C/svg%3E");
+  background-size: 240px 240px;
+}
+
+/* ---------- Watercolor wash blobs ---------- */
+
+.wash {
+  position: fixed;
+  z-index: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  filter: blur(64px);
+  opacity: 0.55;
+  will-change: transform;
+}
+
+.wash--pond {
+  top: -16vh;
+  right: -14vw;
+  width: 58vw;
+  height: 58vw;
+  min-width: 26rem;
+  min-height: 26rem;
+  background:
+    radial-gradient(circle at 38% 42%, rgba(127, 168, 201, 0.55) 0%, rgba(127, 168, 201, 0) 62%),
+    radial-gradient(circle at 64% 58%, rgba(74, 114, 153, 0.32) 0%, rgba(74, 114, 153, 0) 58%),
+    radial-gradient(circle at 50% 70%, rgba(147, 180, 139, 0.22) 0%, rgba(147, 180, 139, 0) 55%);
+  animation: drift-a 46s ease-in-out infinite alternate;
+}
+
+.wash--wisteria {
+  top: 34vh;
+  left: -20vw;
+  width: 52vw;
+  height: 52vw;
+  min-width: 24rem;
+  min-height: 24rem;
+  background:
+    radial-gradient(circle at 55% 45%, rgba(162, 146, 196, 0.5) 0%, rgba(162, 146, 196, 0) 60%),
+    radial-gradient(circle at 35% 65%, rgba(217, 139, 160, 0.26) 0%, rgba(217, 139, 160, 0) 55%),
+    radial-gradient(circle at 70% 30%, rgba(127, 168, 201, 0.22) 0%, rgba(127, 168, 201, 0) 50%);
+  animation: drift-b 58s ease-in-out infinite alternate;
+}
+
+.wash--sage {
+  bottom: -18vh;
+  right: -10vw;
+  width: 48vw;
+  height: 48vw;
+  min-width: 22rem;
+  min-height: 22rem;
+  background:
+    radial-gradient(circle at 45% 50%, rgba(147, 180, 139, 0.48) 0%, rgba(147, 180, 139, 0) 60%),
+    radial-gradient(circle at 62% 38%, rgba(205, 184, 120, 0.3) 0%, rgba(205, 184, 120, 0) 55%),
+    radial-gradient(circle at 30% 65%, rgba(127, 168, 201, 0.2) 0%, rgba(127, 168, 201, 0) 52%);
+  animation: drift-c 52s ease-in-out infinite alternate;
+}
+
+@keyframes drift-a {
+  from { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  to   { transform: translate3d(-5vw, 6vh, 0) rotate(9deg) scale(1.08); }
+}
+
+@keyframes drift-b {
+  from { transform: translate3d(0, 0, 0) rotate(0deg) scale(1.05); }
+  to   { transform: translate3d(6vw, -5vh, 0) rotate(-11deg) scale(0.96); }
+}
+
+@keyframes drift-c {
+  from { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+  to   { transform: translate3d(-4vw, -6vh, 0) rotate(7deg) scale(1.1); }
+}
+
+/* ---------- Skip link ---------- */
+
+.skip-link {
+  position: absolute;
+  top: -3.5rem;
+  left: 1rem;
+  z-index: 100;
+  padding: 0.6rem 1.1rem;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+/* ---------- Top navigation ---------- */
+
+.exhibit-nav {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: clamp(1.25rem, 3vw, 2.25rem) clamp(1.25rem, 5vw, 3rem);
+}
+
+.monogram {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.1rem;
+  height: 3.1rem;
+  border: 1px solid rgba(46, 58, 72, 0.35);
+  border-radius: 50%;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.monogram:hover {
+  background-color: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.back-link {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.78rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--ink-soft);
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid rgba(46, 58, 72, 0.18);
+  transition: color 0.25s ease, border-color 0.25s ease;
+}
+
+.back-link:hover {
+  color: var(--pond-deep);
+  border-color: var(--pond-deep);
+}
+
+/* ---------- Page header (room entrance) ---------- */
+
+.exhibit-room {
+  position: relative;
+  z-index: 1;
+  max-width: 54rem;
+  margin: 0 auto;
+  padding: clamp(1.5rem, 4vw, 3rem) clamp(1.25rem, 5vw, 3rem) clamp(4rem, 8vw, 7rem);
+}
+
+.room-label {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 1.4rem;
+}
+
+.exhibit-title {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: clamp(2.9rem, 8.5vw, 5.5rem);
+  line-height: 1.04;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  margin-bottom: 1.1rem;
+}
+
+.exhibit-subtitle {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.25rem, 3vw, 1.6rem);
+  color: var(--ink-soft);
+  max-width: 36em;
+  margin-bottom: 2.4rem;
+}
+
+.exhibit-intro {
+  max-width: 41rem;
+}
+
+.exhibit-intro p {
+  margin-bottom: 1.2rem;
+  color: var(--ink);
+}
+
+.exhibit-intro p:last-child {
+  margin-bottom: 0;
+}
+
+/* Small painted rule between header and works */
+.brushstroke-rule {
+  display: block;
+  width: 6.5rem;
+  height: 3px;
+  border: 0;
+  border-radius: 3px;
+  margin: clamp(2.8rem, 6vw, 4.5rem) 0;
+  background: linear-gradient(
+    90deg,
+    var(--gold) 0%,
+    var(--rose) 45%,
+    rgba(217, 139, 160, 0) 100%
+  );
+  opacity: 0.8;
+}
+
+/* ---------- Exhibits: framed paintings with placards ---------- */
+
+.exhibit-list {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(4.5rem, 9vw, 7.5rem);
+}
+
+.exhibit {
+  margin: 0;
+}
+
+/* The painted frame: off-white mat, thin double ink border, hung shadow */
+.exhibit-frame {
+  position: relative;
+  background: #fbf7ee;
+  padding: clamp(1.1rem, 3.5vw, 2.1rem);
+  border: 1px solid rgba(46, 58, 72, 0.28);
+  box-shadow:
+    0 1px 2px rgba(46, 58, 72, 0.1),
+    0 14px 28px -14px rgba(46, 58, 72, 0.3),
+    0 34px 56px -28px rgba(74, 114, 153, 0.28);
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* inner line of the double border */
+.exhibit-frame::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgba(46, 58, 72, 0.14);
+  pointer-events: none;
+}
+
+.exhibit:nth-child(odd) .exhibit-frame {
+  transform: rotate(-0.35deg);
+}
+
+.exhibit:nth-child(even) .exhibit-frame {
+  transform: rotate(0.35deg);
+}
+
+.exhibit-frame:hover {
+  transform: rotate(0deg) translateY(-4px);
+  box-shadow:
+    0 1px 2px rgba(46, 58, 72, 0.1),
+    0 20px 34px -14px rgba(46, 58, 72, 0.33),
+    0 44px 66px -28px rgba(74, 114, 153, 0.32);
+}
+
+.exhibit-frame img {
+  width: 100%;
+  height: auto;
+  border: 1px solid rgba(46, 58, 72, 0.12);
+}
+
+/* Museum placard */
+.placard {
+  max-width: 32rem;
+  margin: 1.6rem auto 0;
+  padding: 1.4rem 1.6rem 1.5rem;
+  background: rgba(251, 247, 238, 0.85);
+  border: 1px solid rgba(46, 58, 72, 0.16);
+  box-shadow: 0 8px 20px -14px rgba(46, 58, 72, 0.35);
+  text-align: center;
+}
+
+.placard-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.55rem;
+  line-height: 1.2;
+  color: var(--ink);
+  margin-bottom: 0.45rem;
+}
+
+.placard-medium {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.72rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 0.85rem;
+}
+
+.placard-desc {
+  font-size: 0.97rem;
+  line-height: 1.7;
+  color: var(--ink);
+  text-align: left;
+}
+
+.placard-desc + .placard-desc {
+  margin-top: 0.7rem;
+}
+
+.placard-link {
+  display: inline-block;
+  margin-top: 1rem;
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.75rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--pond-deep);
+  text-decoration: none;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(74, 114, 153, 0.4);
+  transition: color 0.25s ease, border-color 0.25s ease;
+}
+
+.placard-link:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+/* Two images hung side by side inside one frame (diptych) */
+.exhibit-frame--diptych {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(0.8rem, 2.5vw, 1.5rem);
+}
+
+.exhibit-frame--diptych::before {
+  inset: 7px;
+}
+
+@media (max-width: 600px) {
+  .exhibit-frame--diptych {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Footer ---------- */
+
+.exhibit-footer {
+  position: relative;
+  z-index: 1;
+  max-width: 54rem;
+  margin: 0 auto;
+  padding: 2.4rem clamp(1.25rem, 5vw, 3rem) 3rem;
+  border-top: 1px solid rgba(46, 58, 72, 0.16);
+  text-align: center;
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.72rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.exhibit-footer a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(91, 107, 122, 0.35);
+  padding-bottom: 0.15rem;
+  transition: color 0.25s ease, border-color 0.25s ease;
+}
+
+.exhibit-footer a:hover {
+  color: var(--pond-deep);
+  border-color: var(--pond-deep);
+}
+
+.exhibit-footer .sep {
+  margin: 0 0.55em;
+  color: var(--gold);
+}
+
+/* ---------- Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .wash {
+    animation: none;
+  }
+
+  .exhibit-frame,
+  .exhibit-frame:hover {
+    transition: none;
+  }
+
+  .exhibit:nth-child(odd) .exhibit-frame:hover {
+    transform: rotate(-0.35deg);
+  }
+
+  .exhibit:nth-child(even) .exhibit-frame:hover {
+    transform: rotate(0.35deg);
+  }
+}
+
+/* ---------- Small screens ---------- */
+
+@media (max-width: 480px) {
+  body {
+    font-size: 1rem;
+  }
+
+  .monogram {
+    width: 2.7rem;
+    height: 2.7rem;
+    font-size: 1rem;
+  }
+
+  .back-link {
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+  }
+
+  .placard {
+    padding: 1.1rem 1.1rem 1.2rem;
+  }
+}
