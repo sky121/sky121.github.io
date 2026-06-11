@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!--
+    Skylar Hoffman — watercolor monogram favicon
+    Pond blue #7fa8c9 / wisteria #a292c4 washes, ink #2e3a48 monogram
+  -->
+  <defs>
+    <!-- Ragged watercolor edge: turbulence displaces the blob outlines -->
+    <filter id="bleed" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.085" numOctaves="3" seed="7" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="7" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- Slightly coarser bleed for the under-wash -->
+    <filter id="bleed2" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="3" seed="23" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="9" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- Gentle pigment pooling inside the wash -->
+    <radialGradient id="pond" cx="38%" cy="32%" r="80%">
+      <stop offset="0%" stop-color="#9dbedb"/>
+      <stop offset="55%" stop-color="#7fa8c9"/>
+      <stop offset="100%" stop-color="#6c97ba"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Under-wash: pale pond-blue halo, soft and broad -->
+  <g filter="url(#bleed2)">
+    <path fill="#7fa8c9" fill-opacity="0.38"
+          d="M32 3.5
+             C46 2 60.5 12 60.5 30
+             C60.5 49 49 61 31 60.5
+             C13 60 3 49.5 3.5 31.5
+             C4 13 18 5 32 3.5 Z"/>
+  </g>
+
+  <!-- Wisteria glaze drifting in from the lower right -->
+  <g filter="url(#bleed)">
+    <path fill="#a292c4" fill-opacity="0.45"
+          d="M40 14
+             C53 16 59 25 58 38
+             C57 51 47 58.5 35 58
+             C22 57.5 14 49 15 37
+             C16 24 27 12 40 14 Z"/>
+  </g>
+
+  <!-- Main pond-blue wash: layered translucent pigment -->
+  <g filter="url(#bleed)">
+    <path fill="url(#pond)" fill-opacity="0.78"
+          d="M31 5.5
+             C45.5 4 58 14.5 58 30.5
+             C58 47 47.5 58 31.5 57.5
+             C15.5 57 6 47.5 6.5 31
+             C7 15 16.5 7 31 5.5 Z"/>
+    <!-- Darker pooled edge where pigment settles -->
+    <path fill="#5d88ad" fill-opacity="0.35"
+          d="M30 8
+             C43 6.5 55 16 55 30
+             C55 44.5 45.5 54.5 31 54
+             C17 53.5 9.5 44.5 10 30.5
+             C10.5 16.5 17.5 9.5 30 8 Z"/>
+  </g>
+
+  <!-- Monogram: big, high-contrast ink so it reads at 16px -->
+  <text x="32" y="33"
+        font-family="Cormorant Garamond, Georgia, serif"
+        font-size="40" font-weight="700"
+        fill="#2e3a48"
+        text-anchor="middle" dominant-baseline="central"
+        letter-spacing="-1.5">SH</text>
+</svg>
