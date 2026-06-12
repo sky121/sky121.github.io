@@ -1,0 +1,21 @@
+{
+  "name": "Water Lilies — Skylar Hoffman",
+  "short_name": "S.H.",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#f6f1e7",
+  "background_color": "#f6f1e7",
+  "display": "browser",
+  "start_url": "/"
+}
