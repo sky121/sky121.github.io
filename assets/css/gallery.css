@@ -894,10 +894,10 @@ footer#contact {
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 1.1rem 1.4rem;
-  max-width: 46rem;
+  gap: 1.7rem 2.1rem;
+  max-width: 56rem;
   margin: 0 auto;
-  padding-top: 0.5rem;
+  padding-top: 1rem;
 }
 
 .pigment {
@@ -906,31 +906,62 @@ footer#contact {
   border: 0;
   background: transparent;
   cursor: pointer;
-  padding: 0.95rem 1.7rem;
+  padding: 1.75rem 2.7rem;
   border-radius: 56% 44% 48% 52% / 47% 53% 46% 54%;
   font-family: var(--font-body);
-  font-weight: 400;
-  font-size: 0.86rem;
-  letter-spacing: 0.12em;
+  font-weight: 500;
+  font-size: 0.84rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink);
   transition: transform 0.3s ease;
 }
 
-/* The blot of pigment itself. */
+/* The blot of pigment itself: pooled center, settled darker rim. */
 .pigment::before {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: -7% -5%;
   z-index: -1;
   border-radius: 56% 44% 48% 52% / 47% 53% 46% 54%;
   background: var(--c, var(--pond));
-  opacity: 0.62;
+  background:
+    radial-gradient(
+      ellipse 75% 70% at 33% 30%,
+      color-mix(in srgb, var(--c, var(--pond)) 30%, transparent) 0%,
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse 110% 105% at 58% 64%,
+      color-mix(in srgb, var(--c, var(--pond)) 72%, transparent) 0%,
+      color-mix(in srgb, var(--c, var(--pond)) 44%, transparent) 62%,
+      transparent 92%
+    );
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--c, var(--pond)) 50%, transparent),
+    inset 0 0 22px color-mix(in srgb, var(--c, var(--pond)) 38%, transparent),
+    0 14px 26px -18px rgba(46, 58, 72, 0.5);
+  opacity: 0.82;
   mix-blend-mode: multiply;
-  filter: blur(0.5px);
-  box-shadow: 0 10px 22px -14px rgba(46, 58, 72, 0.45);
+  filter: blur(0.4px);
   animation: pigment-morph 12s ease-in-out infinite alternate;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.4s ease;
+}
+
+/* A loose satellite blot, as if the brush rested here a moment. */
+.pigment::after {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  width: 38%;
+  height: 48%;
+  right: -10%;
+  bottom: -16%;
+  border-radius: 62% 38% 55% 45% / 48% 62% 38% 52%;
+  background: color-mix(in srgb, var(--c, var(--pond)) 50%, transparent);
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+  filter: blur(0.6px);
 }
 
 .pigment:hover {
@@ -938,7 +969,8 @@ footer#contact {
 }
 
 .pigment:hover::before {
-  opacity: 0.8;
+  opacity: 1;
+  transform: scale(1.05);
 }
 
 .pigment--mix::before {
@@ -949,15 +981,20 @@ footer#contact {
     var(--rose) 70%,
     var(--sage) 100%
   );
+  opacity: 0.6;
 }
 
-/* Organic scatter — offsets via margins so transforms stay free for .splash. */
-.pigment:nth-child(2n) { margin-top: 1.1rem; }
-.pigment:nth-child(3n) { margin-top: -0.5rem; }
-.pigment:nth-child(4n) { margin-bottom: 0.9rem; }
-.pigment:nth-child(2n)::before { animation-delay: -4s; }
+/* Organic scatter — offsets via margins so transforms stay free for .splash;
+   rotation rides the ::before so the splash/hover transforms never stomp it. */
+.pigment:nth-child(2n) { margin-top: 1.4rem; }
+.pigment:nth-child(3n) { margin-top: -0.7rem; }
+.pigment:nth-child(4n) { margin-bottom: 1.1rem; }
+.pigment:nth-child(odd)::before { transform: rotate(-3deg); }
+.pigment:nth-child(2n)::before { animation-delay: -4s; transform: rotate(2.5deg); }
 .pigment:nth-child(3n)::before { animation-delay: -7s; animation-duration: 15s; }
-.pigment:nth-child(5n)::before { animation-delay: -10s; }
+.pigment:nth-child(5n)::before { animation-delay: -10s; transform: rotate(-1.5deg); }
+.pigment:nth-child(2n)::after { right: auto; left: -10%; bottom: auto; top: -12%; width: 30%; height: 40%; }
+.pigment:nth-child(3n)::after { width: 26%; height: 34%; right: -6%; bottom: -20%; }
 
 @keyframes pigment-morph {
   0% { border-radius: 56% 44% 48% 52% / 47% 53% 46% 54%; }
