@@ -14,8 +14,9 @@
   :root {
     --paper: #f6f1e7;
     --ink: #2e3a48;
-    --ink-soft: rgba(46, 58, 72, 0.62);
+    --ink-soft: rgba(46, 58, 72, 0.71); /* 4.52:1 over --paper (WCAG AA) */
     --pond: #7fa8c9;
+    --pond-ink: #456a8f; /* text-safe pond: 5.03:1 on --paper */
     --wisteria: #a292c4;
     --frame-wood: #d8cdbb;
     --frame-wood-deep: #c4b69f;
@@ -279,11 +280,11 @@
   }
   .return:hover,
   .return:focus-visible {
-    color: var(--pond);
-    border-color: var(--pond);
+    color: var(--pond-ink);
+    border-color: var(--pond-ink);
   }
   .return:focus-visible {
-    outline: 2px solid var(--pond);
+    outline: 2px solid var(--pond-ink);
     outline-offset: 4px;
   }
 
