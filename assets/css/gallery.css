@@ -734,6 +734,26 @@ footer#contact {
   border-color: var(--ink);
 }
 
+/* Quiet provenance line that closes a featured placard ("Private collection —
+   Moveworks."). Hairline above keeps it from crowding the link; the placard's
+   own bottom padding (1.5rem) still balances below it. */
+.placard-note {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-top: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--hairline);
+}
+
+/* The em carries semantics only; italic Karla fights the tracked uppercase. */
+.placard-note em {
+  font-style: normal;
+}
+
 /* --------------------------------------------------------------------------
    8. Hero — the museum entrance
    -------------------------------------------------------------------------- */
@@ -1247,6 +1267,13 @@ footer#contact {
   border: 1px solid rgba(46, 58, 72, 0.12);
 }
 
+/* Featured works ship at 1200x900; pinning 4:3 + cover is a no-op today but
+   guards the hang against future swaps at other ratios. */
+.work .frame img {
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
 .frame[data-tilt] {
   transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
   transition: transform 0.2s ease-out, box-shadow 0.4s ease;
@@ -1290,10 +1317,12 @@ footer#contact {
    13. Annex — studies & sketches grid
    -------------------------------------------------------------------------- */
 
+/* Eleven studies on the wall: a tighter minimum and gap let rows fill out
+   3–4 across instead of orphaning a wide straggler on the last row. */
 .studies-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
-  gap: clamp(1.6rem, 4vw, 2.6rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+  gap: clamp(1.5rem, 3vw, 2rem);
   align-items: stretch;
 }
 
@@ -1310,6 +1339,8 @@ footer#contact {
   inset: 5px;
 }
 
+/* Study thumbnails arrive at varying ratios; the watercolor treatment bakes
+   ragged edges into the images, so cover-cropping to 4:3 evens the wall. */
 .frame--small img {
   aspect-ratio: 4 / 3;
   object-fit: cover;
