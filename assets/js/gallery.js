@@ -55,7 +55,7 @@
         else nav.classList.remove('scrolled');
       }
 
-      if (!reducedMotion) {
+      if (!reducedMotion && finePointer) {
         for (var i = 0; i < washes.length; i++) {
           // Alternating signs, magnitudes cycling through 0.02..0.06
           var mag = 0.02 + (i % 3) * 0.02;            // 0.02, 0.04, 0.06
