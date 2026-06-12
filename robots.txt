@@ -1,5 +1,4 @@
 User-agent: *
 Allow: /
-Disallow: /test_bubble.html
 
 Sitemap: https://sky121.github.io/sitemap.xml
