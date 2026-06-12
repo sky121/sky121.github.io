@@ -294,9 +294,65 @@
     var resizeTimer = 0;
     window.addEventListener('resize', function () {
       window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(resizeCanvas, 150);
+      resizeTimer = window.setTimeout(function () {
+        resizeCanvas();
+        measureSections();
+      }, 150);
     }, { passive: true });
     resizeCanvas();
+
+    /* --- section-aware pigment: bias the palette toward the current room --- */
+    // Palette indices: 0 pond, 1 wisteria, 2 sage, 3 rose, 4 gold, 5 deep pond.
+    // null = full cycle, no bias.
+    var SECTION_PIGMENTS = {
+      hero: null,
+      artist: [1, 0],
+      palette: null,
+      gallery: [0, 5, 4],
+      studies: [2, 4],
+      contact: [3, 1]
+    };
+    var SECTION_IDS = ['hero', 'artist', 'palette', 'gallery', 'studies', 'contact'];
+    var SECTION_BIAS = 0.6; // chance a spawn draws from the room's subset
+    var sectionTops = [];   // [{ top, subset }] sorted by document top
+
+    function measureSections() {
+      // Cheap to call: only runs on resize/load settle, never in the move path.
+      var next = [];
+      for (var i = 0; i < SECTION_IDS.length; i++) {
+        var el = document.getElementById(SECTION_IDS[i]);
+        if (!el) continue;
+        next.push({
+          top: el.getBoundingClientRect().top + (window.scrollY || 0),
+          subset: SECTION_PIGMENTS[SECTION_IDS[i]]
+        });
+      }
+      next.sort(function (a, b) { return a.top - b.top; });
+      sectionTops = next;
+    }
+
+    function sectionSubsetAt(clientY) {
+      // Linear scan over <=6 precomputed tops; no layout reads here.
+      var docY = (window.scrollY || 0) + clientY;
+      var subset = null;
+      for (var i = 0; i < sectionTops.length; i++) {
+        if (sectionTops[i].top <= docY) subset = sectionTops[i].subset;
+        else break;
+      }
+      return subset;
+    }
+
+    function pickPassColors(clientY) {
+      if (Math.random() < SECTION_BIAS) {
+        var subset = sectionSubsetAt(clientY);
+        if (subset) return paletteRGBA[subset[(Math.random() * subset.length) | 0]];
+      }
+      return paletteRGBA[colorIndex++ % paletteRGBA.length];
+    }
+
+    measureSections();
+    window.addEventListener('load', measureSections);
+    window.setTimeout(measureSections, 3000); // re-measure after fonts settle
 
     /* --- bloom construction --- */
     function makeOutlinePath() {
@@ -326,19 +382,19 @@
       return path;
     }
 
-    function spawnBloom(x, y, radius, passColors) {
+    function spawnBloom(x, y, radius, passColors, opts) {
       if (reducedMotion) return; // respect a mid-session toggle for new spawns
-      if (!passColors) {
-        passColors = paletteRGBA[colorIndex % paletteRGBA.length];
-        colorIndex++;
-      }
+      if (!passColors) passColors = pickPassColors(y);
       blooms.push({
         x: x,
         y: y,
         radius: radius,
         path: makeOutlinePath(),
         colors: passColors,
-        born: performance.now()
+        born: performance.now(),
+        life: (opts && opts.life) || LIFESPAN,
+        alpha: (opts && opts.alpha) || 1,
+        idle: !!(opts && opts.idle)
       });
       if (blooms.length > maxBlooms) blooms.splice(0, blooms.length - maxBlooms);
       startLoop();
@@ -375,13 +431,13 @@
       for (var i = 0; i < blooms.length; i++) {
         var b = blooms[i];
         var age = Math.max(0, now - b.born);
-        if (age >= LIFESPAN) continue; // dead — drop it
+        if (age >= b.life) continue; // dead — drop it
         blooms[write++] = b;
 
         // Alpha envelope: fade in, hold, fade out over the last stretch.
         var envelope = 1;
         if (age < FADE_IN) envelope = age / FADE_IN;
-        else if (age > LIFESPAN - FADE_OUT) envelope = (LIFESPAN - age) / FADE_OUT;
+        else if (age > b.life - FADE_OUT) envelope = (b.life - age) / FADE_OUT;
 
         // Slow growth to 1.6x over the first 1200ms, ease-out.
         var growth = age >= GROW_TIME
@@ -392,7 +448,7 @@
         // Reuse the unit-scale Path2D: bake position + scale (+ DPR) into the
         // transform so positions stay in CSS pixels. Layered low-alpha passes
         // give the soft pooled-pigment look without shadowBlur/filters.
-        ctx.globalAlpha = envelope;
+        ctx.globalAlpha = envelope * b.alpha;
         for (var p = 0; p < PASS_SCALES.length; p++) {
           var s = r * PASS_SCALES[p] * dpr;
           ctx.setTransform(s, 0, 0, s, b.x * dpr, b.y * dpr);
@@ -428,11 +484,17 @@
         rafId = 0;
       }
       running = false;
+      // Halt the idle-drip chain while hidden; resume() restarts it.
+      if (idleTimer) {
+        window.clearTimeout(idleTimer);
+        idleTimer = 0;
+      }
     }
 
     function resume() {
       paused = false;
       startLoop();
+      resetIdleTimer();
     }
 
     function stopAndClear() {
@@ -445,6 +507,50 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, viewW, viewH);
     }
+
+    /* --- idle drip: air conditioning stirring a wet wash --- */
+    // One setTimeout chain, never stacked: every arm is preceded by a clear
+    // (resetIdleTimer) or by the previous link zeroing idleTimer (idleDrip),
+    // and pause()/resume() clear/restart it around visibility changes.
+    var IDLE_DELAY_MIN = 6000;
+    var IDLE_DELAY_SPREAD = 3000;
+    var IDLE_MAX = 3;
+    var idleTimer = 0;
+
+    function idleDelay() {
+      return IDLE_DELAY_MIN + Math.random() * IDLE_DELAY_SPREAD;
+    }
+
+    function idleDrip() {
+      idleTimer = 0;
+      if (paused || document.hidden) return; // chain ends; resume() restarts it
+      if (!reducedMotion) {
+        var idleCount = 0;
+        for (var i = 0; i < blooms.length; i++) {
+          if (blooms[i].idle) idleCount++;
+        }
+        // Only drip onto a quiet canvas: nothing present but earlier drips.
+        if (idleCount < IDLE_MAX && blooms.length === idleCount) {
+          spawnBloom(
+            viewW * (0.08 + Math.random() * 0.84),
+            viewH * (1 / 3 + Math.random() * 0.6), // lower two-thirds, off the very edge
+            6 + Math.random() * 6,
+            null,
+            { life: 9000, alpha: 0.5, idle: true }
+          );
+        }
+      }
+      idleTimer = window.setTimeout(idleDrip, idleDelay());
+    }
+
+    function resetIdleTimer() {
+      if (idleTimer) window.clearTimeout(idleTimer);
+      idleTimer = window.setTimeout(idleDrip, idleDelay());
+    }
+
+    // Any pointer movement marks the visitor as present again.
+    window.addEventListener('pointermove', resetIdleTimer, { passive: true });
+    resetIdleTimer();
 
     var burstCapTimer = 0;
     function boostBloomCap() {
@@ -481,6 +587,27 @@
           event.target.closest('a,button,input,textarea,select')) return;
       spawnSplash(event.clientX, event.clientY);
     });
+
+    /* --- placard hover accent: a small bloom at the link's left edge --- */
+    var ACCENT_GAP = 600; // global throttle, ms
+    var lastAccentAt = 0;
+
+    document.addEventListener('pointerover', function (event) {
+      if (!finePointer || reducedMotion) return;
+      var t = event.target;
+      if (!t || !t.closest) return;
+      var link = t.closest('.placard-link, .contact-link');
+      if (!link) return;
+      // Ignore pointerover fired by moves between the link's own children.
+      var from = event.relatedTarget;
+      if (from && link.contains(from)) return;
+      var now = performance.now();
+      if (now - lastAccentAt < ACCENT_GAP) return;
+      lastAccentAt = now;
+      // One rect read per hover entry — never in the move path.
+      var rect = link.getBoundingClientRect();
+      spawnBloom(rect.left, rect.top + rect.height / 2, 10 + Math.random() * 6);
+    }, { passive: true });
 
     /* --- page visibility --- */
     document.addEventListener('visibilitychange', function () {
