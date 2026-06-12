@@ -1,148 +1,127 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <!-- Required meta tags -->
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Class Alert · Skylar Hoffman</title>
     <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+      name="description"
+      content="Class Alert, a Python web-scraping tool by Skylar Hoffman that watches UC Irvine course enrollment and sends an email and text the moment a full class opens."
     />
-
-    <!-- Bootstrap CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Karla:wght@300;400;500&display=swap"
       rel="stylesheet"
-      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
-      integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
-      crossorigin="anonymous"
     />
-    <!-- Add icon library -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
-    />
-
-    <link rel="stylesheet" href="assets/css/main.css" />
-    <title>Class Alert</title>
+    <link rel="stylesheet" href="assets/css/exhibit-page.css" />
   </head>
   <body>
-    <nav class="navbar navbar-expand fixed-top py-3">
-      <a class="navbar-brand" href="index.html">Skylar Hoffman's Portfolio</a>
+    <a class="skip-link" href="#room">Skip to exhibit</a>
 
-      <div class="collapse navbar-collapse" id="navbarSupportedContent">
-        <ul class="navbar-nav ml-auto ">
-          <li class="nav-item active">
-            <a class="nav-link" href="index.html"
-              >Home <span class="sr-only">(current)</span></a
-            >
-          </li>
+    <div class="wash wash--pond" aria-hidden="true"></div>
+    <div class="wash wash--wisteria" aria-hidden="true"></div>
+    <div class="wash wash--sage" aria-hidden="true"></div>
 
-          <li class="nav-item dropdown">
-            <a
-              class="nav-link dropdown-toggle"
-              href="#"
-              id="navbarDropdown"
-              role="button"
-              data-toggle="dropdown"
-              aria-haspopup="true"
-              aria-expanded="false"
-            >
-              Projects
-            </a>
-            <div
-              class="dropdown-menu dropdown-menu-right"
-              aria-labelledby="navbarDropdown"
-            >
-              <a class="dropdown-item" href="SkyProject">SkyProject</a>
-              <a class="dropdown-item" href="https://www.lavamind.com/"
-                >Lavamind Games</a
-              >
+    <header>
+      <nav class="exhibit-nav" aria-label="Primary">
+        <a class="monogram" href="index.html" aria-label="S.H. — return to the gallery home">S.H.</a>
+        <a class="back-link" href="index.html">&larr; Back to the gallery</a>
+      </nav>
+    </header>
 
-              <a
-                class="dropdown-item"
-                href="https://devpost.com/software/lyffe-style"
-                >Lyffe Style</a
-              >
+    <main id="room" class="exhibit-room">
+      <p class="room-label">Exhibit &middot; Class Alert</p>
+      <h1 class="exhibit-title">Class Alert</h1>
+      <p class="exhibit-subtitle">
+        A watchful Python script that refreshes the page so you never have
+        to &mdash; and writes the moment a seat opens.
+      </p>
 
-              <a class="dropdown-item" href="Cprojects.html">C++ Projects</a>
-              <a class="dropdown-item" href="PythonProjects.html"
-                >Python Projects</a
-              >
-              <a class="dropdown-item" href="JavaProjects.html"
-                >Mini Java Projects</a
-              >
-              <a class="dropdown-item" href="ClassChecker.html">Class Alert</a>
-              <a class="dropdown-item" href="SunBasket.html">Sun Basket</a>
-            </div>
-          </li>
-        </ul>
-      </div>
-    </nav>
-    <div class="projects">
-      <header class="descript">
-        <h2>Class Alert</h2>
+      <div class="exhibit-intro">
         <p>
-          During my undergraduate studies at University of California, Irvine, I encountered many frustrations during the course enrollment process from bad wifi and server crashes, to full courses and stressful waitlisting. During one of these especially bad occurrences where the website for course enrollment kept crashing, I had to spend hours refreshing the page in hopes of being able to claim a spot in an important course. After this experience of countless hours wasted at my computer refreshing a single page, I decided there must be a better solution. I had a vision of building an application that would automatically refresh and view the page for me so I would not have to waste my time doing such a trivial task. After researching and deciding how to build this application, I decided to use a web scraper built for Python to load and refresh the page and detect when the course I wanted opened. 
-
-<br \><br \>I called this project Class Alerts, and I built it using Python where it would send me an alert through email and text when a course would become available. When the script is run, it takes the Department of your class as input, as well as the course code of the specific class you want in that Department. It gives you the real time info on whether the class is open or not. A time interval for when the script refreshes the page can be set as well as your contact info to ping when the course becomes available. 
-
-<br \><br \>I found I was very passionate about this project as it was solving a major frustration and issue that I was facing. I found myself so engaged in the project that I would spend hours without even realizing the time was moving by. Solving real-world issues and having important impacts on life was really engaging and thrilling. Even though this project was not highly technical, I learned a lot from it and explored a whole new realm of web scraping. It was a great way for me to apply the knowledge and fundamentals I developed through my courses to the real world. 
+          During my undergraduate studies at the University of California,
+          Irvine, course enrollment brought a familiar litany of frustrations:
+          bad wifi, server crashes, full courses, and stressful waitlists.
+          During one especially bad episode, with the enrollment site crashing
+          again and again, I spent hours refreshing a single page in hopes of
+          claiming a spot in an important course. After so much time lost to so
+          trivial a task, I decided there had to be a better way &mdash; an
+          application that would watch the page on my behalf. I chose a Python
+          web scraper to load and refresh the page and detect the instant my
+          course opened.
         </p>
-      </header>
-      <div class="anim-rect"></div>
-
-      <div class="proj-sec">
-        <h3>
-          Inputs
-        </h3>
-        <img src="images/classCheckerInputs.jpg" />
-        <img src="images/classOpen.jpg" />
         <p>
-          When you run the script, you can input the Department of your class,
-          and the course code of the specific class you want in that Department.
-          It will then give you the realtime info on whether the class is Open
-          or not. Every 60 seconds it will check again to see if its OPEN.
+          I called the project Class Alert. Built in Python, it sends an alert
+          by email and text the moment a course becomes available. When the
+          script runs, it takes the department and the course code of the
+          class you want, reports in real time whether the class is open, and
+          lets you set both the refresh interval and the contact details to
+          ping when a seat appears.
+        </p>
+        <p>
+          I found I was deeply engaged by this project precisely because it
+          solved a frustration I was living through &mdash; hours would pass
+          without my noticing. Though the work was not highly technical, it
+          opened a whole new realm of web scraping for me, and it was a
+          gratifying way to carry the fundamentals from my coursework into the
+          real world.
         </p>
       </div>
-      <div class="proj-sec">
-        <h3>
-          Email
-        </h3>
-        <img src="images/emailSent.jpg" />
-        <p>
-          Once the class OPENS, the script will detect the change and send an
-          email to you telling you that it OPENED. The email will include all
-          the details about the class that opened including the course code and
-          the time that it OPENED.
-        </p>
+
+      <hr class="brushstroke-rule" />
+
+      <div class="exhibit-list">
+        <figure class="exhibit">
+          <div class="exhibit-frame exhibit-frame--diptych">
+            <img
+              src="images/classCheckerInputs.jpg"
+              alt="Terminal prompt asking for the department and course code to watch"
+            />
+            <img
+              src="images/classOpen.jpg"
+              alt="Terminal output reporting in real time that the watched class is OPEN"
+            />
+          </div>
+          <figcaption class="placard">
+            <p class="placard-title">The Inputs</p>
+            <p class="placard-medium">Python &middot; web scraping &middot; command line</p>
+            <p class="placard-desc">
+              On launch, the script asks for the department and the course
+              code of the specific class you want, then reports in real time
+              whether that class is open. Every sixty seconds it looks again,
+              waiting patiently for OPEN.
+            </p>
+          </figcaption>
+        </figure>
+
+        <figure class="exhibit">
+          <div class="exhibit-frame">
+            <img
+              src="images/emailSent.jpg"
+              alt="The alert email announcing that the watched course has opened, with its course code and the time it opened"
+            />
+          </div>
+          <figcaption class="placard">
+            <p class="placard-title">The Letter</p>
+            <p class="placard-medium">Python &middot; email &amp; SMS alerts &middot; automation</p>
+            <p class="placard-desc">
+              The moment the class opens, the script detects the change and
+              sends an email announcing the news &mdash; complete with the
+              course code and the exact time the seat appeared.
+            </p>
+          </figcaption>
+        </figure>
       </div>
-    </div>
-    <!-- Optional JavaScript -->
-    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
-    <script
-      src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
-      integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
-      integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
-      integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
-      crossorigin="anonymous"
-    ></script>
-    <!--jquery-->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-    <script src="assets/js/main.js"></script>
-    <div class="load-wrapper">
-      <div class="box">
-        <div class="b b1"></div>
-        <div class="b b2"></div>
-        <div class="b b3"></div>
-        <div class="b b4"></div>
-      </div>
-    </div>
+    </main>
+
+    <footer class="exhibit-footer">
+      <p>
+        Skylar Hoffman<span class="sep">&middot;</span
+        ><a href="mailto:skylar.j.hoffman@gmail.com">skylar.j.hoffman@gmail.com</a
+        ><span class="sep">&middot;</span
+        ><a href="https://github.com/sky121">github.com/sky121</a>
+      </p>
+    </footer>
   </body>
 </html>

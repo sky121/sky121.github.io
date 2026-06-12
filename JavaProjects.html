@@ -1,189 +1,161 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <!-- Required meta tags -->
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Java Miniatures · Skylar Hoffman</title>
     <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+      name="description"
+      content="Five small Java works by Skylar Hoffman: playable Minesweeper and Asteroids games, a fireworks color show, a snowflake catcher, and a chemotaxis simulation."
     />
-
-    <!-- Bootstrap CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Karla:wght@300;400;500&display=swap"
       rel="stylesheet"
-      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
-      integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
-      crossorigin="anonymous"
     />
-    <!-- Add icon library -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
-    />
-
-    <link rel="stylesheet" href="assets/css/main.css" />
-    <title>Java Projects</title>
+    <link rel="stylesheet" href="assets/css/exhibit-page.css" />
   </head>
   <body>
-    <nav class="navbar navbar-expand fixed-top py-3">
-      <a class="navbar-brand" href="index.html">Skylar Hoffman's Portfolio</a>
+    <a class="skip-link" href="#room">Skip to exhibit</a>
 
-      <div class="collapse navbar-collapse" id="navbarSupportedContent">
-        <ul class="navbar-nav ml-auto ">
-          <li class="nav-item active">
-            <a class="nav-link" href="index.html"
-              >Home <span class="sr-only">(current)</span></a
+    <div class="wash wash--pond" aria-hidden="true"></div>
+    <div class="wash wash--wisteria" aria-hidden="true"></div>
+    <div class="wash wash--sage" aria-hidden="true"></div>
+
+    <header>
+      <nav class="exhibit-nav" aria-label="Primary">
+        <a class="monogram" href="index.html" aria-label="S.H. — return to the gallery home">S.H.</a>
+        <a class="back-link" href="index.html">&larr; Back to the gallery</a>
+      </nav>
+    </header>
+
+    <main id="room" class="exhibit-room">
+      <p class="room-label">Archive &middot; Java Miniatures</p>
+      <h1 class="exhibit-title">Java Miniatures</h1>
+      <p class="exhibit-subtitle">
+        A cabinet of small games and simulations &mdash; sketches made while
+        learning Java.
+      </p>
+
+      <div class="exhibit-intro">
+        <p>
+          A collection of the small works I composed while learning Java:
+          two playable games, a fireworks show, a snowfall, and a colony of
+          hungry organisms.
+        </p>
+      </div>
+
+      <hr class="brushstroke-rule" />
+
+      <div class="exhibit-list">
+        <figure class="exhibit">
+          <div class="exhibit-frame">
+            <img
+              src="images/MineSweeper.jpg"
+              alt="The Minesweeper game board with revealed numbered tiles and flagged squares"
+            />
+          </div>
+          <figcaption class="placard">
+            <p class="placard-title">Minesweeper</p>
+            <p class="placard-medium">Java &middot; game logic &middot; playable in browser</p>
+            <p class="placard-desc">
+              The classic game, built from scratch: bombs are scattered at
+              random across the field, and the player must uncover the board
+              while marking the squares believed to hide them. The full source
+              lives on my GitHub.
+            </p>
+            <a class="placard-link" href="http://sky121.github.io/Minesweeper/"
+              >Play the game &rarr;</a
             >
-          </li>
+          </figcaption>
+        </figure>
 
-          <li class="nav-item dropdown">
+        <figure class="exhibit">
+          <div class="exhibit-frame">
+            <img
+              src="images/Asteroids.jpg"
+              alt="The Asteroids game in play, a small spaceship surrounded by drifting asteroids on a starfield"
+            />
+          </div>
+          <figcaption class="placard">
+            <p class="placard-title">Asteroids</p>
+            <p class="placard-medium">Java &middot; arcade physics &middot; playable in browser</p>
+            <p class="placard-desc">
+              The classic arcade game: pilot a spaceship through a drifting
+              asteroid field, shooting the rocks apart and slipping into
+              hyperspace to survive. The full source lives on my GitHub.
+            </p>
             <a
-              class="nav-link dropdown-toggle"
-              href="#"
-              id="navbarDropdown"
-              role="button"
-              data-toggle="dropdown"
-              aria-haspopup="true"
-              aria-expanded="false"
+              class="placard-link"
+              href="https://sky121.github.io/AsteroidsGame/"
+              >Play the game &rarr;</a
             >
-              Projects
-            </a>
-            <div
-              class="dropdown-menu dropdown-menu-right"
-              aria-labelledby="navbarDropdown"
-            >
-              <a class="dropdown-item" href="SkyProject">SkyProject</a>
-              <a class="dropdown-item" href="https://www.lavamind.com/"
-                >Lavamind Games</a
-              >
+          </figcaption>
+        </figure>
 
-              <a
-                class="dropdown-item"
-                href="https://devpost.com/software/lyffe-style"
-                >Lyffe Style</a
-              >
+        <figure class="exhibit">
+          <div class="exhibit-frame">
+            <img
+              src="images/Fireworks.jpg"
+              alt="Bursts of colored fireworks rendered against a night-dark canvas"
+            />
+          </div>
+          <figcaption class="placard">
+            <p class="placard-title">Fireworks</p>
+            <p class="placard-medium">Java &middot; animation &middot; color study</p>
+            <p class="placard-desc">
+              A fireworks show composed to practice object-oriented
+              programming, letting color and animation carry the piece &mdash;
+              a small celebration in code.
+            </p>
+          </figcaption>
+        </figure>
 
-              <a class="dropdown-item" href="Cprojects.html">C++ Projects</a>
-              <a class="dropdown-item" href="PythonProjects.html"
-                >Python Projects</a
-              >
-              <a class="dropdown-item" href="JavaProjects.html"
-                >Mini Java Projects</a
-              >
-              <a class="dropdown-item" href="ClassChecker.html">Class Alert</a>
-              <a class="dropdown-item" href="SunBasket.html">Sun Basket</a>
-            </div>
-          </li>
-        </ul>
-      </div>
-    </nav>
-    <div class="projects">
-      <header class="descript">
-        <h2>Java Projects</h2>
-        <p>
-          Here are some of the projects I built while learning Java.
-        </p>
-      </header>
-      <div class="anim-rect"></div>
+        <figure class="exhibit">
+          <div class="exhibit-frame">
+            <img
+              src="images/snowflake.jpg"
+              alt="The snowflake catcher in play, white flakes drifting down toward a drawn catching line"
+            />
+          </div>
+          <figcaption class="placard">
+            <p class="placard-title">Snowflake Catcher</p>
+            <p class="placard-medium">Java &middot; drawing &middot; interaction</p>
+            <p class="placard-desc">
+              A quiet little program in which the player catches the falling
+              snow by drawing &mdash; an exercise in interaction at its
+              simplest.
+            </p>
+          </figcaption>
+        </figure>
 
-      <div class="proj-sec">
-        <h3>
-          MineSweeper
-        </h3>
-        <img src="images/MineSweeper.jpg" />
-        <p>
-          I built the basic minesweeper game where bombs are placed randomly on
-          the field and the player have to find all of them. The player can
-          black out squares that you believe are the bombs. You can check out
-          how I built it on my github page. The link to try out the game is
-          bellow.
-        </p>
-        <a
-          type="button"
-          class="btn btn-outline-light"
-          href="http://sky121.github.io/Minesweeper/"
-        >
-          Play Game
-        </a>
+        <figure class="exhibit">
+          <div class="exhibit-frame">
+            <img
+              src="images/Chemo.jpg"
+              alt="The chemotaxis simulation, small organisms scattered across the field moving toward food"
+            />
+          </div>
+          <figcaption class="placard">
+            <p class="placard-title">Chemotaxis</p>
+            <p class="placard-medium">Java &middot; simulation &middot; emergent behavior</p>
+            <p class="placard-desc">
+              A simulation of organisms drifting toward food and consuming
+              it &mdash; simple rules, gathered into a small living scene.
+            </p>
+          </figcaption>
+        </figure>
       </div>
-      <div class="proj-sec">
-        <h3>
-          Asteroids Game
-        </h3>
-        <img src="images/Asteroids.jpg" />
-        <p>
-          I built the basic asteroids game where you flight around in your
-          spaceship and try to dodge all the asteroids and stay alive. The
-          player can shoot the asteroids and use the hyperspace special ability
-          to survive. You can check out how I built it on my github page. The
-          link to try out the game is bellow.
-        </p>
-        <a
-          type="button"
-          class="btn btn-outline-light"
-          href="https://sky121.github.io/AsteroidsGame/"
-        >
-          Play Game
-        </a>
-      </div>
-      <div class="proj-sec">
-        <h3>
-          Fireworks
-        </h3>
-        <img src="images/Fireworks.jpg" />
-        <p>
-          Here I made a fun firwork show to practice object oriented programming
-          as well as utilizing the color and animation to create a color show.
-        </p>
-      </div>
-      <div class="proj-sec">
-        <h3>
-          Snowflake Catcher
-        </h3>
-        <img src="images/snowflake.jpg" />
-        <p>
-          In this project, I developed a simple program where the player tries
-          to catch the snow by drawing.
-        </p>
-      </div>
-      <div class="proj-sec">
-        <h3>
-          Chemotaxis
-        </h3>
-        <img src="images/Chemo.jpg" />
-        <p>
-          In this project, I developed a simple program that is a simulation of
-          organisms moving toward food and eating it.
-        </p>
-      </div>
-    </div>
-    <!-- Optional JavaScript -->
-    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
-    <script
-      src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
-      integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
-      integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
-      integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
-      crossorigin="anonymous"
-    ></script>
-    <!--jquery-->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-    <script src="assets/js/main.js"></script>
-    <div class="load-wrapper">
-      <div class="box">
-        <div class="b b1"></div>
-        <div class="b b2"></div>
-        <div class="b b3"></div>
-        <div class="b b4"></div>
-      </div>
-    </div>
+    </main>
+
+    <footer class="exhibit-footer">
+      <p>
+        Skylar Hoffman<span class="sep">&middot;</span
+        ><a href="mailto:skylar.j.hoffman@gmail.com">skylar.j.hoffman@gmail.com</a
+        ><span class="sep">&middot;</span
+        ><a href="https://github.com/sky121">github.com/sky121</a>
+      </p>
+    </footer>
   </body>
 </html>
