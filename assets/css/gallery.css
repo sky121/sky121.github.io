@@ -61,6 +61,7 @@ html {
 
 html,
 body {
+  overflow-x: hidden; /* pre-2022 Safari ignores clip */
   overflow-x: clip;
 }
 
@@ -491,6 +492,7 @@ html.golden body::after {
   transition:
     background-color 0.35s ease,
     border-color 0.35s ease,
+    -webkit-backdrop-filter 0.35s ease,
     backdrop-filter 0.35s ease,
     box-shadow 0.35s ease;
 }
@@ -560,7 +562,12 @@ html.golden body::after {
   transition: transform 0.3s ease;
 }
 
-.nav-links a:hover::after,
+/* Kept as separate rules: grouping :focus-visible would drop the whole
+   list on engines that don't recognize it. */
+.nav-links a:hover::after {
+  transform: scaleX(1);
+}
+
 .nav-links a:focus-visible::after {
   transform: scaleX(1);
 }
@@ -952,7 +959,10 @@ footer#contact {
   transition: transform 0.3s ease;
 }
 
-/* The blot of pigment itself: pooled center, settled darker rim. */
+/* The blot of pigment itself: pooled center, settled darker rim.
+   Plain-color fallback first: color-mix() with var() is invalid at
+   computed-value time on pre-2023 engines, which would otherwise leave the
+   blot fully transparent rather than falling back through the cascade. */
 .pigment::before {
   content: "";
   position: absolute;
@@ -960,23 +970,8 @@ footer#contact {
   z-index: -1;
   border-radius: 56% 44% 48% 52% / 47% 53% 46% 54%;
   background: var(--c, var(--pond));
-  background:
-    radial-gradient(
-      ellipse 75% 70% at 33% 30%,
-      color-mix(in srgb, var(--c, var(--pond)) 30%, transparent) 0%,
-      transparent 68%
-    ),
-    radial-gradient(
-      ellipse 110% 105% at 58% 64%,
-      color-mix(in srgb, var(--c, var(--pond)) 72%, transparent) 0%,
-      color-mix(in srgb, var(--c, var(--pond)) 44%, transparent) 62%,
-      transparent 92%
-    );
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--c, var(--pond)) 50%, transparent),
-    inset 0 0 22px color-mix(in srgb, var(--c, var(--pond)) 38%, transparent),
-    0 14px 26px -18px rgba(46, 58, 72, 0.5);
-  opacity: 0.82;
+  box-shadow: 0 14px 26px -18px rgba(46, 58, 72, 0.5);
+  opacity: 0.45;
   mix-blend-mode: multiply;
   filter: blur(0.4px);
   animation: pigment-morph 12s ease-in-out infinite alternate;
@@ -993,10 +988,36 @@ footer#contact {
   right: -10%;
   bottom: -16%;
   border-radius: 62% 38% 55% 45% / 48% 62% 38% 52%;
-  background: color-mix(in srgb, var(--c, var(--pond)) 50%, transparent);
+  background: var(--c, var(--pond));
   mix-blend-mode: multiply;
   opacity: 0.55;
   filter: blur(0.6px);
+}
+
+@supports (background: color-mix(in srgb, red 50%, transparent)) {
+  .pigment::before {
+    opacity: 0.82;
+    background:
+      radial-gradient(
+        ellipse 75% 70% at 33% 30%,
+        color-mix(in srgb, var(--c, var(--pond)) 30%, transparent) 0%,
+        transparent 68%
+      ),
+      radial-gradient(
+        ellipse 110% 105% at 58% 64%,
+        color-mix(in srgb, var(--c, var(--pond)) 72%, transparent) 0%,
+        color-mix(in srgb, var(--c, var(--pond)) 44%, transparent) 62%,
+        transparent 92%
+      );
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--c, var(--pond)) 50%, transparent),
+      inset 0 0 22px color-mix(in srgb, var(--c, var(--pond)) 38%, transparent),
+      0 14px 26px -18px rgba(46, 58, 72, 0.5);
+  }
+
+  .pigment::after {
+    background: color-mix(in srgb, var(--c, var(--pond)) 50%, transparent);
+  }
 }
 
 .pigment:hover {
@@ -1266,7 +1287,10 @@ footer#contact .section-head {
   color: var(--pond-ink);
 }
 
-.contact-link:hover::after,
+.contact-link:hover::after {
+  transform: scaleX(1);
+}
+
 .contact-link:focus-visible::after {
   transform: scaleX(1);
 }
