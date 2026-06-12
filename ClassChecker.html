@@ -50,33 +50,32 @@
       <p class="room-label">Exhibit &middot; Class Alert</p>
       <h1 class="exhibit-title">Class Alert</h1>
       <p class="exhibit-subtitle">
-        A watchful Python script that refreshes the page so you never have
-        to &mdash; and writes the moment a seat opens.
+        A Python web scraper that monitors UC Irvine course enrollment and
+        sends an alert the moment a seat opens.
       </p>
 
       <div class="exhibit-intro">
         <p>
           During my undergraduate studies at the University of California,
-          Irvine, course enrollment brought a familiar litany of frustrations:
-          bad wifi, server crashes, full courses, and stressful waitlists.
-          During one especially bad episode, with the enrollment site crashing
-          again and again, I spent hours refreshing a single page in hopes of
-          claiming a spot in an important course. After so much time lost to so
-          trivial a task, I decided there had to be a better way &mdash; an
-          application that would watch the page on my behalf. I chose a Python
-          web scraper to load and refresh the page and detect the instant my
-          course opened.
+          Irvine, course enrollment was a recurring frustration: server
+          crashes, full courses, and long waitlists. During one enrollment
+          period, with the site repeatedly crashing, I spent hours refreshing
+          a single page to claim a spot in an important course. I decided to
+          automate the task &mdash; a Python web scraper that would load and
+          refresh the page and detect the moment the course opened.
         </p>
         <p>
           I called the project Class Alert. Built in Python, it sends an alert
-          by email and text the moment a course becomes available. When the
-          script runs, it takes the department and the course code of the
-          class you want, reports in real time whether the class is open, and
-          lets you set both the refresh interval and the contact details to
-          ping when a seat appears.
+          by email and text the moment a course becomes available. The script
+          takes a department and course code, reports in real time whether
+          the class is open, and allows both the refresh interval and the
+          alert's contact details to be configured.
         </p>
         <p>
-          The project absorbed me precisely because it solved a frustration I was living through &mdash; hours would pass without my noticing. It opened a whole new realm of web scraping, and it carried the fundamentals of my coursework into the real world, where they finally had something to do.
+          The project held my attention because it solved a problem I was
+          dealing with at the time. It introduced me to web scraping, and it
+          was an early application of coursework fundamentals to a practical
+          problem.
         </p>
       </div>
 
@@ -98,10 +97,10 @@
             <h2 class="placard-title">The Inputs</h2>
             <p class="placard-medium">Python &middot; web scraping &middot; command line</p>
             <p class="placard-desc">
-              On launch, the script asks for the department and the course
-              code of the specific class you want, then reports in real time
-              whether that class is open. Every sixty seconds it looks again,
-              waiting patiently for OPEN.
+              On launch, the script asks for the department and course code
+              of the class to watch, then reports in real time whether that
+              class is open. It checks again every sixty seconds until the
+              status reads OPEN.
             </p>
           </figcaption>
         </figure>
@@ -114,12 +113,12 @@
             />
           </div>
           <figcaption class="placard">
-            <h2 class="placard-title">The Letter</h2>
+            <h2 class="placard-title">The Alert</h2>
             <p class="placard-medium">Python &middot; email &amp; SMS alerts &middot; automation</p>
             <p class="placard-desc">
               The moment the class opens, the script detects the change and
-              sends an email announcing the news &mdash; complete with the
-              course code and the exact time the seat appeared.
+              sends an email with the course code and the time the seat
+              opened.
             </p>
           </figcaption>
         </figure>
