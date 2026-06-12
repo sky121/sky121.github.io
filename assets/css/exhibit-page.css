@@ -97,7 +97,7 @@ body::after {
   border-radius: 50%;
   pointer-events: none;
   mix-blend-mode: multiply;
-  filter: blur(64px);
+  filter: blur(14px);
   opacity: 0.55;
   will-change: transform;
 }

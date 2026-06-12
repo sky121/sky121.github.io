@@ -216,9 +216,9 @@ html.golden body::after {
   position: absolute;
   inset: 0;
   border-radius: 52% 48% 55% 45% / 48% 56% 44% 52%;
-  filter: blur(48px);
+  filter: blur(12px); /* gradients carry the softness; heavy blur was 4x frame cost */
   opacity: 0.55;
-  will-change: transform, border-radius;
+  will-change: transform;
 }
 
 .wash--pond {
@@ -882,7 +882,7 @@ footer#contact {
     radial-gradient(circle at 64% 62%, rgba(127, 168, 201, 0.3) 0%, rgba(127, 168, 201, 0) 58%),
     radial-gradient(circle at 36% 70%, rgba(217, 139, 160, 0.24) 0%, rgba(217, 139, 160, 0) 54%);
   mix-blend-mode: multiply;
-  filter: blur(26px);
+  filter: blur(14px);
   animation: portrait-wash-morph 24s ease-in-out infinite alternate;
 }
 
