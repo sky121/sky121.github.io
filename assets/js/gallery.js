@@ -327,6 +327,7 @@
     }
 
     function spawnBloom(x, y, radius, passColors) {
+      if (reducedMotion) return; // respect a mid-session toggle for new spawns
       if (!passColors) {
         passColors = paletteRGBA[colorIndex % paletteRGBA.length];
         colorIndex++;
@@ -434,6 +435,28 @@
       startLoop();
     }
 
+    function stopAndClear() {
+      blooms.length = 0;
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+        rafId = 0;
+      }
+      running = false;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, viewW, viewH);
+    }
+
+    var burstCapTimer = 0;
+    function boostBloomCap() {
+      // The "monet" burst spawns far more blooms than the steady-state cap;
+      // raise it temporarily so the burst doesn't evict its own splashes.
+      maxBlooms = 160;
+      window.clearTimeout(burstCapTimer);
+      burstCapTimer = window.setTimeout(function () {
+        maxBlooms = MAX_BLOOMS;
+      }, 8000);
+    }
+
     /* --- input: trail painting (fine pointers only) --- */
     if (finePointer) {
       var lastX = null;
@@ -457,7 +480,7 @@
       if (event.target && event.target.closest &&
           event.target.closest('a,button,input,textarea,select')) return;
       spawnSplash(event.clientX, event.clientY);
-    }, { passive: true });
+    });
 
     /* --- page visibility --- */
     document.addEventListener('visibilitychange', function () {
@@ -465,7 +488,12 @@
       else resume();
     });
 
-    return { spawnSplash: spawnSplash, goldenRGBA: goldenRGBA };
+    return {
+      spawnSplash: spawnSplash,
+      goldenRGBA: goldenRGBA,
+      stopAndClear: stopAndClear,
+      boostBloomCap: boostBloomCap
+    };
   })();
 
   /* ------------------------------------------------------------------ *
@@ -493,6 +521,7 @@
       }, 6000);
 
       if (paint) {
+        paint.boostBloomCap();
         var w = window.innerWidth;
         var h = window.innerHeight;
         for (var i = 0; i < 14; i++) {
