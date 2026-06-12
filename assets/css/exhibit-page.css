@@ -8,9 +8,10 @@
   --paper: #f6f1e7;
   --paper-deep: #efe7d8;
   --ink: #2e3a48;
-  --ink-soft: #5b6b7a;
+  --ink-soft: #5a6a79; /* 4.53:1 on --paper-deep, 4.94:1 on --paper (WCAG AA) */
   --pond: #7fa8c9;
   --pond-deep: #4a7299;
+  --pond-ink: #456a8f; /* text-safe pond: 4.61:1 on --paper-deep, 5.03:1 on --paper */
   --wisteria: #a292c4;
   --sage: #93b48b;
   --rose: #d98ba0;
@@ -59,12 +60,12 @@ img {
 }
 
 a {
-  color: var(--pond-deep);
+  color: var(--pond-ink);
 }
 
 ::selection {
-  background: var(--pond);
-  color: var(--paper);
+  background: rgba(127, 168, 201, 0.3); /* pond at 30% — ink stays 8.2:1 */
+  color: var(--ink);
 }
 
 /* Visible focus states */
@@ -180,6 +181,20 @@ body::after {
   top: 1rem;
 }
 
+/* Visually hidden, available to assistive technology */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ---------- Top navigation ---------- */
 
 .exhibit-nav {
@@ -231,8 +246,8 @@ body::after {
 }
 
 .back-link:hover {
-  color: var(--pond-deep);
-  border-color: var(--pond-deep);
+  color: var(--pond-ink);
+  border-color: var(--pond-ink);
 }
 
 /* ---------- Page header (room entrance) ---------- */
@@ -411,7 +426,7 @@ body::after {
   font-size: 0.75rem;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: var(--pond-deep);
+  color: var(--pond-ink);
   text-decoration: none;
   padding-bottom: 0.25rem;
   border-bottom: 1px solid rgba(74, 114, 153, 0.4);
@@ -467,8 +482,8 @@ body::after {
 }
 
 .exhibit-footer a:hover {
-  color: var(--pond-deep);
-  border-color: var(--pond-deep);
+  color: var(--pond-ink);
+  border-color: var(--pond-ink);
 }
 
 .exhibit-footer .sep {
@@ -488,7 +503,8 @@ body::after {
   }
 
   .exhibit-frame,
-  .exhibit-frame:hover {
+  .exhibit-frame:hover,
+  .skip-link {
     transition: none;
   }
 
