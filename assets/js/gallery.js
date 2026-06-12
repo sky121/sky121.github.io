@@ -3,14 +3,37 @@
 (function () {
   'use strict';
 
+  if (window.__galleryInit) return;
+  window.__galleryInit = true;
+
   /* ------------------------------------------------------------------ *
    * Environment capabilities
    * ------------------------------------------------------------------ */
   var reducedMotion = false;
   var finePointer = false;
+
+  function watchQuery(query, onChange) {
+    if (typeof query.addEventListener === 'function') {
+      query.addEventListener('change', onChange);
+    } else if (typeof query.addListener === 'function') {
+      query.addListener(onChange);
+    }
+  }
+
   try {
-    reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    var reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var finePointerQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
+    reducedMotion = reducedMotionQuery.matches;
+    finePointer = finePointerQuery.matches;
+    watchQuery(reducedMotionQuery, function (event) {
+      reducedMotion = event.matches;
+      // Let existing blooms finish naturally elsewhere; on opt-in to reduced
+      // motion, clear current blooms and stop the paint loop immediately.
+      if (reducedMotion && paint) paint.stopAndClear();
+    });
+    watchQuery(finePointerQuery, function (event) {
+      finePointer = event.matches;
+    });
   } catch (e) { /* matchMedia unavailable; keep safe defaults */ }
 
   /* ------------------------------------------------------------------ *
@@ -67,7 +90,8 @@
     }
 
     function clearDelayAfterTransition(el) {
-      el.addEventListener('transitionend', function handler() {
+      el.addEventListener('transitionend', function handler(e) {
+        if (e.target !== el) return;
         el.style.transitionDelay = '';
         el.removeEventListener('transitionend', handler);
       });
@@ -103,12 +127,22 @@
 
     var MAX_DEG = 4;
 
-    function onMove(event) {
-      var el = event.currentTarget;
-      var rect = el.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-      var mx = (event.clientX - rect.left) / rect.width;   // 0..1
-      var my = (event.clientY - rect.top) / rect.height;   // 0..1
+    // Cache rects per element (measured at rest, before any tilt rotation),
+    // and gate CSS-var writes behind a single pending rAF.
+    var rects = new WeakMap();
+    var pendingFrame = 0;
+    var pendingEl = null;
+    var pendingX = 0;
+    var pendingY = 0;
+
+    function applyTilt() {
+      pendingFrame = 0;
+      var el = pendingEl;
+      if (!el) return;
+      var rect = rects.get(el);
+      if (!rect || rect.width === 0 || rect.height === 0) return;
+      var mx = (pendingX - rect.left) / rect.width;   // 0..1
+      var my = (pendingY - rect.top) / rect.height;   // 0..1
       mx = Math.min(1, Math.max(0, mx));
       my = Math.min(1, Math.max(0, my));
       // Tilt toward the cursor: top edge leans back when cursor is high, etc.
@@ -120,8 +154,22 @@
       el.style.setProperty('--my', my.toFixed(3));
     }
 
+    function onEnter(event) {
+      var el = event.currentTarget;
+      rects.set(el, el.getBoundingClientRect());
+    }
+
+    function onMove(event) {
+      pendingEl = event.currentTarget;
+      pendingX = event.clientX;
+      pendingY = event.clientY;
+      if (!pendingFrame) pendingFrame = window.requestAnimationFrame(applyTilt);
+    }
+
     function onLeave(event) {
       var el = event.currentTarget;
+      rects.delete(el);
+      if (pendingEl === el) pendingEl = null;
       el.style.setProperty('--rx', '0deg');
       el.style.setProperty('--ry', '0deg');
       el.style.setProperty('--mx', '0.5');
@@ -129,7 +177,8 @@
     }
 
     for (var i = 0; i < frames.length; i++) {
-      frames[i].addEventListener('pointermove', onMove);
+      frames[i].addEventListener('pointerenter', onEnter);
+      frames[i].addEventListener('pointermove', onMove, { passive: true });
       frames[i].addEventListener('pointerleave', onLeave);
     }
   })();
@@ -138,16 +187,26 @@
    * Pigment buttons — ripple + splash
    * ------------------------------------------------------------------ */
   (function initPigmentButtons() {
-    var buttons = document.querySelectorAll('button.pigment');
+    var buttons = document.querySelectorAll('.pigment');
     if (buttons.length === 0) return;
 
     function onClick(event) {
       var btn = event.currentTarget;
+      var rect = btn.getBoundingClientRect();
+      var x, y;
+      if (event.detail === 0) {
+        // Keyboard activation: center the ripple.
+        x = rect.width / 2;
+        y = rect.height / 2;
+      } else {
+        x = event.clientX - rect.left;
+        y = event.clientY - rect.top;
+      }
 
       var ripple = document.createElement('span');
       ripple.className = 'ripple';
-      ripple.style.left = event.offsetX + 'px';
-      ripple.style.top = event.offsetY + 'px';
+      ripple.style.left = x + 'px';
+      ripple.style.top = y + 'px';
       btn.appendChild(ripple);
       window.setTimeout(function () {
         if (ripple.parentNode) ripple.parentNode.removeChild(ripple);
@@ -187,6 +246,7 @@
     var GROW_TIME = 1200;
     var GROW_MAX = 1.6;
     var MAX_BLOOMS = 90;
+    var maxBlooms = MAX_BLOOMS; // raised temporarily during the easter-egg burst
     var SPAWN_DIST = 34;
 
     function hexToRgb(hex) {
@@ -218,10 +278,11 @@
     var colorIndex = 0;
     var viewW = 0;
     var viewH = 0;
+    var dpr = 1; // owned by resizeCanvas(); matches the current canvas bitmap
 
     /* --- sizing --- */
     function resizeCanvas() {
-      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
       viewW = window.innerWidth;
       viewH = window.innerHeight;
       canvas.width = Math.round(viewW * dpr);
@@ -278,7 +339,7 @@
         colors: passColors,
         born: performance.now()
       });
-      if (blooms.length > MAX_BLOOMS) blooms.splice(0, blooms.length - MAX_BLOOMS);
+      if (blooms.length > maxBlooms) blooms.splice(0, blooms.length - maxBlooms);
       startLoop();
     }
 
@@ -306,14 +367,13 @@
 
     function frame(now) {
       rafId = 0;
-      var dpr = Math.min(window.devicePixelRatio || 1, 2);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, viewW, viewH);
 
       var write = 0;
       for (var i = 0; i < blooms.length; i++) {
         var b = blooms[i];
-        var age = now - b.born;
+        var age = Math.max(0, now - b.born);
         if (age >= LIFESPAN) continue; // dead — drop it
         blooms[write++] = b;
 
