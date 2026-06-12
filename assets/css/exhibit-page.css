@@ -89,14 +89,31 @@ body::after {
   background-size: 240px 240px;
 }
 
-/* ---------- Watercolor wash blobs ---------- */
+/* ---------- Watercolor wash blobs ----------
+   .wash-field stays static (zero height, no stacking context) so each fixed
+   .wash can multiply-blend against the paper itself. gallery.js writes a
+   --parallax length onto each .wash on scroll; that translate lives on the
+   element while the drift animation lives on ::before, so the keyframes
+   never stomp the inline custom property. (Mirrors gallery.css.) */
+
+.wash-field {
+  pointer-events: none;
+}
 
 .wash {
   position: fixed;
   z-index: 0;
-  border-radius: 50%;
   pointer-events: none;
   mix-blend-mode: multiply;
+  transform: translateY(var(--parallax, 0px));
+  will-change: transform;
+}
+
+.wash::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
   filter: blur(14px);
   opacity: 0.55;
   will-change: transform;
@@ -109,6 +126,8 @@ body::after {
   height: 58vw;
   min-width: 26rem;
   min-height: 26rem;
+}
+.wash--pond::before {
   background:
     radial-gradient(circle at 38% 42%, rgba(127, 168, 201, 0.55) 0%, rgba(127, 168, 201, 0) 62%),
     radial-gradient(circle at 64% 58%, rgba(74, 114, 153, 0.32) 0%, rgba(74, 114, 153, 0) 58%),
@@ -123,6 +142,8 @@ body::after {
   height: 52vw;
   min-width: 24rem;
   min-height: 24rem;
+}
+.wash--wisteria::before {
   background:
     radial-gradient(circle at 55% 45%, rgba(162, 146, 196, 0.5) 0%, rgba(162, 146, 196, 0) 60%),
     radial-gradient(circle at 35% 65%, rgba(217, 139, 160, 0.26) 0%, rgba(217, 139, 160, 0) 55%),
@@ -137,6 +158,8 @@ body::after {
   height: 48vw;
   min-width: 22rem;
   min-height: 22rem;
+}
+.wash--sage::before {
   background:
     radial-gradient(circle at 45% 50%, rgba(147, 180, 139, 0.48) 0%, rgba(147, 180, 139, 0) 60%),
     radial-gradient(circle at 62% 38%, rgba(205, 184, 120, 0.3) 0%, rgba(205, 184, 120, 0) 55%),
@@ -157,6 +180,64 @@ body::after {
 @keyframes drift-c {
   from { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
   to   { transform: translate3d(-4vw, -6vh, 0) rotate(7deg) scale(1.1); }
+}
+
+/* ---------- Cursor paint canvas ----------
+   gallery.js paints watercolor blooms here. Above the washes (z:0),
+   below all content (z:2+). Mirrors gallery.css. */
+
+#paint-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+/* ---------- Golden-hour overlay ----------
+   "monet" easter egg: gallery.js toggles html.golden for 6 seconds.
+   The grain already owns body::after on these pages, so the golden wash
+   rides body::before instead. */
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: multiply;
+  background:
+    radial-gradient(
+      120% 90% at 50% 28%,
+      rgba(255, 226, 158, 0.06) 0%,
+      rgba(205, 170, 100, 0.26) 62%,
+      rgba(152, 112, 72, 0.4) 100%
+    ),
+    linear-gradient(180deg, rgba(255, 214, 140, 0.16), rgba(217, 139, 160, 0.12));
+  transition: opacity 1.2s ease;
+}
+
+html.golden body::before {
+  opacity: 1;
+}
+
+/* ---------- Reveal-on-scroll ----------
+   gallery.js adds .is-visible (with a staggered inline transition-delay).
+   Hidden state only applies when JS is running (html.js is set by an
+   inline script in <head>). Mirrors gallery.css. */
+
+html.js .reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.9s ease, transform 0.9s ease;
+}
+
+html.js .reveal.is-visible {
+  opacity: 1;
+  transform: none;
 }
 
 /* ---------- Skip link ---------- */
@@ -252,9 +333,10 @@ body::after {
 
 /* ---------- Page header (room entrance) ---------- */
 
+/* Content sits above the washes (z:0) and the paint canvas (z:1). */
 .exhibit-room {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   max-width: 54rem;
   margin: 0 auto;
   padding: clamp(1.5rem, 4vw, 3rem) clamp(1.25rem, 5vw, 3rem) clamp(4rem, 8vw, 7rem);
@@ -459,7 +541,7 @@ body::after {
 
 .exhibit-footer {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   max-width: 54rem;
   margin: 0 auto;
   padding: 2.4rem clamp(1.25rem, 5vw, 3rem) 3rem;
@@ -498,13 +580,28 @@ body::after {
     scroll-behavior: auto;
   }
 
-  .wash {
+  /* The compound selectors out-rank the per-wash rules
+     (.wash--pond::before etc.), which would otherwise keep animating. */
+  .wash,
+  .wash::before,
+  .wash--pond::before,
+  .wash--wisteria::before,
+  .wash--sage::before {
     animation: none;
+  }
+
+  /* Reveal targets show instantly; gallery.js never hides the canvas
+     paint loop under reduced motion (it skips init / clears blooms). */
+  html.js .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 
   .exhibit-frame,
   .exhibit-frame:hover,
-  .skip-link {
+  .skip-link,
+  body::before {
     transition: none;
   }
 

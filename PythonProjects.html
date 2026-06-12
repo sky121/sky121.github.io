@@ -26,13 +26,18 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="assets/css/exhibit-page.css" />
+    <script>document.documentElement.classList.add('js');</script>
   </head>
   <body>
     <a class="skip-link" href="#room">Skip to exhibit</a>
 
-    <div class="wash wash--pond" aria-hidden="true"></div>
-    <div class="wash wash--wisteria" aria-hidden="true"></div>
-    <div class="wash wash--sage" aria-hidden="true"></div>
+    <div class="wash-field" aria-hidden="true">
+      <div class="wash wash--pond"></div>
+      <div class="wash wash--wisteria"></div>
+      <div class="wash wash--sage"></div>
+    </div>
+
+    <canvas id="paint-canvas" aria-hidden="true"></canvas>
 
     <header>
       <nav class="exhibit-nav" aria-label="Primary">
@@ -62,7 +67,7 @@
       <hr class="brushstroke-rule" />
 
       <div class="exhibit-list">
-        <figure class="exhibit">
+        <figure class="exhibit reveal">
           <div class="exhibit-frame">
             <img loading="lazy" decoding="async"
               src="images/Columns.jpg"
@@ -86,7 +91,7 @@
           </figcaption>
         </figure>
 
-        <figure class="exhibit">
+        <figure class="exhibit reveal">
           <div class="exhibit-frame">
             <img loading="lazy" decoding="async"
               src="images/BallSim.jpg"
@@ -124,5 +129,7 @@
         ><a href="https://github.com/sky121">github.com/sky121</a>
       </p>
     </footer>
+
+    <script defer src="assets/js/gallery.js"></script>
   </body>
 </html>

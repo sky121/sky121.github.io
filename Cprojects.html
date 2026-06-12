@@ -26,13 +26,18 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="assets/css/exhibit-page.css" />
+    <script>document.documentElement.classList.add('js');</script>
   </head>
   <body>
     <a class="skip-link" href="#room">Skip to exhibit</a>
 
-    <div class="wash wash--pond" aria-hidden="true"></div>
-    <div class="wash wash--wisteria" aria-hidden="true"></div>
-    <div class="wash wash--sage" aria-hidden="true"></div>
+    <div class="wash-field" aria-hidden="true">
+      <div class="wash wash--pond"></div>
+      <div class="wash wash--wisteria"></div>
+      <div class="wash wash--sage"></div>
+    </div>
+
+    <canvas id="paint-canvas" aria-hidden="true"></canvas>
 
     <header>
       <nav class="exhibit-nav" aria-label="Primary">
@@ -62,7 +67,7 @@
       <hr class="brushstroke-rule" />
 
       <div class="exhibit-list">
-        <figure class="exhibit">
+        <figure class="exhibit reveal">
           <div class="exhibit-frame">
             <img loading="lazy" decoding="async"
               src="images/TextEditor.jpg"
@@ -73,9 +78,7 @@
             <h2 class="placard-title">Text Editor</h2>
             <p class="placard-medium">C++ &middot; command pattern &middot; undo / redo</p>
             <p class="placard-desc">
-              A text editor written in C++ with the full vocabulary of the
-              form: insert character, cursor up, down, left, and right, home
-              and end, new line, backspace, delete line, undo, redo, and quit.
+              A text editor written in C++ with the full vocabulary of the form &mdash; cursor, line, and character at your command, with undo and redo to forgive every stroke.
             </p>
             <a
               class="placard-link"
@@ -85,7 +88,7 @@
           </figcaption>
         </figure>
 
-        <figure class="exhibit">
+        <figure class="exhibit reveal">
           <div class="exhibit-frame">
             <img loading="lazy" decoding="async"
               src="images/LoginSystem.jpg"
@@ -96,9 +99,7 @@
             <h2 class="placard-title">Login System</h2>
             <p class="placard-medium">C++ &middot; hash map &middot; data structures</p>
             <p class="placard-desc">
-              A simple login framework composed in C++ from a range of data
-              structures and types, including a hash map implemented entirely
-              by hand.
+              A login framework whose credentials are kept in a hash map implemented entirely by hand &mdash; the structure this exhibit is really about.
             </p>
             <a
               class="placard-link"
@@ -108,7 +109,7 @@
           </figcaption>
         </figure>
 
-        <figure class="exhibit">
+        <figure class="exhibit reveal">
           <div class="exhibit-frame">
             <img loading="lazy" decoding="async"
               src="images/path.jpg"
@@ -132,7 +133,7 @@
           </figcaption>
         </figure>
 
-        <figure class="exhibit">
+        <figure class="exhibit reveal">
           <div class="exhibit-frame">
             <img loading="lazy" decoding="async"
               src="images/WordGen.jpg"
@@ -164,5 +165,7 @@
         ><a href="https://github.com/sky121">github.com/sky121</a>
       </p>
     </footer>
+
+    <script defer src="assets/js/gallery.js"></script>
   </body>
 </html>

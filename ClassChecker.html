@@ -26,13 +26,18 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="assets/css/exhibit-page.css" />
+    <script>document.documentElement.classList.add('js');</script>
   </head>
   <body>
     <a class="skip-link" href="#room">Skip to exhibit</a>
 
-    <div class="wash wash--pond" aria-hidden="true"></div>
-    <div class="wash wash--wisteria" aria-hidden="true"></div>
-    <div class="wash wash--sage" aria-hidden="true"></div>
+    <div class="wash-field" aria-hidden="true">
+      <div class="wash wash--pond"></div>
+      <div class="wash wash--wisteria"></div>
+      <div class="wash wash--sage"></div>
+    </div>
+
+    <canvas id="paint-canvas" aria-hidden="true"></canvas>
 
     <header>
       <nav class="exhibit-nav" aria-label="Primary">
@@ -71,19 +76,14 @@
           ping when a seat appears.
         </p>
         <p>
-          I found I was deeply engaged by this project precisely because it
-          solved a frustration I was living through &mdash; hours would pass
-          without my noticing. Though the work was not highly technical, it
-          opened a whole new realm of web scraping for me, and it was a
-          gratifying way to carry the fundamentals from my coursework into the
-          real world.
+          The project absorbed me precisely because it solved a frustration I was living through &mdash; hours would pass without my noticing. It opened a whole new realm of web scraping, and it carried the fundamentals of my coursework into the real world, where they finally had something to do.
         </p>
       </div>
 
       <hr class="brushstroke-rule" />
 
       <div class="exhibit-list">
-        <figure class="exhibit">
+        <figure class="exhibit reveal">
           <div class="exhibit-frame exhibit-frame--diptych">
             <img loading="lazy" decoding="async"
               src="images/classCheckerInputs.jpg"
@@ -106,7 +106,7 @@
           </figcaption>
         </figure>
 
-        <figure class="exhibit">
+        <figure class="exhibit reveal">
           <div class="exhibit-frame">
             <img loading="lazy" decoding="async"
               src="images/emailSent.jpg"
@@ -134,5 +134,7 @@
         ><a href="https://github.com/sky121">github.com/sky121</a>
       </p>
     </footer>
+
+    <script defer src="assets/js/gallery.js"></script>
   </body>
 </html>

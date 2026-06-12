@@ -26,13 +26,18 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="assets/css/exhibit-page.css" />
+    <script>document.documentElement.classList.add('js');</script>
   </head>
   <body>
     <a class="skip-link" href="#room">Skip to exhibit</a>
 
-    <div class="wash wash--pond" aria-hidden="true"></div>
-    <div class="wash wash--wisteria" aria-hidden="true"></div>
-    <div class="wash wash--sage" aria-hidden="true"></div>
+    <div class="wash-field" aria-hidden="true">
+      <div class="wash wash--pond"></div>
+      <div class="wash wash--wisteria"></div>
+      <div class="wash wash--sage"></div>
+    </div>
+
+    <canvas id="paint-canvas" aria-hidden="true"></canvas>
 
     <header>
       <nav class="exhibit-nav" aria-label="Primary">
@@ -45,8 +50,7 @@
       <p class="room-label">Residency &middot; Sun Basket</p>
       <h1 class="exhibit-title">Sun Basket</h1>
       <p class="exhibit-subtitle">
-        Four short films from <em>30 Days of Summer Salads</em> &mdash; an
-        Instagram TV series produced during my internship.
+        Four episodes of <em>30 Days of Summer Salads</em>, Sun Basket&rsquo;s Instagram TV series &mdash; shot and edited during a summer internship.
       </p>
 
       <div class="exhibit-intro">
@@ -61,7 +65,7 @@
       <hr class="brushstroke-rule" />
 
       <div class="exhibit-list">
-        <figure class="exhibit">
+        <figure class="exhibit reveal">
           <div class="exhibit-frame">
             <img loading="lazy" decoding="async"
               src="images/shrimp_louie.png"
@@ -84,7 +88,7 @@
           </figcaption>
         </figure>
 
-        <figure class="exhibit">
+        <figure class="exhibit reveal">
           <div class="exhibit-frame">
             <img loading="lazy" decoding="async"
               src="images/Burmese_salmon.png"
@@ -106,7 +110,7 @@
           </figcaption>
         </figure>
 
-        <figure class="exhibit">
+        <figure class="exhibit reveal">
           <div class="exhibit-frame">
             <img loading="lazy" decoding="async"
               src="images/Mu%20Shu%20Lettuce.png"
@@ -128,7 +132,7 @@
           </figcaption>
         </figure>
 
-        <figure class="exhibit">
+        <figure class="exhibit reveal">
           <div class="exhibit-frame">
             <img loading="lazy" decoding="async"
               src="images/Chipotle%20Shrimp.png"
@@ -139,8 +143,7 @@
             <h2 class="placard-title">Superfast Chipotle Marinated Shrimp</h2>
             <p class="placard-medium">Instagram TV &middot; food video &middot; summer series</p>
             <p class="placard-desc">
-              The series' smoky finale &mdash; shrimp in a chipotle marinade,
-              seared and plated at Instagram speed.
+              The last of my four, and the smokiest &mdash; shrimp in a chipotle marinade, seared and plated at Instagram speed.
             </p>
             <a
               class="placard-link"
@@ -160,5 +163,7 @@
         ><a href="https://github.com/sky121">github.com/sky121</a>
       </p>
     </footer>
+
+    <script defer src="assets/js/gallery.js"></script>
   </body>
 </html>
