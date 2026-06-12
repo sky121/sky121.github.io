@@ -50,8 +50,16 @@ body {
   font-weight: 300;
   font-size: 1.0625rem;
   line-height: 1.75;
-  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+}
+
+/* clip (with hidden fallback) keeps the layout viewport at device width
+   even when decorative fixed washes overflow — hidden alone let an
+   unbreakable inline run inflate phones to a 577px viewport. */
+html,
+body {
+  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 img {
@@ -569,8 +577,29 @@ html.js .reveal.is-visible {
 }
 
 .exhibit-footer .sep {
-  margin: 0 0.55em;
   color: var(--gold);
+}
+
+/* Flex-wrap so the credit line breaks gracefully instead of forcing the
+   layout viewport wide on phones. */
+.exhibit-footer p {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  column-gap: 0.55em;
+}
+
+/* Page-scoped hangs: tall near-identical posters hang smaller (SunBasket),
+   letterboxed desktop captures crop to their subject (JavaProjects). */
+.room--narrow .exhibit-frame {
+  max-width: 26rem;
+  margin-inline: auto;
+}
+
+.room--crop .exhibit-frame img {
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
 }
 
 /* ---------- Reduced motion ---------- */

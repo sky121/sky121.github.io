@@ -791,6 +791,7 @@ footer#contact {
 .hero-subtitle {
   font-family: var(--font-display);
   font-size: clamp(1.15rem, 2.8vw, 1.55rem);
+  text-wrap: balance;
   font-weight: 400;
   color: var(--ink-soft);
   max-width: 34em;
@@ -1300,10 +1301,10 @@ footer#contact .section-head {
   z-index: -1;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--pond) 0%, var(--wisteria) 60%, var(--rose) 100%);
-  opacity: 0.45;
-  transform: scaleX(0);
+  opacity: 0.16;
+  transform: scaleX(0.3); /* resting hint so links don't read as plain text */
   transform-origin: left center;
-  transition: transform 0.35s ease;
+  transition: transform 0.35s ease, opacity 0.35s ease;
 }
 
 .contact-link:hover {
@@ -1312,10 +1313,12 @@ footer#contact .section-head {
 
 .contact-link:hover::after {
   transform: scaleX(1);
+  opacity: 0.45;
 }
 
 .contact-link:focus-visible::after {
   transform: scaleX(1);
+  opacity: 0.45;
 }
 
 .colophon {
