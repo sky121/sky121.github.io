@@ -14,13 +14,14 @@
    8.  Hero — the entrance (#hero)
    9.  Room I — the artist (#artist)
    10. Room II — the palette (#palette)
-   11. Room III — the gallery (#gallery): frames, tilt, placards
-   12. Annex — studies (#studies)
-   13. The last room — correspondence (#contact)
-   14. Reveal-on-scroll contract
-   15. Responsive
-   16. Reduced motion
-   17. Print
+   11. Room III — the practice (#practice)
+   12. Room IV — the gallery (#gallery): frames, tilt, placards
+   13. Annex — studies (#studies)
+   14. The last room — correspondence (#contact)
+   15. Reveal-on-scroll contract
+   16. Responsive
+   17. Reduced motion
+   18. Print
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -1116,7 +1117,95 @@ footer#contact {
 }
 
 /* --------------------------------------------------------------------------
-   11. Room III — the gallery: hung frames with tilt + sheen, zigzag layout
+   11. Room III — the practice: wall-text panels of professional experience
+   #practice inherits the room container rule (main > section, §7) and the
+   .section-head primitives. Each panel is an austere cousin of the placard —
+   hairline border, soft hung shadow, no tilt. --pc carries each entry's
+   pigment identity (gold, pond, sage in hanging order) onto the left accent
+   edge and the bullet dots, the same way --dc rides the dividers.
+   -------------------------------------------------------------------------- */
+
+.practice-list {
+  list-style: none;
+  max-width: 46rem;
+  margin: 0 auto;
+}
+
+.practice-entry {
+  --pc: var(--gold);
+  background: rgba(251, 247, 238, 0.72); /* --mat at lower presence than .placard */
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--pc);
+  box-shadow: 0 6px 16px -13px rgba(46, 58, 72, 0.3); /* hung lighter than .frame */
+  padding: 2rem 2.4rem;
+  margin-bottom: 3.5rem;
+}
+
+.practice-entry:nth-child(2) { --pc: var(--pond); }
+.practice-entry:nth-child(3) { --pc: var(--sage); }
+
+.practice-entry:last-child {
+  margin-bottom: 0;
+}
+
+.practice-head {
+  padding-bottom: 1.1rem;
+  margin-bottom: 1.1rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.practice-role {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.55rem;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.practice-org {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-top: 0.35rem;
+}
+
+.practice-dates {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--pond-ink);
+  margin-top: 0.15rem;
+}
+
+.practice-points li {
+  position: relative;
+  padding-left: 1.4rem;
+  margin: 0.55rem 0;
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+/* A small settled drop of the entry's pigment in place of a list marker. */
+.practice-points li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 7px;
+  height: 7px;
+  border-radius: 56% 44% 48% 52% / 47% 53% 46% 54%;
+  background: var(--pc, var(--pond));
+  opacity: 0.55;
+  mix-blend-mode: multiply;
+}
+
+/* --------------------------------------------------------------------------
+   12. Room IV — the gallery: hung frames with tilt + sheen, zigzag layout
    -------------------------------------------------------------------------- */
 
 .work {
@@ -1198,7 +1287,7 @@ footer#contact {
 }
 
 /* --------------------------------------------------------------------------
-   12. Annex — studies & sketches grid
+   13. Annex — studies & sketches grid
    -------------------------------------------------------------------------- */
 
 .studies-grid {
@@ -1259,7 +1348,7 @@ footer#contact {
 }
 
 /* --------------------------------------------------------------------------
-   13. The last room — correspondence
+   14. The last room — correspondence
    -------------------------------------------------------------------------- */
 
 footer#contact {
@@ -1334,7 +1423,7 @@ footer#contact .section-head {
 }
 
 /* --------------------------------------------------------------------------
-   14. Reveal-on-scroll — gallery.js adds .is-visible (with a staggered
+   15. Reveal-on-scroll — gallery.js adds .is-visible (with a staggered
    inline transition-delay). Hidden state only applies when JS is running
    (html.js is set by an inline script in <head>).
    -------------------------------------------------------------------------- */
@@ -1351,7 +1440,7 @@ html.js .reveal.is-visible {
 }
 
 /* --------------------------------------------------------------------------
-   15. Responsive
+   16. Responsive
    -------------------------------------------------------------------------- */
 
 @media (min-width: 900px) {
@@ -1398,6 +1487,41 @@ html.js .reveal.is-visible {
     right: clamp(1.5rem, 6vw, 5rem);
     bottom: clamp(5.5rem, 12vh, 8rem);
     margin-top: 0;
+  }
+}
+
+@media (min-width: 700px) {
+  /* Practice panels: role and dates share a baseline, org sits below. */
+  .practice-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    column-gap: 1.2rem;
+  }
+
+  .practice-head .practice-role {
+    order: 1;
+  }
+
+  .practice-head .practice-dates {
+    order: 2;
+    margin-top: 0;
+  }
+
+  .practice-head .practice-org {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 699px) {
+  .practice-entry {
+    padding: 1.4rem 1.2rem;
+  }
+
+  .practice-role {
+    font-size: 1.3rem;
   }
 }
 
@@ -1471,6 +1595,15 @@ html.js .reveal.is-visible {
     padding: 1.2rem 1.2rem 1.3rem;
   }
 
+  .practice-entry {
+    margin-bottom: 2.4rem;
+  }
+
+  .practice-head {
+    padding-bottom: 0.9rem;
+    margin-bottom: 0.9rem;
+  }
+
   .placard-medium {
     letter-spacing: 0.2em;
   }
@@ -1490,7 +1623,7 @@ html.js .reveal.is-visible {
 }
 
 /* --------------------------------------------------------------------------
-   16. Reduced motion — stop the drifting, morphing, floating and blooming;
+   17. Reduced motion — stop the drifting, morphing, floating and blooming;
    show everything instantly.
    -------------------------------------------------------------------------- */
 
@@ -1561,7 +1694,7 @@ html.js .reveal.is-visible {
 }
 
 /* --------------------------------------------------------------------------
-   17. Print — drop the atmosphere, keep the catalogue
+   18. Print — drop the atmosphere, keep the catalogue
    -------------------------------------------------------------------------- */
 
 @media print {
@@ -1605,7 +1738,8 @@ html.js .reveal.is-visible {
   }
 
   .frame,
-  .placard {
+  .placard,
+  .practice-entry {
     box-shadow: none;
   }
 
