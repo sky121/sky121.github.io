@@ -1,195 +1,168 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <!-- Required meta tags -->
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Studies in C++ · Skylar Hoffman</title>
     <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+      name="description"
+      content="A gallery of C++ studies by Skylar Hoffman: a text editor with undo and redo, a login system over a hand-built hash map, an extended Dijkstra's shortest-path explorer, and hand-implemented data structures."
     />
-
-    <!-- Bootstrap CSS -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="canonical" href="https://sky121.github.io/Cprojects.html" />
+    <meta name="theme-color" content="#f6f1e7" />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://sky121.github.io/Cprojects.html" />
+    <meta property="og:image" content="https://sky121.github.io/images/og-card.png" />
+    <meta property="og:title" content="Studies in C++ · Skylar Hoffman" />
+    <meta
+      property="og:description"
+      content="A gallery of C++ studies by Skylar Hoffman: a text editor with undo and redo, a login system over a hand-built hash map, an extended Dijkstra's shortest-path explorer, and hand-implemented data structures."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Karla:wght@300;400;500&display=swap"
       rel="stylesheet"
-      href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
-      integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
-      crossorigin="anonymous"
     />
-    <!-- Add icon library -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
-    />
-
-    <link rel="stylesheet" href="assets/css/main.css" />
-    <title>C++ Projects</title>
+    <link rel="stylesheet" href="assets/css/exhibit-page.css" />
   </head>
   <body>
-    <nav class="navbar navbar-expand fixed-top py-3">
-      <a class="navbar-brand" href="index.html">Skylar Hoffman's Portfolio</a>
+    <a class="skip-link" href="#room">Skip to exhibit</a>
 
-      <div class="collapse navbar-collapse" id="navbarSupportedContent">
-        <ul class="navbar-nav ml-auto ">
-          <li class="nav-item active">
-            <a class="nav-link" href="index.html"
-              >Home <span class="sr-only">(current)</span></a
-            >
-          </li>
+    <div class="wash wash--pond" aria-hidden="true"></div>
+    <div class="wash wash--wisteria" aria-hidden="true"></div>
+    <div class="wash wash--sage" aria-hidden="true"></div>
 
-          <li class="nav-item dropdown">
+    <header>
+      <nav class="exhibit-nav" aria-label="Primary">
+        <a class="monogram" href="index.html" aria-label="S.H. — return to the gallery home">S.H.</a>
+        <a class="back-link" href="index.html">&larr; Back to the gallery</a>
+      </nav>
+    </header>
+
+    <main id="room" class="exhibit-room">
+      <p class="room-label">Archive &middot; C++ Studies</p>
+      <h1 class="exhibit-title">Studies in C++</h1>
+      <p class="exhibit-subtitle">
+        Four works on memory and structure &mdash; built while learning the
+        language from its foundations up.
+      </p>
+
+      <div class="exhibit-intro">
+        <p>
+          This room gathers the pieces I composed while learning C++: a small
+          text editor written from scratch, and a series of data types and
+          structures &mdash; maps, sets, equivalence classes, and graphs &mdash;
+          designed and implemented by hand atop hash tables and the language's
+          own primitives.
+        </p>
+      </div>
+
+      <hr class="brushstroke-rule" />
+
+      <div class="exhibit-list">
+        <figure class="exhibit">
+          <div class="exhibit-frame">
+            <img loading="lazy" decoding="async"
+              src="images/TextEditor.jpg"
+              alt="Terminal screenshot of the C++ text editor, showing lines of text being composed and edited at a cursor"
+            />
+          </div>
+          <figcaption class="placard">
+            <h2 class="placard-title">Text Editor</h2>
+            <p class="placard-medium">C++ &middot; command pattern &middot; undo / redo</p>
+            <p class="placard-desc">
+              A text editor written in C++ with the full vocabulary of the
+              form: insert character, cursor up, down, left, and right, home
+              and end, new line, backspace, delete line, undo, redo, and quit.
+            </p>
             <a
-              class="nav-link dropdown-toggle"
-              href="#"
-              id="navbarDropdown"
-              role="button"
-              data-toggle="dropdown"
-              aria-haspopup="true"
-              aria-expanded="false"
+              class="placard-link"
+              href="https://drive.google.com/file/d/1km6o6XVMJdXpaj8-dpf_GgBDTXvoTPKd/view?usp=sharing"
+              >Watch the recording<span class="visually-hidden"> of Text Editor</span> &rarr;</a
             >
-              Projects
-            </a>
-            <div
-              class="dropdown-menu dropdown-menu-right"
-              aria-labelledby="navbarDropdown"
+          </figcaption>
+        </figure>
+
+        <figure class="exhibit">
+          <div class="exhibit-frame">
+            <img loading="lazy" decoding="async"
+              src="images/LoginSystem.jpg"
+              alt="Terminal screenshot of the C++ login system prompting for credentials"
+            />
+          </div>
+          <figcaption class="placard">
+            <h2 class="placard-title">Login System</h2>
+            <p class="placard-medium">C++ &middot; hash map &middot; data structures</p>
+            <p class="placard-desc">
+              A simple login framework composed in C++ from a range of data
+              structures and types, including a hash map implemented entirely
+              by hand.
+            </p>
+            <a
+              class="placard-link"
+              href="https://drive.google.com/file/d/1iGV7N6CBPa1pAMXmqfSB9xRSCSIm8rMn/view?usp=sharing"
+              >Watch the recording<span class="visually-hidden"> of Login System</span> &rarr;</a
             >
-              <a class="dropdown-item" href="SkyProject">SkyProject</a>
-              <a class="dropdown-item" href="https://www.lavamind.com/"
-                >Lavamind Games</a
-              >
+          </figcaption>
+        </figure>
 
-              <a
-                class="dropdown-item"
-                href="https://devpost.com/software/lyffe-style"
-                >Lyffe Style</a
-              >
+        <figure class="exhibit">
+          <div class="exhibit-frame">
+            <img loading="lazy" decoding="async"
+              src="images/path.jpg"
+              alt="Output of the extended Dijkstra's algorithm tracing the shortest flight paths between airports in a graph"
+            />
+          </div>
+          <figcaption class="placard">
+            <h2 class="placard-title">Extended Dijkstra&rsquo;s Algorithm</h2>
+            <p class="placard-medium">C++ &middot; hash graphs &middot; shortest paths</p>
+            <p class="placard-desc">
+              An implementation of extended Dijkstra's algorithm built on my
+              own hash graphs and sets. The algorithm finds the shortest paths
+              between nodes in a graph &mdash; here, the shortest flight paths
+              between airports.
+            </p>
+            <a
+              class="placard-link"
+              href="https://drive.google.com/file/d/1KfYkfNgY1ljwSFlasCft-96gsCo74vLc/view?usp=sharing"
+              >Watch the recording<span class="visually-hidden"> of Extended Dijkstra&rsquo;s Algorithm</span> &rarr;</a
+            >
+          </figcaption>
+        </figure>
 
-              <a class="dropdown-item" href="Cprojects.html">C++ Projects</a>
-              <a class="dropdown-item" href="PythonProjects.html"
-                >Python Projects</a
-              >
-              <a class="dropdown-item" href="JavaProjects.html"
-                >Mini Java Projects</a
-              >
-              <a class="dropdown-item" href="ClassChecker.html">Class Alert</a>
-              <a class="dropdown-item" href="SunBasket.html">Sun Basket</a>
-            </div>
-          </li>
-        </ul>
+        <figure class="exhibit">
+          <div class="exhibit-frame">
+            <img loading="lazy" decoding="async"
+              src="images/WordGen.jpg"
+              alt="Console output of the Mark Twain word generator predicting word sequences learned from Huckleberry Finn"
+            />
+          </div>
+          <figcaption class="placard">
+            <h2 class="placard-title">Data Types on Structures</h2>
+            <p class="placard-medium">C++ &middot; linked lists &middot; binary trees &middot; hash tables</p>
+            <p class="placard-desc">
+              A suite of hand-built data types: queues, priority queues, and
+              sets over linked lists; priority queues and maps over binary
+              trees; maps and sets via hash tables. Pictured: the entirety of
+              Mark Twain's <em>The Adventures of Huckleberry Finn</em> poured
+              into a hash map, building a dictionary of the author's word
+              combinations so the program learns his patterns and predicts the
+              words he might write next.
+            </p>
+          </figcaption>
+        </figure>
       </div>
-    </nav>
-    <div class="projects">
-      <header class="descript">
-        <h2>C++ Projects</h2>
-        <p>
-          Here are some of the Projects I built while learning C++. I built a
-          simple text editor using C++ as well as designed and implemented
-          various data types and structures such as Maps, Equivalence Classes,
-          Sets, and Graphs using Hash tables and various of data types built
-          into C++
-        </p>
-      </header>
-      <div class="anim-rect"></div>
+    </main>
 
-      <div class="proj-sec">
-        <h3>
-          Text Editor
-        </h3>
-        <img src="images/TextEditor.jpg" />
-        <p>
-          Created a text editor in C++ with all the basic commands of a text
-          editor including Insert Character, Cursor Up, Cursor Down, Cursor
-          Left, Cursor Right, Cursor Home, Cursor End, New Line, Backspace,
-          Delete Line, Undo, Redo, and Quit.
-        </p>
-        <a
-          type="button"
-          class="btn btn-outline-light"
-          href="https://drive.google.com/file/d/1km6o6XVMJdXpaj8-dpf_GgBDTXvoTPKd/view?usp=sharing"
-        >
-          Watch Video
-        </a>
-      </div>
-      <div class="proj-sec">
-        <h3>
-          Login System
-        </h3>
-        <img src="images/LoginSystem.jpg" />
-        <p>
-          Created a simple login framework in C++ using various data structures
-          and types including implementing a Hash Map
-        </p>
-        <a
-          type="button"
-          class="btn btn-outline-light"
-          href="https://drive.google.com/file/d/1iGV7N6CBPa1pAMXmqfSB9xRSCSIm8rMn/view?usp=sharing"
-        >
-          Watch Video
-        </a>
-      </div>
-      <div class="proj-sec">
-        <h3>
-          Extended Dijkstra's Algorithm
-        </h3>
-        <img src="images/path.jpg" />
-        <p>
-          Implemented Extended Dijkstra's Algorithm using personal
-          implementation of Hash Graphs and Sets. Extended Dijkstra's algorithm
-          is an algorithm for finding the shortest paths between nodes in a
-          graph. In this example, we are able to find the shortest flight paths
-          between airports.
-        </p>
-        <a
-          type="button"
-          class="btn btn-outline-light"
-          href="https://drive.google.com/file/d/1KfYkfNgY1ljwSFlasCft-96gsCo74vLc/view?usp=sharing"
-        >
-          Watch Video
-        </a>
-      </div>
-      <div class="proj-sec">
-        <h3>
-          Implementation of Data Types on Structures
-        </h3>
-        <img src="images/WordGen.jpg" />
-        <p>
-          Using C++ I learned how to code various data types and structures such
-          as Queues/Priority Queues/Sets with Linked Lists, Priority Queues and
-          Maps with Binary Trees, and Maps and Sets via Hash Tables. In the
-          image above, I inputed the entirety of Mark Twain's book, "The
-          Adventures of Huckleberry Finn" into a HashMap to create a dictionary
-          of all the word combinations Mark Twain uses. Doing so the program
-          will "learn" the word pattern of Mark Twain and be able to generate
-          and predict the next possible words the author will write.
-        </p>
-      </div>
-    </div>
-    <!-- Optional JavaScript -->
-    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
-    <script
-      src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
-      integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
-      integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
-      integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
-      crossorigin="anonymous"
-    ></script>
-    <!--jquery-->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-    <script src="assets/js/main.js"></script>
-    <div class="load-wrapper">
-      <div class="box">
-        <div class="b b1"></div>
-        <div class="b b2"></div>
-        <div class="b b3"></div>
-        <div class="b b4"></div>
-      </div>
-    </div>
+    <footer class="exhibit-footer">
+      <p>
+        Skylar Hoffman<span class="sep">&middot;</span
+        ><a href="mailto:skylar.j.hoffman@gmail.com">skylar.j.hoffman@gmail.com</a
+        ><span class="sep">&middot;</span
+        ><a href="https://github.com/sky121">github.com/sky121</a>
+      </p>
+    </footer>
   </body>
 </html>
