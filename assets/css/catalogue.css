@@ -370,6 +370,99 @@ body::after {
   font-style: italic;
 }
 
+/* Row byline (e.g. "With Prof. Frug · 2021") */
+.cat-row-meta {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.7rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 0.15rem 0 0.3rem;
+}
+
+/* ---------- The practice (numbered entries) ---------- */
+
+.cat-entries {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.7rem, 4.5vw, 2.4rem);
+}
+
+.cat-entry {
+  display: grid;
+  grid-template-columns: 2.7rem 1fr;
+  gap: 0 1rem;
+  align-items: baseline;
+}
+
+.cat-entry-no {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 0.95rem;
+  color: var(--pond-ink);
+  text-align: right;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.cat-entry-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.55rem;
+  line-height: 1.25;
+  color: var(--ink);
+  margin-bottom: 0.2rem;
+}
+
+.cat-entry-meta {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.7rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 0.35rem;
+}
+
+.cat-entry-note {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.55rem;
+}
+
+.cat-entry-desc {
+  font-size: 0.97rem;
+  line-height: 1.7;
+  color: var(--ink);
+  max-width: 36rem;
+}
+
+.cat-entry-points {
+  list-style: none;
+  max-width: 36rem;
+}
+
+.cat-entry-points li {
+  position: relative;
+  padding: 0.3rem 0 0.3rem 1.4rem;
+  font-size: 0.97rem;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+.cat-entry-points li::before {
+  content: "\2014"; /* brushstroke dash */
+  position: absolute;
+  left: 0;
+  color: var(--gold);
+}
+
 /* Media line */
 .cat-media-line {
   padding-left: 2.7rem;
@@ -391,6 +484,82 @@ body::after {
   font-style: italic;
   font-size: 1.05rem;
   color: var(--ink-soft);
+}
+
+/* Media, grouped (Languages / ML & Retrieval / Systems) */
+.cat-media-groups {
+  padding-left: 2.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.cat-media-label {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.7rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 0.15rem;
+}
+
+.cat-media-items {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.25rem;
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+.cat-media-items .sep {
+  margin: 0 0.35em;
+}
+
+/* Compact listings (independent works) & off-canvas line */
+.cat-compact {
+  list-style: none;
+  padding-left: 2.7rem;
+}
+
+.cat-compact li {
+  padding: 0.3rem 0;
+}
+
+.cat-compact-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.25rem;
+  color: var(--ink);
+}
+
+.cat-compact-note {
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+
+.cat-compact-sep {
+  color: var(--gold);
+  margin: 0 0.4em;
+}
+
+.cat-compact-years {
+  padding-left: 2.7rem;
+  margin-top: 0.5rem;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--ink-soft);
+}
+
+.cat-offcanvas {
+  padding-left: 2.7rem;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.25rem;
+  line-height: 1.7;
+  color: var(--ink);
 }
 
 /* ---------- Selected works (numbered entries) ---------- */
@@ -564,16 +733,22 @@ body::after {
   .cat-rows,
   .cat-reading,
   .cat-media-line,
-  .cat-media-note {
+  .cat-media-note,
+  .cat-media-groups,
+  .cat-compact,
+  .cat-compact-years,
+  .cat-offcanvas {
     padding-left: 0;
   }
 
-  .cat-work {
+  .cat-work,
+  .cat-entry {
     grid-template-columns: 1fr;
     gap: 0.15rem 0;
   }
 
-  .cat-work-no {
+  .cat-work-no,
+  .cat-entry-no {
     text-align: left;
   }
 
@@ -790,6 +965,114 @@ body::after {
     max-width: none;
   }
 
+  /* Practice entries */
+  .cat-entries {
+    gap: 7pt;
+  }
+
+  .cat-entry {
+    grid-template-columns: 21pt 1fr;
+    gap: 0 7pt;
+    break-inside: avoid;
+  }
+
+  .cat-entry-no {
+    font-size: 7.5pt;
+    color: var(--ink-soft);
+  }
+
+  .cat-entry-title {
+    font-size: 12pt;
+    line-height: 1.2;
+    margin-bottom: 1pt;
+  }
+
+  .cat-entry-meta {
+    font-size: 6.5pt;
+    letter-spacing: 0.22em;
+    margin-bottom: 1pt;
+  }
+
+  .cat-entry-note {
+    font-size: 8.5pt;
+    margin-bottom: 2pt;
+  }
+
+  .cat-entry-desc {
+    font-size: 8.5pt;
+    line-height: 1.45;
+    max-width: none;
+  }
+
+  .cat-entry-points {
+    max-width: none;
+  }
+
+  .cat-entry-points li {
+    padding: 1pt 0 1pt 10pt;
+    font-size: 8.5pt;
+    line-height: 1.45;
+  }
+
+  .cat-entry-points li::before {
+    color: var(--ink-soft);
+  }
+
+  .cat-row-meta {
+    font-size: 6.5pt;
+    letter-spacing: 0.22em;
+    margin: 0.5pt 0 1pt;
+  }
+
+  /* Media groups & compact listings */
+  .cat-media-groups {
+    padding-left: 21pt;
+    gap: 4pt;
+  }
+
+  .cat-media-label {
+    font-size: 6.5pt;
+    letter-spacing: 0.22em;
+    margin-bottom: 0.5pt;
+  }
+
+  .cat-media-items {
+    font-size: 10.5pt;
+    line-height: 1.4;
+  }
+
+  .cat-compact {
+    padding-left: 21pt;
+  }
+
+  .cat-compact li {
+    padding: 1.5pt 0;
+  }
+
+  .cat-compact-title {
+    font-size: 11pt;
+  }
+
+  .cat-compact-note {
+    font-size: 8.5pt;
+  }
+
+  .cat-compact-sep {
+    color: var(--ink-soft);
+  }
+
+  .cat-compact-years {
+    padding-left: 21pt;
+    margin-top: 1pt;
+    font-size: 8.5pt;
+  }
+
+  .cat-offcanvas {
+    padding-left: 21pt;
+    font-size: 10.5pt;
+    line-height: 1.4;
+  }
+
   /* Further reading: show the URLs of the two external links */
   .cat-reading li {
     padding: 2pt 0;
@@ -832,5 +1115,113 @@ body::after {
   .cat-colophon a {
     color: inherit;
     border-bottom: none;
+  }
+}
+
+/* ==========================================================================
+   EVENING EXHIBITION — dark theme. html.evening is applied pre-paint by an
+   inline <head> script (localStorage 'sh-theme', else prefers-color-scheme).
+   Scoped to screen: the printed catalogue stays ink on white, whatever the
+   gallery lighting.
+   ========================================================================== */
+
+@media screen {
+  html.evening {
+    color-scheme: dark;
+    --paper: #232936;
+    --paper-deep: #1c212c;
+    --ink: #e9e3d3;
+    --ink-soft: #b3ac9a;
+    --pond-ink: #9fc2e0;
+    --mat: #2b3140;
+    --hairline: rgba(233, 227, 211, 0.16);
+  }
+
+  /* Deep variant of the wall gradient — darkest at the foot of the page */
+  html.evening body {
+    background-image: linear-gradient(
+      180deg,
+      var(--paper) 0%,
+      var(--paper-deep) 58%,
+      #181d27 100%
+    );
+  }
+
+  html.evening ::selection {
+    background: rgba(159, 194, 224, 0.32);
+    color: var(--ink);
+  }
+
+  html.evening a:focus-visible {
+    outline-color: var(--pond-ink);
+  }
+
+  /* Grain reads as paper tooth, not soot, against the night walls */
+  html.evening body::after {
+    mix-blend-mode: soft-light;
+    opacity: 0.5;
+  }
+
+  /* The corner wash glows out of the dark instead of staining the paper */
+  html.evening .wash {
+    mix-blend-mode: screen;
+    opacity: 0.34;
+  }
+
+  /* Chrome */
+  html.evening .monogram {
+    border-color: rgba(233, 227, 211, 0.32);
+  }
+
+  html.evening .monogram:hover {
+    background-color: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+  }
+
+  html.evening .back-link {
+    border-bottom-color: var(--hairline);
+  }
+
+  html.evening .back-link:hover {
+    border-bottom-color: var(--pond-ink);
+  }
+
+  /* Catalogue hairlines & link underlines */
+  html.evening .cat-contact a {
+    border-bottom-color: rgba(159, 194, 224, 0.4);
+  }
+
+  html.evening .cat-contact a:hover {
+    border-bottom-color: var(--ink);
+  }
+
+  html.evening .cat-section-rule {
+    background: var(--hairline);
+  }
+
+  html.evening .cat-row + .cat-row,
+  html.evening .cat-reading li + li {
+    border-top-color: rgba(233, 227, 211, 0.1);
+  }
+
+  html.evening .cat-reading-link {
+    border-bottom-color: rgba(159, 194, 224, 0.45);
+  }
+
+  html.evening .cat-reading-link:hover {
+    border-bottom-color: var(--ink);
+  }
+
+  html.evening .cat-colophon {
+    border-top-color: var(--hairline);
+  }
+
+  html.evening .cat-colophon a {
+    border-bottom-color: rgba(179, 172, 154, 0.4);
+  }
+
+  html.evening .cat-colophon a:hover {
+    border-bottom-color: var(--pond-ink);
   }
 }

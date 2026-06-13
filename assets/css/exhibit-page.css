@@ -661,3 +661,151 @@ html.js .reveal.is-visible {
     padding: 1.1rem 1.1rem 1.2rem;
   }
 }
+
+/* ==========================================================================
+   EVENING EXHIBITION — dark theme. html.evening is applied pre-paint by an
+   inline <head> script (localStorage 'sh-theme', else prefers-color-scheme).
+   The museum after hours: slate walls, lamplit ink, a moonlit pond.
+   ========================================================================== */
+
+html.evening {
+  color-scheme: dark;
+  --paper: #232936;
+  --paper-deep: #1c212c;
+  --ink: #e9e3d3;
+  --ink-soft: #b3ac9a;
+  --pond-ink: #9fc2e0;
+  --mat: #2b3140;
+  --hairline: rgba(233, 227, 211, 0.16);
+}
+
+/* Deep variant of the wall gradient — darkest at the foot of the wall */
+html.evening body {
+  background-image: linear-gradient(
+    180deg,
+    var(--paper) 0%,
+    var(--paper-deep) 58%,
+    #181d27 100%
+  );
+}
+
+html.evening ::selection {
+  background: rgba(159, 194, 224, 0.32); /* moonlit pond */
+  color: var(--ink);
+}
+
+html.evening a:focus-visible {
+  outline-color: var(--pond-ink);
+}
+
+/* Grain reads as paper tooth, not soot, against the night walls */
+html.evening body::after {
+  mix-blend-mode: soft-light;
+  opacity: 0.5;
+}
+
+/* Washes glow out of the dark instead of staining the paper */
+html.evening .wash {
+  mix-blend-mode: screen;
+}
+
+html.evening .wash::before {
+  opacity: 0.34;
+}
+
+/* Cursor blooms become lamplight */
+html.evening #paint-canvas {
+  mix-blend-mode: screen;
+}
+
+/* Golden-hour easter egg, evening variant: a low gas-lamp warmth rather
+   than late sun — screened on, and gentler. */
+html.evening body::before {
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(
+      120% 90% at 50% 28%,
+      rgba(255, 214, 140, 0.3) 0%,
+      rgba(205, 170, 100, 0.12) 55%,
+      rgba(20, 16, 10, 0) 100%
+    ),
+    linear-gradient(180deg, rgba(255, 214, 140, 0.1), rgba(217, 139, 160, 0.07));
+}
+
+html.evening.golden body::before {
+  opacity: 0.6;
+}
+
+/* ---------- Evening chrome: nav, links ---------- */
+
+html.evening .monogram {
+  border-color: rgba(233, 227, 211, 0.32);
+}
+
+html.evening .monogram:hover {
+  background-color: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+html.evening .back-link {
+  border-bottom-color: var(--hairline);
+}
+
+html.evening .back-link:hover {
+  border-bottom-color: var(--pond-ink);
+}
+
+/* ---------- Evening frames, mats & placards ---------- */
+
+html.evening .exhibit-frame {
+  background: var(--mat);
+  border-color: rgba(233, 227, 211, 0.22);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 14px 28px -14px rgba(0, 0, 0, 0.55),
+    0 34px 56px -28px rgba(6, 10, 18, 0.6);
+}
+
+html.evening .exhibit-frame::before {
+  border-color: rgba(233, 227, 211, 0.12);
+}
+
+html.evening .exhibit-frame:hover {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 20px 34px -14px rgba(0, 0, 0, 0.6),
+    0 44px 66px -28px rgba(6, 10, 18, 0.65);
+}
+
+html.evening .exhibit-frame img {
+  border-color: rgba(233, 227, 211, 0.14);
+}
+
+html.evening .placard {
+  background: rgba(43, 49, 64, 0.9);
+  border-color: var(--hairline);
+  box-shadow: 0 8px 20px -14px rgba(0, 0, 0, 0.7);
+}
+
+html.evening .placard-link {
+  border-bottom-color: rgba(159, 194, 224, 0.45);
+}
+
+html.evening .placard-link:hover {
+  border-bottom-color: var(--ink);
+}
+
+/* ---------- Evening footer ---------- */
+
+html.evening .exhibit-footer {
+  border-top-color: var(--hairline);
+}
+
+html.evening .exhibit-footer a {
+  border-bottom-color: rgba(179, 172, 154, 0.4);
+}
+
+html.evening .exhibit-footer a:hover {
+  border-bottom-color: var(--pond-ink);
+}
