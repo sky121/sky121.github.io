@@ -254,22 +254,41 @@
       return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
     }
 
+    function lighten(rgb) {
+      // Lift each channel 25% toward white. The evening exhibition flips the
+      // canvas from multiply to screen blend (CSS); brightened pigment keeps
+      // the blooms visible against the dark walls.
+      return [
+        Math.round(rgb[0] + (255 - rgb[0]) * 0.25),
+        Math.round(rgb[1] + (255 - rgb[1]) * 0.25),
+        Math.round(rgb[2] + (255 - rgb[2]) * 0.25)
+      ];
+    }
+
     function rgbaStrings(hexList) {
-      // Precompute one rgba string per (color, pass) pair.
+      // Precompute one rgba string per (color, pass) pair — twice: a day set
+      // and a brightened evening set, selected at draw time.
       var out = [];
       for (var i = 0; i < hexList.length; i++) {
         var rgb = hexToRgb(hexList[i]);
-        var passes = [];
+        var lit = lighten(rgb);
+        var day = [];
+        var evening = [];
         for (var p = 0; p < PASS_ALPHAS.length; p++) {
-          passes.push('rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + PASS_ALPHAS[p] + ')');
+          day.push('rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + PASS_ALPHAS[p] + ')');
+          evening.push('rgba(' + lit[0] + ',' + lit[1] + ',' + lit[2] + ',' + PASS_ALPHAS[p] + ')');
         }
-        out.push(passes);
+        out.push({ day: day, evening: evening });
       }
       return out;
     }
 
     var paletteRGBA = rgbaStrings(PALETTE_HEX);
     var goldenRGBA = rgbaStrings(GOLDEN_HEX);
+
+    // Cached theme flag, refreshed via setEvening() when the theme toggles —
+    // checked once per bloom per frame, never via classList in the hot loop.
+    var evening = document.documentElement.classList.contains('evening');
 
     var blooms = [];
     var rafId = 0;
@@ -449,10 +468,11 @@
         // transform so positions stay in CSS pixels. Layered low-alpha passes
         // give the soft pooled-pigment look without shadowBlur/filters.
         ctx.globalAlpha = envelope * b.alpha;
+        var passColors = evening ? b.colors.evening : b.colors.day;
         for (var p = 0; p < PASS_SCALES.length; p++) {
           var s = r * PASS_SCALES[p] * dpr;
           ctx.setTransform(s, 0, 0, s, b.x * dpr, b.y * dpr);
-          ctx.fillStyle = b.colors[p];
+          ctx.fillStyle = passColors[p];
           ctx.fill(b.path);
         }
       }
@@ -619,7 +639,8 @@
       spawnSplash: spawnSplash,
       goldenRGBA: goldenRGBA,
       stopAndClear: stopAndClear,
-      boostBloomCap: boostBloomCap
+      boostBloomCap: boostBloomCap,
+      setEvening: function (on) { evening = !!on; }
     };
   })();
 
@@ -660,5 +681,113 @@
         }
       }
     });
+  })();
+
+  /* ------------------------------------------------------------------ *
+   * Evening Exhibition — theme toggle, persistence, OS preference
+   * ------------------------------------------------------------------ */
+  (function initTheme() {
+    var root = document.documentElement;
+    var STORAGE_KEY = 'sh-theme';
+    var EVENING_THEME_COLOR = '#232936';
+    var DAY_THEME_COLOR = '#f6f1e7';
+
+    var themeMeta = document.querySelector('meta[name="theme-color"]');
+    var navHost = document.getElementById('nav') ||
+                  document.querySelector('.exhibit-nav');
+
+    function readStored() {
+      // Returns 'evening', 'day', or null (absent, garbage, or storage blocked).
+      try {
+        var value = window.localStorage.getItem(STORAGE_KEY);
+        return (value === 'evening' || value === 'day') ? value : null;
+      } catch (e) { return null; }
+    }
+
+    function store(value) {
+      try { window.localStorage.setItem(STORAGE_KEY, value); } catch (e) { /* private mode etc. */ }
+    }
+
+    var darkQuery = null;
+    try {
+      darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    } catch (e) { /* matchMedia unavailable; OS preference simply unfollowed */ }
+
+    function isEvening() {
+      return root.classList.contains('evening');
+    }
+
+    /* --- toggle button (homepage #nav or project-page .exhibit-nav) --- */
+    var toggle = null;
+    if (navHost) {
+      toggle = document.createElement('button');
+      toggle.className = 'theme-toggle';
+      toggle.type = 'button';
+      navHost.appendChild(toggle);
+    }
+
+    function render() {
+      // Make button glyph/ARIA, the theme-color meta, and the paint engine
+      // agree with the current class on <html>.
+      var evening = isEvening();
+      if (toggle) {
+        // Glyph: "☾" invites the evening; "☀" invites the day back.
+        toggle.textContent = evening ? '☀' : '☾';
+        toggle.setAttribute('aria-label', evening
+          ? 'Switch to the day exhibition'
+          : 'Switch to the evening exhibition');
+        toggle.setAttribute('aria-pressed', evening ? 'true' : 'false');
+      }
+      if (themeMeta) {
+        themeMeta.setAttribute('content', evening ? EVENING_THEME_COLOR : DAY_THEME_COLOR);
+      }
+      if (paint) paint.setEvening(evening);
+    }
+
+    function applyEvening(on) {
+      if (on) root.classList.add('evening');
+      else root.classList.remove('evening');
+      render();
+    }
+
+    /* --- brief cross-fade window around a theme change --- */
+    var transitionTimer = 0;
+    function flashTransition() {
+      if (reducedMotion) return;
+      root.classList.add('evening-transition');
+      window.clearTimeout(transitionTimer); // guard rapid repeated toggles
+      transitionTimer = window.setTimeout(function () {
+        root.classList.remove('evening-transition');
+      }, 700);
+    }
+
+    if (toggle) {
+      toggle.addEventListener('click', function () {
+        var evening = !isEvening();
+        flashTransition();
+        store(evening ? 'evening' : 'day');
+        // Old blooms were tuned for the previous blend mode; clear them so
+        // they don't linger looking wrong against the new walls.
+        if (paint) paint.stopAndClear();
+        applyEvening(evening);
+      });
+    }
+
+    /* --- follow the OS only while the visitor hasn't chosen --- */
+    if (darkQuery) {
+      watchQuery(darkQuery, function (event) {
+        if (readStored() !== null) return;
+        if (paint) paint.stopAndClear();
+        applyEvening(event.matches);
+      });
+    }
+
+    // Reconcile: the inline head script already applied the class pre-paint;
+    // here we only ensure class, button, meta, and paint engine agree
+    // (and cover any page that lacks the head script).
+    var stored = readStored();
+    if (stored !== null) applyEvening(stored === 'evening');
+    else if (darkQuery) applyEvening(darkQuery.matches);
+    else render();
   })();
 })();
