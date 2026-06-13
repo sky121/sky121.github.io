@@ -1,18 +1,18 @@
-# Water Lilies — Skylar Hoffman's Portfolio
+# Skylar Hoffman — Portfolio
 
 **Live site:** [https://sky121.github.io/](https://sky121.github.io/)
 
-An interactive watercolor museum exhibit inspired by Claude Monet. Every page is a living canvas — your cursor becomes a paintbrush, blooming soft pigment as you move, following you from the main hall into each exhibit room. Projects hang as framed works on the gallery wall, each accompanied by a museum placard describing the piece, and technical skills are presented as a pigment palette: daubs of color you might find on the artist's worktable. The whole site is meant to feel less like a résumé and more like wandering a quiet wing of an impressionist exhibit — though if you want the résumé after all, the exhibition catalogue is a printable one-pager.
+A personal portfolio site with a watercolor-inspired visual design. It covers an about section, skills, experience, selected work, projects, and contact details, plus a printable one-page résumé. Your cursor leaves soft blooms of pigment as you move, and there's a dark theme that follows your system preference.
 
 ## Tech Notes
 
 - **Hand-built, zero frameworks** — no build step, no dependencies, just HTML, CSS, and JavaScript.
-- **Vanilla JS canvas painting engine** — the cursor-as-paintbrush effect is rendered on a `<canvas>` with custom blending and decay logic, loaded on the homepage and every exhibit page.
-- **SVG turbulence watercolor filters** — `feTurbulence` and `feDisplacementMap` give frames, placards, and edges their hand-painted wobble.
-- **Evening Exhibition** — a dark theme that follows your system's `prefers-color-scheme` by default and remembers your choice in `localStorage`, applied before first paint so there's no flash.
-- **Printable exhibition catalogue** — `catalogue.html` is a print-friendly one-page résumé styled as a catalogue of selected works.
-- **Typography** — [Cormorant Garamond](https://fonts.google.com/specimen/Cormorant+Garamond) for exhibit headings and [Karla](https://fonts.google.com/specimen/Karla) for placard text.
-- **Guest amenities** — Open Graph social card, SVG/ICO favicons with apple-touch icon and web manifest, and a custom 404.
+- **Vanilla JS canvas painting engine** — the cursor-as-paintbrush effect is rendered on a `<canvas>` with custom blending and decay logic, loaded on the homepage and every page.
+- **SVG turbulence filters** — `feTurbulence` and `feDisplacementMap` give borders and edges their hand-painted wobble.
+- **Dark theme** — follows your system's `prefers-color-scheme` by default and remembers your choice in `localStorage`, applied before first paint so there's no flash.
+- **Printable résumé** — `catalogue.html` is a print-friendly one-page résumé of selected work.
+- **Typography** — [Cormorant Garamond](https://fonts.google.com/specimen/Cormorant+Garamond) for headings and [Karla](https://fonts.google.com/specimen/Karla) for body text.
+- **Extras** — Open Graph social card, SVG/ICO favicons with apple-touch icon and web manifest, and a custom 404.
 
 ## Local Development
 
@@ -33,23 +33,23 @@ python3 -m http.server
 
 ```
 .
-├── index.html               # The gallery — main exhibit hall
-├── catalogue.html           # Exhibition catalogue — printable one-page résumé
+├── index.html               # Main page (about, skills, experience, work, projects, contact)
+├── catalogue.html           # Printable one-page résumé
 ├── assets/
 │   ├── css/
-│   │   ├── gallery.css      # Gallery layout, frames, placards, palette
-│   │   ├── exhibit-page.css # Shared styles for individual exhibit pages
-│   │   └── catalogue.css    # Catalogue layout + print styles
+│   │   ├── gallery.css      # Home page layout and components
+│   │   ├── exhibit-page.css # Shared styles for the project detail pages
+│   │   └── catalogue.css    # Résumé layout + print styles
 │   └── js/
-│       └── gallery.js       # Canvas painting engine, loaded on every exhibit page
+│       └── gallery.js       # Cursor canvas effect, dark theme, scroll reveals
 ├── images/                  # Project screenshots + og-card.png social card
-├── Cprojects.html           # Exhibit: C/C++ works
-├── PythonProjects.html      # Exhibit: Python studies
-├── JavaProjects.html        # Exhibit: Java works
-├── ClassChecker.html        # Exhibit: Class Checker
-├── SunBasket.html           # Exhibit: Sun Basket
-├── 404.html                 # "This painting is not on display"
-├── favicon.svg              # Water lily mark (with favicon.ico + apple-touch-icon.png)
+├── Cprojects.html           # Project page: C/C++
+├── PythonProjects.html      # Project page: Python
+├── JavaProjects.html        # Project page: Java
+├── ClassChecker.html        # Project page: Class Alert
+├── SunBasket.html           # Project page: Sun Basket
+├── 404.html                 # Custom 404 page
+├── favicon.svg              # Monogram mark (with favicon.ico + apple-touch-icon.png)
 ├── site.webmanifest
 ├── robots.txt
 └── sitemap.xml

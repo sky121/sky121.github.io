@@ -734,8 +734,8 @@
         // Glyph: "☾" invites the evening; "☀" invites the day back.
         toggle.textContent = evening ? '☀' : '☾';
         toggle.setAttribute('aria-label', evening
-          ? 'Switch to the day exhibition'
-          : 'Switch to the evening exhibition');
+          ? 'Switch to light theme'
+          : 'Switch to dark theme');
         toggle.setAttribute('aria-pressed', evening ? 'true' : 'false');
       }
       if (themeMeta) {
