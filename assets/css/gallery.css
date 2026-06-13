@@ -470,8 +470,9 @@ html.golden body::after {
   background:
     radial-gradient(circle at 38% 42%, rgba(127, 168, 201, 0.55) 0%, rgba(127, 168, 201, 0) 62%),
     radial-gradient(circle at 64% 58%, rgba(74, 114, 153, 0.32) 0%, rgba(74, 114, 153, 0) 58%),
+    radial-gradient(circle at 28% 64%, rgba(162, 146, 196, 0.16) 0%, rgba(162, 146, 196, 0) 52%),
     radial-gradient(circle at 50% 70%, rgba(147, 180, 139, 0.22) 0%, rgba(147, 180, 139, 0) 55%);
-  animation: drift-a 52s ease-in-out infinite alternate;
+  animation: wander-pond 58s ease-in-out infinite;
 }
 
 .wash--wisteria {
@@ -486,8 +487,10 @@ html.golden body::after {
   background:
     radial-gradient(circle at 55% 45%, rgba(162, 146, 196, 0.5) 0%, rgba(162, 146, 196, 0) 60%),
     radial-gradient(circle at 35% 65%, rgba(217, 139, 160, 0.26) 0%, rgba(217, 139, 160, 0) 55%),
-    radial-gradient(circle at 70% 30%, rgba(127, 168, 201, 0.22) 0%, rgba(127, 168, 201, 0) 50%);
-  animation: drift-b 64s ease-in-out infinite alternate;
+    radial-gradient(circle at 70% 30%, rgba(127, 168, 201, 0.22) 0%, rgba(127, 168, 201, 0) 50%),
+    radial-gradient(circle at 60% 72%, rgba(147, 180, 139, 0.14) 0%, rgba(147, 180, 139, 0) 48%);
+  animation: wander-wisteria 71s ease-in-out infinite;
+  animation-delay: -12s;
 }
 
 .wash--sage {
@@ -502,8 +505,9 @@ html.golden body::after {
   background:
     radial-gradient(circle at 45% 50%, rgba(147, 180, 139, 0.48) 0%, rgba(147, 180, 139, 0) 60%),
     radial-gradient(circle at 62% 38%, rgba(205, 184, 120, 0.3) 0%, rgba(205, 184, 120, 0) 55%),
+    radial-gradient(circle at 68% 66%, rgba(162, 146, 196, 0.14) 0%, rgba(162, 146, 196, 0) 50%),
     radial-gradient(circle at 30% 65%, rgba(127, 168, 201, 0.2) 0%, rgba(127, 168, 201, 0) 52%);
-  animation: drift-c 58s ease-in-out infinite alternate;
+  animation: wander-sage 64s ease-in-out infinite;
 }
 
 .wash--rose {
@@ -519,8 +523,8 @@ html.golden body::after {
     radial-gradient(circle at 52% 48%, rgba(217, 139, 160, 0.42) 0%, rgba(217, 139, 160, 0) 60%),
     radial-gradient(circle at 32% 62%, rgba(162, 146, 196, 0.24) 0%, rgba(162, 146, 196, 0) 54%),
     radial-gradient(circle at 68% 34%, rgba(205, 184, 120, 0.18) 0%, rgba(205, 184, 120, 0) 50%);
-  animation: drift-b 74s ease-in-out infinite alternate;
-  animation-delay: -18s;
+  animation: wander-rose 67s ease-in-out infinite;
+  animation-delay: -22s;
 }
 
 .wash--gold {
@@ -536,8 +540,8 @@ html.golden body::after {
     radial-gradient(circle at 48% 46%, rgba(205, 184, 120, 0.42) 0%, rgba(205, 184, 120, 0) 60%),
     radial-gradient(circle at 64% 60%, rgba(147, 180, 139, 0.22) 0%, rgba(147, 180, 139, 0) 54%),
     radial-gradient(circle at 34% 66%, rgba(217, 139, 160, 0.18) 0%, rgba(217, 139, 160, 0) 50%);
-  animation: drift-a 86s ease-in-out infinite alternate;
-  animation-delay: -32s;
+  animation: wander-gold 79s ease-in-out infinite;
+  animation-delay: -34s;
 }
 
 /* Second pass of pond & wisteria, hung elsewhere, fainter, off-beat. */
@@ -552,8 +556,8 @@ html.golden body::after {
 }
 .wash--pond.wash--alt::before {
   opacity: 0.34;
-  animation: drift-c 68s ease-in-out infinite alternate;
-  animation-delay: -24s;
+  animation: wander-pond-alt 73s ease-in-out infinite;
+  animation-delay: -26s;
 }
 
 .wash--wisteria.wash--alt {
@@ -566,68 +570,212 @@ html.golden body::after {
 }
 .wash--wisteria.wash--alt::before {
   opacity: 0.3;
-  animation: drift-a 90s ease-in-out infinite alternate;
-  animation-delay: -40s;
+  animation: wander-wisteria-alt 80s ease-in-out infinite;
+  animation-delay: -44s;
 }
 
-@keyframes drift-a {
+/* Each wash meanders along its own closed loop (0% == 100% for a seamless
+   non-alternate cycle): a wandering translate that never simply slides back
+   and forth, a rotation that progresses in one direction (clockwise or
+   counter-clockwise, per wash) to read as a slow swirl, a gentle scale pulse,
+   and a border-radius that cycles through asymmetric shapes so the silhouette
+   breathes like wet pigment settling. Only transform + border-radius animate,
+   both compositor-/cheap-paint friendly. */
+
+/* Pond — large drift down-and-around, clockwise swirl. */
+@keyframes wander-pond {
   0% {
     transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
     border-radius: 52% 48% 55% 45% / 48% 56% 44% 52%;
   }
-  50% {
-    transform: translate3d(-3vw, 4vh, 0) rotate(5deg) scale(1.05);
+  20% {
+    transform: translate3d(-4vw, 3vh, 0) rotate(6deg) scale(1.05);
     border-radius: 46% 54% 48% 52% / 56% 44% 58% 42%;
   }
-  100% {
-    transform: translate3d(-5vw, 6vh, 0) rotate(9deg) scale(1.08);
+  40% {
+    transform: translate3d(-8vw, 7vh, 0) rotate(13deg) scale(1.1);
     border-radius: 57% 43% 44% 56% / 45% 57% 43% 55%;
   }
-}
-
-@keyframes drift-b {
-  0% {
-    transform: translate3d(0, 0, 0) rotate(0deg) scale(1.05);
-    border-radius: 48% 52% 46% 54% / 54% 46% 56% 44%;
+  60% {
+    transform: translate3d(-5vw, 10vh, 0) rotate(20deg) scale(1.04);
+    border-radius: 44% 56% 58% 42% / 54% 46% 52% 48%;
   }
-  50% {
-    transform: translate3d(4vw, -3vh, 0) rotate(-6deg) scale(1);
-    border-radius: 55% 45% 54% 46% / 44% 58% 42% 56%;
+  80% {
+    transform: translate3d(-2vw, 5vh, 0) rotate(27deg) scale(0.96);
+    border-radius: 54% 46% 47% 53% / 47% 55% 45% 53%;
   }
   100% {
-    transform: translate3d(6vw, -5vh, 0) rotate(-11deg) scale(0.96);
-    border-radius: 44% 56% 50% 50% / 52% 44% 56% 48%;
+    transform: translate3d(0, 0, 0) rotate(36deg) scale(1);
+    border-radius: 52% 48% 55% 45% / 48% 56% 44% 52%;
   }
 }
 
-@keyframes drift-c {
+/* Wisteria — counter-clockwise swirl, drifts up-and-right then back. */
+@keyframes wander-wisteria {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1.04);
+    border-radius: 48% 52% 46% 54% / 54% 46% 56% 44%;
+  }
+  20% {
+    transform: translate3d(5vw, -3vh, 0) rotate(-7deg) scale(1);
+    border-radius: 55% 45% 54% 46% / 44% 58% 42% 56%;
+  }
+  40% {
+    transform: translate3d(9vw, -6vh, 0) rotate(-15deg) scale(0.94);
+    border-radius: 44% 56% 50% 50% / 52% 44% 56% 48%;
+  }
+  60% {
+    transform: translate3d(6vw, -10vh, 0) rotate(-23deg) scale(1.02);
+    border-radius: 58% 42% 47% 53% / 46% 56% 44% 54%;
+  }
+  80% {
+    transform: translate3d(2vw, -4vh, 0) rotate(-31deg) scale(1.1);
+    border-radius: 47% 53% 56% 44% / 55% 45% 53% 47%;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-40deg) scale(1.04);
+    border-radius: 48% 52% 46% 54% / 54% 46% 56% 44%;
+  }
+}
+
+/* Sage — clockwise swirl, drifts up-and-left. */
+@keyframes wander-sage {
   0% {
     transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
     border-radius: 50% 50% 46% 54% / 46% 54% 48% 52%;
   }
-  50% {
-    transform: translate3d(-2vw, -4vh, 0) rotate(4deg) scale(1.06);
+  20% {
+    transform: translate3d(-3vw, -4vh, 0) rotate(5deg) scale(1.07);
     border-radius: 58% 42% 52% 48% / 50% 48% 54% 46%;
   }
-  100% {
-    transform: translate3d(-4vw, -6vh, 0) rotate(7deg) scale(1.1);
+  40% {
+    transform: translate3d(-7vw, -8vh, 0) rotate(12deg) scale(1.12);
     border-radius: 46% 54% 58% 42% / 56% 46% 50% 50%;
+  }
+  60% {
+    transform: translate3d(-9vw, -5vh, 0) rotate(18deg) scale(1.05);
+    border-radius: 53% 47% 45% 55% / 45% 57% 43% 55%;
+  }
+  80% {
+    transform: translate3d(-4vw, -2vh, 0) rotate(24deg) scale(0.95);
+    border-radius: 47% 53% 54% 46% / 54% 44% 56% 46%;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(30deg) scale(1);
+    border-radius: 50% 50% 46% 54% / 46% 54% 48% 52%;
   }
 }
 
-/* --------------------------------------------------------------------------
-   4. Cursor paint canvas — gallery.js paints watercolor blooms here.
-   Above the washes, below all content.
-   -------------------------------------------------------------------------- */
+/* Rose — counter-clockwise swirl, wide loop down-and-right. */
+@keyframes wander-rose {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1.02);
+    border-radius: 54% 46% 48% 52% / 50% 52% 48% 50%;
+  }
+  20% {
+    transform: translate3d(4vw, 4vh, 0) rotate(-6deg) scale(0.96);
+    border-radius: 45% 55% 56% 44% / 56% 44% 54% 46%;
+  }
+  40% {
+    transform: translate3d(8vw, 9vh, 0) rotate(-14deg) scale(1.06);
+    border-radius: 57% 43% 45% 55% / 44% 56% 46% 54%;
+  }
+  60% {
+    transform: translate3d(5vw, 6vh, 0) rotate(-22deg) scale(1.11);
+    border-radius: 46% 54% 53% 47% / 54% 46% 52% 48%;
+  }
+  80% {
+    transform: translate3d(2vw, 2vh, 0) rotate(-29deg) scale(1.03);
+    border-radius: 53% 47% 46% 54% / 47% 55% 45% 53%;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-34deg) scale(1.02);
+    border-radius: 54% 46% 48% 52% / 50% 52% 48% 50%;
+  }
+}
 
-#paint-canvas {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 1;
-  pointer-events: none;
-  mix-blend-mode: multiply;
+/* Gold — slow clockwise swirl, gentle up-and-right loop. */
+@keyframes wander-gold {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+    border-radius: 49% 51% 53% 47% / 52% 48% 52% 48%;
+  }
+  20% {
+    transform: translate3d(4vw, -3vh, 0) rotate(5deg) scale(1.06);
+    border-radius: 56% 44% 47% 53% / 45% 57% 43% 55%;
+  }
+  40% {
+    transform: translate3d(8vw, -6vh, 0) rotate(11deg) scale(1.1);
+    border-radius: 45% 55% 54% 46% / 55% 45% 53% 47%;
+  }
+  60% {
+    transform: translate3d(6vw, -9vh, 0) rotate(17deg) scale(1.03);
+    border-radius: 54% 46% 46% 54% / 46% 56% 44% 54%;
+  }
+  80% {
+    transform: translate3d(3vw, -4vh, 0) rotate(22deg) scale(0.94);
+    border-radius: 47% 53% 55% 45% / 53% 47% 51% 49%;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(28deg) scale(1);
+    border-radius: 49% 51% 53% 47% / 52% 48% 52% 48%;
+  }
+}
+
+/* Pond (second pass) — counter-clockwise, small wandering loop. */
+@keyframes wander-pond-alt {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+    border-radius: 50% 50% 48% 52% / 48% 52% 48% 52%;
+  }
+  20% {
+    transform: translate3d(-3vw, -3vh, 0) rotate(-5deg) scale(1.05);
+    border-radius: 57% 43% 52% 48% / 51% 49% 53% 47%;
+  }
+  40% {
+    transform: translate3d(-6vw, 2vh, 0) rotate(-11deg) scale(1.1);
+    border-radius: 45% 55% 57% 43% / 55% 45% 51% 49%;
+  }
+  60% {
+    transform: translate3d(-4vw, 6vh, 0) rotate(-17deg) scale(1.02);
+    border-radius: 53% 47% 45% 55% / 46% 56% 44% 54%;
+  }
+  80% {
+    transform: translate3d(-1vw, 3vh, 0) rotate(-23deg) scale(0.95);
+    border-radius: 47% 53% 54% 46% / 54% 46% 52% 48%;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-28deg) scale(1);
+    border-radius: 50% 50% 48% 52% / 48% 52% 48% 52%;
+  }
+}
+
+/* Wisteria (second pass) — clockwise, slowest wandering loop. */
+@keyframes wander-wisteria-alt {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1.03);
+    border-radius: 51% 49% 47% 53% / 53% 47% 51% 49%;
+  }
+  20% {
+    transform: translate3d(3vw, 3vh, 0) rotate(6deg) scale(0.97);
+    border-radius: 45% 55% 55% 45% / 47% 55% 45% 53%;
+  }
+  40% {
+    transform: translate3d(7vw, 5vh, 0) rotate(13deg) scale(1.07);
+    border-radius: 57% 43% 46% 54% / 55% 45% 53% 47%;
+  }
+  60% {
+    transform: translate3d(4vw, 8vh, 0) rotate(19deg) scale(1.11);
+    border-radius: 46% 54% 53% 47% / 45% 57% 43% 55%;
+  }
+  80% {
+    transform: translate3d(1vw, 4vh, 0) rotate(25deg) scale(1.02);
+    border-radius: 53% 47% 46% 54% / 54% 46% 52% 48%;
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(31deg) scale(1.03);
+    border-radius: 51% 49% 47% 53% / 53% 47% 51% 49%;
+  }
 }
 
 /* --------------------------------------------------------------------------
