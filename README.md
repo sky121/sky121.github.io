@@ -9,6 +9,7 @@ An interactive watercolor museum exhibit inspired by Claude Monet. Every page is
 - **Hand-built, zero frameworks** — no build step, no dependencies, just HTML, CSS, and JavaScript.
 - **Vanilla JS canvas painting engine** — the cursor-as-paintbrush effect is rendered on a `<canvas>` with custom blending and decay logic, loaded on the homepage and every exhibit page.
 - **SVG turbulence watercolor filters** — `feTurbulence` and `feDisplacementMap` give frames, placards, and edges their hand-painted wobble.
+- **Evening Exhibition** — a dark theme that follows your system's `prefers-color-scheme` by default and remembers your choice in `localStorage`, applied before first paint so there's no flash.
 - **Printable exhibition catalogue** — `catalogue.html` is a print-friendly one-page résumé styled as a catalogue of selected works.
 - **Typography** — [Cormorant Garamond](https://fonts.google.com/specimen/Cormorant+Garamond) for exhibit headings and [Karla](https://fonts.google.com/specimen/Karla) for placard text.
 - **Guest amenities** — Open Graph social card, SVG/ICO favicons with apple-touch icon and web manifest, and a custom 404.
