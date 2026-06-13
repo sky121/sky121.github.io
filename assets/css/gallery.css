@@ -5,6 +5,7 @@
    Contents
    --------
    1.  Tokens & base
+   1b. Evening Exhibition — html.evening dark theme (tokens + overrides)
    2.  Paper grain & golden-hour overlay
    3.  Drifting watercolor washes (.wash-field)
    4.  Cursor paint canvas (#paint-canvas)
@@ -29,6 +30,7 @@
    -------------------------------------------------------------------------- */
 
 :root {
+  color-scheme: light; /* UA scrollbars/form controls; html.evening flips to dark */
   --paper: #f6f1e7;
   --paper-deep: #efe7d8;
   --ink: #2e3a48;
@@ -150,6 +152,236 @@ main,
 footer#contact {
   position: relative;
   z-index: 2;
+}
+
+/* --------------------------------------------------------------------------
+   1b. Evening Exhibition — the gallery after dark
+   Activated by html.evening (gallery.js toggles it; an inline head script
+   applies it pre-paint, so even #loader opens on dark — its background is
+   var(--paper) and simply follows the tokens). Deep indigo-slate walls,
+   warm lamplight ink; the six pigments are untouched — their translucent
+   washes read on dark because every multiply blend below flips to screen,
+   so the same color now GLOWS instead of staining.
+
+   Contrast (WCAG 2.x, computed):              on --paper   on --paper-deep
+     --ink      #e9e3d3 ........................ 11.37:1        12.58:1
+     --ink-soft #b3ac9a .........................  6.44:1         7.12:1
+     --pond-ink #9fc2e0 .........................  7.81:1         8.65:1
+   (--ink-soft is 5.75:1 and --pond-ink 6.97:1 even on --mat #2b3140.)
+
+   Everything here is scoped under html.evening, which out-ranks the base
+   rules on specificity alone — no source-order tricks needed.
+   -------------------------------------------------------------------------- */
+
+html.evening {
+  color-scheme: dark; /* dark UA scrollbars & form controls */
+  --paper: #232936;
+  --paper-deep: #1c212c;
+  --ink: #e9e3d3;
+  --ink-soft: #b3ac9a;
+  --pond-ink: #9fc2e0;
+  --mat: #2b3140;
+  --hairline: rgba(233, 227, 211, 0.16);
+  /* pigments (--pond, --pond-deep, --wisteria, --sage, --rose, --gold)
+     deliberately unchanged — see the blend flips below */
+}
+
+/* Night walls: the light page kept its brightest paper at the edges; the
+   evening room is darkest at the edges and lifts gently at center, like a
+   single lamp down the hall. */
+html.evening body {
+  background-color: var(--paper);
+  background-image: linear-gradient(
+    180deg,
+    var(--paper-deep) 0%,
+    var(--paper) 58%,
+    var(--paper-deep) 100%
+  );
+}
+
+/* Pond at 30% almost vanishes into the slate; a touch more presence, and
+   --ink (lamplight cream) stays ~7:1 over the blended result. */
+html.evening ::selection {
+  background: rgba(127, 168, 201, 0.38);
+  color: var(--ink);
+}
+
+/* .skip-link needs no override: background var(--ink) / color var(--paper)
+   invert with the tokens (cream chip, dark text — 11.4:1). */
+
+/* --- Atmosphere: washes, grain, paint canvas, loader, golden hour -------- */
+
+/* The drifting washes flip from stain to glow. Base opacity 0.55 screened
+   over near-black bloomed too hot; 0.34 reads as pigment under lamplight. */
+html.evening .wash {
+  mix-blend-mode: screen;
+}
+
+html.evening .wash::before {
+  opacity: 0.34;
+}
+
+/* Keep the second-pass washes fainter than the primaries, as in daylight. */
+html.evening .wash--alt::before {
+  opacity: 0.2;
+}
+
+/* Wisteria pooled behind the portrait glows instead of staining. */
+html.evening .portrait-wash {
+  mix-blend-mode: screen;
+  opacity: 0.8;
+}
+
+/* Multiply grain goes invisible on dark; soft-light at half presence keeps
+   the paper tooth without ashing the blacks. */
+html.evening .grain {
+  mix-blend-mode: soft-light;
+  opacity: 0.5;
+}
+
+/* Cursor blooms become luminous trails (gallery.js brightens the pigment). */
+html.evening #paint-canvas {
+  mix-blend-mode: screen;
+}
+
+/* Loader background already follows var(--paper) — no white flash. The
+   bloom itself switches to a glow. */
+html.evening .loader-blob {
+  mix-blend-mode: screen;
+}
+
+/* Golden-hour easter egg, night variant: the multiply dusk would crush the
+   dark walls, so it becomes a screened lamplight warmth at lower strength.
+   html.evening.golden out-ranks html.golden for the lit state. */
+html.evening body::after {
+  mix-blend-mode: screen;
+}
+
+html.evening.golden body::after {
+  opacity: 0.45;
+}
+
+/* --- Navigation ----------------------------------------------------------- */
+
+/* Scrolled bar: same blur, translucent slate instead of translucent paper,
+   and a deeper hung shadow. */
+html.evening #nav.scrolled {
+  background: rgba(28, 33, 44, 0.8);
+  box-shadow: 0 10px 30px -20px rgba(0, 0, 0, 0.85);
+}
+
+html.evening .monogram {
+  border-color: rgba(233, 227, 211, 0.35);
+}
+/* .monogram:hover already inverts via tokens: cream disc, dark initials. */
+
+/* --- Cards: placards, practice panels ------------------------------------ */
+
+/* The cards' hardcoded translucent-paper fills become translucent mat
+   (--mat #2b3140) at the same alphas; shadows deepen to true night. */
+html.evening .placard {
+  background: rgba(43, 49, 64, 0.88);
+  box-shadow: 0 8px 20px -12px rgba(0, 0, 0, 0.6);
+}
+
+html.evening .practice-entry {
+  background: rgba(43, 49, 64, 0.72);
+  box-shadow: 0 6px 16px -11px rgba(0, 0, 0, 0.55);
+}
+
+/* Underline was pond-deep at 40% — too dim on slate; use night pond-ink. */
+html.evening .placard-link {
+  border-bottom-color: rgba(159, 194, 224, 0.45);
+}
+
+/* Pigment-drop list markers glow instead of staining. */
+html.evening .practice-points li::before {
+  mix-blend-mode: screen;
+}
+
+/* --- Frames: lit for night viewing ---------------------------------------- */
+
+/* Mat follows --mat. Ink borders become pale hairlines; shadows deepen and
+   pick up a faint gold ambience — the picture lights stay on after close. */
+html.evening .frame {
+  border-color: rgba(233, 227, 211, 0.24);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 14px 28px -12px rgba(0, 0, 0, 0.6),
+    0 34px 56px -26px rgba(8, 11, 18, 0.75),
+    0 0 44px -16px rgba(205, 184, 120, 0.22);
+}
+
+html.evening .frame::before {
+  border-color: rgba(233, 227, 211, 0.12);
+}
+
+html.evening .frame img {
+  border-color: rgba(233, 227, 211, 0.1);
+}
+
+html.evening .frame[data-tilt]:hover {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 20px 34px -12px rgba(0, 0, 0, 0.65),
+    0 44px 66px -26px rgba(8, 11, 18, 0.8),
+    0 0 54px -14px rgba(205, 184, 120, 0.3);
+}
+
+/* Full-strength glass sheen reads as glare under lamplight; soften it. */
+html.evening .frame[data-tilt]:hover::after {
+  opacity: 0.28;
+}
+
+/* --- Room I: portrait ------------------------------------------------------ */
+
+html.evening .artist-portrait img {
+  border-color: rgba(233, 227, 211, 0.22);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    0 22px 44px -20px rgba(0, 0, 0, 0.65);
+}
+
+/* --- Room II: pigment blots glow ------------------------------------------ */
+
+html.evening .pigment::before,
+html.evening .pigment::after,
+html.evening .pigment .ripple {
+  mix-blend-mode: screen;
+}
+
+/* --- Painted strokes: hero stroke, dividers, contact underline ------------ */
+
+/* No blend in daylight (they sit on pale paper); screened at night they
+   become ribbons of light. Opacity comes down so they stay brushwork. */
+html.evening .hero-stroke {
+  mix-blend-mode: screen;
+  opacity: 0.55;
+}
+
+html.evening .divider {
+  mix-blend-mode: screen;
+  opacity: 0.45;
+}
+
+html.evening .contact-link::after {
+  mix-blend-mode: screen;
+}
+
+/* --- Theme switch transition ----------------------------------------------
+   gallery.js adds .evening-transition to <html> only for the duration of a
+   toggle, then removes it. Gated so reduced-motion visitors switch
+   instantly; the !important is deliberate — it must beat every component's
+   own transition list for the 0.6s the class is present. */
+@media (prefers-reduced-motion: no-preference) {
+  html.evening-transition *,
+  html.evening-transition *::before,
+  html.evening-transition *::after {
+    transition:
+      background-color 0.6s ease,
+      color 0.6s ease,
+      border-color 0.6s ease !important;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -571,6 +803,37 @@ html.golden body::after {
 
 .nav-links a:focus-visible::after {
   transform: scaleX(1);
+}
+
+/* Theme toggle — gallery.js injects <button class="theme-toggle"> after
+   .nav-links and supplies the glyph (☾ by day, ☀ at night). A quiet
+   circular switch; focus-visible is covered by the global button rule. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-left: 1rem;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--pond-ink);
+  background-color: rgba(127, 168, 201, 0.14);
 }
 
 /* --------------------------------------------------------------------------
@@ -1599,6 +1862,14 @@ html.js .reveal.is-visible {
     padding: 0.85rem 0.25rem; /* ≥44px tap target */
   }
 
+  /* The toggle joins the wrapped nav rows; drop the desktop offset so it
+     centers with the links instead of pushing them off-balance. */
+  .theme-toggle {
+    width: 36px;
+    height: 36px;
+    margin-left: 0;
+  }
+
   /* Trim GPU load: fewer multiply-blended fixed layers on phone GPUs. */
   .wash--alt,
   .wash--rose {
@@ -1719,6 +1990,7 @@ html.js .reveal.is-visible {
   .study .frame--small img,
   .frame[data-tilt]::after,
   .skip-link,
+  .theme-toggle,
   body::after {
     transition: none;
   }
@@ -1737,8 +2009,22 @@ html.js .reveal.is-visible {
   .scroll-cue,
   .hero-hint,
   .divider,
+  .theme-toggle,
   .portrait-wash {
     display: none;
+  }
+
+  /* Evening visitors print the daylight catalogue: reset the tokens so
+     cream ink never lands on white paper. */
+  html.evening {
+    color-scheme: light;
+    --paper: #f6f1e7;
+    --paper-deep: #efe7d8;
+    --ink: #2e3a48;
+    --ink-soft: #5a6a79;
+    --pond-ink: #456a8f;
+    --mat: #fbf7ee;
+    --hairline: rgba(46, 58, 72, 0.16);
   }
 
   body {
