@@ -77,6 +77,89 @@
   })();
 
   /* ------------------------------------------------------------------ *
+   * Cursor-wash parallax — background washes drift gently toward the cursor
+   * ------------------------------------------------------------------ */
+  // Writes only --wash-x / --wash-y (px); the scroll handler owns --parallax.
+  // The CSS composes both: translate(var(--wash-x), calc(var(--parallax) + var(--wash-y))).
+  (function initCursorWash() {
+    var washes = document.querySelectorAll('.wash-field .wash');
+    if (washes.length === 0) return;
+
+    var BASE = 14;        // base drift amplitude in px before per-depth scaling
+    var CAP = 20;         // hard cap on any single axis, px
+    var LERP = 0.06;      // current -> target easing per frame (heavy smoothing)
+    var SETTLE = 0.05;    // |current - target| below this (px) counts as at-rest
+
+    // Target/current cursor offset as fractions in [-0.5..0.5] (0,0 = center).
+    var targetX = 0;
+    var targetY = 0;
+    var curX = 0;
+    var curY = 0;
+    var rafId = 0;
+    var lastMoveAt = 0;
+
+    function render() {
+      rafId = 0;
+      curX += (targetX - curX) * LERP;
+      curY += (targetY - curY) * LERP;
+
+      for (var i = 0; i < washes.length; i++) {
+        // Magnitude grows with depth; parity alternates the drift direction.
+        var depth = BASE * (0.5 + (i % 3) * 0.35);
+        var sign = (i % 2 === 0) ? 1 : -1;
+        var dx = curX * depth * sign;
+        var dy = curY * depth * sign;
+        if (dx > CAP) dx = CAP; else if (dx < -CAP) dx = -CAP;
+        if (dy > CAP) dy = CAP; else if (dy < -CAP) dy = -CAP;
+        washes[i].style.setProperty('--wash-x', dx.toFixed(2) + 'px');
+        washes[i].style.setProperty('--wash-y', dy.toFixed(2) + 'px');
+      }
+
+      // Self-stop once settled and no recent movement; pointermove restarts us.
+      var settled = Math.abs(curX - targetX) < SETTLE / BASE &&
+                    Math.abs(curY - targetY) < SETTLE / BASE;
+      var quiet = performance.now() - lastMoveAt > 600;
+      if (!settled || !quiet) {
+        if (!document.hidden) rafId = window.requestAnimationFrame(render);
+      }
+    }
+
+    function startLoop() {
+      if (!rafId && !document.hidden) rafId = window.requestAnimationFrame(render);
+    }
+
+    window.addEventListener('pointermove', function (event) {
+      if (!finePointer || reducedMotion) return;
+      var w = window.innerWidth || 1;
+      var h = window.innerHeight || 1;
+      targetX = event.clientX / w - 0.5;
+      targetY = event.clientY / h - 0.5;
+      lastMoveAt = performance.now();
+      startLoop();
+    }, { passive: true });
+
+    // Pointer leaving the window: ease the washes back to rest.
+    window.addEventListener('pointerout', function (event) {
+      if (event.relatedTarget) return; // still inside the document
+      targetX = 0;
+      targetY = 0;
+      lastMoveAt = performance.now();
+      startLoop();
+    }, { passive: true });
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        if (rafId) {
+          window.cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+      } else {
+        startLoop();
+      }
+    });
+  })();
+
+  /* ------------------------------------------------------------------ *
    * Reveal-on-scroll with per-batch stagger
    * ------------------------------------------------------------------ */
   (function initReveals() {
@@ -247,7 +330,6 @@
     var GROW_MAX = 1.6;
     var MAX_BLOOMS = 90;
     var maxBlooms = MAX_BLOOMS; // raised temporarily during the easter-egg burst
-    var SPAWN_DIST = 34;
 
     function hexToRgb(hex) {
       var n = parseInt(hex.slice(1), 16);
@@ -412,8 +494,7 @@
         colors: passColors,
         born: performance.now(),
         life: (opts && opts.life) || LIFESPAN,
-        alpha: (opts && opts.alpha) || 1,
-        idle: !!(opts && opts.idle)
+        alpha: (opts && opts.alpha) || 1
       });
       if (blooms.length > maxBlooms) blooms.splice(0, blooms.length - maxBlooms);
       startLoop();
@@ -504,17 +585,11 @@
         rafId = 0;
       }
       running = false;
-      // Halt the idle-drip chain while hidden; resume() restarts it.
-      if (idleTimer) {
-        window.clearTimeout(idleTimer);
-        idleTimer = 0;
-      }
     }
 
     function resume() {
       paused = false;
       startLoop();
-      resetIdleTimer();
     }
 
     function stopAndClear() {
@@ -528,50 +603,6 @@
       ctx.clearRect(0, 0, viewW, viewH);
     }
 
-    /* --- idle drip: air conditioning stirring a wet wash --- */
-    // One setTimeout chain, never stacked: every arm is preceded by a clear
-    // (resetIdleTimer) or by the previous link zeroing idleTimer (idleDrip),
-    // and pause()/resume() clear/restart it around visibility changes.
-    var IDLE_DELAY_MIN = 6000;
-    var IDLE_DELAY_SPREAD = 3000;
-    var IDLE_MAX = 3;
-    var idleTimer = 0;
-
-    function idleDelay() {
-      return IDLE_DELAY_MIN + Math.random() * IDLE_DELAY_SPREAD;
-    }
-
-    function idleDrip() {
-      idleTimer = 0;
-      if (paused || document.hidden) return; // chain ends; resume() restarts it
-      if (!reducedMotion) {
-        var idleCount = 0;
-        for (var i = 0; i < blooms.length; i++) {
-          if (blooms[i].idle) idleCount++;
-        }
-        // Only drip onto a quiet canvas: nothing present but earlier drips.
-        if (idleCount < IDLE_MAX && blooms.length === idleCount) {
-          spawnBloom(
-            viewW * (0.08 + Math.random() * 0.84),
-            viewH * (1 / 3 + Math.random() * 0.6), // lower two-thirds, off the very edge
-            6 + Math.random() * 6,
-            null,
-            { life: 9000, alpha: 0.5, idle: true }
-          );
-        }
-      }
-      idleTimer = window.setTimeout(idleDrip, idleDelay());
-    }
-
-    function resetIdleTimer() {
-      if (idleTimer) window.clearTimeout(idleTimer);
-      idleTimer = window.setTimeout(idleDrip, idleDelay());
-    }
-
-    // Any pointer movement marks the visitor as present again.
-    window.addEventListener('pointermove', resetIdleTimer, { passive: true });
-    resetIdleTimer();
-
     var burstCapTimer = 0;
     function boostBloomCap() {
       // The "monet" burst spawns far more blooms than the steady-state cap;
@@ -583,24 +614,6 @@
       }, 8000);
     }
 
-    /* --- input: trail painting (fine pointers only) --- */
-    if (finePointer) {
-      var lastX = null;
-      var lastY = null;
-      window.addEventListener('pointermove', function (event) {
-        var x = event.clientX;
-        var y = event.clientY;
-        if (lastX !== null) {
-          var dx = x - lastX;
-          var dy = y - lastY;
-          if (dx * dx + dy * dy < SPAWN_DIST * SPAWN_DIST) return;
-        }
-        lastX = x;
-        lastY = y;
-        spawnBloom(x, y, 18 + Math.random() * 28);
-      }, { passive: true });
-    }
-
     /* --- input: click/tap splash (all devices, incl. touch) --- */
     window.addEventListener('click', function (event) {
       if (event.target && event.target.closest &&
@@ -608,25 +621,25 @@
       spawnSplash(event.clientX, event.clientY);
     });
 
-    /* --- placard hover accent: a small bloom at the link's left edge --- */
-    var ACCENT_GAP = 600; // global throttle, ms
+    /* --- hover accent: one small bloom where the cursor meets an object --- */
+    var HOVER_TARGETS = '.frame, .frame--small, .exhibit-frame, .pigment, .placard-link, .contact-link';
+    var ACCENT_GAP = 280; // global throttle, ms
     var lastAccentAt = 0;
 
     document.addEventListener('pointerover', function (event) {
       if (!finePointer || reducedMotion) return;
       var t = event.target;
       if (!t || !t.closest) return;
-      var link = t.closest('.placard-link, .contact-link');
-      if (!link) return;
-      // Ignore pointerover fired by moves between the link's own children.
+      var hit = t.closest(HOVER_TARGETS);
+      if (!hit) return;
+      // Ignore pointerover fired by moves between the element's own children.
       var from = event.relatedTarget;
-      if (from && link.contains(from)) return;
+      if (from && hit.contains(from)) return;
       var now = performance.now();
       if (now - lastAccentAt < ACCENT_GAP) return;
       lastAccentAt = now;
-      // One rect read per hover entry — never in the move path.
-      var rect = link.getBoundingClientRect();
-      spawnBloom(rect.left, rect.top + rect.height / 2, 10 + Math.random() * 6);
+      // Bloom at the contact point — feels like the object responds where touched.
+      spawnBloom(event.clientX, event.clientY, 12 + Math.random() * 6);
     }, { passive: true });
 
     /* --- page visibility --- */

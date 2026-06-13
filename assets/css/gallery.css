@@ -441,8 +441,11 @@ html.golden body::after {
   z-index: 0;
   pointer-events: none;
   mix-blend-mode: multiply;
-  transform: translateY(var(--parallax, 0px));
+  transform: translate(var(--wash-x, 0px), calc(var(--parallax, 0px) + var(--wash-y, 0px)));
   will-change: transform;
+  /* Eases the cursor-follow offset (JS already lerps --wash-x/y); kept short
+     so scroll parallax via --parallax stays responsive enough. */
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .wash::before {
@@ -1264,7 +1267,7 @@ footer#contact {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink);
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* The blot of pigment itself: pooled center, settled darker rim.
@@ -1330,6 +1333,18 @@ footer#contact {
 
 .pigment:hover {
   transform: translateY(-3px);
+  /* Neutral soft fallback first; pre-2023 engines reject the color-mix-with-var
+     halo at computed-value time, so they keep this quiet shadow. */
+  box-shadow: 0 6px 22px -10px rgba(46, 58, 72, 0.4);
+}
+
+/* The chip's own pigment (--c) bloomed into a soft outer halo. Wrapped in
+   @supports like the .pigment::before block above, since color-mix() with a
+   var() is invalid at computed-value time on older engines. */
+@supports (background: color-mix(in srgb, red 50%, transparent)) {
+  .pigment:hover {
+    box-shadow: 0 6px 22px -10px color-mix(in srgb, var(--c, var(--pond)) 55%, transparent);
+  }
 }
 
 .pigment:hover::before {
@@ -1570,6 +1585,31 @@ footer#contact {
   opacity: 0.5;
 }
 
+/* Featured works lift toward the light on hover/focus: the tilt transform on
+   .frame[data-tilt] is left untouched (DO NOT overwrite); instead the hung
+   shadow deepens and the mat brightens a touch, and the sheen rises a little
+   more than the generic frame hover. ~0.3s ease, in step with the others. */
+.work .frame {
+  transition:
+    transform 0.2s ease-out,
+    box-shadow 0.4s ease,
+    filter 0.3s ease;
+}
+
+.work .frame:hover,
+.work .frame:focus-within {
+  box-shadow:
+    0 1px 2px rgba(46, 58, 72, 0.1),
+    0 24px 40px -14px rgba(46, 58, 72, 0.36),
+    0 50px 74px -28px rgba(74, 114, 153, 0.36);
+  filter: brightness(1.03);
+}
+
+.work .frame[data-tilt]:hover::after,
+.work .frame[data-tilt]:focus-within::after {
+  opacity: 0.62;
+}
+
 .work-placard {
   max-width: 30rem;
   padding: 1.6rem 1.8rem 1.7rem;
@@ -1623,7 +1663,17 @@ footer#contact {
 }
 
 .study:hover .frame--small {
-  transform: rotate(0deg) translateY(-4px);
+  transform: rotate(0deg) translateY(-3px);
+}
+
+/* On hover the small frame deepens its hung shadow and picks up a faint warm
+   (gold) ring — kept low-alpha so it reads as catalogue light, not a glow. */
+.study:hover .frame--small,
+.study .frame--small:focus-within {
+  box-shadow:
+    0 1px 2px rgba(46, 58, 72, 0.1),
+    0 16px 30px -16px rgba(46, 58, 72, 0.34),
+    inset 0 0 0 1px rgba(205, 184, 120, 0.35);
 }
 
 .study-placard {
@@ -1993,6 +2043,22 @@ html.js .reveal.is-visible {
   .theme-toggle,
   body::after {
     transition: none;
+  }
+
+  /* Kill the cursor-follow ease on the washes (the JS offsets still apply, but
+     without animating). */
+  .wash {
+    transition: none;
+  }
+
+  /* Hovers must not move under reduced motion: drop the translateY lifts but
+     keep the non-motion color/shadow/brightness responses. */
+  .pigment:hover {
+    transform: none;
+  }
+
+  .study:hover .frame--small {
+    transform: rotate(0deg);
   }
 }
 

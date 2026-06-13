@@ -113,8 +113,9 @@ body::after {
   z-index: 0;
   pointer-events: none;
   mix-blend-mode: multiply;
-  transform: translateY(var(--parallax, 0px));
+  transform: translate(var(--wash-x, 0px), calc(var(--parallax, 0px) + var(--wash-y, 0px)));
   will-change: transform;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .wash::before {
@@ -432,7 +433,7 @@ html.js .reveal.is-visible {
     0 1px 2px rgba(46, 58, 72, 0.1),
     0 14px 28px -14px rgba(46, 58, 72, 0.3),
     0 34px 56px -28px rgba(74, 114, 153, 0.28);
-  transition: transform 0.4s ease, box-shadow 0.4s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
 }
 
 /* inner line of the double border */
@@ -453,11 +454,13 @@ html.js .reveal.is-visible {
 }
 
 .exhibit-frame:hover {
-  transform: rotate(0deg) translateY(-4px);
+  transform: rotate(0deg) translateY(-3px);
   box-shadow:
     0 1px 2px rgba(46, 58, 72, 0.1),
     0 20px 34px -14px rgba(46, 58, 72, 0.33),
     0 44px 66px -28px rgba(74, 114, 153, 0.32);
+  /* faint brightening of the mat — watercolor catching the light */
+  background: #fdfaf3;
 }
 
 .exhibit-frame img {
@@ -613,6 +616,11 @@ html.js .reveal.is-visible {
   .wash--wisteria::before,
   .wash--sage::before {
     animation: none;
+  }
+
+  /* No eased cursor-follow parallax under reduced motion */
+  .wash {
+    transition: none;
   }
 
   /* Reveal targets show instantly; gallery.js never hides the canvas
@@ -772,10 +780,13 @@ html.evening .exhibit-frame::before {
 }
 
 html.evening .exhibit-frame:hover {
+  /* deeper, black-based shadows so the lift reads on the slate walls */
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.3),
-    0 20px 34px -14px rgba(0, 0, 0, 0.6),
-    0 44px 66px -28px rgba(6, 10, 18, 0.65);
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 20px 34px -14px rgba(0, 0, 0, 0.65),
+    0 44px 66px -28px rgba(6, 10, 18, 0.7);
+  /* faint brightening of the mat — lamplight catching the frame */
+  background: #333a4b;
 }
 
 html.evening .exhibit-frame img {
