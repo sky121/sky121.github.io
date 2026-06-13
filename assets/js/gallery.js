@@ -321,8 +321,6 @@
     var PALETTE_HEX = ['#7fa8c9', '#a292c4', '#93b48b', '#d98ba0', '#cdb878', '#4a7299'];
     var GOLDEN_HEX = ['#cdb878', '#d98ba0', '#e0c98f', '#d6a07a'];
 
-    var PASS_SCALES = [1, 0.82, 0.62, 0.4];
-    var PASS_ALPHAS = [0.05, 0.06, 0.07, 0.09];
     var LIFESPAN = 7000;
     var FADE_IN = 150;
     var FADE_OUT = 2500;
@@ -348,19 +346,13 @@
     }
 
     function rgbaStrings(hexList) {
-      // Precompute one rgba string per (color, pass) pair — twice: a day set
-      // and a brightened evening set, selected at draw time.
+      // Precompute the base pigment RGB twice per color — a day set and a
+      // brightened evening set. Per-stamp rgba strings (with their alpha,
+      // lightness and hue tweaks) are baked at spawn time from these bases.
       var out = [];
       for (var i = 0; i < hexList.length; i++) {
         var rgb = hexToRgb(hexList[i]);
-        var lit = lighten(rgb);
-        var day = [];
-        var evening = [];
-        for (var p = 0; p < PASS_ALPHAS.length; p++) {
-          day.push('rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + PASS_ALPHAS[p] + ')');
-          evening.push('rgba(' + lit[0] + ',' + lit[1] + ',' + lit[2] + ',' + PASS_ALPHAS[p] + ')');
-        }
-        out.push({ day: day, evening: evening });
+        out.push({ day: rgb, evening: lighten(rgb) });
       }
       return out;
     }
@@ -455,32 +447,207 @@
     window.addEventListener('load', measureSections);
     window.setTimeout(measureSections, 3000); // re-measure after fonts settle
 
-    /* --- bloom construction --- */
-    function makeOutlinePath() {
-      // Irregular blot at unit scale: 12 angle points, radius jitter 0.72..1.28,
-      // closed smooth curve via quadratic curves through midpoints.
-      var POINTS = 12;
-      var xs = [];
-      var ys = [];
-      var i;
-      for (i = 0; i < POINTS; i++) {
-        var angle = (i / POINTS) * Math.PI * 2;
-        var r = 0.72 + Math.random() * 0.56;
-        xs.push(Math.cos(angle) * r);
-        ys.push(Math.sin(angle) * r);
+    /* --- bloom construction (recursive polygon edge-deformation model) --- *
+     * A bloom is built from many overlapping translucent LAYERS, each a closed
+     * polygon whose outline was fractally roughened by recursive midpoint
+     * displacement (big wobbles first, finer detail each pass). All layers grow
+     * from the same lumpy base polygon but re-run the deformation with fresh
+     * randomness, so every layer has a slightly different ragged edge. Filled at
+     * very low alpha with source-over, the stack accumulates: the deep interior
+     * (reached by every layer) goes rich, the perimeter (reached by only a few
+     * of the longest-reaching layers) dissolves into a continuous feathered
+     * edge — never a circle, never a discrete dab. A few inset, slightly darker
+     * layers pool pigment near the rim (the dried "cauliflower" backrun); tiny
+     * separately-deformed mini-blobs read as spatter. All geometry is a flat
+     * Float coordinate list baked once at spawn (unit mean radius ~1) and reused
+     * each frame via setTransform — no per-frame allocation. */
+
+    var TWO_PI = Math.PI * 2;
+
+    function clampByte(v) {
+      v = Math.round(v);
+      return v < 0 ? 0 : (v > 255 ? 255 : v);
+    }
+
+    // Approx standard normal via sum of uniforms (Irwin-Hall), centered/scaled.
+    function gauss() {
+      return (Math.random() + Math.random() + Math.random() - 1.5) * 0.9;
+    }
+
+    // 1. BASE POLYGON — a closed lumpy blob (not a circle). Returns parallel
+    //    angle/radius arrays so variant layers can re-deform from the same seed
+    //    while keeping the bloom's overall character. ~8-12 vertices, each with
+    //    jittered angle spacing and jittered radius.
+    function makeBaseBlob() {
+      var n = 8 + ((Math.random() * 5) | 0); // 8..12
+      var pts = []; // [x0,y0,x1,y1,...]
+      var step = TWO_PI / n;
+      for (var i = 0; i < n; i++) {
+        // Jitter the angle around its slot so spacing is uneven.
+        var ang = i * step + (Math.random() - 0.5) * step * 0.7;
+        var rad = 0.78 + Math.random() * 0.44; // 0.78..1.22 — already lumpy
+        pts.push(Math.cos(ang) * rad, Math.sin(ang) * rad);
       }
+      return pts;
+    }
+
+    // 2. RECURSIVE EDGE DEFORMATION — subdivide `depth` times. Each pass inserts
+    //    a midpoint on every edge, displaced along that edge's normal by a random
+    //    amount proportional to edge length * variance. Variance HALVES each
+    //    level (fractal: large lobes first, fine ripples last). `rough` scales
+    //    the overall wobble. Returns a fresh flat point list — the source `base`
+    //    is never mutated, so each variant re-runs from the same seed.
+    function deform(base, depth, rough) {
+      var pts = base.slice();
+      var variance = rough;
+      for (var pass = 0; pass < depth; pass++) {
+        var n = pts.length / 2;
+        var out = [];
+        for (var i = 0; i < n; i++) {
+          var ax = pts[i * 2];
+          var ay = pts[i * 2 + 1];
+          var j = (i + 1) % n;
+          var bx = pts[j * 2];
+          var by = pts[j * 2 + 1];
+          out.push(ax, ay);
+          // Edge vector + length.
+          var ex = bx - ax;
+          var ey = by - ay;
+          var len = Math.sqrt(ex * ex + ey * ey) || 0.0001;
+          // Unit normal (perpendicular).
+          var nx = -ey / len;
+          var ny = ex / len;
+          // Displace the midpoint along the normal (signed), plus a touch of
+          // tangential jitter so vertices don't sit on a clean arc.
+          var disp = (Math.random() - 0.5) * 2 * len * variance;
+          var tang = (Math.random() - 0.5) * len * variance * 0.5;
+          var mx = (ax + bx) * 0.5 + nx * disp + (ex / len) * tang;
+          var my = (ay + by) * 0.5 + ny * disp + (ey / len) * tang;
+          out.push(mx, my);
+        }
+        pts = out;
+        variance *= 0.5; // fractal falloff
+      }
+      return pts;
+    }
+
+    // Build a smooth closed Path2D through a flat point list using midpoint
+    // quadratics (Catmull-ish): control points are the vertices, curve passes
+    // through edge midpoints. Gives a continuous organic outline with no kinks.
+    function pathFromPoints(pts) {
+      var n = pts.length / 2;
       var path = new Path2D();
-      var startX = (xs[0] + xs[POINTS - 1]) / 2;
-      var startY = (ys[0] + ys[POINTS - 1]) / 2;
+      var startX = (pts[(n - 1) * 2] + pts[0]) * 0.5;
+      var startY = (pts[(n - 1) * 2 + 1] + pts[1]) * 0.5;
       path.moveTo(startX, startY);
-      for (i = 0; i < POINTS; i++) {
-        var next = (i + 1) % POINTS;
-        var midX = (xs[i] + xs[next]) / 2;
-        var midY = (ys[i] + ys[next]) / 2;
-        path.quadraticCurveTo(xs[i], ys[i], midX, midY);
+      for (var i = 0; i < n; i++) {
+        var cx = pts[i * 2];
+        var cy = pts[i * 2 + 1];
+        var j = (i + 1) % n;
+        var mx = (cx + pts[j * 2]) * 0.5;
+        var my = (cy + pts[j * 2 + 1]) * 0.5;
+        path.quadraticCurveTo(cx, cy, mx, my);
       }
       path.closePath();
       return path;
+    }
+
+    // Scale a flat point list about the origin (for inset rim layers).
+    function scalePoints(pts, k) {
+      var out = new Array(pts.length);
+      for (var i = 0; i < pts.length; i++) out[i] = pts[i] * k;
+      return out;
+    }
+
+    // One bloom layer: a baked Path2D + its rgba string. `lift` shifts lightness
+    // (negative = darker/more pigment), with a tiny warm/cool hue drift so the
+    // wash mottles instead of reading as one flat colour.
+    function makeLayer(rgb, pts, alpha, lift) {
+      var hue = (Math.random() - 0.5) * 14;
+      var rr = clampByte(rgb[0] + lift + hue);
+      var gg = clampByte(rgb[1] + lift);
+      var bb = clampByte(rgb[2] + lift - hue);
+      return {
+        path: pathFromPoints(pts),
+        color: 'rgba(' + rr + ',' + gg + ',' + bb + ',' + alpha + ')'
+      };
+    }
+
+    // 3-6. LAYERED ACCUMULATION + rim darkening + granulation + spatter.
+    // `rgb` is the base pigment [r,g,b]; layer count scales with radius so tiny
+    // hover blooms stay cheap (~9 layers) and big splashes get a deep stack
+    // (~34 layers). Returns a flat array of {path,color} drawn back-to-front.
+    function makeBloomLayers(rgb, radius) {
+      var base = makeBaseBlob();
+
+      // Layer count scales with radius. radius ~12 (hover) -> ~9; ~90 -> ~34.
+      var bodyCount = Math.round(7 + radius * 0.32);
+      if (bodyCount < 8) bodyCount = 8;
+      if (bodyCount > 34) bodyCount = 34;
+      var deep = radius > 26; // big splash gets richer rim + spatter
+
+      var layers = [];
+      var i;
+
+      // Body wash: full-size variants, each a fresh deformation of the base.
+      // Most reach the full silhouette; a fraction are slightly inset, so the
+      // outermost few layers feather the edge while the core stacks up dense.
+      var depth = radius > 40 ? 6 : (radius > 18 ? 5 : 4);
+      var rough = 0.30 + Math.random() * 0.06;
+      for (i = 0; i < bodyCount; i++) {
+        // The outermost ~third of layers reach further and ragged harder so the
+        // silhouette fingers into the paper (a splash, not a soft disc); the
+        // inner two-thirds stack tighter to build a rich, mottled core.
+        var outer = i / bodyCount > 0.66;
+        var pts = deform(base, depth, outer ? rough * 1.35 : rough);
+        // Wide scale spread so layers never share one hard rim; the sparse
+        // larger ones dissolve the outer edge into feathered tendrils.
+        var k = outer ? (0.96 + Math.random() * 0.22) // 0.96..1.18 reach out
+                      : (0.80 + Math.random() * 0.20); // 0.80..1.00 core
+        pts = scalePoints(pts, k);
+        // Centre-weighted lightness: interior wash a touch lighter than mid.
+        // Outer reaching layers run fainter so the edge stays translucent.
+        var lift = 10 + (Math.random() - 0.5) * 24;
+        var alpha = outer ? (0.022 + Math.random() * 0.02)
+                          : (0.035 + Math.random() * 0.028);
+        layers.push(makeLayer(rgb, pts, alpha, lift));
+      }
+
+      // 4. EDGE DARKENING (cauliflower / backrun rim): several inset, slightly
+      //    darker layers concentrated just inside the perimeter, each its own
+      //    ragged deformation so the rim pools irregularly — never a clean ring.
+      var rimCount = Math.round(bodyCount * (deep ? 0.6 : 0.45));
+      for (i = 0; i < rimCount; i++) {
+        var rpts = deform(base, depth, rough * 1.2);
+        // Inset so darker pigment pools at/just inside the edge; a tight spread
+        // of scales keeps the rim from ever reading as one clean ring.
+        rpts = scalePoints(rpts, 0.88 + Math.random() * 0.11); // 0.88..0.99
+        layers.push(makeLayer(
+          rgb, rpts,
+          0.045 + Math.random() * 0.035,
+          -40 - Math.random() * 26 // darker pooled pigment
+        ));
+      }
+
+      // 6. SPATTER: a few tiny separately-deformed mini-blobs flung 1.4..2.6x
+      //    out, as if the brush were tapped (big blooms only). Still polygons.
+      var speckCount = deep ? 3 + ((Math.random() * 4) | 0) : 0;
+      for (i = 0; i < speckCount; i++) {
+        var sa = Math.random() * TWO_PI;
+        var sd = 1.4 + Math.random() * 1.2;
+        var sx = Math.cos(sa) * sd;
+        var sy = Math.sin(sa) * sd;
+        var sk = 0.12 + Math.random() * 0.12; // tiny
+        var speck = deform(makeBaseBlob(), 3, 0.3);
+        // Scale down and translate out to the spatter position.
+        for (var p = 0; p < speck.length; p += 2) {
+          speck[p] = speck[p] * sk + sx;
+          speck[p + 1] = speck[p + 1] * sk + sy;
+        }
+        layers.push(makeLayer(rgb, speck, 0.08 + Math.random() * 0.06, -18));
+      }
+
+      return layers;
     }
 
     function spawnBloom(x, y, radius, passColors, opts) {
@@ -490,11 +657,17 @@
         x: x,
         y: y,
         radius: radius,
-        path: makeOutlinePath(),
-        colors: passColors,
+        // Two layer stacks: one baked from the day pigment, one from the
+        // brightened evening pigment. The geometry differs slightly between
+        // them but that's invisible (only one set is ever drawn per theme).
+        layersDay: makeBloomLayers(passColors.day, radius),
+        layersEve: makeBloomLayers(passColors.evening, radius),
         born: performance.now(),
         life: (opts && opts.life) || LIFESPAN,
-        alpha: (opts && opts.alpha) || 1
+        alpha: (opts && opts.alpha) || 1,
+        // Slight asymmetric growth target so the wash doesn't bloom as a circle.
+        sx: 0.9 + Math.random() * 0.2,
+        sy: 0.9 + Math.random() * 0.2
       });
       if (blooms.length > maxBlooms) blooms.splice(0, blooms.length - maxBlooms);
       startLoop();
@@ -545,16 +718,22 @@
           : 1 + (GROW_MAX - 1) * easeOutCubic(age / GROW_TIME);
         var r = b.radius * growth;
 
-        // Reuse the unit-scale Path2D: bake position + scale (+ DPR) into the
-        // transform so positions stay in CSS pixels. Layered low-alpha passes
-        // give the soft pooled-pigment look without shadowBlur/filters.
+        // Draw the precomputed layer stack. Every layer's Path2D is in unit
+        // bloom space; growth + asymmetric scale + bloom position (+ DPR) bake
+        // into ONE transform shared by the whole stack, so no geometry is
+        // rebuilt per frame — growth just scales the precomputed silhouettes.
+        // Many low-alpha source-over fills accumulate: the deep interior goes
+        // rich, the perimeter (reached by only the largest few layers) feathers
+        // into a continuous ragged edge. The canvas element's own multiply/
+        // screen blend (CSS) composites the whole wash onto the page.
         ctx.globalAlpha = envelope * b.alpha;
-        var passColors = evening ? b.colors.evening : b.colors.day;
-        for (var p = 0; p < PASS_SCALES.length; p++) {
-          var s = r * PASS_SCALES[p] * dpr;
-          ctx.setTransform(s, 0, 0, s, b.x * dpr, b.y * dpr);
-          ctx.fillStyle = passColors[p];
-          ctx.fill(b.path);
+        var rx = r * b.sx * dpr;
+        var ry = r * b.sy * dpr;
+        ctx.setTransform(rx, 0, 0, ry, b.x * dpr, b.y * dpr);
+        var layers = evening ? b.layersEve : b.layersDay;
+        for (var p = 0; p < layers.length; p++) {
+          ctx.fillStyle = layers[p].color;
+          ctx.fill(layers[p].path);
         }
       }
       blooms.length = write;
