@@ -9,11 +9,14 @@
      - state        in-memory app state
      - distance     haversine util
      - demo         sample restaurant + visited data
-     - tabs         tablist router (Find / Visited)
+     - tabs         tablist router (Find / Visited / Friends / Popular)
      - find         Find-tab rendering, controls, pick-for-me, geolocation
      - gmaps        lazy Google Maps + Places integration (current API)
      - sheet        rating sheet (shared by Find + Visited)
      - visited      Visited store rendering + CRUD
+     - social       MOCK SOCIAL API (friends feed + popular leaderboard)
+     - friends      Friends-tab rendering (consumes social.* promises)
+     - popular      Popular-tab rendering (consumes social.* promises)
      - settings     API key panel
    ========================================================================== */
 (function () {
@@ -128,9 +131,9 @@
 
   function demoVisited() {
     return [
-      { id: 'demo-v-1', name: 'Tonkotsu Lane', food: 9, vibe: 7.5, service: 8, note: 'Tonkotsu was rich and silky. Tiny room, expect a wait.', date: '2026-05-02', loc: 'Embarcadero, SF', demo: true },
-      { id: 'demo-v-2', name: 'Little Wren Bakery', food: 9.5, vibe: 8, service: 7, note: 'The morning bun is unreal. Coffee a touch weak.', date: '2026-04-18', loc: 'Embarcadero, SF', demo: true },
-      { id: 'demo-v-3', name: 'Pier 9 Oyster Co.', food: 8, vibe: 9, service: 6.5, note: 'Beautiful patio at sunset. Pricey, slow service.', date: '2026-03-27', loc: 'Pier 9, SF', demo: true }
+      { id: 'demo-v-1', name: 'Tonkotsu Lane', food: 90, vibe: 75, service: 80, note: 'Tonkotsu was rich and silky. Tiny room, expect a wait.', date: '2026-05-02', loc: 'Embarcadero, SF', demo: true },
+      { id: 'demo-v-2', name: 'Little Wren Bakery', food: 95, vibe: 80, service: 70, note: 'The morning bun is unreal. Coffee a touch weak.', date: '2026-04-18', loc: 'Embarcadero, SF', demo: true },
+      { id: 'demo-v-3', name: 'Pier 9 Oyster Co.', food: 80, vibe: 90, service: 65, note: 'Beautiful patio at sunset. Pricey, slow service.', date: '2026-03-27', loc: 'Pier 9, SF', demo: true }
     ];
   }
 
@@ -158,47 +161,83 @@
     return (Number(entry.food) + Number(entry.vibe) + Number(entry.service)) / 3;
   }
   function fmt1(n) { return (Math.round(n * 10) / 10).toFixed(1); }
+  function fmtScore(n) { return String(Math.round(n)); }  /* ratings: whole numbers, 0-100 */
+
+  /* Shared watercolor sub-score bar (reused by Visited + Friends). */
+  function scoreBar(label, value, mod) {
+    var row = el('div', 'v-bar v-bar--' + mod);
+    row.appendChild(el('span', 'lbl', label));
+    var track = el('div', 'track');
+    var fill = el('div', 'fill');
+    fill.style.width = value + '%';
+    track.appendChild(fill);
+    row.appendChild(track);
+    row.appendChild(el('span', 'val', fmtScore(value)));
+    return row;
+  }
+
+  /* Relative time from an ISO date or a Date, e.g. "3 days ago". */
+  function relTime(when) {
+    var then = (when instanceof Date) ? when : new Date(when);
+    if (isNaN(then.getTime())) return '';
+    var secs = Math.round((Date.now() - then.getTime()) / 1000);
+    if (secs < 45) return 'just now';
+    var mins = Math.round(secs / 60);
+    if (mins < 60) return mins + (mins === 1 ? ' minute ago' : ' minutes ago');
+    var hrs = Math.round(mins / 60);
+    if (hrs < 24) return hrs + (hrs === 1 ? ' hour ago' : ' hours ago');
+    var days = Math.round(hrs / 24);
+    if (days < 7) return days + (days === 1 ? ' day ago' : ' days ago');
+    var wks = Math.round(days / 7);
+    if (wks < 5) return wks + (wks === 1 ? ' week ago' : ' weeks ago');
+    var mos = Math.round(days / 30);
+    if (mos < 12) return mos + (mos === 1 ? ' month ago' : ' months ago');
+    var yrs = Math.round(days / 365);
+    return yrs + (yrs === 1 ? ' year ago' : ' years ago');
+  }
 
   /* ================================================================== *
    * TABS — accessible tablist router
    * ================================================================== */
   var tabs = (function () {
-    var tabFind = $('tab-find');
-    var tabVisited = $('tab-visited');
-    var panelFind = $('panel-find');
-    var panelVisited = $('panel-visited');
-    var tabEls = [tabFind, tabVisited];
+    // Tab registry — add a tab by adding one entry here (keeps a11y wiring generic).
+    var defs = [
+      { name: 'find', tab: $('tab-find'), panel: $('panel-find'), onShow: null },
+      { name: 'visited', tab: $('tab-visited'), panel: $('panel-visited'), onShow: function () { visited.render(); } },
+      { name: 'friends', tab: $('tab-friends'), panel: $('panel-friends'), onShow: function () { friends.render(); } },
+      { name: 'popular', tab: $('tab-popular'), panel: $('panel-popular'), onShow: function () { popular.render(); } }
+    ].filter(function (d) { return d.tab && d.panel; });
+
+    var tabEls = defs.map(function (d) { return d.tab; });
 
     function activate(which, focus) {
-      var isFind = which === 'find';
-      [tabFind, tabVisited].forEach(function (t) {
-        var on = (t === (isFind ? tabFind : tabVisited));
-        if (!t) return;
-        t.classList.toggle('is-active', on);
-        t.setAttribute('aria-selected', on ? 'true' : 'false');
-        t.tabIndex = on ? 0 : -1;
-        if (on && focus) t.focus();
+      defs.forEach(function (d) {
+        var on = d.name === which;
+        d.tab.classList.toggle('is-active', on);
+        d.tab.setAttribute('aria-selected', on ? 'true' : 'false');
+        d.tab.tabIndex = on ? 0 : -1;
+        d.panel.classList.toggle('is-hidden', !on);
+        d.panel.hidden = !on;
+        if (on) {
+          if (focus) d.tab.focus();
+          if (d.onShow) d.onShow();
+        }
       });
-      if (panelFind) { panelFind.classList.toggle('is-hidden', !isFind); panelFind.hidden = !isFind; }
-      if (panelVisited) { panelVisited.classList.toggle('is-hidden', isFind); panelVisited.hidden = isFind; }
-      if (!isFind) visited.render();
     }
 
     function init() {
-      if (tabFind) tabFind.addEventListener('click', function () { activate('find'); });
-      if (tabVisited) tabVisited.addEventListener('click', function () { activate('visited'); });
-      // keyboard: left/right/home/end on the tablist
-      tabEls.forEach(function (t, idx) {
-        if (!t) return;
-        t.addEventListener('keydown', function (e) {
+      defs.forEach(function (d, idx) {
+        d.tab.addEventListener('click', function () { activate(d.name); });
+        // keyboard: arrows/home/end with roving tabindex
+        d.tab.addEventListener('keydown', function (e) {
           var next = null;
-          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (idx + 1) % tabEls.length;
-          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (idx - 1 + tabEls.length) % tabEls.length;
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (idx + 1) % defs.length;
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (idx - 1 + defs.length) % defs.length;
           else if (e.key === 'Home') next = 0;
-          else if (e.key === 'End') next = tabEls.length - 1;
+          else if (e.key === 'End') next = defs.length - 1;
           if (next != null) {
             e.preventDefault();
-            activate(next === 0 ? 'find' : 'visited', true);
+            activate(defs[next].name, true);
           }
         });
       });
@@ -271,9 +310,8 @@
       var meta = el('div', 'card-meta');
       if (r.rating) {
         var st = el('span', 'stars');
-        var num = el('span', 'num', fmt1(r.rating));
+        var num = el('span', 'num', '\u2605 ' + fmtScore(r.rating * 20));
         st.appendChild(num);
-        st.appendChild(document.createTextNode(stars(r.rating)));
         if (r.reviews) st.appendChild(document.createTextNode(' (' + r.reviews.toLocaleString() + ')'));
         meta.appendChild(st);
       }
@@ -744,13 +782,13 @@
 
     function syncSlider(input, out) {
       var v = parseFloat(input.value);
-      out.textContent = fmt1(v);
-      input.setAttribute('aria-valuetext', fmt1(v) + ' out of 10');
+      out.textContent = fmtScore(v);
+      input.setAttribute('aria-valuetext', fmtScore(v) + ' out of 100');
       paintRange(input);
     }
     function syncOverall() {
       var avg = (parseFloat(sFood.value) + parseFloat(sVibe.value) + parseFloat(sService.value)) / 3;
-      overallOut.textContent = fmt1(avg);
+      overallOut.textContent = fmtScore(avg);
     }
     function syncAll() {
       syncSlider(sFood, nFood); syncSlider(sVibe, nVibe); syncSlider(sService, nService);
@@ -809,7 +847,7 @@
       locField.hidden = true;
       noteInput.value = '';
       dateInput.value = todayStr();
-      setValues({ food: 5, vibe: 5, service: 5 });
+      setValues({ food: 50, vibe: 50, service: 50 });
       show();
     }
 
@@ -824,7 +862,7 @@
       locInput.value = '';
       noteInput.value = '';
       dateInput.value = todayStr();
-      setValues({ food: 5, vibe: 5, service: 5 });
+      setValues({ food: 50, vibe: 50, service: 50 });
       show();
     }
 
@@ -961,17 +999,7 @@
       return months[parseInt(parts[1], 10) - 1] + ' ' + parseInt(parts[2], 10) + ', ' + parts[0];
     }
 
-    function bar(label, value, mod) {
-      var row = el('div', 'v-bar v-bar--' + mod);
-      row.appendChild(el('span', 'lbl', label));
-      var track = el('div', 'track');
-      var fill = el('div', 'fill');
-      fill.style.width = (value / 10 * 100) + '%';
-      track.appendChild(fill);
-      row.appendChild(track);
-      row.appendChild(el('span', 'val', fmt1(value)));
-      return row;
-    }
+    var bar = scoreBar; // shared watercolor bar renderer
 
     function buildCard(e) {
       var card = el('article', 'card v-card');
@@ -983,7 +1011,7 @@
       top.appendChild(left);
 
       var ov = el('div', 'v-overall');
-      ov.appendChild(el('span', 'big', fmt1(overallOf(e))));
+      ov.appendChild(el('span', 'big', fmtScore(overallOf(e))));
       ov.appendChild(el('span', 'lbl', 'Overall'));
       top.appendChild(ov);
       card.appendChild(top);
@@ -1048,7 +1076,7 @@
       statsEl.appendChild(document.createTextNode('You’ve logged '));
       statsEl.appendChild(el('strong', null, String(n)));
       statsEl.appendChild(document.createTextNode(' place' + (n === 1 ? '' : 's') + ' · average overall '));
-      statsEl.appendChild(el('strong', null, fmt1(avg)));
+      statsEl.appendChild(el('strong', null, fmtScore(avg)));
 
       arr.forEach(function (e) { listEl.appendChild(buildCard(e)); });
     }
@@ -1064,6 +1092,351 @@
     }
 
     return { init: init, render: render, add: add, update: update, remove: remove };
+  })();
+
+  /* ================================================================== *
+   * MOCK SOCIAL API
+   * ------------------------------------------------------------------
+   * Replace these resolvers with real backend (Firebase/Supabase) calls.
+   * The UI already consumes promises + loading/error states, so dropping
+   * in real network requests is a contained change: keep the same return
+   * shapes (documented below) and the Friends/Popular tabs keep working.
+   *
+   *   social.getFriendsFeed({ sort }) ->
+   *     Promise<Array<{
+   *       id, friend:{name,initial,color}, place, loc,
+   *       food, vibe, service, note, date (ISO), demo:true
+   *     }>>
+   *
+   *   social.getPopular({ range }) ->          // range: 'today'|'month'|'year'
+   *     Promise<Array<{
+   *       rank, place, loc, cuisine, score (avg overall, 0-100),
+   *       reviews (this period), trend: 'up'|'down'|'flat', demo:true
+   *     }>>
+   *
+   * All entries are clearly flagged demo:true and labelled "Sample" in UI.
+   * ================================================================== */
+  var social = (function () {
+    var FAKE_LATENCY = prefersReducedMotion ? 120 : 360; // ms — mimic a network
+
+    // Friend palette tokens (watercolor accents for avatar chips).
+    var FRIENDS = [
+      { name: 'Maya Okafor', initial: 'M', color: 'rose' },
+      { name: 'Devin Park', initial: 'D', color: 'pond' },
+      { name: 'Priya Raman', initial: 'P', color: 'wisteria' },
+      { name: 'Leo Castellanos', initial: 'L', color: 'sage' },
+      { name: 'Hana Sato', initial: 'H', color: 'gold' },
+      { name: 'Theo Brandt', initial: 'T', color: 'pond' }
+    ];
+
+    function friend(i) { return FRIENDS[i]; }
+    function daysAgo(n) {
+      var d = new Date();
+      d.setDate(d.getDate() - n);
+      return d.toISOString();
+    }
+    function hoursAgo(n) {
+      var d = new Date();
+      d.setHours(d.getHours() - n);
+      return d.toISOString();
+    }
+
+    // --- DEMO FRIENDS FEED (sample data) ---
+    var FRIENDS_FEED = [
+      { id: 'f-1', friend: friend(0), place: 'Tonkotsu Lane', loc: 'Embarcadero, SF', food: 95, vibe: 80, service: 85, note: 'Best ramen south of Japantown. The chashu melts.', date: hoursAgo(5), demo: true },
+      { id: 'f-2', friend: friend(1), place: 'Little Wren Bakery', loc: 'Embarcadero, SF', food: 90, vibe: 75, service: 80, note: 'Grabbed the morning bun before work — still warm.', date: daysAgo(1), demo: true },
+      { id: 'f-3', friend: friend(2), place: 'Saffron House', loc: 'FiDi, SF', food: 85, vibe: 70, service: 90, note: 'Butter chicken was rich; lovely staff.', date: daysAgo(2), demo: true },
+      { id: 'f-4', friend: friend(3), place: 'Casa Poblana', loc: 'Mission, SF', food: 90, vibe: 85, service: 75, note: 'Al pastor tacos for days. Bring cash.', date: daysAgo(3), demo: true },
+      { id: 'f-5', friend: friend(4), place: 'Pier 9 Oyster Co.', loc: 'Pier 9, SF', food: 80, vibe: 95, service: 65, note: 'Sunset on the patio is unbeatable. Service lagged.', date: daysAgo(4), demo: true },
+      { id: 'f-6', friend: friend(5), place: 'Verde Trattoria', loc: 'Waterfront, SF', food: 85, vibe: 80, service: 80, note: 'Cacio e pepe done right. Cozy little room.', date: daysAgo(6), demo: true },
+      { id: 'f-7', friend: friend(0), place: 'Marigold & Sage', loc: 'Embarcadero, SF', food: 90, vibe: 85, service: 90, note: 'Farm-to-table tasting menu was a treat.', date: daysAgo(8), demo: true },
+      { id: 'f-8', friend: friend(2), place: 'Foggy Bell Coffee', loc: 'Embarcadero, SF', food: 75, vibe: 80, service: 85, note: 'Flat white + a window seat. My new spot.', date: daysAgo(11), demo: true }
+    ];
+
+    // --- DEMO POPULAR LEADERBOARDS (distinct per range) ---
+    var POPULAR = {
+      today: [
+        { rank: 1, place: 'Tonkotsu Lane', loc: 'Embarcadero, SF', cuisine: 'Ramen · Japanese', score: 91, reviews: 48, trend: 'up' },
+        { rank: 2, place: 'Little Wren Bakery', loc: 'Embarcadero, SF', cuisine: 'Bakery · Café', score: 89, reviews: 41, trend: 'up' },
+        { rank: 3, place: 'Casa Poblana', loc: 'Mission, SF', cuisine: 'Mexican · Taquería', score: 86, reviews: 33, trend: 'flat' },
+        { rank: 4, place: 'Foggy Bell Coffee', loc: 'Embarcadero, SF', cuisine: 'Coffee · Light bites', score: 84, reviews: 27, trend: 'up' },
+        { rank: 5, place: 'Saffron House', loc: 'FiDi, SF', cuisine: 'Indian · Curry house', score: 82, reviews: 22, trend: 'down' },
+        { rank: 6, place: 'Verde Trattoria', loc: 'Waterfront, SF', cuisine: 'Italian · Pasta', score: 81, reviews: 19, trend: 'flat' }
+      ],
+      month: [
+        { rank: 1, place: 'Little Wren Bakery', loc: 'Embarcadero, SF', cuisine: 'Bakery · Café', score: 90, reviews: 612, trend: 'up' },
+        { rank: 2, place: 'Casa Poblana', loc: 'Mission, SF', cuisine: 'Mexican · Taquería', score: 88, reviews: 540, trend: 'up' },
+        { rank: 3, place: 'Tonkotsu Lane', loc: 'Embarcadero, SF', cuisine: 'Ramen · Japanese', score: 87, reviews: 521, trend: 'down' },
+        { rank: 4, place: 'Verde Trattoria', loc: 'Waterfront, SF', cuisine: 'Italian · Pasta', score: 85, reviews: 388, trend: 'up' },
+        { rank: 5, place: 'Marigold & Sage', loc: 'Embarcadero, SF', cuisine: 'Californian · Farm-to-table', score: 84, reviews: 351, trend: 'flat' },
+        { rank: 6, place: 'Pier 9 Oyster Co.', loc: 'Pier 9, SF', cuisine: 'Seafood · Raw bar', score: 80, reviews: 290, trend: 'down' }
+      ],
+      year: [
+        { rank: 1, place: 'Casa Poblana', loc: 'Mission, SF', cuisine: 'Mexican · Taquería', score: 89, reviews: 7240, trend: 'up' },
+        { rank: 2, place: 'Verde Trattoria', loc: 'Waterfront, SF', cuisine: 'Italian · Pasta', score: 87, reviews: 6810, trend: 'up' },
+        { rank: 3, place: 'Little Wren Bakery', loc: 'Embarcadero, SF', cuisine: 'Bakery · Café', score: 86, reviews: 6502, trend: 'flat' },
+        { rank: 4, place: 'Saffron House', loc: 'FiDi, SF', cuisine: 'Indian · Curry house', score: 85, reviews: 5980, trend: 'up' },
+        { rank: 5, place: 'Tonkotsu Lane', loc: 'Embarcadero, SF', cuisine: 'Ramen · Japanese', score: 84, reviews: 5640, trend: 'down' },
+        { rank: 6, place: 'Olive & Thyme', loc: 'Embarcadero, SF', cuisine: 'Mediterranean', score: 81, reviews: 4120, trend: 'flat' }
+      ]
+    };
+
+    // Resolve a deep copy after a small artificial delay (mimics async backend).
+    function resolveLater(data) {
+      return new Promise(function (resolve) {
+        window.setTimeout(function () {
+          resolve(JSON.parse(JSON.stringify(data)));
+        }, FAKE_LATENCY);
+      });
+    }
+
+    function getFriendsFeed(opts) {
+      var sort = (opts && opts.sort) || 'recent';
+      return resolveLater(FRIENDS_FEED).then(function (list) {
+        if (sort === 'overall') {
+          list.sort(function (a, b) { return overallOf(b) - overallOf(a); });
+        } else {
+          list.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
+        }
+        return list;
+      });
+    }
+
+    function getPopular(opts) {
+      var range = (opts && opts.range) || 'today';
+      var data = POPULAR[range] || POPULAR.today;
+      return resolveLater(data);
+    }
+
+    function listFriends() { return FRIENDS.slice(); }
+
+    return { getFriendsFeed: getFriendsFeed, getPopular: getPopular, listFriends: listFriends };
+  })();
+
+  /* ================================================================== *
+   * FRIENDS — feed of friends' ratings (consumes social.getFriendsFeed)
+   * ================================================================== */
+  var friends = (function () {
+    var listEl = $('friends-list');
+    var statsEl = $('friends-stats');
+    var sortSel = $('friends-sort');
+    var chipsEl = $('friend-chips');
+    var state2 = { sort: 'recent', filter: 'all', token: 0 };
+
+    function buildChips() {
+      if (!chipsEl) return;
+      clear(chipsEl);
+      var mkChip = function (label, value, color) {
+        var b = el('button', 'friend-chip' + (state2.filter === value ? ' is-active' : ''), label);
+        b.type = 'button';
+        b.setAttribute('aria-pressed', state2.filter === value ? 'true' : 'false');
+        if (color) b.classList.add('friend-chip--' + color);
+        b.addEventListener('click', function () { state2.filter = value; buildChips(); render(); });
+        return b;
+      };
+      chipsEl.appendChild(mkChip('All friends', 'all', null));
+      social.listFriends().forEach(function (f) {
+        chipsEl.appendChild(mkChip(f.name.split(' ')[0], f.name, f.color));
+      });
+    }
+
+    function avatar(f) {
+      var a = el('span', 'friend-avatar friend-avatar--' + (f.color || 'pond'), f.initial);
+      a.setAttribute('aria-hidden', 'true');
+      return a;
+    }
+
+    function buildEntry(e) {
+      var card = el('article', 'card friend-card');
+
+      var head = el('div', 'friend-head');
+      head.appendChild(avatar(e.friend));
+      var who = el('div', 'friend-who');
+      who.appendChild(el('span', 'friend-name', e.friend.name));
+      var sub = el('span', 'friend-sub');
+      sub.appendChild(document.createTextNode('rated '));
+      sub.appendChild(el('strong', 'friend-place', e.place));
+      who.appendChild(sub);
+      if (e.loc) who.appendChild(el('span', 'friend-loc', e.loc));
+      head.appendChild(who);
+
+      var ov = el('div', 'v-overall');
+      ov.appendChild(el('span', 'big', fmtScore(overallOf(e))));
+      ov.appendChild(el('span', 'lbl', 'Overall'));
+      head.appendChild(ov);
+      card.appendChild(head);
+
+      var bars = el('div', 'v-bars');
+      bars.appendChild(scoreBar('Food', e.food, 'food'));
+      bars.appendChild(scoreBar('Vibe', e.vibe, 'vibe'));
+      bars.appendChild(scoreBar('Service', e.service, 'service'));
+      card.appendChild(bars);
+
+      if (e.note) card.appendChild(el('p', 'v-note', '“' + e.note + '”'));
+
+      var foot = el('div', 'friend-foot');
+      foot.appendChild(el('span', 'v-date', relTime(e.date)));
+      foot.appendChild(el('span', 'v-demo-tag', 'Sample'));
+      card.appendChild(foot);
+      return card;
+    }
+
+    function showLoading() {
+      clear(listEl);
+      var sk = el('div', 'social-loading');
+      sk.appendChild(el('span', 'social-spinner', ''));
+      sk.appendChild(el('span', null, 'Loading your friends’ feed…'));
+      sk.setAttribute('role', 'status');
+      listEl.appendChild(sk);
+    }
+    function showError() {
+      clear(listEl);
+      var empty = el('div', 'empty');
+      empty.appendChild(el('div', 'empty-glyph', '⚠'));
+      empty.appendChild(el('p', 'empty-title', 'Couldn’t load the feed'));
+      empty.appendChild(el('p', 'empty-sub', 'Try switching tabs and back.'));
+      listEl.appendChild(empty);
+    }
+
+    function render() {
+      if (!listEl) return;
+      var token = ++state2.token;
+      showLoading();
+      social.getFriendsFeed({ sort: state2.sort }).then(function (list) {
+        if (token !== state2.token) return; // stale response
+        if (state2.filter !== 'all') {
+          list = list.filter(function (e) { return e.friend.name === state2.filter; });
+        }
+        clear(listEl);
+        if (statsEl) {
+          var nFriends = social.listFriends().length;
+          statsEl.textContent = list.length + ' rating' + (list.length === 1 ? '' : 's') + ' from ' + nFriends + ' friends';
+        }
+        if (!list.length) {
+          var empty = el('div', 'empty');
+          empty.appendChild(el('div', 'empty-glyph', '👀'));
+          empty.appendChild(el('p', 'empty-title', 'No ratings from them yet'));
+          empty.appendChild(el('p', 'empty-sub', 'Pick “All friends” to see everyone.'));
+          listEl.appendChild(empty);
+          return;
+        }
+        list.forEach(function (e) { listEl.appendChild(buildEntry(e)); });
+        announce(list.length + ' friend ratings shown');
+      }).catch(function () {
+        if (token === state2.token) showError();
+      });
+    }
+
+    function init() {
+      if (sortSel) sortSel.addEventListener('change', function () { state2.sort = sortSel.value; render(); });
+      buildChips();
+    }
+
+    return { init: init, render: render };
+  })();
+
+  /* ================================================================== *
+   * POPULAR — trending leaderboard (consumes social.getPopular)
+   * ================================================================== */
+  var popular = (function () {
+    var listEl = $('popular-list');
+    var toggle = $('range-toggle');
+    var btns = toggle ? Array.prototype.slice.call(toggle.querySelectorAll('.range-btn')) : [];
+    var state3 = { range: 'today', token: 0 };
+
+    var TREND = {
+      up: { glyph: '▲', cls: 'up', label: 'trending up' },
+      down: { glyph: '▼', cls: 'down', label: 'trending down' },
+      flat: { glyph: '—', cls: 'flat', label: 'holding steady' }
+    };
+
+    function buildRow(item) {
+      var li = el('li', 'pop-card pop-rank-' + item.rank);
+      if (item.rank <= 3) li.classList.add('pop-top', 'pop-top-' + item.rank);
+
+      var rank = el('div', 'pop-rank', String(item.rank));
+      rank.setAttribute('aria-hidden', 'true');
+      li.appendChild(rank);
+
+      var body = el('div', 'pop-body');
+      body.appendChild(el('h3', 'pop-name', item.place));
+      var meta = el('p', 'pop-meta');
+      if (item.cuisine) meta.appendChild(el('span', 'pop-cuisine', item.cuisine));
+      if (item.loc) {
+        meta.appendChild(el('span', 'dotsep', '·'));
+        meta.appendChild(el('span', 'pop-loc', item.loc));
+      }
+      body.appendChild(meta);
+      body.appendChild(el('span', 'v-demo-tag', 'Sample'));
+      li.appendChild(body);
+
+      var stat = el('div', 'pop-stat');
+      var score = el('div', 'pop-score');
+      score.appendChild(el('span', 'big', fmtScore(item.score)));
+      score.appendChild(el('span', 'lbl', 'avg overall'));
+      stat.appendChild(score);
+
+      var t = TREND[item.trend] || TREND.flat;
+      var line = el('div', 'pop-reviews');
+      var tr = el('span', 'pop-trend pop-trend--' + t.cls, t.glyph);
+      tr.setAttribute('aria-label', t.label);
+      tr.setAttribute('role', 'img');
+      line.appendChild(tr);
+      line.appendChild(document.createTextNode(item.reviews.toLocaleString() + ' reviews'));
+      stat.appendChild(line);
+      li.appendChild(stat);
+      return li;
+    }
+
+    function showLoading() {
+      clear(listEl);
+      var sk = el('li', 'social-loading');
+      sk.appendChild(el('span', 'social-spinner', ''));
+      sk.appendChild(el('span', null, 'Crunching the rankings…'));
+      sk.setAttribute('role', 'status');
+      listEl.appendChild(sk);
+    }
+    function showError() {
+      clear(listEl);
+      var empty = el('li', 'empty');
+      empty.appendChild(el('div', 'empty-glyph', '⚠'));
+      empty.appendChild(el('p', 'empty-title', 'Couldn’t load trends'));
+      empty.appendChild(el('p', 'empty-sub', 'Try another time range.'));
+      listEl.appendChild(empty);
+    }
+
+    function setRange(range) {
+      state3.range = range;
+      btns.forEach(function (b) {
+        var on = b.dataset.range === range;
+        b.classList.toggle('is-active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      render();
+    }
+
+    function render() {
+      if (!listEl) return;
+      var token = ++state3.token;
+      showLoading();
+      social.getPopular({ range: state3.range }).then(function (list) {
+        if (token !== state3.token) return; // stale response
+        clear(listEl);
+        list.forEach(function (item) { listEl.appendChild(buildRow(item)); });
+        var label = state3.range === 'today' ? 'today' : (state3.range === 'month' ? 'this month' : 'this year');
+        announce('Top ' + list.length + ' places ' + label);
+      }).catch(function () {
+        if (token === state3.token) showError();
+      });
+    }
+
+    function init() {
+      btns.forEach(function (b) {
+        b.addEventListener('click', function () { setRange(b.dataset.range); });
+      });
+    }
+
+    return { init: init, render: render };
   })();
 
   /* ================================================================== *
@@ -1168,6 +1541,8 @@
     tabs.init();
     sheet.init();
     visited.init();
+    friends.init();
+    popular.init();
     settings.init();
     find.init();
   }

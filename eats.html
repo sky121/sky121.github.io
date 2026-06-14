@@ -76,6 +76,28 @@
           >
             Visited <span class="tab-count" id="visited-tab-count" aria-hidden="true"></span>
           </button>
+          <button
+            class="tab"
+            id="tab-friends"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-friends"
+            tabindex="-1"
+            type="button"
+          >
+            Friends
+          </button>
+          <button
+            class="tab"
+            id="tab-popular"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-popular"
+            tabindex="-1"
+            type="button"
+          >
+            Popular
+          </button>
         </div>
         <button class="settings-btn" id="settings-open" type="button" aria-haspopup="dialog">
           <span class="gear" aria-hidden="true">&#9881;</span>
@@ -166,6 +188,69 @@
 
         <div class="visited-list" id="visited-list"></div>
       </section>
+
+      <!-- ===================== FRIENDS PANEL ===================== -->
+      <section
+        class="eats-panel is-hidden"
+        id="panel-friends"
+        role="tabpanel"
+        aria-labelledby="tab-friends"
+        tabindex="0"
+        hidden
+      >
+        <div class="social-banner" role="note">
+          <span class="social-banner-dot" aria-hidden="true"></span>
+          <span class="social-banner-text">
+            <strong>Demo</strong> &mdash; friends require an account + backend (coming soon). Entries below are sample data.
+          </span>
+        </div>
+
+        <div class="friends-head">
+          <div class="friends-intro" id="friends-stats" aria-live="polite"></div>
+          <div class="friends-tools">
+            <label class="sort-ctl" for="friends-sort">
+              <span>Sort</span>
+              <select id="friends-sort">
+                <option value="recent">By recent</option>
+                <option value="overall">By overall</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="friend-chips" id="friend-chips" role="group" aria-label="Filter by friend"></div>
+
+        <div class="friends-list" id="friends-list" aria-live="polite"></div>
+      </section>
+
+      <!-- ===================== POPULAR PANEL ===================== -->
+      <section
+        class="eats-panel is-hidden"
+        id="panel-popular"
+        role="tabpanel"
+        aria-labelledby="tab-popular"
+        tabindex="0"
+        hidden
+      >
+        <div class="social-banner" role="note">
+          <span class="social-banner-dot" aria-hidden="true"></span>
+          <span class="social-banner-text">
+            <strong>Demo</strong> &mdash; live trends require a backend (coming soon). Rankings below are sample data.
+          </span>
+        </div>
+
+        <div class="popular-head">
+          <h2 class="popular-title">Trending near you</h2>
+          <p class="popular-sub">What people are reviewing most right now.</p>
+          <div class="range-toggle" id="range-toggle" role="group" aria-label="Time range">
+            <button class="range-btn is-active" id="range-today" type="button" aria-pressed="true" data-range="today">Today</button>
+            <button class="range-btn" id="range-month" type="button" aria-pressed="false" data-range="month">This Month</button>
+            <button class="range-btn" id="range-year" type="button" aria-pressed="false" data-range="year">This Year</button>
+          </div>
+        </div>
+
+        <ol class="popular-list" id="popular-list" aria-live="polite"></ol>
+      </section>
     </main>
 
     <!-- ===================== RATING SHEET ===================== -->
@@ -199,31 +284,31 @@
             <div class="slider-block slider--food">
               <div class="slider-top">
                 <label for="s-food">Food</label>
-                <output class="slider-num" id="s-food-num" for="s-food">5.0</output>
+                <output class="slider-num" id="s-food-num" for="s-food">50</output>
               </div>
-              <input type="range" id="s-food" class="wc-range" min="0" max="10" step="0.5" value="5" aria-valuetext="5.0 out of 10" />
+              <input type="range" id="s-food" class="wc-range" min="0" max="100" step="1" value="50" aria-valuetext="50 out of 100" />
             </div>
 
             <div class="slider-block slider--vibe">
               <div class="slider-top">
                 <label for="s-vibe">Vibe</label>
-                <output class="slider-num" id="s-vibe-num" for="s-vibe">5.0</output>
+                <output class="slider-num" id="s-vibe-num" for="s-vibe">50</output>
               </div>
-              <input type="range" id="s-vibe" class="wc-range" min="0" max="10" step="0.5" value="5" aria-valuetext="5.0 out of 10" />
+              <input type="range" id="s-vibe" class="wc-range" min="0" max="100" step="1" value="50" aria-valuetext="50 out of 100" />
             </div>
 
             <div class="slider-block slider--service">
               <div class="slider-top">
                 <label for="s-service">Service</label>
-                <output class="slider-num" id="s-service-num" for="s-service">5.0</output>
+                <output class="slider-num" id="s-service-num" for="s-service">50</output>
               </div>
-              <input type="range" id="s-service" class="wc-range" min="0" max="10" step="0.5" value="5" aria-valuetext="5.0 out of 10" />
+              <input type="range" id="s-service" class="wc-range" min="0" max="100" step="1" value="50" aria-valuetext="50 out of 100" />
             </div>
           </div>
 
           <div class="overall-readout" aria-live="polite">
             <span class="overall-label">Overall</span>
-            <span class="overall-value" id="overall-value">5.0</span>
+            <span class="overall-value" id="overall-value">50</span>
           </div>
 
           <label class="field">
