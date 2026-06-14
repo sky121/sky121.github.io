@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Peckish — find where to eat</title>
+    <meta
+      name="description"
+      content="Peckish helps you decide where to eat: discover restaurants nearby, let it pick for you, and keep a personal log of places you've eaten with your own Food, Vibe, and Service ratings."
+    />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="canonical" href="https://sky121.github.io/eats.html" />
+    <meta name="theme-color" content="#f6f1e7" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sky121.github.io/eats.html" />
+    <meta property="og:image" content="https://sky121.github.io/images/og-card.png" />
+    <meta property="og:title" content="Peckish — find where to eat" />
+    <meta
+      property="og:description"
+      content="Discover where to eat nearby and keep a watercolor log of every place you've tasted."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Karla:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script>document.documentElement.classList.add('js');(function(){try{var t=localStorage.getItem('sh-theme');if(t==='evening'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('evening');}catch(e){}})();</script>
+    <link rel="stylesheet" href="assets/css/exhibit-page.css" />
+    <link rel="stylesheet" href="assets/css/eats.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#room">Skip to content</a>
+
+    <div class="wash-field" aria-hidden="true">
+      <div class="wash wash--pond"></div>
+      <div class="wash wash--wisteria"></div>
+      <div class="wash wash--sage"></div>
+    </div>
+
+    <header>
+      <nav class="exhibit-nav" aria-label="Primary">
+        <a class="monogram" href="index.html" aria-label="Skylar Hoffman — back to home">S.H.</a>
+        <a class="back-link" href="lab.html">&larr; Back to the Lab</a>
+      </nav>
+    </header>
+
+    <main id="room" class="exhibit-room eats-room">
+      <p class="room-label">An indecision-breaker</p>
+      <h1 class="exhibit-title">Peckish</h1>
+      <p class="exhibit-subtitle">
+        Find somewhere good to eat &mdash; then keep a little log of every place you've tasted.
+      </p>
+
+      <!-- Tab switcher -->
+      <div class="eats-tabs">
+        <div class="tablist" role="tablist" aria-label="Peckish sections">
+          <button
+            class="tab is-active"
+            id="tab-find"
+            role="tab"
+            aria-selected="true"
+            aria-controls="panel-find"
+            type="button"
+          >
+            Find
+          </button>
+          <button
+            class="tab"
+            id="tab-visited"
+            role="tab"
+            aria-selected="false"
+            aria-controls="panel-visited"
+            tabindex="-1"
+            type="button"
+          >
+            Visited <span class="tab-count" id="visited-tab-count" aria-hidden="true"></span>
+          </button>
+        </div>
+        <button class="settings-btn" id="settings-open" type="button" aria-haspopup="dialog">
+          <span class="gear" aria-hidden="true">&#9881;</span>
+          <span class="settings-label">Use live data</span>
+        </button>
+      </div>
+
+      <!-- ===================== FIND PANEL ===================== -->
+      <section
+        class="eats-panel"
+        id="panel-find"
+        role="tabpanel"
+        aria-labelledby="tab-find"
+        tabindex="0"
+      >
+        <div class="mode-badge" id="mode-badge" role="status">
+          <span class="dot" aria-hidden="true"></span>
+          <span id="mode-badge-text">Sample data &mdash; add your Google Maps API key for live results.</span>
+          <button class="badge-link" id="badge-add-key" type="button">Add key</button>
+        </div>
+
+        <div class="find-hero">
+          <button class="cta-find" id="find-near-me" type="button">
+            <span class="cta-find-glyph" aria-hidden="true">&#9737;</span>
+            <span class="cta-find-text">Find food near me</span>
+          </button>
+
+          <form class="loc-form" id="loc-form" autocomplete="off">
+            <label class="loc-label" for="loc-input">or set a specific location</label>
+            <div class="loc-row">
+              <input
+                class="loc-input"
+                id="loc-input"
+                type="text"
+                placeholder="city or address"
+                aria-label="City or address"
+              />
+              <button class="loc-go" id="loc-go" type="submit">Search</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Controls -->
+        <div class="find-controls" id="find-controls">
+          <label class="ctl ctl-toggle">
+            <input type="checkbox" id="open-now" />
+            <span class="ctl-switch" aria-hidden="true"></span>
+            <span class="ctl-text">Open now</span>
+          </label>
+
+          <div class="ctl ctl-radius">
+            <label for="radius">Radius <span class="radius-val" id="radius-val">1.0 mi</span></label>
+            <input type="range" id="radius" class="wc-range radius-range" min="0.5" max="5" step="0.5" value="1" aria-valuetext="1.0 miles" />
+          </div>
+
+          <button class="pick-btn" id="pick-for-me" type="button">
+            <span aria-hidden="true">&#127922;</span> Pick for me
+          </button>
+        </div>
+
+        <p class="results-status" id="results-status" role="status" aria-live="polite"></p>
+
+        <div class="results" id="results" aria-live="polite"></div>
+      </section>
+
+      <!-- ===================== VISITED PANEL ===================== -->
+      <section
+        class="eats-panel is-hidden"
+        id="panel-visited"
+        role="tabpanel"
+        aria-labelledby="tab-visited"
+        tabindex="0"
+        hidden
+      >
+        <div class="visited-head">
+          <div class="visited-stats" id="visited-stats" aria-live="polite"></div>
+          <div class="visited-tools">
+            <label class="sort-ctl" for="visited-sort">
+              <span>Sort</span>
+              <select id="visited-sort">
+                <option value="date">By date</option>
+                <option value="overall">By overall</option>
+              </select>
+            </label>
+            <button class="add-place-btn" id="add-place" type="button">+ Add a place</button>
+          </div>
+        </div>
+
+        <div class="visited-list" id="visited-list"></div>
+      </section>
+    </main>
+
+    <!-- ===================== RATING SHEET ===================== -->
+    <div class="sheet-backdrop" id="sheet-backdrop" hidden>
+      <div
+        class="sheet"
+        id="rating-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sheet-title"
+      >
+        <div class="sheet-grip" aria-hidden="true"></div>
+        <header class="sheet-head">
+          <h2 class="sheet-title" id="sheet-title">Rate this place</h2>
+          <button class="sheet-close" id="sheet-close" type="button" aria-label="Close">&times;</button>
+        </header>
+
+        <form id="rating-form" class="sheet-body">
+          <label class="field">
+            <span class="field-label">Place</span>
+            <input type="text" id="rate-name" class="field-input" placeholder="Restaurant name" required />
+          </label>
+          <p class="field-sub" id="rate-place-sub" hidden></p>
+
+          <label class="field" id="rate-loc-field" hidden>
+            <span class="field-label">Location <span class="field-opt">(optional)</span></span>
+            <input type="text" id="rate-loc" class="field-input" placeholder="neighborhood or address" />
+          </label>
+
+          <div class="sliders">
+            <div class="slider-block slider--food">
+              <div class="slider-top">
+                <label for="s-food">Food</label>
+                <output class="slider-num" id="s-food-num" for="s-food">5.0</output>
+              </div>
+              <input type="range" id="s-food" class="wc-range" min="0" max="10" step="0.5" value="5" aria-valuetext="5.0 out of 10" />
+            </div>
+
+            <div class="slider-block slider--vibe">
+              <div class="slider-top">
+                <label for="s-vibe">Vibe</label>
+                <output class="slider-num" id="s-vibe-num" for="s-vibe">5.0</output>
+              </div>
+              <input type="range" id="s-vibe" class="wc-range" min="0" max="10" step="0.5" value="5" aria-valuetext="5.0 out of 10" />
+            </div>
+
+            <div class="slider-block slider--service">
+              <div class="slider-top">
+                <label for="s-service">Service</label>
+                <output class="slider-num" id="s-service-num" for="s-service">5.0</output>
+              </div>
+              <input type="range" id="s-service" class="wc-range" min="0" max="10" step="0.5" value="5" aria-valuetext="5.0 out of 10" />
+            </div>
+          </div>
+
+          <div class="overall-readout" aria-live="polite">
+            <span class="overall-label">Overall</span>
+            <span class="overall-value" id="overall-value">5.0</span>
+          </div>
+
+          <label class="field">
+            <span class="field-label">Note <span class="field-opt">(optional)</span></span>
+            <textarea id="rate-note" class="field-input field-area" rows="3" placeholder="What did you have? How was it?"></textarea>
+          </label>
+
+          <label class="field">
+            <span class="field-label">Date</span>
+            <input type="date" id="rate-date" class="field-input" />
+          </label>
+
+          <div class="sheet-actions">
+            <button type="button" class="btn-ghost" id="rate-cancel">Cancel</button>
+            <button type="submit" class="btn-solid" id="rate-save">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===================== SETTINGS / KEY SHEET ===================== -->
+    <div class="sheet-backdrop" id="settings-backdrop" hidden>
+      <div
+        class="sheet settings-sheet"
+        id="settings-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+      >
+        <div class="sheet-grip" aria-hidden="true"></div>
+        <header class="sheet-head">
+          <h2 class="sheet-title" id="settings-title">Use live data</h2>
+          <button class="sheet-close" id="settings-close" type="button" aria-label="Close">&times;</button>
+        </header>
+
+        <div class="sheet-body">
+          <p class="settings-intro">
+            Peckish runs on <strong>sample data</strong> until you add your own Google Maps API key.
+            Your key stays in this browser only (localStorage) &mdash; it's never sent anywhere but Google.
+          </p>
+
+          <ol class="settings-guide">
+            <li>Create a project in the <strong>Google Cloud Console</strong>.</li>
+            <li>Enable <strong>Places API (New)</strong> and <strong>Maps JavaScript API</strong>.</li>
+            <li>Create an <strong>API key</strong>.</li>
+            <li>Restrict it to HTTP referrers: <code>https://sky121.github.io/*</code></li>
+            <li>Paste it below.</li>
+          </ol>
+
+          <label class="field">
+            <span class="field-label">Google Maps API key</span>
+            <input type="password" id="key-input" class="field-input" placeholder="AIza..." autocomplete="off" spellcheck="false" />
+          </label>
+
+          <p class="settings-msg" id="settings-msg" role="status" aria-live="polite"></p>
+
+          <div class="sheet-actions">
+            <button type="button" class="btn-ghost" id="key-clear">Clear key</button>
+            <button type="button" class="btn-solid" id="key-save">Save key</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- live region for transient announcements -->
+    <p class="visually-hidden" id="live-announce" role="status" aria-live="polite"></p>
+
+    <footer class="exhibit-footer">
+      <p>
+        Skylar Hoffman<span class="sep">&middot;</span
+        ><a href="mailto:skylar.j.hoffman@gmail.com">skylar.j.hoffman@gmail.com</a
+        ><span class="sep">&middot;</span
+        ><a href="https://github.com/sky121">github.com/sky121</a>
+      </p>
+    </footer>
+
+    <script defer src="assets/js/gallery.js"></script>
+    <script defer src="assets/js/eats.js"></script>
+  </body>
+</html>
