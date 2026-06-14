@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lab — Skylar Hoffman</title>
+    <meta
+      name="description"
+      content="The Lab — things Skylar Hoffman is building outside of work: games, tools, and creative web experiments, each a pool of pigment blooming on wet paper."
+    />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="canonical" href="https://sky121.github.io/lab.html" />
+    <meta name="theme-color" content="#f6f1e7" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sky121.github.io/lab.html" />
+    <meta property="og:image" content="https://sky121.github.io/images/og-card.png" />
+    <meta property="og:title" content="Lab — Skylar Hoffman" />
+    <meta
+      property="og:description"
+      content="The Lab — things Skylar Hoffman is building outside of work: games, tools, and creative web experiments, each a pool of pigment blooming on wet paper."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Karla:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script>document.documentElement.classList.add('js');(function(){try{var t=localStorage.getItem('sh-theme');if(t==='evening'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('evening');}catch(e){}})();</script>
+    <link rel="stylesheet" href="assets/css/exhibit-page.css" />
+    <link rel="stylesheet" href="assets/css/lab.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#lab">Skip to content</a>
+
+    <!-- Watercolor displacement filters — ragged wet edges for the pigment pools.
+         Mirrors the homepage's wc-rough / wc-soft; lab-rough is hover-tuned. -->
+    <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+      <defs>
+        <filter id="lab-rough" x="-35%" y="-35%" width="170%" height="170%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.011 0.026" numOctaves="3" seed="11" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="26" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        <filter id="lab-soft" x="-25%" y="-25%" width="150%" height="150%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.02 0.05" numOctaves="2" seed="23" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="9" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </defs>
+    </svg>
+
+    <!-- Drifting watercolor washes (gallery.js animates parallax/drift) -->
+    <div class="wash-field" aria-hidden="true">
+      <div class="wash wash--pond"></div>
+      <div class="wash wash--wisteria"></div>
+      <div class="wash wash--sage"></div>
+    </div>
+
+    <!-- Cursor paint canvas (gallery.js paints blooms here) -->
+    <canvas id="paint-canvas" aria-hidden="true"></canvas>
+
+    <header>
+      <nav class="exhibit-nav" aria-label="Primary">
+        <a class="monogram" href="index.html" aria-label="Skylar Hoffman — back to home">S.H.</a>
+        <a class="back-link" href="index.html">&larr; Back to home</a>
+      </nav>
+    </header>
+
+    <main id="lab" class="lab">
+      <header class="lab-head">
+        <p class="room-label reveal">Wet studio &middot; always in progress</p>
+        <h1 class="lab-title reveal">The Lab</h1>
+        <p class="lab-subtitle reveal">
+          A sheet of wet paper where every project is a pool of pigment &mdash;
+          some still bleeding open, some only an idea on the brush.
+        </p>
+      </header>
+
+      <!-- ============================================================= -->
+      <!-- PALETTE FILTER — paint dabs, not buttons.                      -->
+      <!-- Each dab filters the mosaic + triggers a FLIP re-layout.       -->
+      <!-- ============================================================= -->
+      <div class="palette reveal" role="group" aria-label="Filter projects by type">
+        <button class="dab dab--all is-active" type="button" data-filter="all" aria-pressed="true">
+          <span class="dab-blot" aria-hidden="true"></span>
+          <span class="dab-label">All</span>
+        </button>
+        <button class="dab dab--game" type="button" data-filter="game" aria-pressed="false">
+          <span class="dab-blot" aria-hidden="true"></span>
+          <span class="dab-label">Games</span>
+        </button>
+        <button class="dab dab--tool" type="button" data-filter="tool" aria-pressed="false">
+          <span class="dab-blot" aria-hidden="true"></span>
+          <span class="dab-label">Tools</span>
+        </button>
+        <button class="dab dab--experiment" type="button" data-filter="experiment" aria-pressed="false">
+          <span class="dab-blot" aria-hidden="true"></span>
+          <span class="dab-label">Experiments</span>
+        </button>
+      </div>
+      <p class="filter-status visually-hidden" role="status" aria-live="polite"></p>
+
+      <!-- ============================================================= -->
+      <!-- THE MOSAIC — an asymmetric bento of watercolor pools.          -->
+      <!--                                                               -->
+      <!-- HOW TO ADD A PROJECT (hand-edit this list):                   -->
+      <!--   Copy the TEMPLATE article below and fill it in.             -->
+      <!--                                                               -->
+      <!--   data-type   : "game" | "tool" | "experiment"  (sets default -->
+      <!--                  accent + glyph dot + filter group)           -->
+      <!--   data-status : "live" | "building" | "idea"                  -->
+      <!--   data-span   : "1x1" | "2x1" | "2x2"  (size in the bento)    -->
+      <!--   style="-\-accent: …; -\-accent-deep: …"  : OPTIONAL per-tile -->
+      <!--                  pigment override (else the type default wins) -->
+      <!--                                                               -->
+      <!--   * status="live"  -> wrap content in <a class="pool-link"     -->
+      <!--       href="your-project.html"> so the whole tile is a link    -->
+      <!--       AND the click-bloom page transition fires.               -->
+      <!--   * status="building"/"idea" -> NO href, NO <a> (no dead links)-->
+      <!-- ============================================================= -->
+      <ul class="mosaic" id="mosaic">
+
+        <!-- Intro tile — the welcome bloom. Always shown, on every filter. -->
+        <li class="pool pool--intro reveal" data-type="intro" data-span="2x2">
+          <div class="pool-skin" aria-hidden="true"></div>
+          <div class="pool-body">
+            <p class="pool-kicker">Welcome to the studio</p>
+            <h2 class="pool-title pool-title--intro">New pieces bloom here as they ship.</h2>
+            <p class="pool-desc">
+              Things I&rsquo;m building outside of work &mdash; games, tools, and
+              creative experiments. Pick a pigment from the palette above to
+              filter the field, or just let your eyes wander the page.
+            </p>
+            <p class="pool-hint" aria-hidden="true">Three example pools below &mdash; replace them with the real thing.</p>
+          </div>
+        </li>
+
+        <!-- ===================== TEMPLATE =========================== -->
+        <!-- Copy this block to add a LIVE, linking project. Delete the -->
+        <!-- comment markers around it. (Commented so it never renders.) -->
+        <!--
+        <li class="pool reveal" data-type="tool" data-status="live" data-span="1x1"
+            style="-\-accent: #7fa8c9; -\-accent-deep: #4a7299;">
+          <a class="pool-link" href="your-project.html">
+            <div class="pool-skin" aria-hidden="true"></div>
+            <div class="pool-body">
+              <div class="pool-meta">
+                <span class="pool-type">
+                  <span class="type-dot" aria-hidden="true"></span>
+                  Tool
+                </span>
+                <span class="status status--live">Live</span>
+              </div>
+              <h2 class="pool-title">Your Project Name</h2>
+              <p class="pool-desc">One or two sentences on what it is and why it is fun.</p>
+              <ul class="pool-tags">
+                <li>tag</li>
+                <li>another</li>
+              </ul>
+              <span class="pool-cta" aria-hidden="true">Open the project &rarr;</span>
+            </div>
+          </a>
+        </li>
+        -->
+        <!-- =================== END TEMPLATE ========================= -->
+
+        <!-- SEED EXAMPLE 1 — Game (rose), status idea (non-linking) -->
+        <li class="pool reveal" data-type="game" data-status="idea" data-span="2x1">
+          <div class="pool-skin" aria-hidden="true"></div>
+          <div class="pool-body">
+            <div class="pool-meta">
+              <span class="pool-type">
+                <span class="type-dot" aria-hidden="true"></span>
+                Game
+              </span>
+              <span class="status status--idea">Idea</span>
+            </div>
+            <h2 class="pool-title">Placeholder Game</h2>
+            <p class="pool-desc">
+              Example tile &mdash; a small browser game lives here once it ships.
+              Swap this copy for the real thing.
+            </p>
+            <ul class="pool-tags">
+              <li>canvas</li>
+              <li>arcade</li>
+            </ul>
+          </div>
+        </li>
+
+        <!-- SEED EXAMPLE 2 — Tool (pond), status idea (non-linking) -->
+        <li class="pool reveal" data-type="tool" data-status="idea" data-span="1x1">
+          <div class="pool-skin" aria-hidden="true"></div>
+          <div class="pool-body">
+            <div class="pool-meta">
+              <span class="pool-type">
+                <span class="type-dot" aria-hidden="true"></span>
+                Tool
+              </span>
+              <span class="status status--idea">Idea</span>
+            </div>
+            <h2 class="pool-title">Placeholder Tool</h2>
+            <p class="pool-desc">
+              Example tile &mdash; a handy little utility will bloom here.
+            </p>
+            <ul class="pool-tags">
+              <li>utility</li>
+            </ul>
+          </div>
+        </li>
+
+        <!-- SEED EXAMPLE 3 — Experiment (wisteria), status idea (non-linking) -->
+        <li class="pool reveal" data-type="experiment" data-status="idea" data-span="1x1">
+          <div class="pool-skin" aria-hidden="true"></div>
+          <div class="pool-body">
+            <div class="pool-meta">
+              <span class="pool-type">
+                <span class="type-dot" aria-hidden="true"></span>
+                Experiment
+              </span>
+              <span class="status status--idea">Idea</span>
+            </div>
+            <h2 class="pool-title">Placeholder Experiment</h2>
+            <p class="pool-desc">
+              Example tile &mdash; a generative or interactive sketch goes here.
+            </p>
+            <ul class="pool-tags">
+              <li>generative</li>
+            </ul>
+          </div>
+        </li>
+
+      </ul>
+
+      <!-- Page-transition bloom overlay (JS fallback when the View Transitions
+           API is unavailable). Fires only for LIVE tiles. -->
+      <div id="bloom-overlay" aria-hidden="true"></div>
+    </main>
+
+    <footer class="exhibit-footer">
+      <p>
+        Skylar Hoffman<span class="sep">&middot;</span
+        ><a href="mailto:skylar.j.hoffman@gmail.com">skylar.j.hoffman@gmail.com</a
+        ><span class="sep">&middot;</span
+        ><a href="https://github.com/sky121">github.com/sky121</a>
+      </p>
+    </footer>
+
+    <script defer src="assets/js/gallery.js"></script>
+    <script defer src="assets/js/lab.js"></script>
+  </body>
+</html>
