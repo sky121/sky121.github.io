@@ -162,27 +162,33 @@
         -->
         <!-- =================== END TEMPLATE ========================= -->
 
-        <!-- SEED EXAMPLE 1 — Game (rose), status idea (non-linking) -->
-        <li class="pool reveal" data-type="game" data-status="idea" data-span="2x1">
-          <div class="pool-skin" aria-hidden="true"></div>
-          <div class="pool-body">
-            <div class="pool-meta">
-              <span class="pool-type">
-                <span class="type-dot" aria-hidden="true"></span>
-                Game
-              </span>
-              <span class="status status--idea">Idea</span>
+        <!-- Dragoose — Game (rose ember), status live (linking tile) -->
+        <li class="pool reveal" data-type="game" data-status="live" data-span="2x1"
+            style="--accent: var(--accent-game); --accent-deep: var(--accent-game-deep);">
+          <a class="pool-link" href="dragoose.html">
+            <div class="pool-skin" aria-hidden="true"></div>
+            <div class="pool-body">
+              <div class="pool-meta">
+                <span class="pool-type">
+                  <span class="type-dot" aria-hidden="true"></span>
+                  Game
+                </span>
+                <span class="status status--live">Live</span>
+              </div>
+              <h2 class="pool-title">Dragoose</h2>
+              <p class="pool-desc">
+                A one-thumb roguelike: Gary the goose breathes dragonfire and
+                battles the dragons who rule the skies, earning their respect
+                one duel at a time &mdash; until a goose is named Dragoose.
+              </p>
+              <ul class="pool-tags">
+                <li>Canvas</li>
+                <li>Roguelike</li>
+                <li>Mobile</li>
+              </ul>
+              <span class="pool-cta" aria-hidden="true">Open the project &rarr;</span>
             </div>
-            <h2 class="pool-title">Placeholder Game</h2>
-            <p class="pool-desc">
-              Example tile &mdash; a small browser game lives here once it ships.
-              Swap this copy for the real thing.
-            </p>
-            <ul class="pool-tags">
-              <li>canvas</li>
-              <li>arcade</li>
-            </ul>
-          </div>
+          </a>
         </li>
 
         <!-- SEED EXAMPLE 2 — Tool (pond), status idea (non-linking) -->

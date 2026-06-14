@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Dragoose</title>
+    <meta
+      name="description"
+      content="Dragoose — a one-thumb watercolor flying roguelike. Gary the goose breathes dragonfire and duels the dragons who rule the skies, earning their respect one duel at a time."
+    />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="canonical" href="https://sky121.github.io/dragoose.html" />
+    <meta name="theme-color" content="#9fc2e0" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sky121.github.io/dragoose.html" />
+    <meta property="og:image" content="https://sky121.github.io/images/og-card.png" />
+    <meta property="og:title" content="Dragoose — a watercolor flying roguelike" />
+    <meta
+      property="og:description"
+      content="Gary the goose breathes dragonfire and duels the dragons who rule the skies. Drag to steer, tap to dodge, hold to charge."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Karla:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/css/dragoose.css" />
+  </head>
+  <body>
+    <div id="game-root" class="game-root">
+      <!-- The play surface -->
+      <canvas id="game-canvas" aria-label="Dragoose game"></canvas>
+
+      <!-- ===================== LOADING ===================== -->
+      <section id="screen-loading" class="screen screen--loading is-active" aria-live="polite">
+        <div class="loading-bloom" aria-hidden="true"></div>
+        <h1 class="loading-title">Dragoose</h1>
+        <p class="loading-sub">wetting the paper&hellip;</p>
+        <div class="loading-track" aria-hidden="true"><div id="loading-fill" class="loading-fill"></div></div>
+      </section>
+
+      <!-- ===================== TITLE ===================== -->
+      <section id="screen-title" class="screen screen--title" aria-label="Title screen" hidden>
+        <div class="title-card">
+          <p class="title-kicker">A watercolor flying roguelike</p>
+          <h1 class="title-logo">Dragoose</h1>
+          <p class="title-tag">
+            Gary is a goose who dreams of the skies. A fallen dragon scale gave him
+            dragonfire &mdash; now he must earn the respect of the dragons who rule the clouds.
+          </p>
+
+          <button id="btn-start" class="btn btn--primary" type="button">Take flight</button>
+
+          <div id="hoard-summary" class="hoard" hidden>
+            <span class="hoard-label">Your hoard</span>
+            <span id="hoard-stats" class="hoard-stats"></span>
+          </div>
+
+          <ul class="howto" aria-label="How to play">
+            <li><span class="howto-key">drag</span> steer</li>
+            <li><span class="howto-key">tap</span> dodge</li>
+            <li><span class="howto-key">hold</span> charge fire</li>
+          </ul>
+
+          <a class="back-link" href="lab.html">&larr; Back to the Lab</a>
+        </div>
+      </section>
+
+      <!-- ===================== HUD (in play) ===================== -->
+      <div id="hud" class="hud" hidden>
+        <div class="hud-top">
+          <div class="boss-bar">
+            <div class="boss-name"><span id="boss-name">Ember, the Cinder Wyrm</span></div>
+            <div class="boss-track"><div id="boss-fill" class="boss-fill"></div></div>
+          </div>
+          <div class="hud-top-right">
+            <div class="scale-count" title="Scales collected">
+              <span class="scale-pip" aria-hidden="true"></span>
+              <span id="scale-count">0</span>
+            </div>
+            <button id="btn-mute" class="icon-btn" type="button" aria-pressed="false" title="Mute">
+              <span id="mute-glyph" aria-hidden="true">&#9834;</span>
+              <span class="visually-hidden">Toggle sound</span>
+            </button>
+            <button id="btn-pause" class="icon-btn" type="button" title="Pause">
+              <span aria-hidden="true">&#10073;&#10073;</span>
+              <span class="visually-hidden">Pause</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="hud-bottom">
+          <div class="feathers" id="feathers" aria-label="Health"></div>
+          <div class="powers" id="powers" aria-label="Powers"></div>
+        </div>
+      </div>
+
+      <!-- ===================== POWER PICK ===================== -->
+      <section id="screen-power" class="screen screen--power" aria-label="Choose a power" hidden>
+        <div class="overlay-card">
+          <p class="overlay-kicker">A scale ignites</p>
+          <h2 class="overlay-title">Choose your gift</h2>
+          <div id="power-choices" class="power-choices"></div>
+        </div>
+      </section>
+
+      <!-- ===================== PAUSE ===================== -->
+      <section id="screen-pause" class="screen screen--pause" aria-label="Paused" hidden>
+        <div class="overlay-card">
+          <h2 class="overlay-title">Paused</h2>
+          <button id="btn-resume" class="btn btn--primary" type="button">Resume</button>
+          <button id="btn-restart-pause" class="btn" type="button">Restart run</button>
+          <a class="back-link" href="lab.html">&larr; Back to the Lab</a>
+        </div>
+      </section>
+
+      <!-- ===================== DEATH ===================== -->
+      <section id="screen-dead" class="screen screen--dead" aria-label="Defeated" hidden>
+        <div class="overlay-card">
+          <p class="overlay-kicker overlay-kicker--dark">defeat</p>
+          <h2 class="overlay-title">The sky claims another goose&hellip;</h2>
+          <p id="dead-sub" class="overlay-sub"></p>
+          <button id="btn-retry" class="btn btn--primary" type="button">Try again</button>
+          <a class="back-link" href="lab.html">&larr; Back to the Lab</a>
+        </div>
+      </section>
+
+      <!-- ===================== VICTORY ===================== -->
+      <section id="screen-win" class="screen screen--win" aria-label="Victory" hidden>
+        <div class="overlay-card">
+          <p class="overlay-kicker overlay-kicker--gold">respect earned</p>
+          <h2 class="overlay-title">You have earned its respect</h2>
+          <p id="win-sub" class="overlay-sub"></p>
+          <div id="relic-grant" class="relic-grant"></div>
+          <button id="btn-continue" class="btn btn--primary" type="button">Onward</button>
+          <a class="back-link" href="lab.html">&larr; Back to the Lab</a>
+        </div>
+      </section>
+
+      <!-- Bloom wipe used for transitions -->
+      <div id="bloom-wipe" class="bloom-wipe" aria-hidden="true"></div>
+    </div>
+
+    <script src="assets/js/dragoose.js" defer></script>
+  </body>
+</html>
