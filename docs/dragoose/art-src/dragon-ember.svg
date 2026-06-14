@@ -1,0 +1,294 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 680" width="680" height="680">
+  <defs>
+    <filter id="rough" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.008 0.016" numOctaves="3" seed="11" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="10" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02 0.04" numOctaves="2" seed="23" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="8" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="wingrough" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.006 0.012" numOctaves="2" seed="11" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="6" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="blur" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="20"/>
+    </filter>
+
+    <radialGradient id="aura" cx="50%" cy="44%" r="56%">
+      <stop offset="0%" stop-color="#e8924a" stop-opacity="0.42"/>
+      <stop offset="45%" stop-color="#d98ba0" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="#d98ba0" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="bodyG" cx="50%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#e89a52"/>
+      <stop offset="42%" stop-color="#cf6f48"/>
+      <stop offset="100%" stop-color="#8f3a3c"/>
+    </radialGradient>
+    <linearGradient id="tailG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#cf6f48"/>
+      <stop offset="100%" stop-color="#7e3338"/>
+    </linearGradient>
+    <radialGradient id="headG" cx="50%" cy="62%" r="72%">
+      <stop offset="0%" stop-color="#e89a52"/>
+      <stop offset="58%" stop-color="#c0613f"/>
+      <stop offset="100%" stop-color="#8f3a3c"/>
+    </radialGradient>
+    <linearGradient id="hornG" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0%" stop-color="#e0cd8e"/>
+      <stop offset="100%" stop-color="#a98f4e"/>
+    </linearGradient>
+
+    <linearGradient id="memL" x1="0.9" y1="0.05" x2="0.05" y2="0.95">
+      <stop offset="0%" stop-color="#dd8f5e"/>
+      <stop offset="50%" stop-color="#cf6f64"/>
+      <stop offset="100%" stop-color="#9a4658"/>
+    </linearGradient>
+    <linearGradient id="memR" x1="0.1" y1="0.05" x2="0.95" y2="0.95">
+      <stop offset="0%" stop-color="#dd8f5e"/>
+      <stop offset="50%" stop-color="#cf6f64"/>
+      <stop offset="100%" stop-color="#9a4658"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ember aura -->
+  <g filter="url(#blur)">
+    <ellipse cx="340" cy="330" rx="300" ry="300" fill="url(#aura)"/>
+  </g>
+  <g fill="#cdb878" filter="url(#soft)">
+    <circle cx="118" cy="150" r="6" fill-opacity="0.5"/><circle cx="566" cy="160" r="5" fill-opacity="0.5"/>
+    <circle cx="74" cy="470" r="5" fill-opacity="0.45"/><circle cx="606" cy="460" r="6" fill-opacity="0.45"/>
+    <circle cx="340" cy="654" r="5" fill-opacity="0.4"/>
+  </g>
+
+  <!-- =================================================================
+       WINGS — bold angular leathery BAT sail.
+       Leading edge (arm bone): shoulder -> sweeps up-out to wrist at the
+       top outer corner. From the wrist, 4 finger struts fan downward and
+       outward to the wing's lower outline. The membrane trailing edge
+       scallops in a shallow arc between each fingertip (clawed dips),
+       then returns to the body. One bold sheet, not a tattered fan.
+       ================================================================= -->
+
+  <!-- LEFT WING : one bold taut sail. Leading edge arm-bone sweeps up-out
+       to wrist (top corner). Trailing edge is a single continuous sweep
+       from the outermost fingertip back to the body, with shallow scallop
+       notches at the 4 fingertips. -->
+  <g filter="url(#wingrough)">
+    <!-- membrane: leading edge from shoulder up to wrist(48,132);
+         then trailing edge = 4 sharp clawed fingertips joined by CONCAVE
+         (inward-sagging) membrane arcs -> taut leathery bat sail -->
+    <path fill="url(#memL)" stroke="#2e3a48" stroke-width="5" stroke-opacity="0.62"
+      d="M330 252
+         C268 198 188 150 98 126
+         C72 119 50 122 48 132
+         L122 210
+         Q120 248 152 296
+         Q138 332 184 392
+         Q176 430 248 470
+         Q300 420 320 354
+         Q338 300 344 278
+         C346 266 342 258 330 252 Z"/>
+    <!-- arm bone leading edge (thick) -->
+    <path fill="none" stroke="#7e3338" stroke-width="8.5" stroke-opacity="0.88" stroke-linecap="round"
+      d="M336 258 C274 204 194 154 106 130 C86 124 64 124 50 130"/>
+    <!-- wrist claw -->
+    <path fill="#e0cd8e" stroke="#2e3a48" stroke-width="3" stroke-opacity="0.62"
+      d="M50 130 C36 120 24 124 24 138 C38 144 48 140 54 130 Z"/>
+    <!-- bold finger struts running to each fingertip -->
+    <path fill="none" stroke="#7e3338" stroke-width="6.5" stroke-opacity="0.85" stroke-linecap="round"
+      d="M54 132 L122 210"/>
+    <path fill="none" stroke="#7e3338" stroke-width="6" stroke-opacity="0.85" stroke-linecap="round"
+      d="M56 138 C92 184 128 250 152 296"/>
+    <path fill="none" stroke="#7e3338" stroke-width="5.5" stroke-opacity="0.85" stroke-linecap="round"
+      d="M60 148 C96 226 150 330 184 392"/>
+    <path fill="none" stroke="#7e3338" stroke-width="5" stroke-opacity="0.82" stroke-linecap="round"
+      d="M66 162 C108 256 200 400 248 470"/>
+    <!-- claw nibs at fingertips -->
+    <g fill="#e0cd8e" stroke="#2e3a48" stroke-width="1.6" stroke-opacity="0.6">
+      <path d="M122 210 L110 214 L120 222 Z"/>
+      <path d="M152 296 L140 300 L150 308 Z"/>
+      <path d="M184 392 L172 396 L182 404 Z"/>
+    </g>
+    <!-- pigment pooling at root -->
+    <path fill="#8f3a3c" fill-opacity="0.32" filter="url(#soft)"
+      d="M312 260 C258 230 188 202 116 186 C190 228 274 270 330 308 Z"/>
+    <!-- gold rim accent -->
+    <path fill="none" stroke="#cdb878" stroke-width="2.4" stroke-opacity="0.5"
+      d="M106 132 C84 128 62 128 50 134"/>
+  </g>
+
+  <!-- RIGHT WING (mirror, slightly larger) -->
+  <g filter="url(#wingrough)">
+    <path fill="url(#memR)" stroke="#2e3a48" stroke-width="5" stroke-opacity="0.62"
+      d="M350 252
+         C412 196 494 146 586 122
+         C612 115 634 118 636 128
+         L558 210
+         Q560 248 528 296
+         Q542 332 496 392
+         Q504 430 432 470
+         Q380 420 360 354
+         Q342 300 336 278
+         C334 266 338 258 350 252 Z"/>
+    <path fill="none" stroke="#7e3338" stroke-width="8.5" stroke-opacity="0.88" stroke-linecap="round"
+      d="M344 258 C406 204 488 154 578 130 C598 124 620 124 634 130"/>
+    <path fill="#e0cd8e" stroke="#2e3a48" stroke-width="3" stroke-opacity="0.62"
+      d="M634 130 C648 120 660 124 660 138 C646 144 636 140 630 130 Z"/>
+    <path fill="none" stroke="#7e3338" stroke-width="6.5" stroke-opacity="0.85" stroke-linecap="round"
+      d="M630 132 L558 210"/>
+    <path fill="none" stroke="#7e3338" stroke-width="6" stroke-opacity="0.85" stroke-linecap="round"
+      d="M628 138 C592 184 556 250 528 296"/>
+    <path fill="none" stroke="#7e3338" stroke-width="5.5" stroke-opacity="0.85" stroke-linecap="round"
+      d="M624 148 C588 226 534 330 496 392"/>
+    <path fill="none" stroke="#7e3338" stroke-width="5" stroke-opacity="0.82" stroke-linecap="round"
+      d="M618 162 C576 256 484 400 432 470"/>
+    <g fill="#e0cd8e" stroke="#2e3a48" stroke-width="1.6" stroke-opacity="0.6">
+      <path d="M558 210 L570 214 L560 222 Z"/>
+      <path d="M528 296 L540 300 L530 308 Z"/>
+      <path d="M496 392 L508 396 L498 404 Z"/>
+    </g>
+    <path fill="#8f3a3c" fill-opacity="0.32" filter="url(#soft)"
+      d="M368 260 C422 230 492 202 564 186 C490 228 406 270 350 308 Z"/>
+    <path fill="none" stroke="#cdb878" stroke-width="2.4" stroke-opacity="0.5"
+      d="M574 130 C596 126 618 126 630 132"/>
+  </g>
+
+  <!-- =================================================================
+       CLAWED FORELIMBS — talons splayed forward from chest
+       ================================================================= -->
+  <g filter="url(#rough)">
+    <path fill="url(#bodyG)" stroke="#2e3a48" stroke-width="4.5" stroke-opacity="0.62"
+      d="M306 306 C280 318 262 344 256 372 C270 366 286 356 296 342 C304 332 308 318 306 306 Z"/>
+    <g fill="#e0cd8e" stroke="#2e3a48" stroke-width="2.4" stroke-opacity="0.62">
+      <path d="M256 372 C244 384 236 400 236 414 C248 404 256 390 262 378 Z"/>
+      <path d="M268 368 C262 384 260 402 264 416 C270 400 272 382 272 370 Z"/>
+      <path d="M282 360 C280 376 282 394 288 406 C290 388 288 372 286 360 Z"/>
+    </g>
+    <path fill="url(#bodyG)" stroke="#2e3a48" stroke-width="4.5" stroke-opacity="0.62"
+      d="M374 306 C400 318 418 344 424 372 C410 366 394 356 384 342 C376 332 372 318 374 306 Z"/>
+    <g fill="#e0cd8e" stroke="#2e3a48" stroke-width="2.4" stroke-opacity="0.62">
+      <path d="M424 372 C436 384 444 400 444 414 C432 404 424 390 418 378 Z"/>
+      <path d="M412 368 C418 384 420 402 416 416 C410 400 408 382 408 370 Z"/>
+      <path d="M398 360 C400 376 398 394 392 406 C390 388 392 372 394 360 Z"/>
+    </g>
+  </g>
+
+  <!-- =================================================================
+       TAIL — long tapering serpentine, blade tip
+       ================================================================= -->
+  <g filter="url(#rough)">
+    <path fill="url(#tailG)" stroke="#2e3a48" stroke-width="5" stroke-opacity="0.62"
+      d="M320 490
+         C302 526 318 554 314 588
+         C320 580 328 582 332 596
+         C334 558 350 548 354 522
+         C356 506 350 498 340 490 Z"/>
+    <path fill="#a84e64" stroke="#2e3a48" stroke-width="4" stroke-opacity="0.62"
+      d="M324 582 C298 598 298 618 312 640 C320 624 328 622 332 630 C338 622 346 624 354 640 C370 618 370 598 344 582 Z"/>
+    <path fill="none" stroke="#7e3338" stroke-width="3.5" stroke-opacity="0.6"
+      d="M332 492 C328 528 326 560 328 590"/>
+    <g fill="#e0cd8e" stroke="#7e3338" stroke-width="2.2" stroke-opacity="0.6">
+      <path d="M334 506 L320 524 L340 522 Z"/>
+      <path d="M330 550 L316 568 L336 564 Z"/>
+    </g>
+  </g>
+
+  <!-- =================================================================
+       BODY — long, lean, SERPENTINE
+       ================================================================= -->
+  <g filter="url(#rough)">
+    <path fill="url(#bodyG)" stroke="#2e3a48" stroke-width="5.5" stroke-opacity="0.66"
+      d="M340 152
+         C372 152 392 180 396 226
+         C402 272 396 320 386 368
+         C378 416 366 462 352 500
+         C346 512 344 514 340 514
+         C336 514 334 512 328 500
+         C314 462 302 416 294 368
+         C284 320 278 272 284 226
+         C288 180 308 152 340 152 Z"/>
+    <path fill="#f0a85a" fill-opacity="0.42" filter="url(#soft)"
+      d="M318 232 C330 216 350 216 362 232 C354 302 326 302 318 232 Z"/>
+    <path fill="#e8924a" fill-opacity="0.3" filter="url(#soft)"
+      d="M312 332 C326 316 354 316 368 332 C358 412 322 412 312 332 Z"/>
+    <g fill="none" stroke="#7e3338" stroke-width="1.8" stroke-opacity="0.32">
+      <path d="M314 248 C320 254 328 256 334 254"/>
+      <path d="M346 252 C352 256 360 254 366 248"/>
+      <path d="M310 288 C316 294 324 296 330 294"/>
+      <path d="M350 292 C356 296 364 294 372 288"/>
+      <path d="M312 330 C318 336 326 338 332 336"/>
+      <path d="M348 334 C354 338 362 336 370 330"/>
+      <path d="M314 374 C320 380 328 382 334 380"/>
+      <path d="M346 378 C352 382 360 380 368 374"/>
+      <path d="M318 418 C324 424 332 426 338 424"/>
+      <path d="M342 422 C348 426 356 424 364 418"/>
+    </g>
+    <!-- DORSAL CREST: a single bold serrated sawtooth ridge down the
+         spine, shaded so it reads as a 3D row of back-spikes from above.
+         Built as one zigzag band: dark base + gold lit edge. -->
+    <path fill="#7e3338" fill-opacity="0.85" stroke="#2e3a48" stroke-width="2" stroke-opacity="0.5"
+      d="M340 168
+         L352 200 L340 214 L354 250 L340 268 L356 308
+         L340 330 L354 372 L340 392 L350 432 L340 452
+         L346 482 L340 500
+         L334 482 L330 452 L340 432 L326 392 L340 372
+         L324 308 L340 268 L326 250 L340 214 L328 200 Z"/>
+    <!-- gold lit highlight along the right side of each tooth -->
+    <path fill="url(#hornG)" fill-opacity="0.95" stroke="#2e3a48" stroke-width="1.4" stroke-opacity="0.45"
+      d="M340 176 L350 202 L340 214 Z
+         M340 224 L352 252 L340 268 Z
+         M340 280 L354 308 L340 330 Z
+         M340 344 L352 374 L340 392 Z
+         M340 404 L348 432 L340 452 Z"/>
+  </g>
+
+  <!-- =================================================================
+       HEAD — reptilian, elongated snout up, big swept horns
+       ================================================================= -->
+  <g filter="url(#rough)">
+    <path fill="url(#hornG)" stroke="#2e3a48" stroke-width="4.5" stroke-opacity="0.62"
+      d="M300 92 C260 66 228 32 218 0 C214 28 222 60 246 88 C266 110 286 118 304 120 Z"/>
+    <path fill="url(#hornG)" stroke="#2e3a48" stroke-width="4.5" stroke-opacity="0.62"
+      d="M380 92 C420 66 452 32 462 0 C466 28 458 60 434 88 C414 110 394 118 376 120 Z"/>
+    <path fill="url(#headG)" stroke="#2e3a48" stroke-width="5.5" stroke-opacity="0.66"
+      d="M340 58
+         C362 58 378 68 390 88
+         C404 110 410 138 406 162
+         C400 186 374 198 340 200
+         C306 198 280 186 274 162
+         C270 138 276 110 290 88
+         C302 68 318 58 340 58 Z"/>
+    <path fill="url(#headG)" stroke="#2e3a48" stroke-width="5" stroke-opacity="0.62"
+      d="M322 82 C320 44 328 18 340 2 C352 18 360 44 358 82
+         C351 66 329 66 322 82 Z"/>
+    <path fill="none" stroke="#7e3338" stroke-width="4.5" stroke-opacity="0.6"
+      d="M294 130 C308 116 326 116 336 128 M386 130 C372 116 354 116 344 128"/>
+    <path fill="#8f3a3c" fill-opacity="0.32" filter="url(#soft)"
+      d="M288 152 C298 144 310 144 316 154 C308 170 294 168 288 152 Z"/>
+    <path fill="#8f3a3c" fill-opacity="0.32" filter="url(#soft)"
+      d="M392 152 C382 144 370 144 364 154 C372 170 386 168 392 152 Z"/>
+    <ellipse cx="331" cy="44" rx="3.8" ry="5" fill="#2e3a48"/>
+    <ellipse cx="349" cy="44" rx="3.8" ry="5" fill="#2e3a48"/>
+    <path d="M329 32 C323 20 327 10 331 2" stroke="#e8924a" stroke-width="4.5" stroke-opacity="0.72" fill="none"/>
+    <path d="M351 32 C357 20 353 10 349 2" stroke="#e8924a" stroke-width="4.5" stroke-opacity="0.72" fill="none"/>
+    <g fill="#f0ead2" stroke="#7e3338" stroke-width="1" stroke-opacity="0.4">
+      <path d="M298 192 L294 203 L305 198 Z"/>
+      <path d="M316 198 L314 209 L324 202 Z"/>
+      <path d="M364 198 L366 209 L356 202 Z"/>
+      <path d="M382 192 L386 203 L375 198 Z"/>
+    </g>
+  </g>
+
+  <!-- =================================================================
+       EYES — narrow glowing gold slits
+       ================================================================= -->
+  <g>
+    <path d="M294 134 C306 122 324 124 334 136 C324 146 306 146 294 134 Z" fill="#e0cd8e"/>
+    <path d="M346 136 C356 124 374 122 386 134 C374 146 356 146 346 136 Z" fill="#e0cd8e"/>
+    <ellipse cx="313" cy="135" rx="2.8" ry="7.5" fill="#2e3a48"/>
+    <ellipse cx="367" cy="135" rx="2.8" ry="7.5" fill="#2e3a48"/>
+  </g>
+</svg>

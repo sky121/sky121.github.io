@@ -1,0 +1,137 @@
+# Dragoose — project handoff & design doc
+
+> A watercolor flying roguelike where **Gary the goose**, granted dragonfire by a
+> fallen scale, battles the dragons who rule the skies and earns their respect —
+> until a goose is named **Dragoose**, ruler of the skies.
+>
+> This document is the single source of truth so we can pick up exactly where we
+> left off. Last updated: **2026-06-14**.
+
+---
+
+## Status: v1 vertical slice — SHIPPED & LIVE
+
+- **Play it:** https://sky121.github.io/dragoose.html (best on phone, one-handed)
+- **Discoverable from:** the **Lab** page (`lab.html`) — the Dragoose tile is the first *Live* project.
+- v1 is **one complete, well-tuned fight** against the Ember dragon, start to finish, with the core roguelike loop and persistence. It reads as a finished indie game, cohesive with the site's watercolor aesthetic.
+
+### Files (all committed to `master`)
+| File | What it is |
+|---|---|
+| `dragoose.html` | Game page (title/meta, canvas, Google Fonts, links the CSS/JS) |
+| `assets/css/dragoose.css` | All game styling (screens, HUD, buttons, watercolor UI) — ~628 lines |
+| `assets/js/dragoose.js` | The whole game — vanilla JS, one IIFE, no deps — ~1593 lines |
+| `images/dragoose/*.png` | Watercolor sprites (see Assets below) |
+| `docs/dragoose/art-src/*.svg` | **Editable** source SVGs for every sprite + render scripts |
+| `lab.html` | Contains the Live "Dragoose" tile linking to the game |
+| `sitemap.xml` | Has the `dragoose.html` entry |
+
+---
+
+## How to resume / develop
+
+- **Run locally:** from the repo root, `python3 -m http.server` then open `http://localhost:8000/dragoose.html`. (Must be served over HTTP, not `file://`, so the sprite PNGs load.)
+- **Architecture (in `assets/js/dragoose.js`):** single `"use strict"` IIFE, one `<canvas>` at fixed logical resolution **540×960**, letterboxed + DPR-aware (capped 2.5×). Fixed-timestep update (1/60s) with frame clamping + spiral-of-death guard; interpolated render. Modules: **Save** (localStorage), **Audio2** (synthesized Web Audio), **Input** (pointer-primary + keyboard), **Particles** (pool of 260), two **projectile pools** (player 48 / dragon 80), **Pickups**, and a **Game** state machine: `LOADING → TITLE → PLAYING → POWER → PAUSED → DEAD → WIN`. Pauses on tab blur/visibilitychange; honors `prefers-reduced-motion` (tones down shake/flash). Minimal test hook exposed at `window.__dragoose`.
+- **Save data:** localStorage key **`dragoose-save`**. Shape e.g. `{"scales":7,"relics":["emberHeart"],"wins":1}`. To reset progress, clear that key in devtools.
+- **Editing sprites:** edit the SVGs in `docs/dragoose/art-src/`, then re-render to transparent PNGs with Playwright (`omitBackground:true`, viewport = sprite size, dpr 1) using the included `render.js` / `render-dragons.js` as a starting point, and overwrite the matching file in `images/dragoose/`. Dragons should be quantized (alpha-preserving) to stay ~50–55 KB.
+- **Adding a project tile to the Lab** (for future games): copy the `<li class="pool ...">` template documented inside `lab.html` (there's a commented TEMPLATE + "how to add a project" block).
+
+### Controls (implemented)
+- **Drag** anywhere = steer (eased toward pointer, momentum + banking tilt).
+- **Tap** (<220 ms, no move) = dodge/dash with **0.42 s i-frames** + 0.6 s cooldown (motion streak + shimmer).
+- **Hold** (>220 ms) = charge a fireball (arc meter + rising audio + glow); release fires; size/damage scale with charge.
+- **Desktop:** mouse drag steers; also WASD/arrows steer, **Space** tap=dodge / hold=charge, **Esc** pause, **M** mute.
+- Canvas blocks scroll/zoom/pull-to-refresh (`touch-action: none`).
+
+### Combat / boss — Ember, the Cinder Wyrm
+- Boss has a health bar + name; **telegraphed** attacks (tint + dashed aim line wind-up) so dodging is skillful and fair.
+- **Phase 1 (>50% HP):** roams; spread volley, aimed multi-shot, sweeping breath cone.
+- **Phase 2 (<50% HP, "enraged"):** purple pulsing bar, faster, shorter cooldowns, adds a telegraphed **charge/dash** body-check.
+- Drops **scales** at HP milestones (use `scale-ember.png`). Defeat → it bows → "You have earned its respect" → grants a **relic** → victory.
+
+### Powers (the "no-stats" ability system) — 5 implemented
+Offered as a **1-of-2 pick** every few scales collected:
+1. **Tailwind Fury** — the faster you fly, the harder your fireballs hit.
+2. **Ember Wake** — your first shot after a dodge becomes a big searing blast.
+3. **Storm Dodge** — dodging fires a radial lightning burst.
+4. **Mirror Plume** — reflect a portion of damage when hit.
+5. **Forked Flame** — fireballs split into two.
+
+### Roguelike meta / hoard (persists across runs)
+- Banks total **scales**, **dragons bowed**, and **relics** in `dragoose-save`.
+- Relics give next-run perks: **Heart of Ember** = +1 starting feather (health); **Cinder's Gift** = start already wielding Ember Wake.
+- Death **salvages half** your scales. Hoard summary shown on the title screen.
+
+### Screens & polish (done)
+Title (logo + Gary's backstory + how-to + hoard), Loading, in-game HUD (player feathers, charge meter, dragon health+name, scale count, power icons), Power pick, Pause, Death, Victory. Watercolor sky wash + 3-depth parallax clouds, particle blooms, hit-stop / screen-shake / hit-flash / knockback, floating feedback, bloom-wipe transitions, synthesized Web Audio SFX + mute toggle, "← Back to the Lab" link.
+
+### Verified
+`node --check` passes; HTML parses; CSS balanced; all 8 sprite paths resolve; loads with **0 console errors**; dragon takes damage, player can be hit, scales drop/collect, a power grants, win/death/retry transition, hoard persists across reloads, mute + pause + keyboard all work, no page overflow. Tested desktop 540×960 and mobile 390×844.
+
+---
+
+## Roadmap — deferred features (what to build next)
+
+Ordered roughly by value / readiness. **The storm dragon is the easiest next win** — its sprite (`dragon-storm.png`) and scale variant are already in the repo and the code has hooks for a second fight.
+
+1. **Second fight: the Storm dragon.** Add it as a follow-up boss (cool palette, lightning attacks, distinct patterns). Assets + hooks ready.
+2. **Open sky (open world).** A flyable map of dragon *realms*; entering a realm angers that dragon and starts its fight. Pick your route; progress toward defeating all dragons. (This is the big structural step from "one fight" → "the game.")
+3. **More dragons**, each with a unique realm, palette, attack identity, and signature reward.
+4. **Equipment that reskins Gary + grants abilities/attacks** (the spec calls for equipment changing the goose's look as well as powers). Could layer cosmetic sprite pieces over `goose.png` or add variant gooses.
+5. **Rematches / ceremonial duels.** After earning a dragon's respect, return to challenge it again for rarer drops. **Dragons adapt between rematches** — evolve attacks, gain phases/counters to your build, get more aggressive.
+6. **RNG loot tables.** Rarer scales and rarer "gifts from the hoard" on repeat victories; rare drops should change **playstyle/aesthetics, not raw power**. First victory = guaranteed respect/story/signature power; repeats = chance for rare scales, alternate gifts, cosmetic gear, legendary mutations. Consider higher drop rate for faster clears.
+7. **Endgame:** earn the respect of *all* dragons → crowned **Dragoose**, ruler of the skies; geese and dragons live in harmony (the win-the-game state). 
+8. **Polish passes:** push the breath-cone to fully painterly watercolor; more SFX/music; haptics on mobile; difficulty tuning; maybe a brief tutorial.
+
+### Key design decisions already made
+- **No traditional stats** — all progression is *mechanic-changing* abilities from collected scales/equipment, not number buffs.
+- **No minions** — the sky holds only large dragons; XP/strength come from fighting them and collecting scales over time.
+- **One great fight over two rushed ones** for v1 (hence Storm deferred despite ready assets).
+- **Watercolor cohesion** with the host portfolio site (shared palette, fonts, painterly rendering) — keep this for everything new.
+- **One-thumb, vertical, mobile-first** (drag steer / tap dodge / hold charge), but it must also play well on desktop.
+
+---
+
+## Assets inventory (`images/dragoose/`, transparent PNGs, top-down facing up)
+| File | Size | Use |
+|---|---|---|
+| `goose.png` (280²) | Gary, the player |
+| `dragon-ember.png` (680²) | Ember boss (live) |
+| `dragon-storm.png` (680²) | Storm boss (ready, not yet used in a fight) |
+| `fireball.png` (140²) | projectile / breath bloom |
+| `scale.png`, `scale-ember.png`, `scale-storm.png` (110²) | scale pickups (per-dragon tints) |
+| `cloud.png` (300×180) | parallax sky cloud |
+
+Editable sources + render scripts: `docs/dragoose/art-src/`. Style: hand-authored SVG using `feTurbulence` + `feDisplacementMap` ragged wet edges, layered translucent washes, radial pigment pooling, ink linework, gold-rim accents. Palette only: ink `#2e3a48`, pond `#7fa8c9`, pond-deep `#4a7299`, wisteria `#a292c4`, sage `#93b48b`, rose `#d98ba0`, gold `#cdb878`; paper `#f6f1e7` (never as a sprite background — sprites are transparent).
+
+---
+
+## Appendix — original design brief (preserved verbatim from the concept)
+
+### Gameplay
+- **No Stats** — equipment, scales, or buffs give an interesting mechanic or ability directly, e.g.:
+  - "your next attack burns the enemy"
+  - "when hit by an attack reflect damage"
+  - "gain movement speed when flying away from enemies"
+  - "the higher your movement speed the more your damage"
+  - "shoot lightning at enemies when dodging"
+- **Open sky (open world).** Dragons each have their own realm you can fly into, which angers that dragon; they then attack you while you're in their realm.
+- Equipment changes the goose's sprite look as well as abilities and attacks.
+- **No hordes / minions / small basic creatures** to fight — the sky is ruled only by large dragons.
+- Since there are no minions, gain experience through **time spent fighting** the dragons. Do enough damage to a dragon and it drops a **scale**, which you collect for more magical powers. The more you fight, the stronger you get until you can defeat all the dragons.
+- **One-handed, only thumb, vertical mobile game.** Drag to steer. Tap to dodge/boost. Hold to charge attack.
+- **Roguelike** (die → fully restart). But items collected for your **hoard** back at your pond carry to the next goose who takes on the sky.
+- Semi-ranged attacks and abilities (fireballs, claw swipe, etc.).
+- Defeat a dragon → earn its respect → it gives a **gift from its hoard**. Earn the respect of **all** dragons → you're named **Dragoose**, ruler of the skies; you invite all geese to fly freely; geese and dragons live in harmony.
+- **RNG** for rarer gifts from defeating dragons, and rarer scales dropped.
+- *Problem:* if you can only defeat a dragon once, what if you want to retry for the rare drops? *Solution:* after earning a dragon's respect, return for a **ceremonial duel**. **Dragons adapt between rematches** — attacks evolve, phases change, gain counters to your build, become more aggressive.
+- **Rare drops change playstyle/aesthetics, not power.** First victory guaranteed (respect, story progression, signature power); repeat victories: chance for rare scales, alternate gifts, cosmetic gear, legendary mutations. Possibly higher drop rate for faster time-to-victory.
+
+### Backstory
+Dragoose is the story of **Gary**, a goose who dreams of flying among the clouds — but the skies belong to dragons. For generations, geese have lived in fear, hiding on the ground while dragons soar above; to dragons, geese are prey.
+
+One day Gary discovers a fallen dragon scale glowing with strange magical energy. Drawn to it, he reaches out — a torrent of magic erupts, and everything goes dark. When he awakens, he can **breathe fire**. Believing this power may finally earn him a place in the skies, Gary takes flight for the first time — unaware the dragons may never accept a goose among them.
+
+As Gary defeats each dragon, he earns their respect in battle. Rather than dying, the dragons acknowledge his strength and offer a gift from their hoard — relics infused with ancient draconic magic. With every victory he grows stronger, and the dragons begin to see him not as prey but as one of their own.
+
+After earning the respect of every dragon, Gary is given a new title: **Dragoose** — the first goose accepted among dragonkind. He unites the skies and the earth; geese are finally free to fly alongside dragons, and the skies enter a new age of harmony.

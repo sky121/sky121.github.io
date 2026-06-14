@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" width="140" height="140">
+  <defs>
+    <filter id="rough" x="-50%" y="-50%" width="200%" height="200%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04 0.06" numOctaves="3" seed="5" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="10" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6"/></filter>
+    <radialGradient id="bloom" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff4d8"/>
+      <stop offset="32%" stop-color="#f0c25a"/>
+      <stop offset="62%" stop-color="#e88a5a"/>
+      <stop offset="100%" stop-color="#d98ba0" stop-opacity="0.85"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#cdb878" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#d98ba0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g filter="url(#blur)"><circle cx="70" cy="70" r="60" fill="url(#halo)"/></g>
+  <g filter="url(#rough)">
+    <!-- ragged flame bloom with licks -->
+    <path fill="url(#bloom)" stroke="#b5566f" stroke-width="1.5" stroke-opacity="0.4"
+      d="M70 14
+         C82 30 96 32 104 26 C100 40 108 50 120 52
+         C106 60 108 74 116 84 C102 84 96 96 100 110
+         C88 100 76 106 70 122 C64 106 52 100 40 110
+         C44 96 38 84 24 84 C32 74 34 60 20 52
+         C32 50 40 40 36 26 C44 32 58 30 70 14 Z"/>
+    <!-- inner hot core -->
+    <circle cx="70" cy="68" r="26" fill="#f6d98a" fill-opacity="0.85"/>
+    <circle cx="70" cy="66" r="14" fill="#fff4d8" fill-opacity="0.9"/>
+    <!-- rose mottling -->
+    <path fill="#d98ba0" fill-opacity="0.4" d="M48 50 C56 44 66 46 70 54 C62 60 50 60 48 50 Z"/>
+    <path fill="#d98ba0" fill-opacity="0.35" d="M86 86 C94 82 102 86 102 94 C94 98 86 94 86 86 Z"/>
+  </g>
+</svg>

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 180" width="300" height="180">
+  <defs>
+    <filter id="rough" x="-40%" y="-40%" width="180%" height="180%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.03" numOctaves="3" seed="3" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="14" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="blur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="8"/></filter>
+    <radialGradient id="puff" cx="46%" cy="38%" r="68%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="55%" stop-color="#f6f1e7"/>
+      <stop offset="100%" stop-color="#dfe8f0"/>
+    </radialGradient>
+  </defs>
+  <!-- soft under-halo -->
+  <g filter="url(#blur)">
+    <ellipse cx="150" cy="98" rx="130" ry="62" fill="#7fa8c9" fill-opacity="0.18"/>
+  </g>
+  <g filter="url(#rough)">
+    <!-- layered puff lumps -->
+    <g fill="url(#puff)">
+      <ellipse cx="92" cy="104" rx="58" ry="44"/>
+      <ellipse cx="150" cy="86" rx="66" ry="52"/>
+      <ellipse cx="210" cy="104" rx="56" ry="42"/>
+      <ellipse cx="120" cy="116" rx="48" ry="36"/>
+      <ellipse cx="186" cy="116" rx="48" ry="36"/>
+    </g>
+    <!-- pale pond shadow underside -->
+    <path fill="#7fa8c9" fill-opacity="0.16" filter="url(#blur)"
+      d="M50 124 C100 150 200 150 250 124 C210 142 90 142 50 124 Z"/>
+    <!-- soft top sheen -->
+    <ellipse cx="140" cy="70" rx="60" ry="22" fill="#ffffff" fill-opacity="0.5"/>
+  </g>
+</svg>

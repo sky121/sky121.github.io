@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 110" width="110" height="110">
+  <defs>
+    <filter id="rough" x="-50%" y="-50%" width="200%" height="200%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.05 0.07" numOctaves="2" seed="11" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="blur" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
+    <radialGradient id="glow" cx="50%" cy="46%" r="52%">
+      <stop offset="0%" stop-color="#cdb878" stop-opacity="0.6"/>
+      <stop offset="60%" stop-color="#d98ba0" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#e8924a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="scaleG" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#f1cf92"/>
+      <stop offset="50%" stop-color="#e0996a"/>
+      <stop offset="100%" stop-color="#d98ba0"/>
+    </linearGradient>
+  </defs>
+  <g filter="url(#blur)"><circle cx="55" cy="52" r="46" fill="url(#glow)"/></g>
+  <g filter="url(#rough)">
+    <path fill="url(#scaleG)" stroke="#cdb878" stroke-width="3" stroke-opacity="0.9"
+      d="M55 14 C74 30 84 50 84 68 C84 88 70 98 55 98 C40 98 26 88 26 68 C26 50 36 30 55 14 Z"/>
+    <path d="M55 22 C55 50 55 76 55 92" stroke="#b5566f" stroke-width="2.4" stroke-opacity="0.5" fill="none"/>
+    <path d="M55 44 C46 50 40 58 38 68 M55 44 C64 50 70 58 72 68 M55 64 C48 70 44 76 43 84 M55 64 C62 70 66 76 67 84"
+      stroke="#b5566f" stroke-width="1.6" stroke-opacity="0.38" fill="none"/>
+    <path fill="#fff4d8" fill-opacity="0.55" d="M48 30 C56 28 62 34 60 44 C52 46 46 40 48 30 Z"/>
+    <path fill="#d98ba0" fill-opacity="0.35" d="M62 70 C70 68 76 74 74 84 C66 86 60 80 62 70 Z"/>
+  </g>
+  <circle cx="55" cy="16" r="3" fill="#cdb878"/>
+</svg>

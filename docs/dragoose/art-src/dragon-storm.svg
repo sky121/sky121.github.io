@@ -1,0 +1,320 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 680" width="680" height="680">
+  <defs>
+    <filter id="rough" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.008 0.016" numOctaves="3" seed="31" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="10" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="wingrough" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.006 0.012" numOctaves="2" seed="31" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="6" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02 0.04" numOctaves="2" seed="43" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="8" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="blur" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="20"/>
+    </filter>
+
+    <radialGradient id="aura" cx="50%" cy="44%" r="56%">
+      <stop offset="0%" stop-color="#7fa8c9" stop-opacity="0.42"/>
+      <stop offset="45%" stop-color="#a292c4" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="#a292c4" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- cool body: pond-deep -> wisteria, pooling darker -->
+    <radialGradient id="bodyG" cx="50%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#7fa8c9"/>
+      <stop offset="42%" stop-color="#4a7299"/>
+      <stop offset="100%" stop-color="#3a5675"/>
+    </radialGradient>
+    <linearGradient id="tailG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4a7299"/>
+      <stop offset="100%" stop-color="#3a5675"/>
+    </linearGradient>
+    <radialGradient id="headG" cx="50%" cy="62%" r="72%">
+      <stop offset="0%" stop-color="#7fa8c9"/>
+      <stop offset="58%" stop-color="#4a7299"/>
+      <stop offset="100%" stop-color="#3a5675"/>
+    </radialGradient>
+    <linearGradient id="hornG" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0%" stop-color="#cdb878"/>
+      <stop offset="100%" stop-color="#9a8a4e"/>
+    </linearGradient>
+
+    <!-- cool membranes: pond / wisteria -->
+    <linearGradient id="memL" x1="0.9" y1="0.05" x2="0.05" y2="0.95">
+      <stop offset="0%" stop-color="#7fa8c9"/>
+      <stop offset="50%" stop-color="#6f86b6"/>
+      <stop offset="100%" stop-color="#a292c4"/>
+    </linearGradient>
+    <linearGradient id="memR" x1="0.1" y1="0.05" x2="0.95" y2="0.95">
+      <stop offset="0%" stop-color="#7fa8c9"/>
+      <stop offset="50%" stop-color="#6f86b6"/>
+      <stop offset="100%" stop-color="#a292c4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- storm aura -->
+  <g filter="url(#blur)">
+    <ellipse cx="340" cy="330" rx="300" ry="300" fill="url(#aura)"/>
+  </g>
+  <g fill="#cdb878" filter="url(#soft)">
+    <circle cx="118" cy="150" r="6" fill-opacity="0.5"/><circle cx="566" cy="160" r="5" fill-opacity="0.5"/>
+    <circle cx="74" cy="470" r="5" fill-opacity="0.45"/><circle cx="606" cy="460" r="6" fill-opacity="0.45"/>
+    <circle cx="340" cy="654" r="5" fill-opacity="0.4"/>
+  </g>
+
+  <!-- =================================================================
+       WINGS — narrower, more sharply angular than the ember's.
+       Long pointed sail with a more pronounced JAGGED trailing edge
+       and a sharper top sweep. Lightning crackle accents on membrane.
+       ================================================================= -->
+
+  <!-- LEFT WING : angular bat sail, narrower & more raked than ember's;
+       sharp clawed fingertips, concave taut membrane, lightning crackle. -->
+  <g filter="url(#wingrough)">
+    <path fill="url(#memL)" stroke="#2e3a48" stroke-width="5" stroke-opacity="0.62"
+      d="M330 250
+         C260 188 174 136 80 114
+         C54 107 32 110 32 122
+         L110 206
+         Q104 246 138 296
+         Q120 334 168 396
+         Q158 436 232 474
+         Q288 420 312 352
+         Q334 298 342 276
+         C344 264 342 256 330 250 Z"/>
+    <!-- arm bone -->
+    <path fill="none" stroke="#3a5675" stroke-width="8.5" stroke-opacity="0.88" stroke-linecap="round"
+      d="M336 256 C266 196 182 146 88 122 C66 116 44 114 34 120"/>
+    <!-- wrist claw -->
+    <path fill="#cdb878" stroke="#2e3a48" stroke-width="3" stroke-opacity="0.62"
+      d="M34 120 C20 110 8 114 8 128 C22 134 32 130 38 120 Z"/>
+    <!-- bold finger struts to each fingertip -->
+    <path fill="none" stroke="#3a5675" stroke-width="6.5" stroke-opacity="0.85" stroke-linecap="round"
+      d="M38 122 L110 206"/>
+    <path fill="none" stroke="#3a5675" stroke-width="6" stroke-opacity="0.85" stroke-linecap="round"
+      d="M40 128 C78 176 114 250 138 296"/>
+    <path fill="none" stroke="#3a5675" stroke-width="5.5" stroke-opacity="0.85" stroke-linecap="round"
+      d="M44 138 C82 220 134 332 168 396"/>
+    <path fill="none" stroke="#3a5675" stroke-width="5" stroke-opacity="0.82" stroke-linecap="round"
+      d="M50 152 C94 250 184 404 232 474"/>
+    <g fill="#cdb878" stroke="#2e3a48" stroke-width="1.6" stroke-opacity="0.6">
+      <path d="M110 206 L98 210 L108 218 Z"/>
+      <path d="M138 296 L126 300 L136 308 Z"/>
+      <path d="M168 396 L156 400 L166 408 Z"/>
+    </g>
+    <!-- lightning crackle accent -->
+    <path fill="none" stroke="#cdb878" stroke-width="2.8" stroke-opacity="0.85" stroke-linecap="round" stroke-linejoin="round"
+      d="M156 230 L136 258 L156 262 L132 300"/>
+    <!-- pigment pooling -->
+    <path fill="#3a5675" fill-opacity="0.34" filter="url(#soft)"
+      d="M314 258 C258 226 184 198 108 182 C188 224 276 266 332 306 Z"/>
+    <path fill="none" stroke="#cdb878" stroke-width="2.4" stroke-opacity="0.5"
+      d="M90 122 C68 118 46 118 34 124"/>
+  </g>
+
+  <!-- RIGHT WING (mirror, slightly larger) -->
+  <g filter="url(#wingrough)">
+    <path fill="url(#memR)" stroke="#2e3a48" stroke-width="5" stroke-opacity="0.62"
+      d="M350 250
+         C420 188 506 136 600 114
+         C626 107 648 110 648 122
+         L570 206
+         Q576 246 542 296
+         Q560 334 512 396
+         Q522 436 448 474
+         Q392 420 368 352
+         Q346 298 338 276
+         C336 264 338 256 350 250 Z"/>
+    <path fill="none" stroke="#3a5675" stroke-width="8.5" stroke-opacity="0.88" stroke-linecap="round"
+      d="M344 256 C414 196 498 146 592 122 C614 116 636 114 646 120"/>
+    <path fill="#cdb878" stroke="#2e3a48" stroke-width="3" stroke-opacity="0.62"
+      d="M646 120 C660 110 672 114 672 128 C658 134 648 130 642 120 Z"/>
+    <path fill="none" stroke="#3a5675" stroke-width="6.5" stroke-opacity="0.85" stroke-linecap="round"
+      d="M642 122 L570 206"/>
+    <path fill="none" stroke="#3a5675" stroke-width="6" stroke-opacity="0.85" stroke-linecap="round"
+      d="M640 128 C602 176 566 250 542 296"/>
+    <path fill="none" stroke="#3a5675" stroke-width="5.5" stroke-opacity="0.85" stroke-linecap="round"
+      d="M636 138 C598 220 546 332 512 396"/>
+    <path fill="none" stroke="#3a5675" stroke-width="5" stroke-opacity="0.82" stroke-linecap="round"
+      d="M630 152 C586 250 496 404 448 474"/>
+    <g fill="#cdb878" stroke="#2e3a48" stroke-width="1.6" stroke-opacity="0.6">
+      <path d="M570 206 L582 210 L572 218 Z"/>
+      <path d="M542 296 L554 300 L544 308 Z"/>
+      <path d="M512 396 L524 400 L514 408 Z"/>
+    </g>
+    <path fill="none" stroke="#cdb878" stroke-width="2.8" stroke-opacity="0.85" stroke-linecap="round" stroke-linejoin="round"
+      d="M524 230 L544 258 L524 262 L548 300"/>
+    <path fill="#3a5675" fill-opacity="0.34" filter="url(#soft)"
+      d="M366 258 C422 226 496 198 572 182 C492 224 404 266 348 306 Z"/>
+    <path fill="none" stroke="#cdb878" stroke-width="2.4" stroke-opacity="0.5"
+      d="M590 122 C612 118 634 118 646 124"/>
+  </g>
+
+  <!-- =================================================================
+       CLAWED FORELIMBS
+       ================================================================= -->
+  <g filter="url(#rough)">
+    <path fill="url(#bodyG)" stroke="#2e3a48" stroke-width="4.5" stroke-opacity="0.62"
+      d="M306 306 C280 318 262 344 256 372 C270 366 286 356 296 342 C304 332 308 318 306 306 Z"/>
+    <g fill="#cdb878" stroke="#2e3a48" stroke-width="2.4" stroke-opacity="0.62">
+      <path d="M256 372 C244 384 236 400 236 414 C248 404 256 390 262 378 Z"/>
+      <path d="M268 368 C262 384 260 402 264 416 C270 400 272 382 272 370 Z"/>
+      <path d="M282 360 C280 376 282 394 288 406 C290 388 288 372 286 360 Z"/>
+    </g>
+    <path fill="url(#bodyG)" stroke="#2e3a48" stroke-width="4.5" stroke-opacity="0.62"
+      d="M374 306 C400 318 418 344 424 372 C410 366 394 356 384 342 C376 332 372 318 374 306 Z"/>
+    <g fill="#cdb878" stroke="#2e3a48" stroke-width="2.4" stroke-opacity="0.62">
+      <path d="M424 372 C436 384 444 400 444 414 C432 404 424 390 418 378 Z"/>
+      <path d="M412 368 C418 384 420 402 416 416 C410 400 408 382 408 370 Z"/>
+      <path d="M398 360 C400 376 398 394 392 406 C390 388 392 372 394 360 Z"/>
+    </g>
+  </g>
+
+  <!-- =================================================================
+       TAIL — long tapering serpentine, blade tip + lightning fork
+       ================================================================= -->
+  <g filter="url(#rough)">
+    <path fill="url(#tailG)" stroke="#2e3a48" stroke-width="5" stroke-opacity="0.62"
+      d="M320 490
+         C302 526 318 554 314 588
+         C320 580 328 582 332 596
+         C334 558 350 548 354 522
+         C356 506 350 498 340 490 Z"/>
+    <!-- forked lightning-blade tip -->
+    <path fill="#a292c4" stroke="#2e3a48" stroke-width="3.5" stroke-opacity="0.62"
+      d="M326 582 L318 606 L332 600 L324 632 L344 600 L334 604 L342 582 Z"/>
+    <path fill="none" stroke="#3a5675" stroke-width="3.5" stroke-opacity="0.6"
+      d="M332 492 C328 528 326 560 328 590"/>
+    <g fill="#cdb878" stroke="#3a5675" stroke-width="2.2" stroke-opacity="0.6">
+      <path d="M334 506 L320 524 L340 522 Z"/>
+      <path d="M330 550 L316 568 L336 564 Z"/>
+    </g>
+  </g>
+
+  <!-- =================================================================
+       BODY — long, lean, SERPENTINE
+       ================================================================= -->
+  <g filter="url(#rough)">
+    <path fill="url(#bodyG)" stroke="#2e3a48" stroke-width="5.5" stroke-opacity="0.66"
+      d="M340 152
+         C372 152 392 180 396 226
+         C402 272 396 320 386 368
+         C378 416 366 462 352 500
+         C346 512 344 514 340 514
+         C336 514 334 512 328 500
+         C314 462 302 416 294 368
+         C284 320 278 272 284 226
+         C288 180 308 152 340 152 Z"/>
+    <!-- cool washes (pond + wisteria pooling, NOT segment markings) -->
+    <path fill="#7fa8c9" fill-opacity="0.4" filter="url(#soft)"
+      d="M318 232 C330 216 350 216 362 232 C354 302 326 302 318 232 Z"/>
+    <path fill="#a292c4" fill-opacity="0.3" filter="url(#soft)"
+      d="M312 332 C326 316 354 316 368 332 C358 412 322 412 312 332 Z"/>
+    <!-- scattered scale texture (small, staggered, low-opacity — NOT
+         continuous horizontal bands, to avoid a segmented look) -->
+    <g fill="none" stroke="#3a5675" stroke-width="1.8" stroke-opacity="0.3">
+      <path d="M314 248 C320 254 328 256 334 254"/>
+      <path d="M346 252 C352 256 360 254 366 248"/>
+      <path d="M310 288 C316 294 324 296 330 294"/>
+      <path d="M350 292 C356 296 364 294 372 288"/>
+      <path d="M312 330 C318 336 326 338 332 336"/>
+      <path d="M348 334 C354 338 362 336 370 330"/>
+      <path d="M314 374 C320 380 328 382 334 380"/>
+      <path d="M346 378 C352 382 360 380 368 374"/>
+      <path d="M318 418 C324 424 332 426 338 424"/>
+      <path d="M342 422 C348 426 356 424 364 418"/>
+    </g>
+    <!-- DORSAL CREST: single bold serrated sawtooth ridge down the spine,
+         shaded as a 3D row of back-spikes from above. -->
+    <path fill="#3a5675" fill-opacity="0.9" stroke="#2e3a48" stroke-width="2" stroke-opacity="0.5"
+      d="M340 168
+         L352 200 L340 214 L354 250 L340 268 L356 308
+         L340 330 L354 372 L340 392 L350 432 L340 452
+         L346 482 L340 500
+         L334 482 L330 452 L340 432 L326 392 L340 372
+         L324 308 L340 268 L326 250 L340 214 L328 200 Z"/>
+    <path fill="url(#hornG)" fill-opacity="0.95" stroke="#2e3a48" stroke-width="1.4" stroke-opacity="0.45"
+      d="M340 176 L350 202 L340 214 Z
+         M340 224 L352 252 L340 268 Z
+         M340 280 L354 308 L340 330 Z
+         M340 344 L352 374 L340 392 Z
+         M340 404 L348 432 L340 452 Z"/>
+  </g>
+
+  <!-- =================================================================
+       HEAD — reptilian; STRAIGHT swept-back BLADE horns (distinct from
+       ember's curved horns). Plus a small frill/crest of spikes.
+       ================================================================= -->
+  <g filter="url(#rough)">
+    <!-- BROAD backward-raked wedge horns (thick base, blade tip). Clearly
+         horns, never antennae. Distinct from ember's upward-curved horns. -->
+    <path fill="url(#hornG)" stroke="#2e3a48" stroke-width="4.5" stroke-opacity="0.62"
+      d="M312 108
+         C290 96 268 78 244 54
+         C228 38 214 22 206 6
+         C232 18 262 38 290 64
+         C306 80 318 94 326 106 Z"/>
+    <path fill="url(#hornG)" stroke="#2e3a48" stroke-width="4.5" stroke-opacity="0.62"
+      d="M368 108
+         C390 96 412 78 436 54
+         C452 38 466 22 474 6
+         C448 18 418 38 390 64
+         C374 80 362 94 354 106 Z"/>
+    <!-- inner shading line on each horn -->
+    <path fill="none" stroke="#3a5675" stroke-width="2.4" stroke-opacity="0.5"
+      d="M306 92 C284 74 258 50 228 28 M374 92 C396 74 422 50 452 28"/>
+    <!-- secondary jaw spikes: small, flush to the LOWER jaw corners,
+         angled back (cheek frill) — not near the eyes/antennae zone -->
+    <path fill="url(#hornG)" stroke="#2e3a48" stroke-width="3" stroke-opacity="0.6"
+      d="M282 178 C266 178 252 184 242 196 C260 192 274 188 286 184 Z"/>
+    <path fill="url(#hornG)" stroke="#2e3a48" stroke-width="3" stroke-opacity="0.6"
+      d="M398 178 C414 178 428 184 438 196 C420 192 406 188 394 184 Z"/>
+
+    <!-- skull/jaw -->
+    <path fill="url(#headG)" stroke="#2e3a48" stroke-width="5.5" stroke-opacity="0.66"
+      d="M340 58
+         C362 58 378 68 390 88
+         C404 110 410 138 406 162
+         C400 186 374 198 340 200
+         C306 198 280 186 274 162
+         C270 138 276 110 290 88
+         C302 68 318 58 340 58 Z"/>
+    <!-- elongated tapering snout up -->
+    <path fill="url(#headG)" stroke="#2e3a48" stroke-width="5" stroke-opacity="0.62"
+      d="M322 82 C320 44 328 18 340 2 C352 18 360 44 358 82
+         C351 66 329 66 322 82 Z"/>
+    <!-- brow ridges -->
+    <path fill="none" stroke="#3a5675" stroke-width="4.5" stroke-opacity="0.6"
+      d="M294 130 C308 116 326 116 336 128 M386 130 C372 116 354 116 344 128"/>
+    <!-- cheek glaze -->
+    <path fill="#3a5675" fill-opacity="0.32" filter="url(#soft)"
+      d="M288 152 C298 144 310 144 316 154 C308 170 294 168 288 152 Z"/>
+    <path fill="#3a5675" fill-opacity="0.32" filter="url(#soft)"
+      d="M392 152 C382 144 370 144 364 154 C372 170 386 168 392 152 Z"/>
+    <!-- nostrils + electric breath sparks -->
+    <ellipse cx="331" cy="44" rx="3.6" ry="5" fill="#2e3a48"/>
+    <ellipse cx="349" cy="44" rx="3.6" ry="5" fill="#2e3a48"/>
+    <path d="M329 32 L323 22 L328 20 L323 8" stroke="#cdb878" stroke-width="3" stroke-opacity="0.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M351 32 L357 22 L352 20 L357 8" stroke="#cdb878" stroke-width="3" stroke-opacity="0.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- teeth -->
+    <g fill="#f0ead2" stroke="#3a5675" stroke-width="1" stroke-opacity="0.4">
+      <path d="M298 192 L294 203 L305 198 Z"/>
+      <path d="M316 198 L314 209 L324 202 Z"/>
+      <path d="M364 198 L366 209 L356 202 Z"/>
+      <path d="M382 192 L386 203 L375 198 Z"/>
+    </g>
+  </g>
+
+  <!-- =================================================================
+       EYES — narrow glowing gold slits
+       ================================================================= -->
+  <g>
+    <path d="M294 134 C306 122 324 124 334 136 C324 146 306 146 294 134 Z" fill="#cdb878"/>
+    <path d="M346 136 C356 124 374 122 386 134 C374 146 356 146 346 136 Z" fill="#cdb878"/>
+    <ellipse cx="313" cy="135" rx="2.8" ry="7.5" fill="#2e3a48"/>
+    <ellipse cx="367" cy="135" rx="2.8" ry="7.5" fill="#2e3a48"/>
+  </g>
+</svg>

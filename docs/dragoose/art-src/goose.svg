@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 280" width="280" height="280">
+  <defs>
+    <filter id="rough" x="-40%" y="-40%" width="180%" height="180%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.016 0.038" numOctaves="3" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="8" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.03 0.06" numOctaves="2" seed="13" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="blur" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+    <radialGradient id="aura" cx="50%" cy="46%" r="55%">
+      <stop offset="0%" stop-color="#cdb878" stop-opacity="0.6"/>
+      <stop offset="45%" stop-color="#cdb878" stop-opacity="0.30"/>
+      <stop offset="72%" stop-color="#7fa8c9" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#7fa8c9" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="body" cx="50%" cy="38%" r="68%">
+      <stop offset="0%" stop-color="#fffefb"/>
+      <stop offset="58%" stop-color="#f6f1e7"/>
+      <stop offset="100%" stop-color="#e3d8c2"/>
+    </radialGradient>
+    <linearGradient id="wing" x1="0.5" y1="0" x2="0.1" y2="1">
+      <stop offset="0%" stop-color="#fbf7ee"/>
+      <stop offset="65%" stop-color="#ece2cd"/>
+      <stop offset="100%" stop-color="#d6c9b1"/>
+    </linearGradient>
+    <linearGradient id="wingR" x1="0.5" y1="0" x2="0.9" y2="1">
+      <stop offset="0%" stop-color="#fbf7ee"/>
+      <stop offset="65%" stop-color="#ece2cd"/>
+      <stop offset="100%" stop-color="#d6c9b1"/>
+    </linearGradient>
+    <linearGradient id="beak" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0ab44"/>
+      <stop offset="100%" stop-color="#cc7f1c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- magical draconic aura -->
+  <g filter="url(#blur)">
+    <ellipse cx="140" cy="128" rx="100" ry="108" fill="url(#aura)"/>
+  </g>
+  <!-- faint sparkles -->
+  <g fill="#cdb878" fill-opacity="0.7" filter="url(#soft)">
+    <circle cx="58" cy="70" r="2.4"/><circle cx="222" cy="78" r="2.2"/>
+    <circle cx="46" cy="190" r="2"/><circle cx="236" cy="186" r="2.4"/>
+  </g>
+
+  <!-- ===== WINGS (broad, feathered, swept) ===== -->
+  <!-- LEFT wing -->
+  <g filter="url(#rough)">
+    <path fill="url(#wing)" stroke="#2e3a48" stroke-width="2.4" stroke-opacity="0.6"
+      d="M120 114
+         C90 94 52 90 24 104
+         C8 112 6 132 16 146
+         C18 136 30 130 44 132
+         C30 140 26 156 36 168
+         C40 156 54 150 68 152
+         C58 162 58 178 70 186
+         C74 172 88 166 102 168
+         C116 154 124 132 120 114 Z"/>
+    <!-- feather quill lines -->
+    <path fill="none" stroke="#a99c80" stroke-width="2" stroke-opacity="0.8"
+      d="M118 122 C92 124 60 128 30 130 M116 140 C90 146 64 156 40 168 M110 158 C92 166 80 176 70 186"/>
+    <path fill="#7fa8c9" fill-opacity="0.18" filter="url(#soft)"
+      d="M46 116 C78 110 106 116 118 124 C104 138 74 148 46 146 Z"/>
+    <!-- pond glaze pooling at wingtips -->
+    <path fill="#4a7299" fill-opacity="0.16" filter="url(#soft)"
+      d="M18 132 C30 130 42 134 46 140 C36 150 22 150 16 144 Z"/>
+  </g>
+  <!-- RIGHT wing -->
+  <g filter="url(#rough)">
+    <path fill="url(#wingR)" stroke="#2e3a48" stroke-width="2.4" stroke-opacity="0.6"
+      d="M160 114
+         C190 94 228 90 256 104
+         C272 112 274 132 264 146
+         C262 136 250 130 236 132
+         C250 140 254 156 244 168
+         C240 156 226 150 212 152
+         C222 162 222 178 210 186
+         C206 172 192 166 178 168
+         C164 154 156 132 160 114 Z"/>
+    <path fill="none" stroke="#a99c80" stroke-width="2" stroke-opacity="0.8"
+      d="M162 122 C188 124 220 128 250 130 M164 140 C190 146 216 156 240 168 M170 158 C188 166 200 176 210 186"/>
+    <path fill="#a292c4" fill-opacity="0.16" filter="url(#soft)"
+      d="M234 116 C202 110 174 116 162 124 C176 138 206 148 234 146 Z"/>
+    <path fill="#4a7299" fill-opacity="0.16" filter="url(#soft)"
+      d="M262 132 C250 130 238 134 234 140 C244 150 258 150 264 144 Z"/>
+  </g>
+
+  <!-- ===== TAIL ===== -->
+  <g filter="url(#rough)">
+    <path fill="url(#wing)" stroke="#2e3a48" stroke-width="2" stroke-opacity="0.55"
+      d="M122 198 C123 222 132 240 140 244 C148 240 157 222 158 198
+         C150 208 130 208 122 198 Z"/>
+    <path fill="none" stroke="#bcaf94" stroke-width="1.4" stroke-opacity="0.6" d="M134 204 C135 220 137 232 140 240 M146 204 C145 220 143 232 140 240"/>
+  </g>
+
+  <!-- ===== BODY ===== -->
+  <g filter="url(#rough)">
+    <path fill="url(#body)" stroke="#2e3a48" stroke-width="2.6" stroke-opacity="0.66"
+      d="M140 90
+         C170 90 186 116 186 154
+         C186 196 166 214 140 214
+         C114 214 94 196 94 154
+         C94 116 110 90 140 90 Z"/>
+    <!-- layered translucent washes / mottling -->
+    <path fill="#7fa8c9" fill-opacity="0.12" filter="url(#soft)"
+      d="M110 118 C128 108 152 108 170 118 C162 138 118 138 110 118 Z"/>
+    <path fill="#cdb878" fill-opacity="0.14" filter="url(#soft)"
+      d="M116 168 C132 158 148 158 164 168 C158 192 122 192 116 168 Z"/>
+    <path fill="#a292c4" fill-opacity="0.08" filter="url(#soft)"
+      d="M124 142 C134 136 146 136 156 142 C150 156 130 156 124 142 Z"/>
+  </g>
+
+  <!-- ===== NECK + HEAD (pointing up) ===== -->
+  <g filter="url(#rough)">
+    <path fill="url(#body)" stroke="#2e3a48" stroke-width="2.6" stroke-opacity="0.66"
+      d="M127 102 C124 76 127 54 140 40 C153 54 156 76 153 102
+         C148 94 132 94 127 102 Z"/>
+    <ellipse cx="140" cy="44" rx="19" ry="21" fill="url(#body)"
+      stroke="#2e3a48" stroke-width="2.6" stroke-opacity="0.66"/>
+    <!-- subtle cheek wash -->
+    <ellipse cx="140" cy="48" rx="13" ry="12" fill="#cdb878" fill-opacity="0.12"/>
+  </g>
+
+  <!-- ===== BEAK (orange, pointing up) ===== -->
+  <g filter="url(#soft)">
+    <path fill="url(#beak)" stroke="#a8660f" stroke-width="1.6" stroke-opacity="0.6"
+      d="M140 16 C131 24 131 36 140 41 C149 36 149 24 140 16 Z"/>
+    <path d="M140 22 L140 38" stroke="#a8660f" stroke-width="1" stroke-opacity="0.4"/>
+  </g>
+
+  <!-- eyes -->
+  <circle cx="130" cy="40" r="3" fill="#2e3a48"/>
+  <circle cx="150" cy="40" r="3" fill="#2e3a48"/>
+  <circle cx="129.2" cy="39.1" r="0.95" fill="#fffefb"/>
+  <circle cx="149.2" cy="39.1" r="0.95" fill="#fffefb"/>
+
+  <!-- spine ink hint -->
+  <path d="M140 108 C141 142 141 178 140 200" stroke="#2e3a48" stroke-width="1.4" stroke-opacity="0.2" fill="none" filter="url(#soft)"/>
+</svg>
