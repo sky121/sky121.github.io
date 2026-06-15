@@ -42,68 +42,19 @@
       <nav class="exhibit-nav" aria-label="Primary">
         <a class="monogram" href="index.html" aria-label="Skylar Hoffman — back to home">S.H.</a>
         <a class="back-link" href="lab.html">&larr; Back to the Lab</a>
+        <button class="nav-settings" id="settings-open" type="button" aria-haspopup="dialog" aria-label="Use live data &mdash; Google Maps key settings">
+          <svg class="nav-settings-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"></path>
+          </svg>
+          <span class="settings-label">Use live data</span>
+        </button>
       </nav>
     </header>
 
     <main id="room" class="exhibit-room eats-room">
       <p class="room-label">An indecision-breaker</p>
       <h1 class="exhibit-title">Peckish</h1>
-      <p class="exhibit-subtitle">
-        Find somewhere good to eat &mdash; then keep a little log of every place you've tasted.
-      </p>
-
-      <!-- Tab switcher -->
-      <div class="eats-tabs">
-        <div class="tablist" role="tablist" aria-label="Peckish sections">
-          <button
-            class="tab is-active"
-            id="tab-find"
-            role="tab"
-            aria-selected="true"
-            aria-controls="panel-find"
-            type="button"
-          >
-            Find
-          </button>
-          <button
-            class="tab"
-            id="tab-visited"
-            role="tab"
-            aria-selected="false"
-            aria-controls="panel-visited"
-            tabindex="-1"
-            type="button"
-          >
-            Visited <span class="tab-count" id="visited-tab-count" aria-hidden="true"></span>
-          </button>
-          <button
-            class="tab"
-            id="tab-friends"
-            role="tab"
-            aria-selected="false"
-            aria-controls="panel-friends"
-            tabindex="-1"
-            type="button"
-          >
-            Friends
-          </button>
-          <button
-            class="tab"
-            id="tab-popular"
-            role="tab"
-            aria-selected="false"
-            aria-controls="panel-popular"
-            tabindex="-1"
-            type="button"
-          >
-            Popular
-          </button>
-        </div>
-        <button class="settings-btn" id="settings-open" type="button" aria-haspopup="dialog">
-          <span class="gear" aria-hidden="true">&#9881;</span>
-          <span class="settings-label">Use live data</span>
-        </button>
-      </div>
 
       <!-- ===================== FIND PANEL ===================== -->
       <section
@@ -113,20 +64,26 @@
         aria-labelledby="tab-find"
         tabindex="0"
       >
-        <div class="mode-badge" id="mode-badge" role="status">
-          <span class="dot" aria-hidden="true"></span>
-          <span id="mode-badge-text">Sample data &mdash; add your Google Maps API key for live results.</span>
-          <button class="badge-link" id="badge-add-key" type="button">Add key</button>
-        </div>
+        <!-- CALM LANDING (pre-search) -->
+        <div class="find-landing" id="find-landing">
+          <p class="landing-kicker">Tap to find somewhere to eat</p>
 
-        <div class="find-hero">
-          <button class="cta-find" id="find-near-me" type="button">
-            <span class="cta-find-glyph" aria-hidden="true">&#9737;</span>
-            <span class="cta-find-text">Find food near me</span>
+          <button class="find-orb" id="find-near-me" type="button" aria-label="Find food near me">
+            <span class="find-orb-pool" aria-hidden="true"></span>
+            <span class="find-orb-inner">
+              <svg class="find-orb-icon" viewBox="0 0 24 24" width="34" height="34" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 21s-6.5-5.3-6.5-10.2A6.5 6.5 0 0 1 12 4.3a6.5 6.5 0 0 1 6.5 6.5C18.5 15.7 12 21 12 21z"></path>
+                <circle cx="12" cy="10.6" r="2.4"></circle>
+              </svg>
+              <span class="find-orb-text">Find food<br />near me</span>
+            </span>
           </button>
 
-          <form class="loc-form" id="loc-form" autocomplete="off">
-            <label class="loc-label" for="loc-input">or set a specific location</label>
+          <button class="landing-loc-link" id="loc-reveal" type="button" aria-expanded="false" aria-controls="loc-form">
+            or search a specific location
+          </button>
+
+          <form class="loc-form" id="loc-form" autocomplete="off" hidden>
             <div class="loc-row">
               <input
                 class="loc-input"
@@ -138,29 +95,43 @@
               <button class="loc-go" id="loc-go" type="submit">Search</button>
             </div>
           </form>
+
+          <p class="landing-demo-hint" id="landing-demo-hint" role="status" hidden>
+            Showing sample places.
+            <button class="hint-link" id="hint-add-key" type="button">Use live data</button>
+          </p>
         </div>
 
-        <!-- Controls -->
-        <div class="find-controls" id="find-controls">
-          <label class="ctl ctl-toggle">
-            <input type="checkbox" id="open-now" />
-            <span class="ctl-switch" aria-hidden="true"></span>
-            <span class="ctl-text">Open now</span>
-          </label>
-
-          <div class="ctl ctl-radius">
-            <label for="radius">Radius <span class="radius-val" id="radius-val">1.0 mi</span></label>
-            <input type="range" id="radius" class="wc-range radius-range" min="0.5" max="5" step="0.5" value="1" aria-valuetext="1.0 miles" />
+        <!-- RESULTS STATE (post-search) -->
+        <div class="find-results-wrap" id="find-results-wrap" hidden>
+          <div class="results-bar">
+            <button class="results-back" id="results-back" type="button">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+              New search
+            </button>
+            <p class="results-origin" id="results-origin"></p>
           </div>
 
-          <button class="pick-btn" id="pick-for-me" type="button">
-            <span aria-hidden="true">&#127922;</span> Pick for me
-          </button>
+          <div class="results-controls">
+            <label class="ctl ctl-toggle">
+              <input type="checkbox" id="open-now" />
+              <span class="ctl-switch" aria-hidden="true"></span>
+              <span class="ctl-text">Open now</span>
+            </label>
+
+            <button class="pick-btn" id="pick-for-me" type="button">
+              <span aria-hidden="true">&#127922;</span> Pick for me
+            </button>
+          </div>
+
+          <p class="results-status" id="results-status" role="status" aria-live="polite"></p>
+
+          <div class="results" id="results" aria-live="polite"></div>
+
+          <div class="results-more" id="results-more" hidden>
+            <button class="more-btn" id="load-more" type="button">Search farther out</button>
+          </div>
         </div>
-
-        <p class="results-status" id="results-status" role="status" aria-live="polite"></p>
-
-        <div class="results" id="results" aria-live="polite"></div>
       </section>
 
       <!-- ===================== VISITED PANEL ===================== -->
@@ -252,6 +223,40 @@
         <ol class="popular-list" id="popular-list" aria-live="polite"></ol>
       </section>
     </main>
+
+    <!-- ===================== BOTTOM TAB BAR ===================== -->
+    <nav class="bottom-bar" aria-label="Peckish sections">
+      <div class="bottom-bar-inner tablist" role="tablist" aria-label="Peckish sections">
+        <button class="bottab is-active" id="tab-find" role="tab" aria-selected="true" aria-controls="panel-find" type="button">
+          <svg class="bottab-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 21s-6.5-5.3-6.5-10.2A6.5 6.5 0 0 1 12 4.3a6.5 6.5 0 0 1 6.5 6.5C18.5 15.7 12 21 12 21z"></path>
+            <circle cx="12" cy="10.6" r="2.4"></circle>
+          </svg>
+          <span class="bottab-label">Find</span>
+        </button>
+        <button class="bottab" id="tab-visited" role="tab" aria-selected="false" aria-controls="panel-visited" tabindex="-1" type="button">
+          <svg class="bottab-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 3.5h11a1.5 1.5 0 0 1 1.5 1.5v15l-2.2-1.4-2.3 1.4-2.3-1.4-2.3 1.4-2.3-1.4L4.5 20V5A1.5 1.5 0 0 1 6 3.5z"></path>
+            <path d="M8.5 8.5h6M8.5 12h6"></path>
+          </svg>
+          <span class="bottab-label">Visited <span class="tab-count" id="visited-tab-count" aria-hidden="true"></span></span>
+        </button>
+        <button class="bottab" id="tab-friends" role="tab" aria-selected="false" aria-controls="panel-friends" tabindex="-1" type="button">
+          <svg class="bottab-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="8.5" r="3"></circle>
+            <path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"></path>
+            <path d="M16 6.2a3 3 0 0 1 0 5.6M17.5 14.4a5.5 5.5 0 0 1 3 5.1"></path>
+          </svg>
+          <span class="bottab-label">Friends</span>
+        </button>
+        <button class="bottab" id="tab-popular" role="tab" aria-selected="false" aria-controls="panel-popular" tabindex="-1" type="button">
+          <svg class="bottab-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3.5l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"></path>
+          </svg>
+          <span class="bottab-label">Popular</span>
+        </button>
+      </div>
+    </nav>
 
     <!-- ===================== RATING SHEET ===================== -->
     <div class="sheet-backdrop" id="sheet-backdrop" hidden>

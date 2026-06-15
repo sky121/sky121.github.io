@@ -27,78 +27,146 @@ html.evening {
   max-width: 60rem;
 }
 
-/* ---------- Tab switcher ---------- */
+/* ---------- Top nav settings affordance ---------- */
 
-.eats-tabs {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 1rem;
-  margin-bottom: 1.6rem;
-}
-
-.tablist {
+.exhibit-nav { align-items: center; }
+.nav-settings {
+  margin-left: auto;
   display: inline-flex;
-  gap: 0.35rem;
-  padding: 0.3rem;
+  align-items: center;
+  gap: 0.45rem;
+  appearance: none;
+  cursor: pointer;
   background: var(--card-bg);
   border: 1px solid var(--card-line);
   border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  min-height: 40px;
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
   box-shadow: var(--card-shadow);
-  max-width: 100%;
+  transition: color 0.25s ease, border-color 0.25s ease;
+}
+.nav-settings:hover { color: var(--pond-ink); border-color: var(--pond-ink); }
+.nav-settings.is-live { border-color: var(--sage); color: var(--pond-ink); }
+.nav-settings-icon { flex: none; }
+@media (max-width: 520px) {
+  .nav-settings .settings-label { display: none; }
+  .nav-settings { padding: 0.4rem; width: 40px; justify-content: center; }
 }
 
-.tab {
+/* ---------- Bottom tab bar (mobile-app style) ---------- */
+
+.bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 120;
+  display: flex;
+  justify-content: center;
+  padding: 0 0 env(safe-area-inset-bottom, 0);
+  background: linear-gradient(180deg, rgba(246, 241, 231, 0) 0%, rgba(246, 241, 231, 0.55) 38%, var(--paper) 100%);
+  pointer-events: none;
+}
+html.evening .bottom-bar {
+  background: linear-gradient(180deg, rgba(20, 24, 33, 0) 0%, rgba(20, 24, 33, 0.5) 38%, rgba(20, 24, 33, 0.92) 100%);
+}
+.bottom-bar-inner {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 30rem;
+  margin: 0.5rem 0.7rem calc(0.5rem + env(safe-area-inset-bottom, 0));
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.15rem;
+  padding: 0.35rem;
+  background: rgba(251, 247, 238, 0.82);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  backdrop-filter: saturate(1.4) blur(14px);
+  border: 1px solid var(--card-line);
+  border-top: 1px solid rgba(46, 58, 72, 0.22);
+  border-radius: 22px;
+  box-shadow: 0 12px 30px -14px rgba(46, 58, 72, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+html.evening .bottom-bar-inner {
+  background: rgba(34, 39, 51, 0.78);
+  border-color: var(--card-line);
+  border-top-color: rgba(233, 227, 211, 0.2);
+  box-shadow: 0 12px 30px -14px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.bottab {
   appearance: none;
   border: 0;
   background: transparent;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
+  padding: 0.45rem 0.2rem 0.4rem;
+  min-height: 52px;
+  border-radius: 16px;
   font-family: var(--font-body);
   font-weight: 500;
-  font-size: 0.78rem;
-  letter-spacing: 0.16em;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-soft);
-  padding: 0.6rem 1.4rem;
-  border-radius: 999px;
-  min-height: 44px;
-  transition: color 0.25s ease, background-color 0.25s ease, box-shadow 0.25s ease;
+  transition: color 0.25s ease, background-color 0.25s ease;
 }
-
-.tab:hover {
-  color: var(--ink);
+.bottab:hover { color: var(--ink); }
+.bottab-icon {
+  flex: none;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
+.bottab-label { line-height: 1; }
+.tab-count { font-size: 0.6rem; opacity: 0.85; letter-spacing: 0; }
 
-.tab.is-active {
-  color: var(--paper);
+.bottab.is-active {
+  color: var(--pond-deep);
   background:
-    radial-gradient(120% 140% at 30% 20%, var(--pond) 0%, var(--pond-deep) 75%);
-  box-shadow: 0 4px 12px -6px rgba(74, 114, 153, 0.7);
+    radial-gradient(110% 120% at 50% 16%, rgba(127, 168, 201, 0.4) 0%, rgba(162, 146, 196, 0.14) 55%, rgba(127, 168, 201, 0) 78%),
+    rgba(127, 168, 201, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(127, 168, 201, 0.3);
 }
-
-html.evening .tab.is-active {
-  color: #1c212c;
-  background: radial-gradient(120% 140% at 30% 20%, #a9cdec 0%, var(--pond) 80%);
+.bottab.is-active .bottab-icon {
+  color: var(--pond-deep);
+  fill: rgba(127, 168, 201, 0.4);
+  transform: translateY(-2px) scale(1.04);
 }
-
-.tab-count {
-  font-size: 0.7rem;
-  opacity: 0.8;
-  letter-spacing: 0;
+html.evening .bottab.is-active {
+  color: #cfe2f2;
+  background:
+    radial-gradient(120% 130% at 50% 18%, rgba(159, 194, 224, 0.3) 0%, rgba(159, 194, 224, 0) 70%),
+    rgba(159, 194, 224, 0.14);
 }
+html.evening .bottab.is-active .bottab-icon { color: #a9cdec; fill: rgba(159, 194, 224, 0.3); }
 
-.tab:focus-visible,
-.settings-btn:focus-visible,
+/* keep page content clear of the fixed bar */
+.eats-room { padding-bottom: 7rem; scroll-margin-bottom: 7rem; }
+.exhibit-footer { padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0)); }
+
+/* ---------- Focus rings ---------- */
+
+.bottab:focus-visible,
+.nav-settings:focus-visible,
 .pick-btn:focus-visible,
 .loc-go:focus-visible,
-.cta-find:focus-visible,
+.find-orb:focus-visible,
+.landing-loc-link:focus-visible,
+.results-back:focus-visible,
+.more-btn:focus-visible,
 .add-place-btn:focus-visible,
 .card-action:focus-visible,
 .btn-solid:focus-visible,
 .btn-ghost:focus-visible,
-.badge-link:focus-visible,
+.hint-link:focus-visible,
 .sheet-close:focus-visible {
   outline: 2px solid var(--pond-deep);
   outline-offset: 3px;
@@ -107,146 +175,162 @@ html.evening :focus-visible {
   outline-color: var(--pond-ink);
 }
 
-/* ---------- Settings button ---------- */
-
-.settings-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  appearance: none;
-  cursor: pointer;
-  background: var(--card-bg);
-  border: 1px solid var(--card-line);
-  border-radius: 999px;
-  padding: 0.55rem 1.05rem;
-  min-height: 44px;
-  font-family: var(--font-body);
-  font-size: 0.74rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  box-shadow: var(--card-shadow);
-  transition: color 0.25s ease, border-color 0.25s ease;
-}
-.settings-btn:hover {
-  color: var(--pond-ink);
-  border-color: var(--pond-ink);
-}
-.settings-btn .gear {
-  font-size: 1rem;
-  line-height: 1;
-}
-
 /* ---------- Panels ---------- */
 
 .eats-panel.is-hidden {
   display: none;
 }
 
-/* ---------- Mode badge ---------- */
+/* ---------- Find landing (calm pre-search) ---------- */
 
-.mode-badge {
+.find-landing[hidden] { display: none; }
+.find-landing {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.55rem;
-  flex-wrap: wrap;
+  justify-content: center;
+  text-align: center;
+  gap: 1.35rem;
+  /* vertically center in the space above the bottom bar */
+  min-height: min(58vh, 32rem);
+  padding: 1.5rem 0 0.5rem;
+}
+
+.landing-kicker {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(1.05rem, 3.4vw, 1.35rem);
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+/* The round centerpiece button */
+.find-orb {
+  position: relative;
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  width: clamp(13rem, 52vw, 16.5rem);
+  height: clamp(13rem, 52vw, 16.5rem);
+  border-radius: 50%;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* watercolor pooled disc */
+.find-orb-pool {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(58% 58% at 28% 22%, rgba(217, 139, 160, 0.98) 0%, rgba(217, 139, 160, 0) 58%),
+    radial-gradient(60% 60% at 78% 28%, rgba(162, 146, 196, 0.95) 0%, rgba(162, 146, 196, 0) 60%),
+    radial-gradient(68% 68% at 66% 84%, rgba(147, 180, 139, 0.85) 0%, rgba(147, 180, 139, 0) 62%),
+    radial-gradient(64% 64% at 22% 78%, rgba(205, 184, 120, 0.55) 0%, rgba(205, 184, 120, 0) 60%),
+    radial-gradient(130% 130% at 44% 48%, var(--pond) 0%, var(--pond-deep) 88%);
+  box-shadow:
+    0 22px 48px -16px rgba(74, 114, 153, 0.7),
+    0 44px 80px -30px rgba(162, 146, 196, 0.65),
+    inset 0 3px 3px rgba(255, 255, 255, 0.4),
+    inset 0 -16px 34px -10px rgba(46, 58, 72, 0.38);
+  z-index: -1;
+  animation: orb-breathe 5.5s ease-in-out infinite;
+}
+html.evening .find-orb-pool {
+  box-shadow:
+    0 22px 48px -16px rgba(0, 0, 0, 0.6),
+    0 44px 80px -30px rgba(74, 114, 153, 0.6),
+    inset 0 3px 3px rgba(255, 255, 255, 0.3),
+    inset 0 -16px 34px -10px rgba(0, 0, 0, 0.45);
+}
+/* soft outward ripple ring */
+.find-orb::before {
+  content: "";
+  position: absolute;
+  inset: -6%;
+  border-radius: 50%;
+  border: 1px solid rgba(127, 168, 201, 0.5);
+  z-index: -2;
+  animation: orb-ripple 5.5s ease-out infinite;
+}
+html.evening .find-orb::before { border-color: rgba(159, 194, 224, 0.45); }
+.find-orb-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--paper);
+  text-shadow: 0 1px 3px rgba(46, 58, 72, 0.45);
+}
+.find-orb-icon { display: block; }
+.find-orb-text {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.3rem, 4.6vw, 1.7rem);
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+}
+.find-orb:hover { transform: translateY(-4px) scale(1.02); }
+.find-orb:active { transform: translateY(-1px) scale(0.985); }
+
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+@keyframes orb-ripple {
+  0% { transform: scale(0.96); opacity: 0.7; }
+  70% { opacity: 0; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+
+.landing-loc-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.02rem;
+  color: var(--pond-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgba(69, 106, 143, 0.4);
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+}
+.landing-loc-link:hover { text-decoration-color: currentColor; }
+
+.landing-demo-hint {
   font-size: 0.82rem;
   color: var(--ink-soft);
-  background: var(--chip-bg);
-  border: 1px solid var(--card-line);
-  border-radius: 12px;
-  padding: 0.6rem 0.9rem;
-  margin-bottom: 1.6rem;
+  margin: 0;
 }
-.mode-badge .dot {
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 0 4px rgba(205, 184, 120, 0.22);
-  flex: none;
-}
-.mode-badge.is-live .dot {
-  background: var(--sage);
-  box-shadow: 0 0 0 4px rgba(147, 180, 139, 0.22);
-}
-.badge-link {
+.hint-link, .badge-link {
   appearance: none;
   border: 0;
   background: transparent;
   cursor: pointer;
   font-family: var(--font-body);
-  font-size: 0.8rem;
+  font-size: inherit;
   color: var(--pond-ink);
   text-decoration: underline;
   text-underline-offset: 2px;
-  padding: 0.2rem 0.3rem;
-  margin-left: auto;
+  padding: 0.2rem 0.25rem;
 }
 
-/* ---------- Find hero ---------- */
-
-.find-hero {
-  text-align: center;
-  margin: 0.4rem 0 2rem;
-}
-
-.cta-find {
-  appearance: none;
-  cursor: pointer;
-  border: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.7rem;
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: clamp(1.5rem, 5vw, 2.1rem);
-  letter-spacing: 0.01em;
-  color: var(--paper);
-  padding: clamp(1rem, 3.5vw, 1.5rem) clamp(1.8rem, 6vw, 3rem);
-  border-radius: 40% 60% 58% 42% / 56% 44% 60% 40%;
-  /* watercolor-pooled CTA */
-  background:
-    radial-gradient(120% 130% at 28% 22%, rgba(217, 139, 160, 0.95) 0%, rgba(217, 139, 160, 0) 55%),
-    radial-gradient(120% 130% at 78% 80%, rgba(162, 146, 196, 0.95) 0%, rgba(162, 146, 196, 0) 58%),
-    radial-gradient(140% 150% at 60% 35%, var(--pond) 0%, var(--pond-deep) 78%);
-  box-shadow:
-    0 10px 26px -10px rgba(74, 114, 153, 0.55),
-    0 26px 50px -24px rgba(162, 146, 196, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  text-shadow: 0 1px 2px rgba(46, 58, 72, 0.3);
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
-}
-.cta-find:hover {
-  transform: translateY(-3px) scale(1.015);
-  box-shadow:
-    0 16px 34px -10px rgba(74, 114, 153, 0.6),
-    0 34px 60px -24px rgba(162, 146, 196, 0.6),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-.cta-find:active {
-  transform: translateY(-1px) scale(0.995);
-}
-.cta-find-glyph {
-  font-size: 1.3em;
-  line-height: 1;
-}
-
+.loc-form[hidden] { display: none; }
 .loc-form {
-  margin-top: 1.4rem;
-}
-.loc-label {
-  display: block;
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 1.05rem;
-  color: var(--ink-soft);
-  margin-bottom: 0.55rem;
+  width: 100%;
+  max-width: 26rem;
+  margin: -0.4rem auto 0;
 }
 .loc-row {
   display: flex;
   gap: 0.5rem;
-  max-width: 30rem;
+  max-width: 26rem;
   margin: 0 auto;
 }
 .loc-input {
@@ -294,21 +378,87 @@ html.evening .loc-go { color: #1c212c; background: var(--pond); }
   box-shadow: var(--card-shadow);
 }
 
-/* ---------- Find controls ---------- */
+/* ---------- Find results state ---------- */
 
-.find-controls {
+.results-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.results-back {
+  appearance: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: var(--card-bg);
+  border: 1px solid var(--card-line);
+  border-radius: 999px;
+  padding: 0.5rem 0.95rem 0.5rem 0.75rem;
+  min-height: 42px;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+.results-back:hover { color: var(--pond-ink); border-color: var(--pond-ink); }
+.results-origin {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+.results-origin .change-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: var(--pond-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0 0.15rem;
+}
+
+.results-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
   gap: 1rem 1.4rem;
-  padding: 1rem 1.1rem;
+  padding: 0.85rem 1.1rem;
   background: var(--card-bg);
   border: 1px solid var(--card-line);
   border-radius: 14px;
   box-shadow: var(--card-shadow);
   margin-bottom: 1.4rem;
 }
+
+.results-more { text-align: center; margin-top: 1.6rem; }
+.more-btn {
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pond-ink);
+  background: var(--card-bg);
+  border: 1px solid var(--pond-ink);
+  border-radius: 999px;
+  padding: 0.7rem 1.6rem;
+  min-height: 46px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.more-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 18px -10px rgba(74, 114, 153, 0.6); }
+.more-btn[disabled] { opacity: 0.55; cursor: default; transform: none; box-shadow: none; }
 
 .ctl { font-size: 0.85rem; color: var(--ink); }
 
@@ -351,10 +501,6 @@ html.evening .ctl-switch { background: rgba(233, 227, 211, 0.2); }
   outline-offset: 2px;
 }
 .ctl-text { letter-spacing: 0.04em; }
-
-.ctl-radius { display: flex; flex-direction: column; gap: 0.3rem; min-width: 12rem; }
-.ctl-radius label { font-size: 0.78rem; letter-spacing: 0.06em; color: var(--ink-soft); }
-.radius-val { color: var(--pond-ink); font-weight: 500; }
 
 .pick-btn {
   appearance: none;
@@ -424,8 +570,6 @@ html.evening .wc-range::-moz-range-track { background: rgba(233,227,211,0.18); }
 }
 .wc-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--pond-deep); }
 .wc-range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px var(--pond-deep); }
-
-.radius-range { --track-fill: var(--pond); }
 
 /* ---------- Results ---------- */
 
@@ -1221,8 +1365,9 @@ html.evening .settings-msg.is-ok { color: #b6d3af; }
 
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .cta-find, .card, .pick-btn, .ctl-switch::after, .card-action, .sheet,
-  .pop-card, .friend-chip, .range-btn {
+  .find-orb, .find-orb-pool, .find-orb::before, .bottab-icon,
+  .card, .pick-btn, .ctl-switch::after, .card-action, .sheet,
+  .more-btn, .pop-card, .friend-chip, .range-btn {
     transition: none;
     animation: none;
   }
@@ -1232,15 +1377,9 @@ html.evening .settings-msg.is-ok { color: #b6d3af; }
 
 /* ---------- Narrow phones ---------- */
 @media (max-width: 400px) {
-  .eats-tabs { gap: 0.5rem; }
-  /* Make the full tablist fit on a narrow phone (4 tabs in one pill). */
-  .eats-tabs { flex-direction: column; align-items: stretch; }
-  .tablist { width: 100%; justify-content: space-between; gap: 0.15rem; }
-  .tab { padding: 0.6rem 0.5rem; letter-spacing: 0.06em; font-size: 0.72rem; flex: 1 1 auto; text-align: center; }
-  .settings-btn { align-self: flex-end; }
-  .settings-label { display: none; }
-  .find-controls { gap: 0.8rem; }
-  .ctl-radius { min-width: 100%; }
+  .bottab { font-size: 0.6rem; letter-spacing: 0.05em; padding: 0.4rem 0.1rem 0.35rem; }
+  .bottab-icon { width: 22px; height: 22px; }
+  .results-controls { gap: 0.8rem; justify-content: center; }
   .card-actions { gap: 0.4rem; }
   .card-action { flex: 1 1 auto; }
   .pop-card { grid-template-columns: 2.4rem 1fr auto; gap: 0.6rem; padding: 0.8rem 0.85rem; }

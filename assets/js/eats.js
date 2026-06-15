@@ -141,10 +141,13 @@
    * state
    * ------------------------------------------------------------------ */
   var state = {
-    results: [],          // current Find results
+    results: [],          // current Find results (accumulated, nearest-first)
     origin: null,         // {lat,lng} search origin
-    radiusMiles: 1,
+    originLabel: null,    // human label for the origin ("you" or a typed query)
     openNow: false,
+    hasMore: false,       // whether more results can be loaded (live pagination)
+    loadingMore: false,   // a "load more" request is in flight
+    nextPage: null,       // live pagination handle (PlacesService getNextPage)
     visited: [],          // visited entries
     sort: 'date',
     editingId: null,      // visited entry id being edited (sheet)
@@ -249,18 +252,14 @@
    * FIND — rendering, controls, pick-for-me, geolocation
    * ================================================================== */
   var find = (function () {
+    var landingEl = $('find-landing');
+    var resultsWrap = $('find-results-wrap');
     var resultsEl = $('results');
     var statusEl = $('results-status');
-    var ctrls = $('find-controls');
+    var originEl = $('results-origin');
+    var moreWrap = $('results-more');
+    var moreBtn = $('load-more');
 
-    function stars(rating) {
-      var full = Math.floor(rating);
-      var half = (rating - full) >= 0.5;
-      var s = '';
-      for (var i = 0; i < full; i++) s += '★';
-      if (half) s += '½';
-      return s;
-    }
     function priceStr(p) {
       if (!p) return '';
       var s = '';
@@ -268,13 +267,11 @@
       return s;
     }
 
+    /* Results are kept nearest-first; "open now" is a soft filter applied
+       on top of the already distance-sorted list. No radius cap. */
     function visibleResults() {
       var list = state.results.slice();
       if (state.openNow) list = list.filter(function (r) { return r.open === true; });
-      // filter by radius (only when distance known)
-      list = list.filter(function (r) {
-        return r.distance == null || r.distance <= state.radiusMiles + 0.0001;
-      });
       list.sort(function (a, b) {
         if (a.distance == null) return 1;
         if (b.distance == null) return -1;
@@ -364,29 +361,80 @@
       var list = visibleResults();
       if (!state.results.length) {
         statusEl.textContent = '';
+        if (moreWrap) moreWrap.hidden = true;
         return;
       }
       if (!list.length) {
         statusEl.textContent = '';
         var empty = el('div', 'empty');
         empty.appendChild(el('div', 'empty-glyph', '🍴'));
-        empty.appendChild(el('p', 'empty-title', 'Nothing matches those filters'));
-        empty.appendChild(el('p', 'empty-sub', 'Try widening the radius or turning off "Open now".'));
+        empty.appendChild(el('p', 'empty-title', 'Nothing open right now'));
+        empty.appendChild(el('p', 'empty-sub', 'Turn off "Open now" to see every nearby spot.'));
         resultsEl.appendChild(empty);
+        if (moreWrap) moreWrap.hidden = true;
         return;
       }
-      statusEl.textContent = list.length + ' place' + (list.length === 1 ? '' : 's') + ' nearby';
+      statusEl.textContent = list.length + ' place' + (list.length === 1 ? '' : 's') +
+        ' · nearest first';
       list.forEach(function (r) { resultsEl.appendChild(buildCard(r)); });
-      announce(list.length + ' results shown');
+      renderMore();
+      announce(list.length + ' results shown, nearest first');
     }
 
+    function renderMore() {
+      if (!moreWrap) return;
+      moreWrap.hidden = !state.hasMore;
+      if (moreBtn) {
+        moreBtn.disabled = state.loadingMore;
+        moreBtn.textContent = state.loadingMore ? 'Searching farther…' : 'Search farther out';
+      }
+    }
+
+    /* Replace the result set (a fresh search). */
     function setResults(list, origin) {
       state.results = list || [];
       if (origin) state.origin = origin;
+      showResultsView();
+      render();
+    }
+
+    /* Append more results (pagination / outward expansion), de-duped by id. */
+    function appendResults(list) {
+      var seen = {};
+      state.results.forEach(function (r) { seen[r.id] = true; });
+      (list || []).forEach(function (r) { if (!seen[r.id]) { seen[r.id] = true; state.results.push(r); } });
       render();
     }
 
     function setStatus(msg) { statusEl.textContent = msg; }
+
+    /* ---- View switching: calm landing <-> results ---- */
+    function showResultsView() {
+      if (landingEl) landingEl.hidden = true;
+      if (resultsWrap) resultsWrap.hidden = false;
+      updateOrigin();
+    }
+    function showLanding() {
+      if (resultsWrap) resultsWrap.hidden = true;
+      if (landingEl) landingEl.hidden = false;
+      // reset transient search state (keep nothing stale behind the landing)
+      state.results = [];
+      state.hasMore = false;
+      state.nextPage = null;
+      clear(resultsEl);
+      statusEl.textContent = '';
+      var orb = $('find-near-me');
+      if (orb) orb.focus();
+    }
+    function updateOrigin() {
+      if (!originEl) return;
+      clear(originEl);
+      originEl.appendChild(document.createTextNode('Searching from ' + (state.originLabel || 'near you') + ' · '));
+      var change = el('button', 'change-link', 'change');
+      change.type = 'button';
+      change.addEventListener('click', showLanding);
+      originEl.appendChild(change);
+    }
 
     /* --- Pick for me: shuffle highlight settling on one --- */
     var pickTimer = null;
@@ -427,45 +475,87 @@
 
     /* --- Geolocation (only on explicit press) --- */
     function findNearMe() {
+      showResultsView();
+      state.originLabel = 'near you';
       if (!navigator.geolocation) {
-        setStatus('Geolocation is not available — set a location below.');
+        // No geolocation: fall back to demo origin / prompt for a place.
+        if (store.getKey()) {
+          setStatus('Geolocation is not available — search a specific location instead.');
+          showLanding();
+          var revealBtn = $('loc-reveal');
+          if (revealBtn) revealBtn.click();
+        } else {
+          searchAt(DEMO_ORIGIN, 'near you');
+        }
         return;
       }
       setStatus('Finding your location…');
       navigator.geolocation.getCurrentPosition(
         function (pos) {
-          var origin = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          searchAt(origin);
+          searchAt({ lat: pos.coords.latitude, lng: pos.coords.longitude }, 'near you');
         },
         function () {
-          setStatus('Location blocked — type a city or address below instead.');
-          var input = $('loc-input');
-          if (input) input.focus();
+          if (store.getKey()) {
+            setStatus('Location blocked — search a specific location instead.');
+            showLanding();
+            var revealBtn = $('loc-reveal');
+            if (revealBtn) revealBtn.click();
+          } else {
+            // Demo mode still works without permission.
+            searchAt(DEMO_ORIGIN, 'near you');
+          }
         },
         { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
       );
     }
 
-    /* --- Run a search at an origin: live if key, else demo --- */
-    function searchAt(origin) {
+    /* --- Run a fresh search at an origin: live if key, else demo --- */
+    function searchAt(origin, label) {
       state.origin = origin;
+      if (label) state.originLabel = label;
+      state.hasMore = false;
+      state.nextPage = null;
+      showResultsView();
       if (store.getKey()) {
         setStatus('Searching nearby…');
-        gmaps.searchNearby(origin, state.radiusMiles, function (err, list) {
+        gmaps.searchNearby(origin, function (err, list, more) {
           if (err) {
             // friendly fallback to demo so the app stays usable
             settings.showError(err);
-            renderDemo();
+            renderDemo(origin);
             return;
           }
+          state.nextPage = more || null;
+          state.hasMore = !!more;
           setResults(list, origin);
         });
       } else {
-        // DEMO MODE: re-base demo results around chosen origin for plausible distances
+        // DEMO MODE: re-base demo results around chosen origin for plausible distances.
         renderDemo(origin);
       }
     }
 
+    /* --- Load more (outward, exhaustive) — live pagination only --- */
+    function loadMore() {
+      if (!state.hasMore || state.loadingMore) return;
+      state.loadingMore = true;
+      renderMore();
+      if (state.nextPage && typeof state.nextPage.fetch === 'function') {
+        state.nextPage.fetch(function (err, list, more) {
+          state.loadingMore = false;
+          if (err) { settings.showError(err); state.hasMore = false; renderMore(); return; }
+          state.nextPage = more || null;
+          state.hasMore = !!more;
+          appendResults(list);
+        });
+      } else {
+        state.loadingMore = false;
+        state.hasMore = false;
+        renderMore();
+      }
+    }
+
+    /* DEMO: all sample restaurants, sorted nearest-first, shown in full. */
     function renderDemo(origin) {
       var list = demoResults();
       if (origin) {
@@ -477,29 +567,49 @@
           r.distance = haversineMiles(origin, r.location);
         });
       }
+      // nearest-first; demo has no pagination so all are shown at once.
+      list.sort(function (a, b) { return (a.distance || 0) - (b.distance || 0); });
+      state.hasMore = false;
+      state.nextPage = null;
+      if (!state.originLabel) state.originLabel = 'near you';
       setResults(list, origin || DEMO_ORIGIN);
     }
 
     function init() {
-      var btnNear = $('find-near-me');
-      if (btnNear) btnNear.addEventListener('click', findNearMe);
+      var orb = $('find-near-me');
+      if (orb) orb.addEventListener('click', findNearMe);
 
+      var back = $('results-back');
+      if (back) back.addEventListener('click', showLanding);
+
+      // "or search a specific location" — reveal the input on demand
+      var reveal = $('loc-reveal');
       var form = $('loc-form');
+      var locInput = $('loc-input');
+      if (reveal && form) {
+        reveal.addEventListener('click', function () {
+          var open = !form.hidden;
+          form.hidden = open;
+          reveal.setAttribute('aria-expanded', open ? 'false' : 'true');
+          if (!open && locInput) locInput.focus();
+        });
+      }
+
       if (form) {
         form.addEventListener('submit', function (e) {
           e.preventDefault();
-          var input = $('loc-input');
-          var q = input ? input.value.trim() : '';
-          if (!q) { setStatus('Type a city or address first.'); return; }
+          var q = locInput ? locInput.value.trim() : '';
+          if (!q) { if (locInput) locInput.focus(); return; }
+          state.originLabel = q;
           if (store.getKey()) {
+            showResultsView();
             setStatus('Looking up "' + q + '"…');
             gmaps.geocode(q, function (err, origin) {
-              if (err || !origin) { settings.showError(err || 'Could not find that place.'); return; }
-              searchAt(origin);
+              if (err || !origin) { settings.showError(err || 'Could not find that place.'); showLanding(); return; }
+              searchAt(origin, q);
             });
           } else {
-            // Demo mode: no geocoder; just show demo data labeled with the query.
-            setStatus('Showing sample places (add a key to search "' + q + '")');
+            // Demo mode: no geocoder; show demo data labeled with the query.
             renderDemo();
           }
         });
@@ -508,29 +618,15 @@
       var openNow = $('open-now');
       if (openNow) openNow.addEventListener('change', function () { state.openNow = openNow.checked; render(); });
 
-      var radius = $('radius');
-      var radiusVal = $('radius-val');
-      if (radius) {
-        var updateRadius = function () {
-          state.radiusMiles = parseFloat(radius.value);
-          var label = fmt1(state.radiusMiles) + ' mi';
-          if (radiusVal) radiusVal.textContent = label;
-          radius.setAttribute('aria-valuetext', fmt1(state.radiusMiles) + ' miles');
-          paintRange(radius);
-          render();
-        };
-        radius.addEventListener('input', updateRadius);
-        updateRadius();
-      }
-
       var pick = $('pick-for-me');
       if (pick) pick.addEventListener('click', pickForMe);
 
-      // initial demo render
-      renderDemo();
+      if (moreBtn) moreBtn.addEventListener('click', loadMore);
+
+      // Start on the calm landing — no results pre-loaded.
     }
 
-    return { init: init, render: render, setResults: setResults, setStatus: setStatus, renderDemo: renderDemo, searchAt: searchAt };
+    return { init: init, render: render, setResults: setResults, setStatus: setStatus, renderDemo: renderDemo, searchAt: searchAt, showLanding: showLanding };
   })();
 
   /* paint a wc-range fill % (shared) */
@@ -542,14 +638,33 @@
   }
 
   /* ================================================================== *
-   * GMAPS — lazy Google Maps + Places (current API)
+   * GMAPS — lazy Google Maps + Places
    *
-   * Loaded ONLY when a key exists. Uses the documented async bootstrap
-   * loader (loading=async). Prefers the new google.maps.places.Place +
-   * Place.searchNearby (circle locationRestriction, includedPrimaryTypes,
-   * minimal fields). Falls back to friendly errors. NOTE: live calls
-   * cannot be exercised without a key + network; this code is written to
-   * the documented API and commented.
+   * Loaded ONLY when a key exists, via the documented async bootstrap
+   * loader (loading=async).
+   *
+   * NEAREST-FIRST, EXHAUSTIVE OUTWARD SEARCH:
+   *   We use the legacy PlacesService.nearbySearch with
+   *   rankBy = google.maps.places.RankBy.DISTANCE. Unlike the newer
+   *   Place.searchNearby (which caps at 20 results, can't paginate, and
+   *   has no true distance ranking), the legacy nearbySearch returns
+   *   results ordered NEAREST FIRST and exposes pagination via the
+   *   PlaceSearchPagination object (`pagination.hasNextPage` +
+   *   `pagination.nextPage()`), yielding up to ~60 places that fan
+   *   outward from the origin. That is exactly the "nearest-first,
+   *   extend outward exhaustively" behaviour we want, so we prefer it.
+   *
+   *   Note: with rankBy=DISTANCE you must NOT pass a radius, and you must
+   *   pass either `keyword`, `type`, or `name` (we pass type:'restaurant').
+   *
+   * searchNearby(origin, done) -> done(err, list, more)
+   *   `more` is null when there are no further pages, otherwise an object
+   *   { fetch: function(cb){...} } that loads the next page and itself
+   *   calls cb(err, list, more) — letting find.loadMore() keep going
+   *   outward until exhausted.
+   *
+   * NOTE: live calls cannot be exercised without a key + network; this
+   * code is written to the documented API and commented.
    * ================================================================== */
   var gmaps = (function () {
     var readyCbs = [];
@@ -605,47 +720,42 @@
       loadOnce(store.getKey());
     }
 
-    /* searchNearby — new Places API (google.maps.places.Place). */
-    function searchNearby(origin, radiusMiles, done) {
+    // One PlacesService instance, reused (needs a DOM node or a Map).
+    var placesService = null;
+    function getService(places) {
+      if (placesService) return placesService;
+      // PlacesService can render attributions into any node; an offscreen
+      // div is fine for a results-list UI (no visible map required).
+      var attrNode = document.createElement('div');
+      placesService = new places.PlacesService(attrNode);
+      return placesService;
+    }
+
+    /* searchNearby — legacy PlacesService.nearbySearch, rankBy DISTANCE.
+       Returns nearest-first results + a pagination handle for "load more". */
+    function searchNearby(origin, done) {
       whenReady(function () {
-        runSearch(origin, radiusMiles, done);
+        runSearch(origin, done);
       });
       // if loading silently fails, the auth/onerror handlers report it.
     }
 
-    function runSearch(origin, radiusMiles, done) {
+    function runSearch(origin, done) {
       try {
-        // Import the Places library (returns the classes for the new API).
         google.maps.importLibrary('places').then(function (places) {
-          var Place = places.Place;
-          var SearchNearbyRankPreference = places.SearchNearbyRankPreference;
-          var radiusMeters = Math.min(radiusMiles * 1609.34, 50000); // API max 50km
+          var service = getService(places);
+          var RankBy = places.RankBy;
 
           var request = {
-            // Request only the fields we render (keeps quota/cost down).
-            fields: [
-              'id', 'displayName', 'rating', 'userRatingCount', 'priceLevel',
-              'primaryTypeDisplayName', 'location', 'googleMapsURI',
-              'nationalPhoneNumber', 'photos', 'regularOpeningHours'
-            ],
-            locationRestriction: {
-              center: { lat: origin.lat, lng: origin.lng },
-              radius: radiusMeters
-            },
-            // Restaurants & adjacent food places.
-            includedPrimaryTypes: ['restaurant', 'cafe', 'bakery', 'bar', 'meal_takeaway'],
-            maxResultCount: 20,
-            rankPreference: SearchNearbyRankPreference
-              ? SearchNearbyRankPreference.DISTANCE
-              : undefined
+            location: { lat: origin.lat, lng: origin.lng },
+            // rankBy DISTANCE => nearest-first, and NO radius allowed.
+            rankBy: RankBy ? RankBy.DISTANCE : undefined,
+            // rankBy=DISTANCE requires keyword/name/type; food places.
+            type: 'restaurant'
           };
 
-          Place.searchNearby(request).then(function (res) {
-            var places2 = res.places || [];
-            var list = places2.map(function (p) { return mapPlace(p, origin); });
-            done(null, list);
-          }).catch(function (e) {
-            done(humanizeError(e), null);
+          service.nearbySearch(request, function (results, status, pagination) {
+            handlePage(origin, results, status, pagination, done);
           });
         }).catch(function (e) {
           done(humanizeError(e), null);
@@ -655,54 +765,102 @@
       }
     }
 
-    // Map a new-API Place to our internal result shape.
+    // Shared handler for the first page and every subsequent page.
+    function handlePage(origin, results, status, pagination, done) {
+      var P = google.maps.places;
+      if (status !== P.PlacesServiceStatus.OK && status !== P.PlacesServiceStatus.ZERO_RESULTS) {
+        done(humanizeStatus(status), null);
+        return;
+      }
+      var list = (results || []).map(function (p) { return mapPlace(p, origin); });
+      // already nearest-first from the API, but enforce it defensively.
+      list.sort(function (a, b) {
+        if (a.distance == null) return 1;
+        if (b.distance == null) return -1;
+        return a.distance - b.distance;
+      });
+
+      // Build an outward-expanding "more" handle if another page exists.
+      // pagination.nextPage() re-invokes the SAME nearbySearch callback
+      // (handlePage) with the next page of farther-out results, so we
+      // route that next page to the caller's cb via a one-shot.
+      var more = null;
+      if (pagination && pagination.hasNextPage) {
+        more = {
+          fetch: function (cb) {
+            pendingMoreCb = cb;
+            pagination.nextPage();
+          }
+        };
+      }
+      // Deliver this page.
+      if (pendingMoreCb) {
+        var cb = pendingMoreCb; pendingMoreCb = null;
+        cb(null, list, more);
+      } else {
+        done(null, list, more);
+      }
+    }
+    // One-shot callback used to route paginated pages back to find.loadMore.
+    var pendingMoreCb = null;
+
+    // Map a legacy PlaceResult to our internal result shape.
     function mapPlace(p, origin) {
       var loc = null;
       try {
-        loc = p.location ? { lat: p.location.lat(), lng: p.location.lng() } : null;
-      } catch (e) {
-        // location may already be a plain {lat,lng}
-        if (p.location && typeof p.location.lat === 'number') loc = { lat: p.location.lat, lng: p.location.lng };
-      }
-      var photoUrl = null;
-      try {
-        if (p.photos && p.photos.length) {
-          photoUrl = p.photos[0].getURI({ maxWidth: 640, maxHeight: 360 });
+        if (p.geometry && p.geometry.location) {
+          loc = { lat: p.geometry.location.lat(), lng: p.geometry.location.lng() };
         }
       } catch (e) {}
-      var price = priceFromEnum(p.priceLevel);
+      var photoUrl = null;
+      try {
+        if (p.photos && p.photos.length && typeof p.photos[0].getUrl === 'function') {
+          photoUrl = p.photos[0].getUrl({ maxWidth: 640, maxHeight: 360 });
+        }
+      } catch (e) {}
       var openState = null;
       try {
-        if (p.regularOpeningHours && typeof p.regularOpeningHours.isOpen === 'function') {
-          openState = p.regularOpeningHours.isOpen();
+        // opening_hours.isOpen() is deprecated but still the simplest signal
+        // available on a nearbySearch result without an extra Details call.
+        if (p.opening_hours && typeof p.opening_hours.isOpen === 'function') {
+          openState = p.opening_hours.isOpen();
+        } else if (p.opening_hours && typeof p.opening_hours.open_now === 'boolean') {
+          openState = p.opening_hours.open_now;
         }
       } catch (e) {}
       return {
-        id: p.id,
-        placeId: p.id,
-        name: p.displayName || 'Unnamed place',
+        id: p.place_id,
+        placeId: p.place_id,
+        name: p.name || 'Unnamed place',
         rating: p.rating || 0,
-        reviews: p.userRatingCount || 0,
-        price: price,
-        type: p.primaryTypeDisplayName || '',
+        reviews: p.user_ratings_total || 0,
+        price: (typeof p.price_level === 'number' && p.price_level > 0) ? p.price_level : 0,
+        type: typeArr(p.types),
         open: openState,
-        phone: p.nationalPhoneNumber || null,
+        phone: null, // not returned by nearbySearch; a Details call would add it
         photoUrl: photoUrl,
         location: loc,
         distance: loc ? haversineMiles(origin, loc) : null,
-        mapsUri: p.googleMapsURI || null
+        mapsUri: p.place_id ? 'https://www.google.com/maps/place/?q=place_id:' + p.place_id : null
       };
     }
 
-    function priceFromEnum(level) {
-      // New API PriceLevel is a string enum.
-      switch (level) {
-        case 'PRICE_LEVEL_INEXPENSIVE': return 1;
-        case 'PRICE_LEVEL_MODERATE': return 2;
-        case 'PRICE_LEVEL_EXPENSIVE': return 3;
-        case 'PRICE_LEVEL_VERY_EXPENSIVE': return 4;
-        default: return (typeof level === 'number' && level > 0) ? level : 0;
-      }
+    // Turn the legacy `types` array into a friendly label.
+    function typeArr(types) {
+      if (!types || !types.length) return '';
+      var skip = { point_of_interest: 1, establishment: 1, food: 1 };
+      var nice = types.filter(function (t) { return !skip[t]; })
+        .slice(0, 2)
+        .map(function (t) { return t.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }); });
+      return nice.join(' · ');
+    }
+
+    function humanizeStatus(status) {
+      var P = google.maps.places;
+      if (status === P.PlacesServiceStatus.OVER_QUERY_LIMIT) return 'Google quota reached — try again later.';
+      if (status === P.PlacesServiceStatus.REQUEST_DENIED) return 'Your Google key was rejected (check API enablement + referrer restriction).';
+      if (status === P.PlacesServiceStatus.INVALID_REQUEST) return 'That search request was invalid.';
+      return 'Live search failed (' + status + ').';
     }
 
     /* geocode — turn a typed address into {lat,lng} (Geocoding library). */
@@ -1446,22 +1604,17 @@
     var backdrop = $('settings-backdrop');
     var input = $('key-input');
     var msg = $('settings-msg');
-    var badge = $('mode-badge');
-    var badgeText = $('mode-badge-text');
+    var navBtn = $('settings-open');
     var settingsLabel = document.querySelector('.settings-label');
+    var demoHint = $('landing-demo-hint');
     var lastFocused = null;
 
     function refreshMode() {
       var has = !!store.getKey();
-      if (badge) badge.classList.toggle('is-live', has);
-      if (badgeText) {
-        badgeText.textContent = has
-          ? 'Live results from Google Places.'
-          : 'Sample data — add your Google Maps API key for live results.';
-      }
-      var addBtn = $('badge-add-key');
-      if (addBtn) addBtn.textContent = has ? 'Change key' : 'Add key';
+      if (navBtn) navBtn.classList.toggle('is-live', has);
       if (settingsLabel) settingsLabel.textContent = has ? 'Live data on' : 'Use live data';
+      // The discreet demo hint sits on the calm landing; hide it when live.
+      if (demoHint) demoHint.hidden = has;
     }
 
     function setMsg(text, kind) {
@@ -1493,9 +1646,9 @@
 
     function init() {
       if (!backdrop) return;
-      $('settings-open').addEventListener('click', open);
-      var addBtn = $('badge-add-key');
-      if (addBtn) addBtn.addEventListener('click', open);
+      if (navBtn) navBtn.addEventListener('click', open);
+      var hintBtn = $('hint-add-key');
+      if (hintBtn) hintBtn.addEventListener('click', open);
       $('settings-close').addEventListener('click', close);
       backdrop.addEventListener('click', function (e) { if (e.target === backdrop) close(); });
 
@@ -1518,7 +1671,7 @@
         if (input) input.value = '';
         setMsg('Key cleared — back to sample data.', 'ok');
         refreshMode();
-        find.renderDemo();
+        find.showLanding();
       });
 
       refreshMode();
