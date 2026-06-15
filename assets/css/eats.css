@@ -27,36 +27,38 @@ html.evening {
   max-width: 60rem;
 }
 
-/* ---------- Top nav settings affordance ---------- */
+/* ---------- Minimal floating settings gear (top-right) ---------- */
 
-.exhibit-nav { align-items: center; }
-.nav-settings {
-  margin-left: auto;
+.corner-gear {
+  position: fixed;
+  top: calc(0.9rem + env(safe-area-inset-top, 0));
+  right: calc(0.9rem + env(safe-area-inset-right, 0));
+  z-index: 40;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
   appearance: none;
   cursor: pointer;
   background: var(--card-bg);
   border: 1px solid var(--card-line);
   border-radius: 999px;
-  padding: 0.4rem 0.85rem;
-  min-height: 40px;
-  font-family: var(--font-body);
-  font-size: 0.68rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
   color: var(--ink-soft);
   box-shadow: var(--card-shadow);
-  transition: color 0.25s ease, border-color 0.25s ease;
+  transition: color 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
 }
-.nav-settings:hover { color: var(--pond-ink); border-color: var(--pond-ink); }
-.nav-settings.is-live { border-color: var(--sage); color: var(--pond-ink); }
-.nav-settings-icon { flex: none; }
-@media (max-width: 520px) {
-  .nav-settings .settings-label { display: none; }
-  .nav-settings { padding: 0.4rem; width: 40px; justify-content: center; }
+.corner-gear:hover { color: var(--pond-ink); border-color: var(--pond-ink); transform: rotate(25deg); }
+.corner-gear.is-live { border-color: var(--sage); color: var(--pond-ink); }
+
+/* "Back to the Lab", tucked discreetly in the settings sheet */
+.settings-backlink {
+  margin-top: 1.1rem;
+  text-align: center;
+  font-size: 0.82rem;
 }
+.settings-backlink a { color: var(--ink-soft); text-decoration: none; }
+.settings-backlink a:hover { color: var(--pond-ink); }
 
 /* ---------- Bottom tab bar (mobile-app style) ---------- */
 
@@ -150,12 +152,11 @@ html.evening .bottab.is-active .bottab-icon { color: #a9cdec; fill: rgba(159, 19
 
 /* keep page content clear of the fixed bar */
 .eats-room { padding-bottom: 7rem; scroll-margin-bottom: 7rem; }
-.exhibit-footer { padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0)); }
 
 /* ---------- Focus rings ---------- */
 
 .bottab:focus-visible,
-.nav-settings:focus-visible,
+.corner-gear:focus-visible,
 .pick-btn:focus-visible,
 .loc-go:focus-visible,
 .find-orb:focus-visible,

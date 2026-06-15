@@ -38,19 +38,13 @@
       <div class="wash wash--sage"></div>
     </div>
 
-    <header>
-      <nav class="exhibit-nav" aria-label="Primary">
-        <a class="monogram" href="index.html" aria-label="Skylar Hoffman — back to home">S.H.</a>
-        <a class="back-link" href="lab.html">&larr; Back to the Lab</a>
-        <button class="nav-settings" id="settings-open" type="button" aria-haspopup="dialog" aria-label="Use live data &mdash; Google Maps key settings">
-          <svg class="nav-settings-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"></path>
-          </svg>
-          <span class="settings-label">Use live data</span>
-        </button>
-      </nav>
-    </header>
+    <!-- Minimal floating settings gear (also holds Back to the Lab + key setup) -->
+    <button class="corner-gear" id="settings-open" type="button" aria-haspopup="dialog" aria-label="Settings &mdash; live data &amp; menu">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"></path>
+      </svg>
+    </button>
 
     <main id="room" class="exhibit-room eats-room">
       <p class="room-label">An indecision-breaker</p>
@@ -364,21 +358,14 @@
             <button type="button" class="btn-ghost" id="key-clear">Clear key</button>
             <button type="button" class="btn-solid" id="key-save">Save key</button>
           </div>
+
+          <p class="settings-backlink"><a href="lab.html">&larr; Back to the Lab</a></p>
         </div>
       </div>
     </div>
 
     <!-- live region for transient announcements -->
     <p class="visually-hidden" id="live-announce" role="status" aria-live="polite"></p>
-
-    <footer class="exhibit-footer">
-      <p>
-        Skylar Hoffman<span class="sep">&middot;</span
-        ><a href="mailto:skylar.j.hoffman@gmail.com">skylar.j.hoffman@gmail.com</a
-        ><span class="sep">&middot;</span
-        ><a href="https://github.com/sky121">github.com/sky121</a>
-      </p>
-    </footer>
 
     <script defer src="assets/js/gallery.js"></script>
     <script defer src="assets/js/eats.js"></script>
