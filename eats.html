@@ -86,34 +86,131 @@
           </form>
         </div>
 
-        <!-- RESULTS STATE (post-search) -->
-        <div class="find-results-wrap" id="find-results-wrap" hidden>
-          <div class="results-bar">
-            <button class="results-back" id="results-back" type="button">
+        <!-- ============ PREFERENCES SCREEN (post-pop) ============ -->
+        <div class="prefs-wrap" id="prefs-wrap" hidden>
+          <div class="prefs-bar">
+            <button class="results-back" id="prefs-back" type="button">
               <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
-              New search
+              Back
             </button>
-            <p class="results-origin" id="results-origin"></p>
+            <p class="prefs-origin" id="prefs-origin"></p>
           </div>
 
-          <div class="results-controls">
-            <label class="ctl ctl-toggle">
-              <input type="checkbox" id="open-now" />
-              <span class="ctl-switch" aria-hidden="true"></span>
-              <span class="ctl-text">Open now</span>
-            </label>
+          <header class="prefs-head">
+            <h2 class="prefs-title">What are you in the mood for?</h2>
+            <p class="prefs-sub">All optional &mdash; skip anything and we&rsquo;ll show everything nearby.</p>
+          </header>
 
-            <button class="pick-btn" id="pick-for-me" type="button">
-              <span aria-hidden="true">&#127922;</span> Pick for me
+          <form class="prefs-form" id="prefs-form" autocomplete="off">
+            <fieldset class="pref-group">
+              <legend class="pref-legend">Cuisine</legend>
+              <div class="chip-row" id="pref-cuisine" role="group" aria-label="Cuisine (choose any)"></div>
+            </fieldset>
+
+            <fieldset class="pref-group">
+              <legend class="pref-legend">Price</legend>
+              <div class="chip-row" id="pref-price" role="group" aria-label="Price (choose any)"></div>
+            </fieldset>
+
+            <fieldset class="pref-group">
+              <legend class="pref-legend">Minimum rating</legend>
+              <div class="seg" id="pref-rating" role="group" aria-label="Minimum rating"></div>
+            </fieldset>
+
+            <fieldset class="pref-group">
+              <legend class="pref-legend">Minimum reviews</legend>
+              <div class="seg" id="pref-reviews" role="group" aria-label="Minimum reviews"></div>
+            </fieldset>
+
+            <fieldset class="pref-group">
+              <legend class="pref-legend">Max distance</legend>
+              <div class="seg" id="pref-distance" role="group" aria-label="Maximum distance"></div>
+            </fieldset>
+
+            <fieldset class="pref-group pref-group--inline">
+              <legend class="pref-legend">Open now</legend>
+              <label class="ctl ctl-toggle">
+                <input type="checkbox" id="pref-open" />
+                <span class="ctl-switch" aria-hidden="true"></span>
+                <span class="ctl-text">Only show places open now</span>
+              </label>
+            </fieldset>
+
+            <fieldset class="pref-group">
+              <legend class="pref-legend">Dietary <span class="pref-opt">(optional)</span></legend>
+              <div class="chip-row" id="pref-dietary" role="group" aria-label="Dietary needs"></div>
+            </fieldset>
+
+            <fieldset class="pref-group">
+              <legend class="pref-legend">Dining mode <span class="pref-opt">(optional)</span></legend>
+              <div class="chip-row" id="pref-dining" role="group" aria-label="Dining mode"></div>
+            </fieldset>
+
+            <p class="prefs-count" id="prefs-count" role="status" aria-live="polite"></p>
+
+            <div class="prefs-actions">
+              <button type="button" class="btn-ghost" id="prefs-skip">Skip</button>
+              <button type="submit" class="btn-solid" id="prefs-start">Start swiping</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- ============ SWIPE DECK SCREEN ============ -->
+        <div class="deck-wrap" id="deck-wrap" hidden>
+          <div class="deck-bar">
+            <button class="results-back" id="deck-back" type="button">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+              Preferences
+            </button>
+            <p class="deck-origin" id="deck-origin"></p>
+          </div>
+
+          <p class="deck-hint" id="deck-hint">Swipe right to keep &middot; left to pass &middot; tap the card for more</p>
+
+          <!-- The card stack. role=group; cards are inserted here, top card last in DOM. -->
+          <div class="deck" id="deck" role="group" aria-roledescription="restaurant card deck" aria-label="Restaurants near you, nearest first"></div>
+
+          <!-- Accessible list fallback note -->
+          <p class="deck-a11y-note visually-hidden" id="deck-a11y-note">
+            Use the Pass and Like buttons below, or the Left and Right arrow keys, to decide. Tap or press Enter on a card to read more about it.
+          </p>
+
+          <div class="deck-controls" id="deck-controls" role="group" aria-label="Decide on the top restaurant">
+            <button class="deck-btn deck-btn--no" id="deck-no" type="button" aria-label="Pass on this place">
+              <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+            </button>
+            <button class="deck-btn deck-btn--info" id="deck-info" type="button" aria-label="Show more about this place">
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.5v.01"></path></svg>
+            </button>
+            <button class="deck-btn deck-btn--yes" id="deck-yes" type="button" aria-label="Keep this place">
+              <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="currentColor" stroke="none"><path d="M12 21s-7.5-4.8-9.7-9.2C.8 8.3 2.4 5 5.6 5c2 0 3.3 1.2 4.1 2.4l.3.5.3-.5C11.1 6.2 12.4 5 14.4 5c3.2 0 4.8 3.3 3.3 6.8C19.5 16.2 12 21 12 21z"></path></svg>
             </button>
           </div>
 
-          <p class="results-status" id="results-status" role="status" aria-live="polite"></p>
+          <!-- DECISION / MATCH screen -->
+          <div class="decision" id="decision" hidden role="group" aria-label="Your pick for tonight">
+            <div class="decision-card">
+              <span class="decision-spark" aria-hidden="true">&#10024;</span>
+              <p class="decision-eyebrow">Tonight</p>
+              <h2 class="decision-name" id="decision-name"></h2>
+              <p class="decision-meta" id="decision-meta"></p>
+              <div class="decision-actions" id="decision-actions"></div>
+              <button class="decision-keep" id="decision-keep" type="button">Keep looking</button>
+            </div>
+          </div>
 
-          <div class="results" id="results" aria-live="polite"></div>
-
-          <div class="results-more" id="results-more" hidden>
-            <button class="more-btn" id="load-more" type="button">Search farther out</button>
+          <!-- END OF DECK screen -->
+          <div class="deck-end" id="deck-end" hidden role="group" aria-label="End of the deck">
+            <div class="deck-end-card">
+              <span class="deck-end-glyph" aria-hidden="true">&#127869;</span>
+              <h2 class="deck-end-title" id="deck-end-title">That&rsquo;s everywhere nearby that matched</h2>
+              <p class="deck-end-sub" id="deck-end-sub">You&rsquo;ve seen every spot within your distance cap.</p>
+              <div class="deck-end-actions">
+                <button class="btn-ghost" id="end-widen" type="button">Widen preferences</button>
+                <button class="btn-ghost" id="end-farther" type="button">Search farther</button>
+                <button class="btn-solid" id="end-restart" type="button">Start over</button>
+              </div>
+            </div>
           </div>
         </div>
       </section>

@@ -45,8 +45,20 @@
    * ------------------------------------------------------------------ */
   var KEY_GMAPS = 'eats-gmaps-key';
   var KEY_VISITED = 'eats-visited';
+  var KEY_PREFS = 'eats-prefs';
 
   var store = {
+    getPrefs: function () {
+      try {
+        var raw = localStorage.getItem(KEY_PREFS);
+        if (!raw) return null;
+        var obj = JSON.parse(raw);
+        return (obj && typeof obj === 'object') ? obj : null;
+      } catch (e) { return null; }
+    },
+    setPrefs: function (p) {
+      try { localStorage.setItem(KEY_PREFS, JSON.stringify(p)); return true; } catch (e) { return false; }
+    },
     getKey: function () {
       try { return localStorage.getItem(KEY_GMAPS) || ''; } catch (e) { return ''; }
     },
@@ -95,18 +107,91 @@
   // Search origin used for demo distance math (Ferry Building area, SF).
   var DEMO_ORIGIN = { lat: 37.7956, lng: -122.3934 };
 
+  /* Demo restaurants — extended for the swipe deck. Each carries:
+     rating (0-5), reviews, price (1-4), cuisine tag(s), open, distance,
+     phone, plus per-segment story content: `vibe`/`food` (watercolor panel
+     captions, since we have no real photos) and 2-3 review quotes, and
+     dietary / dining flags so Preferences visibly filter the deck.
+     `cuisines` are normalized keys matching the Preferences chips. Spread at
+     varied distances so the nearest-first expansion + distance cap read well. */
   var DEMO_RESTAURANTS = [
-    { name: 'Marigold & Sage', rating: 4.6, reviews: 812, price: 3, type: 'Californian · Farm-to-table', lat: 37.7929, lng: -122.3971, open: true, phone: '+14155550142' },
-    { name: 'Little Wren Bakery', rating: 4.8, reviews: 1340, price: 1, type: 'Bakery · Café', lat: 37.7972, lng: -122.3990, open: true, phone: '+14155550178' },
-    { name: 'Pier 9 Oyster Co.', rating: 4.4, reviews: 521, price: 4, type: 'Seafood · Raw bar', lat: 37.7995, lng: -122.3915, open: false, phone: '+14155550199' },
-    { name: 'Casa Poblana', rating: 4.5, reviews: 967, price: 2, type: 'Mexican · Taquería', lat: 37.7901, lng: -122.4003, open: true, phone: '+14155550110' },
-    { name: 'Tonkotsu Lane', rating: 4.7, reviews: 1582, price: 2, type: 'Ramen · Japanese', lat: 37.7948, lng: -122.3958, open: true, phone: '+14155550133' },
-    { name: 'Olive & Thyme', rating: 4.3, reviews: 388, price: 3, type: 'Mediterranean', lat: 37.7918, lng: -122.3949, open: true, phone: '+14155550155' },
-    { name: 'The Copper Kettle', rating: 4.2, reviews: 642, price: 2, type: 'Brunch · American', lat: 37.7983, lng: -122.3962, open: false, phone: '+14155550166' },
-    { name: 'Saffron House', rating: 4.6, reviews: 729, price: 2, type: 'Indian · Curry house', lat: 37.7937, lng: -122.4012, open: true, phone: '+14155550188' },
-    { name: 'Verde Trattoria', rating: 4.5, reviews: 1104, price: 3, type: 'Italian · Pasta', lat: 37.7966, lng: -122.3902, open: true, phone: '+14155550121' },
-    { name: 'Foggy Bell Coffee', rating: 4.4, reviews: 455, price: 1, type: 'Coffee · Light bites', lat: 37.7959, lng: -122.3985, open: true, phone: '+14155550144' }
+    { name: 'Little Wren Bakery', rating: 4.8, reviews: 1340, price: 1, type: 'Bakery · Café', cuisines: ['cafe'], lat: 37.7959, lng: -122.3949, open: true, phone: '+14155550178',
+      diet: ['vegetarian'], dining: ['dine-in', 'takeout'],
+      vibe: 'Sunlit corner café, marble counters, fresh flowers', food: 'Morning buns, laminated pastries, flat whites',
+      reviews_q: [ { by: 'Maya O.', score: 96, text: 'The morning bun is a religious experience. Get there early.' }, { by: 'Devin P.', score: 90, text: 'Cozy, sunny, perfect for a slow Saturday.' } ] },
+    { name: 'Tonkotsu Lane', rating: 4.7, reviews: 1582, price: 2, type: 'Ramen · Japanese', cuisines: ['japanese'], lat: 37.7948, lng: -122.3958, open: true, phone: '+14155550133',
+      diet: [], dining: ['dine-in'],
+      vibe: 'Tiny steamy counter, paper lanterns, jazz on vinyl', food: 'Rich tonkotsu, chashu, soft egg, chili oil',
+      reviews_q: [ { by: 'Hana S.', score: 94, text: 'Broth so silky it ruined other ramen for me.' }, { by: 'Leo C.', score: 88, text: 'Tiny room, worth the wait. The chashu melts.' }, { by: 'Priya R.', score: 90, text: 'Order the spicy miso. Trust me.' } ] },
+    { name: 'Marigold & Sage', rating: 4.6, reviews: 812, price: 3, type: 'Californian · Farm-to-table', cuisines: ['american', 'mediterranean'], lat: 37.7929, lng: -122.3971, open: true, phone: '+14155550142',
+      diet: ['vegetarian', 'gluten-free'], dining: ['dine-in'],
+      vibe: 'Linen tablecloths, candlelight, garden patio', food: 'Heirloom tomato, roast chicken, market salads',
+      reviews_q: [ { by: 'Theo B.', score: 92, text: 'Tasting menu was a quiet, beautiful treat.' }, { by: 'Maya O.', score: 89, text: 'Everything tastes like it was picked this morning.' } ] },
+    { name: 'Casa Poblana', rating: 4.5, reviews: 967, price: 2, type: 'Mexican · Taquería', cuisines: ['mexican'], lat: 37.7901, lng: -122.4003, open: true, phone: '+14155550110',
+      diet: ['vegetarian', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'],
+      vibe: 'Bright tiles, mariachi murals, buzzy and loud', food: 'Al pastor tacos, fresh salsa, horchata',
+      reviews_q: [ { by: 'Leo C.', score: 93, text: 'Al pastor for days. Bring cash, bring friends.' }, { by: 'Devin P.', score: 85, text: 'Lines out the door for a reason.' } ] },
+    { name: 'Verde Trattoria', rating: 4.5, reviews: 1104, price: 3, type: 'Italian · Pasta', cuisines: ['italian'], lat: 37.7966, lng: -122.3902, open: true, phone: '+14155550121',
+      diet: ['vegetarian'], dining: ['dine-in', 'takeout'],
+      vibe: 'Warm trattoria, exposed brick, cozy two-tops', food: 'Cacio e pepe, fresh pappardelle, tiramisu',
+      reviews_q: [ { by: 'Hana S.', score: 91, text: 'Cacio e pepe done exactly right. Cozy little room.' }, { by: 'Theo B.', score: 87, text: 'The pasta is hand-rolled and it shows.' } ] },
+    { name: 'Saffron House', rating: 4.6, reviews: 729, price: 2, type: 'Indian · Curry house', cuisines: ['indian'], lat: 37.7937, lng: -122.4012, open: true, phone: '+14155550188',
+      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'],
+      vibe: 'Jewel-tone walls, brass lanterns, fragrant air', food: 'Butter chicken, garlic naan, dal makhani',
+      reviews_q: [ { by: 'Priya R.', score: 90, text: 'Butter chicken was rich; staff were lovely.' }, { by: 'Maya O.', score: 88, text: 'Best dal in the city, and lots of vegan options.' } ] },
+    { name: 'Foggy Bell Coffee', rating: 4.4, reviews: 455, price: 1, type: 'Coffee · Light bites', cuisines: ['cafe'], lat: 37.7972, lng: -122.3985, open: true, phone: '+14155550144',
+      diet: ['vegetarian', 'vegan'], dining: ['takeout', 'dine-in'],
+      vibe: 'Minimalist, big windows, foggy-day calm', food: 'Single-origin pour-overs, oat lattes, scones',
+      reviews_q: [ { by: 'Devin P.', score: 86, text: 'Flat white + a window seat. My new spot.' }, { by: 'Leo C.', score: 82, text: 'Quiet enough to actually get work done.' } ] },
+    { name: 'Olive & Thyme', rating: 4.3, reviews: 388, price: 3, type: 'Mediterranean', cuisines: ['mediterranean'], lat: 37.7918, lng: -122.3949, open: true, phone: '+14155550155',
+      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout'],
+      vibe: 'Whitewashed walls, olive branches, sea-blue tile', food: 'Mezze platters, lamb kebab, lemony hummus',
+      reviews_q: [ { by: 'Theo B.', score: 86, text: 'The mezze spread is a feast for two.' }, { by: 'Priya R.', score: 84, text: 'Great for a group with mixed diets.' } ] },
+    { name: 'The Copper Kettle', rating: 4.2, reviews: 642, price: 2, type: 'Brunch · American', cuisines: ['american'], lat: 37.7983, lng: -122.3962, open: false, phone: '+14155550166',
+      diet: ['vegetarian'], dining: ['dine-in'],
+      vibe: 'Copper pots, checkered floor, weekend bustle', food: 'Buttermilk pancakes, hash, bottomless coffee',
+      reviews_q: [ { by: 'Hana S.', score: 83, text: 'Classic diner energy and giant pancakes.' }, { by: 'Maya O.', score: 80, text: 'Go on a weekday to skip the wait.' } ] },
+    { name: 'Pier 9 Oyster Co.', rating: 4.4, reviews: 521, price: 4, type: 'Seafood · Raw bar', cuisines: ['seafood'], lat: 37.7995, lng: -122.3915, open: false, phone: '+14155550199',
+      diet: ['gluten-free'], dining: ['dine-in'],
+      vibe: 'Waterfront deck, string lights, sunset views', food: 'Oysters, cioppino, grilled day-boat fish',
+      reviews_q: [ { by: 'Leo C.', score: 88, text: 'Sunset on the patio is unbeatable.' }, { by: 'Devin P.', score: 78, text: 'Pricey and service lagged, but the view…' } ] },
+    { name: 'Smoke & Ember BBQ', rating: 4.6, reviews: 980, price: 2, type: 'BBQ · Smokehouse', cuisines: ['bbq', 'american'], lat: 37.7912, lng: -122.3886, open: true, phone: '+14155550201',
+      diet: [], dining: ['dine-in', 'takeout'],
+      vibe: 'Reclaimed wood, smoke in the air, picnic tables', food: 'Brisket, burnt ends, smoked ribs, slaw',
+      reviews_q: [ { by: 'Theo B.', score: 92, text: 'The brisket falls apart. Come hungry.' }, { by: 'Hana S.', score: 87, text: 'Burnt ends sell out by 2pm. Get there early.' } ] },
+    { name: 'Seoul & Stone', rating: 4.5, reviews: 712, price: 2, type: 'Korean · BBQ', cuisines: ['korean'], lat: 37.8002, lng: -122.4001, open: true, phone: '+14155550213',
+      diet: ['vegetarian'], dining: ['dine-in'],
+      vibe: 'Tabletop grills, neon glow, lively groups', food: 'Galbi, bibimbap, bubbling kimchi jjigae',
+      reviews_q: [ { by: 'Priya R.', score: 90, text: 'Tabletop grill is so fun for a group.' }, { by: 'Maya O.', score: 85, text: 'The banchan alone is worth coming for.' } ] },
+    { name: 'Pho & Lantern', rating: 4.4, reviews: 533, price: 1, type: 'Vietnamese · Noodles', cuisines: ['vietnamese'], lat: 37.7886, lng: -122.3961, open: true, phone: '+14155550224',
+      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'],
+      vibe: 'Steamy storefront, herbs on every table', food: 'Beef pho, fresh rolls, lemongrass tofu',
+      reviews_q: [ { by: 'Devin P.', score: 88, text: 'Broth simmered all day — you can taste it.' }, { by: 'Leo C.', score: 84, text: 'Cheap, fast, and deeply comforting.' } ] },
+    { name: 'Bangkok Orchid', rating: 4.5, reviews: 604, price: 2, type: 'Thai · Street food', cuisines: ['thai'], lat: 37.8021, lng: -122.3958, open: true, phone: '+14155550235',
+      diet: ['vegetarian', 'vegan'], dining: ['dine-in', 'takeout', 'delivery'],
+      vibe: 'Orchids, gold accents, gentle chimes', food: 'Pad see ew, green curry, mango sticky rice',
+      reviews_q: [ { by: 'Hana S.', score: 89, text: 'Green curry with real heat — finally.' }, { by: 'Priya R.', score: 86, text: 'Mango sticky rice is the perfect finish.' } ] },
+    { name: 'The Stacked Patty', rating: 4.3, reviews: 1190, price: 1, type: 'Burgers · American', cuisines: ['burgers', 'american'], lat: 37.7869, lng: -122.3922, open: true, phone: '+14155550246',
+      diet: ['vegetarian'], dining: ['dine-in', 'takeout', 'delivery'],
+      vibe: 'Retro diner booths, chrome, milkshake machines', food: 'Smash burgers, crispy fries, thick shakes',
+      reviews_q: [ { by: 'Theo B.', score: 87, text: 'Smash burger with the crispy edges. Yes.' }, { by: 'Maya O.', score: 82, text: 'Killer veggie burger too, not an afterthought.' } ] },
+    { name: 'Crosta Pizzeria', rating: 4.6, reviews: 1420, price: 2, type: 'Pizza · Neapolitan', cuisines: ['pizza', 'italian'], lat: 37.7849, lng: -122.4005, open: true, phone: '+14155550257',
+      diet: ['vegetarian'], dining: ['dine-in', 'takeout', 'delivery'],
+      vibe: 'Wood-fired oven glow, communal tables', food: 'Blistered margherita, burrata, charred crust',
+      reviews_q: [ { by: 'Leo C.', score: 91, text: 'Leopard-spotted crust, perfect char.' }, { by: 'Devin P.', score: 88, text: 'The margherita is all you need.' } ] },
+    { name: 'Garden & Grain', rating: 4.4, reviews: 410, price: 2, type: 'Vegetarian · Bowls', cuisines: ['vegetarian', 'mediterranean'], lat: 37.8035, lng: -122.3902, open: true, phone: '+14155550268',
+      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'],
+      vibe: 'Leafy, airy, reclaimed-wood and plants', food: 'Grain bowls, roasted veg, tahini everything',
+      reviews_q: [ { by: 'Priya R.', score: 89, text: 'Finally a veg spot that feels indulgent.' }, { by: 'Hana S.', score: 85, text: 'Everything is vegan and you would not guess.' } ] },
+    { name: 'Lupo Rosso', rating: 4.7, reviews: 860, price: 3, type: 'Italian · Wine bar', cuisines: ['italian'], lat: 37.7831, lng: -122.3948, open: false, phone: '+14155550279',
+      diet: ['vegetarian'], dining: ['dine-in'],
+      vibe: 'Dim, romantic, candle-lit wine cellar', food: 'Handmade ravioli, natural wine, affogato',
+      reviews_q: [ { by: 'Maya O.', score: 93, text: 'Date-night perfection. The ravioli, swoon.' }, { by: 'Theo B.', score: 89, text: 'Ask the somm to pick — never wrong.' } ] }
   ];
+
+  /* Watercolor panel descriptors (the deck builds gradient panels from these). */
+  var DEMO_VIBE_GLYPH = '✨'; // sparkles
+  var DEMO_FOOD_GLYPH = '🍴'; // fork & knife with plate
 
   // Pre-built demo result objects (with distance to DEMO_ORIGIN).
   function demoResults() {
@@ -118,13 +203,23 @@
         reviews: r.reviews,
         price: r.price,
         type: r.type,
+        cuisines: r.cuisines || [],
+        diet: r.diet || [],
+        dining: r.dining || [],
         open: r.open,
         phone: r.phone,
         photoUrl: null, // watercolor placeholder
+        // story segments — demo content (live mode fills from Place details)
+        segments: {
+          vibe: { kind: 'vibe', glyph: DEMO_VIBE_GLYPH, caption: r.vibe || '' },
+          food: { kind: 'food', glyph: DEMO_FOOD_GLYPH, caption: r.food || '' },
+          reviews: { kind: 'reviews', quotes: (r.reviews_q || []).slice(0, 3) }
+        },
         location: { lat: r.lat, lng: r.lng },
         distance: haversineMiles(DEMO_ORIGIN, { lat: r.lat, lng: r.lng }),
         mapsUri: null,
-        placeId: null
+        placeId: null,
+        detailsLoaded: true
       };
     });
   }
@@ -144,7 +239,8 @@
     results: [],          // current Find results (accumulated, nearest-first)
     origin: null,         // {lat,lng} search origin
     originLabel: null,    // human label for the origin ("you" or a typed query)
-    openNow: false,
+    prefs: null,          // current swipe preferences (see prefs.defaults)
+    distanceCap: null,    // miles cap derived from prefs.distance (null = anywhere)
     hasMore: false,       // whether more results can be loaded (live pagination)
     loadingMore: false,   // a "load more" request is in flight
     nextPage: null,       // live pagination handle (PlacesService getNextPage)
@@ -249,169 +345,28 @@
     return { init: init, activate: activate };
   })();
 
+  function priceStr(p) {
+    if (!p) return '';
+    var s = '';
+    for (var i = 0; i < p; i++) s += '$';
+    return s;
+  }
+
   /* ================================================================== *
-   * FIND — rendering, controls, pick-for-me, geolocation
+   * FIND — bubble landing -> Preferences -> Swipe deck (router/orchestrator)
+   *
+   * Flow:
+   *   landing (bubble)  --pop-->  Preferences screen  --start-->  Deck
+   * The deck pulls nearest-first results matching the saved prefs; the
+   * prefs module owns the filter controls; the deck module owns the cards.
    * ================================================================== */
   var find = (function () {
     var landingEl = $('find-landing');
-    var resultsWrap = $('find-results-wrap');
-    var resultsEl = $('results');
-    var statusEl = $('results-status');
-    var originEl = $('results-origin');
-    var moreWrap = $('results-more');
-    var moreBtn = $('load-more');
-
-    function priceStr(p) {
-      if (!p) return '';
-      var s = '';
-      for (var i = 0; i < p; i++) s += '$';
-      return s;
-    }
-
-    /* Results are kept nearest-first; "open now" is a soft filter applied
-       on top of the already distance-sorted list. No radius cap. */
-    function visibleResults() {
-      var list = state.results.slice();
-      if (state.openNow) list = list.filter(function (r) { return r.open === true; });
-      list.sort(function (a, b) {
-        if (a.distance == null) return 1;
-        if (b.distance == null) return -1;
-        return a.distance - b.distance;
-      });
-      return list;
-    }
-
-    function buildCard(r) {
-      var card = el('article', 'card');
-      card.dataset.id = r.id;
-
-      // photo
-      var photo;
-      if (r.photoUrl) {
-        photo = el('div', 'card-photo');
-        photo.style.backgroundImage = 'url("' + r.photoUrl.replace(/"/g, '') + '")';
-      } else {
-        photo = el('div', 'card-photo card-photo--placeholder');
-        var glyph = el('span', 'ph-glyph');
-        glyph.textContent = '🍽'; // fork & knife
-        photo.appendChild(glyph);
-      }
-      if (r.open != null) {
-        var badge = el('span', 'card-open-badge' + (r.open ? '' : ' is-closed'), r.open ? 'Open now' : 'Closed');
-        photo.appendChild(badge);
-      }
-      card.appendChild(photo);
-
-      var body = el('div', 'card-body');
-      body.appendChild(el('h3', 'card-name', r.name));
-
-      var meta = el('div', 'card-meta');
-      if (r.rating) {
-        var st = el('span', 'stars');
-        var num = el('span', 'num', '\u2605 ' + fmtScore(r.rating * 20));
-        st.appendChild(num);
-        if (r.reviews) st.appendChild(document.createTextNode(' (' + r.reviews.toLocaleString() + ')'));
-        meta.appendChild(st);
-      }
-      if (r.price) {
-        meta.appendChild(el('span', 'dotsep', '·'));
-        meta.appendChild(el('span', 'price', priceStr(r.price)));
-      }
-      body.appendChild(meta);
-
-      if (r.type) body.appendChild(el('p', 'card-tags', r.type));
-      if (r.distance != null) body.appendChild(el('p', 'card-dist', fmtDist(r.distance) + ' away'));
-
-      // actions
-      var actions = el('div', 'card-actions');
-
-      var mapsHref = r.mapsUri ||
-        (r.placeId ? 'https://www.google.com/maps/place/?q=place_id:' + encodeURIComponent(r.placeId) : null) ||
-        'https://www.google.com/maps/search/' + encodeURIComponent(r.name);
-      var mapLink = el('a', 'card-action', 'Open in Maps');
-      mapLink.href = mapsHref;
-      mapLink.target = '_blank';
-      mapLink.rel = 'noopener';
-      actions.appendChild(mapLink);
-
-      if (r.phone) {
-        var call = el('a', 'card-action', 'Call');
-        call.href = 'tel:' + r.phone;
-        actions.appendChild(call);
-      }
-
-      var rate = el('button', 'card-action card-action--primary', 'I ate here → Rate');
-      rate.type = 'button';
-      rate.addEventListener('click', function () {
-        sheet.openForPlace({
-          name: r.name,
-          placeId: r.placeId || null,
-          loc: r.location || null,
-          address: r.type || ''
-        });
-      });
-      actions.appendChild(rate);
-
-      body.appendChild(actions);
-      card.appendChild(body);
-      return card;
-    }
-
-    function render() {
-      clear(resultsEl);
-      var list = visibleResults();
-      if (!state.results.length) {
-        statusEl.textContent = '';
-        if (moreWrap) moreWrap.hidden = true;
-        return;
-      }
-      if (!list.length) {
-        statusEl.textContent = '';
-        var empty = el('div', 'empty');
-        empty.appendChild(el('div', 'empty-glyph', '🍴'));
-        empty.appendChild(el('p', 'empty-title', 'Nothing open right now'));
-        empty.appendChild(el('p', 'empty-sub', 'Turn off "Open now" to see every nearby spot.'));
-        resultsEl.appendChild(empty);
-        if (moreWrap) moreWrap.hidden = true;
-        return;
-      }
-      statusEl.textContent = list.length + ' place' + (list.length === 1 ? '' : 's') +
-        ' · nearest first';
-      list.forEach(function (r) { resultsEl.appendChild(buildCard(r)); });
-      renderMore();
-      announce(list.length + ' results shown, nearest first');
-    }
-
-    function renderMore() {
-      if (!moreWrap) return;
-      moreWrap.hidden = !state.hasMore;
-      if (moreBtn) {
-        moreBtn.disabled = state.loadingMore;
-        moreBtn.textContent = state.loadingMore ? 'Searching farther…' : 'Search farther out';
-      }
-    }
-
-    /* Replace the result set (a fresh search). */
-    function setResults(list, origin) {
-      state.results = list || [];
-      if (origin) state.origin = origin;
-      showResultsView();
-      render();
-    }
-
-    /* Append more results (pagination / outward expansion), de-duped by id. */
-    function appendResults(list) {
-      var seen = {};
-      state.results.forEach(function (r) { seen[r.id] = true; });
-      (list || []).forEach(function (r) { if (!seen[r.id]) { seen[r.id] = true; state.results.push(r); } });
-      render();
-    }
-
-    function setStatus(msg) { statusEl.textContent = msg; }
+    var prefsWrap = $('prefs-wrap');
+    var deckWrap = $('deck-wrap');
 
     /* Hide the shared page header (eyebrow + "Peckish" wordmark) whenever the
-       calm Find landing is the thing on screen, so the landing reads nearly
-       empty. Other tabs / the results view keep the header. */
+       calm Find landing is the thing on screen. Other screens keep it. */
     function syncHeaderChrome() {
       var room = $('room');
       if (!room) return;
@@ -421,160 +376,107 @@
       room.classList.toggle('find-landing-on', !!landingOn);
     }
 
-    /* ---- View switching: calm landing <-> results ---- */
-    function showResultsView() {
+    /* ---- Screen switching ---- */
+    function hideAll() {
       if (landingEl) landingEl.hidden = true;
-      if (resultsWrap) resultsWrap.hidden = false;
-      updateOrigin();
-      syncHeaderChrome();
+      if (prefsWrap) prefsWrap.hidden = true;
+      if (deckWrap) deckWrap.hidden = true;
     }
     function showLanding() {
-      if (resultsWrap) resultsWrap.hidden = true;
+      hideAll();
       if (landingEl) landingEl.hidden = false;
-      syncHeaderChrome();
-      // reset transient search state (keep nothing stale behind the landing)
+      deck.teardown();
       state.results = [];
       state.hasMore = false;
       state.nextPage = null;
-      clear(resultsEl);
-      statusEl.textContent = '';
+      syncHeaderChrome();
       var orb = $('find-near-me');
       if (orb) orb.focus();
     }
-    function updateOrigin() {
-      if (!originEl) return;
-      clear(originEl);
-      originEl.appendChild(document.createTextNode('Searching from ' + (state.originLabel || 'near you') + ' · '));
-      var change = el('button', 'change-link', 'change');
-      change.type = 'button';
-      change.addEventListener('click', showLanding);
-      originEl.appendChild(change);
+    function showPrefs(focusFirst) {
+      hideAll();
+      if (prefsWrap) prefsWrap.hidden = false;
+      prefs.render();
+      syncHeaderChrome();
+      if (focusFirst) {
+        var title = prefsWrap && prefsWrap.querySelector('.prefs-title');
+        if (title) { title.setAttribute('tabindex', '-1'); title.focus(); }
+      }
+    }
+    function showDeck() {
+      hideAll();
+      if (deckWrap) deckWrap.hidden = false;
+      syncHeaderChrome();
+      startSearch();
     }
 
-    /* --- Pick for me: shuffle highlight settling on one --- */
-    var pickTimer = null;
-    function pickForMe() {
-      var cards = resultsEl.querySelectorAll('.card');
-      if (!cards.length) { setStatus('Search first, then I can pick for you.'); return; }
-      // clear prior
-      cards.forEach(function (c) { c.classList.remove('is-picked', 'is-shuffling'); });
-      var finalIdx = Math.floor(Math.random() * cards.length);
+    /* ---- Origin label for the small chrome line ---- */
+    function originLabel() { return state.originLabel || 'near you'; }
+    function setOriginText(node) {
+      if (!node) return;
+      var lbl = originLabel();
+      node.textContent = (lbl === 'near you') ? 'Near you' : ('Near ' + lbl);
+    }
 
-      if (prefersReducedMotion || cards.length === 1) {
-        landOn(cards, finalIdx);
+    /* ---- Distance cap helper (miles) from prefs.distance ---- */
+    function capForDistance(d) {
+      if (d === 'walk') return 1.2;   // ~1 mi (a little slack)
+      if (d === 'drive') return 5;    // short drive
+      return null;                    // anywhere
+    }
+
+    /* ================================================================
+     * SEARCH — resolve origin, fetch nearest-first results, hand to deck.
+     * Demo mode runs instantly; live mode resolves geolocation then Places.
+     * ================================================================ */
+    function startSearch() {
+      state.prefs = prefs.current();
+      state.distanceCap = capForDistance(state.prefs.distance);
+      state.hasMore = false;
+      state.nextPage = null;
+      deck.showLoading();
+
+      if (store.getKey()) {
+        resolveOriginLive(function (origin, label) {
+          if (label) state.originLabel = label;
+          state.origin = origin;
+          setOriginText($('deck-origin'));
+          gmaps.searchNearby(origin, function (err, list, more) {
+            if (err) {
+              settings.showError(err);
+              loadDemoInto(origin);
+              return;
+            }
+            state.nextPage = more || null;
+            state.hasMore = !!more;
+            deliver(list, origin);
+          });
+        });
+      } else {
+        // DEMO MODE — instant.
+        state.originLabel = state.originLabel || 'near you';
+        loadDemoInto(state.origin || DEMO_ORIGIN);
+      }
+    }
+
+    /* Live: figure out the search origin (typed location, or geolocation). */
+    function resolveOriginLive(cb) {
+      if (state.origin && state.originLabel && state.originLabel !== 'near you') {
+        cb(state.origin, state.originLabel);
         return;
       }
-      var ticks = 12 + Math.floor(Math.random() * 6);
-      var i = 0;
-      window.clearInterval(pickTimer);
-      pickTimer = window.setInterval(function () {
-        cards.forEach(function (c) { c.classList.remove('is-shuffling'); });
-        var idx = i % cards.length;
-        cards[idx].classList.add('is-shuffling');
-        i++;
-        if (i >= ticks) {
-          window.clearInterval(pickTimer);
-          cards.forEach(function (c) { c.classList.remove('is-shuffling'); });
-          landOn(cards, finalIdx);
-        }
-      }, 80);
-    }
-    function landOn(cards, idx) {
-      var chosen = cards[idx];
-      chosen.classList.add('is-picked');
-      chosen.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'center' });
-      var name = chosen.querySelector('.card-name');
-      setStatus('How about — ' + (name ? name.textContent : 'this one') + '?');
-      announce('Picked ' + (name ? name.textContent : 'a place'));
-    }
-
-    /* --- Geolocation (only on explicit press) --- */
-    function findNearMe() {
-      showResultsView();
-      state.originLabel = 'near you';
-      if (!navigator.geolocation) {
-        // No geolocation: fall back to demo origin / prompt for a place.
-        if (store.getKey()) {
-          setStatus('Geolocation is not available — search a specific location instead.');
-          showLanding();
-          var revealBtn = $('loc-reveal');
-          if (revealBtn) revealBtn.click();
-        } else {
-          searchAt(DEMO_ORIGIN, 'near you');
-        }
-        return;
-      }
-      setStatus('Finding your location…');
+      if (!navigator.geolocation) { cb(DEMO_ORIGIN, 'near you'); return; }
       navigator.geolocation.getCurrentPosition(
-        function (pos) {
-          searchAt({ lat: pos.coords.latitude, lng: pos.coords.longitude }, 'near you');
-        },
-        function () {
-          if (store.getKey()) {
-            setStatus('Location blocked — search a specific location instead.');
-            showLanding();
-            var revealBtn = $('loc-reveal');
-            if (revealBtn) revealBtn.click();
-          } else {
-            // Demo mode still works without permission.
-            searchAt(DEMO_ORIGIN, 'near you');
-          }
-        },
+        function (pos) { cb({ lat: pos.coords.latitude, lng: pos.coords.longitude }, 'near you'); },
+        function () { cb(DEMO_ORIGIN, 'near you'); },
         { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
       );
     }
 
-    /* --- Run a fresh search at an origin: live if key, else demo --- */
-    function searchAt(origin, label) {
-      state.origin = origin;
-      if (label) state.originLabel = label;
-      state.hasMore = false;
-      state.nextPage = null;
-      showResultsView();
-      if (store.getKey()) {
-        setStatus('Searching nearby…');
-        gmaps.searchNearby(origin, function (err, list, more) {
-          if (err) {
-            // friendly fallback to demo so the app stays usable
-            settings.showError(err);
-            renderDemo(origin);
-            return;
-          }
-          state.nextPage = more || null;
-          state.hasMore = !!more;
-          setResults(list, origin);
-        });
-      } else {
-        // DEMO MODE: re-base demo results around chosen origin for plausible distances.
-        renderDemo(origin);
-      }
-    }
-
-    /* --- Load more (outward, exhaustive) — live pagination only --- */
-    function loadMore() {
-      if (!state.hasMore || state.loadingMore) return;
-      state.loadingMore = true;
-      renderMore();
-      if (state.nextPage && typeof state.nextPage.fetch === 'function') {
-        state.nextPage.fetch(function (err, list, more) {
-          state.loadingMore = false;
-          if (err) { settings.showError(err); state.hasMore = false; renderMore(); return; }
-          state.nextPage = more || null;
-          state.hasMore = !!more;
-          appendResults(list);
-        });
-      } else {
-        state.loadingMore = false;
-        state.hasMore = false;
-        renderMore();
-      }
-    }
-
-    /* DEMO: all sample restaurants, sorted nearest-first, shown in full. */
-    function renderDemo(origin) {
+    /* DEMO: all sample restaurants, re-based near the origin, nearest-first. */
+    function loadDemoInto(origin) {
       var list = demoResults();
-      if (origin) {
-        // shift demo coords so they cluster near the chosen origin
+      if (origin && (origin.lat !== DEMO_ORIGIN.lat || origin.lng !== DEMO_ORIGIN.lng)) {
         var dLat = origin.lat - DEMO_ORIGIN.lat;
         var dLng = origin.lng - DEMO_ORIGIN.lng;
         list.forEach(function (r) {
@@ -582,23 +484,88 @@
           r.distance = haversineMiles(origin, r.location);
         });
       }
-      // nearest-first; demo has no pagination so all are shown at once.
-      list.sort(function (a, b) { return (a.distance || 0) - (b.distance || 0); });
       state.hasMore = false;
       state.nextPage = null;
-      if (!state.originLabel) state.originLabel = 'near you';
-      setResults(list, origin || DEMO_ORIGIN);
+      setOriginText($('deck-origin'));
+      deliver(list, origin || DEMO_ORIGIN);
     }
 
-    /* --- Watercolor bubble POP, then proceed to search --- */
+    /* Sort nearest-first, apply prefs filters + distance cap, feed the deck. */
+    function deliver(list, origin) {
+      state.results = (list || []).slice();
+      if (origin) state.origin = origin;
+      state.results.sort(function (a, b) {
+        if (a.distance == null) return 1;
+        if (b.distance == null) return -1;
+        return a.distance - b.distance;
+      });
+      var matched = filterByPrefs(state.results);
+      deck.load(matched);
+    }
+
+    /* Apply the active preferences as filters. Distance cap included. */
+    function filterByPrefs(list) {
+      var p = state.prefs || prefs.defaults();
+      var cap = state.distanceCap;
+      return list.filter(function (r) {
+        if (cap != null && r.distance != null && r.distance > cap) return false;
+        if (p.openNow && r.open !== true) return false;
+        // rating: app 0-100 scale; r.rating is 0-5 (Google) -> x20
+        if (p.minRating && (r.rating * 20) < p.minRating) return false;
+        if (p.minReviews && (r.reviews || 0) < p.minReviews) return false;
+        if (p.price && p.price.length) {
+          if (!r.price || p.price.indexOf(r.price) === -1) return false;
+        }
+        if (p.cuisine && p.cuisine.length) {
+          var cz = r.cuisines || [];
+          var hit = p.cuisine.some(function (c) { return cz.indexOf(c) !== -1; });
+          if (!hit) return false;
+        }
+        if (p.dietary && p.dietary.length) {
+          var dt = r.diet || [];
+          var allDiet = p.dietary.every(function (d) { return dt.indexOf(d) !== -1; });
+          if (!allDiet) return false;
+        }
+        if (p.dining && p.dining.length) {
+          var dn = r.dining || [];
+          var anyDine = p.dining.some(function (d) { return dn.indexOf(d) !== -1; });
+          if (!anyDine) return false;
+        }
+        return true;
+      });
+    }
+
+    /* Live "Search farther": next page -> append -> re-filter -> deck. */
+    function searchFarther(cb) {
+      if (!store.getKey() || !state.hasMore || state.loadingMore) { if (cb) cb([]); return; }
+      state.loadingMore = true;
+      if (state.nextPage && typeof state.nextPage.fetch === 'function') {
+        state.nextPage.fetch(function (err, list, more) {
+          state.loadingMore = false;
+          if (err) { settings.showError(err); state.hasMore = false; if (cb) cb([]); return; }
+          state.nextPage = more || null;
+          state.hasMore = !!more;
+          var seen = {};
+          state.results.forEach(function (r) { seen[r.id] = true; });
+          var fresh = (list || []).filter(function (r) { return !seen[r.id]; });
+          state.results = state.results.concat(fresh);
+          state.results.sort(function (a, b) { return (a.distance || 0) - (b.distance || 0); });
+          if (cb) cb(filterByPrefs(fresh));
+        });
+      } else {
+        state.loadingMore = false; state.hasMore = false; if (cb) cb([]);
+      }
+    }
+    function hasFarther() { return !!(store.getKey() && state.hasMore); }
+
+    /* --- Watercolor bubble POP, then go to Preferences --- */
     var popping = false;
-    function popAndFind() {
+    function popAndStart() {
       if (popping) return;
       var orb = $('find-near-me');
-      if (!orb || prefersReducedMotion) { findNearMe(); return; }
+      if (!orb || prefersReducedMotion) { showPrefs(true); return; }
       popping = true;
 
-      // Build a transient burst layer centred on the orb.
       var rect = orb.getBoundingClientRect();
       var layer = el('div', 'orb-burst');
       layer.style.left = (rect.left + rect.width / 2) + 'px';
@@ -621,26 +588,26 @@
         layer.appendChild(d);
       }
       document.body.appendChild(layer);
-
       orb.classList.add('is-popping');
 
-      // After the pop sequence: clean up and run the real search.
       window.setTimeout(function () {
         if (layer.parentNode) layer.parentNode.removeChild(layer);
         orb.classList.remove('is-popping');
         popping = false;
-        findNearMe();
+        showPrefs(true);
       }, 480);
     }
 
     function init() {
       var orb = $('find-near-me');
-      if (orb) orb.addEventListener('click', popAndFind);
+      if (orb) orb.addEventListener('click', popAndStart);
 
-      var back = $('results-back');
-      if (back) back.addEventListener('click', showLanding);
+      var prefsBack = $('prefs-back');
+      if (prefsBack) prefsBack.addEventListener('click', showLanding);
+      var deckBack = $('deck-back');
+      if (deckBack) deckBack.addEventListener('click', function () { showPrefs(false); });
 
-      // "or search a specific location" — reveal the input on demand
+      // "search a specific location" — reveal the input on demand (kept)
       var reveal = $('loc-reveal');
       var form = $('loc-form');
       var locInput = $('loc-input');
@@ -652,7 +619,6 @@
           if (!open && locInput) locInput.focus();
         });
       }
-
       if (form) {
         form.addEventListener('submit', function (e) {
           e.preventDefault();
@@ -660,32 +626,642 @@
           if (!q) { if (locInput) locInput.focus(); return; }
           state.originLabel = q;
           if (store.getKey()) {
-            showResultsView();
-            setStatus('Looking up "' + q + '"…');
             gmaps.geocode(q, function (err, origin) {
-              if (err || !origin) { settings.showError(err || 'Could not find that place.'); showLanding(); return; }
-              searchAt(origin, q);
+              if (err || !origin) { settings.showError(err || 'Could not find that place.'); return; }
+              state.origin = origin;
+              showPrefs(true);
             });
           } else {
-            // Demo mode: no geocoder; show demo data labeled with the query.
-            renderDemo();
+            showPrefs(true);
           }
         });
       }
 
-      var openNow = $('open-now');
-      if (openNow) openNow.addEventListener('change', function () { state.openNow = openNow.checked; render(); });
-
-      var pick = $('pick-for-me');
-      if (pick) pick.addEventListener('click', pickForMe);
-
-      if (moreBtn) moreBtn.addEventListener('click', loadMore);
-
-      // Start on the calm landing — no results pre-loaded.
+      prefs.init();
+      deck.init();
       syncHeaderChrome();
     }
 
-    return { init: init, render: render, setResults: setResults, setStatus: setStatus, renderDemo: renderDemo, searchAt: searchAt, showLanding: showLanding, syncHeaderChrome: syncHeaderChrome };
+    return {
+      init: init,
+      showLanding: showLanding,
+      showPrefs: showPrefs,
+      showDeck: showDeck,
+      syncHeaderChrome: syncHeaderChrome,
+      startSearch: startSearch,
+      searchFarther: searchFarther,
+      hasFarther: hasFarther,
+      filterByPrefs: filterByPrefs
+    };
+  })();
+
+  /* ================================================================== *
+   * PREFS — tap-based preference controls, persisted to `eats-prefs`.
+   * All optional; everything defaults to "Any". Repeat use is instant.
+   * ================================================================== */
+  var prefs = (function () {
+    var CUISINES = [
+      ['italian', 'Italian'], ['japanese', 'Japanese'], ['mexican', 'Mexican'],
+      ['thai', 'Thai'], ['indian', 'Indian'], ['chinese', 'Chinese'],
+      ['american', 'American'], ['mediterranean', 'Mediterranean'], ['korean', 'Korean'],
+      ['vietnamese', 'Vietnamese'], ['pizza', 'Pizza'], ['burgers', 'Burgers'],
+      ['seafood', 'Seafood'], ['cafe', 'Café/Bakery'], ['bbq', 'BBQ'], ['vegetarian', 'Vegetarian']
+    ];
+    var DIETARY = [['vegetarian', 'Vegetarian'], ['vegan', 'Vegan'], ['gluten-free', 'Gluten-free']];
+    var DINING = [['dine-in', 'Dine-in'], ['takeout', 'Takeout'], ['delivery', 'Delivery']];
+    var RATINGS = [[0, 'Any'], [70, '70+'], [80, '80+'], [90, '90+']];
+    var REVIEWS = [[0, 'Any'], [100, '100+'], [500, '500+'], [1000, '1000+']];
+    var DISTANCES = [['walk', 'Walking'], ['drive', 'Short drive'], ['any', 'Anywhere']];
+
+    function defaults() {
+      return {
+        cuisine: [], price: [], minRating: 0, minReviews: 0,
+        openNow: false, distance: 'any', dietary: [], dining: []
+      };
+    }
+
+    var cur = null;
+    function current() { return cur || (cur = load()); }
+
+    function load() {
+      var saved = store.getPrefs();
+      var d = defaults();
+      if (!saved) return d;
+      if (Array.isArray(saved.cuisine)) d.cuisine = saved.cuisine;
+      if (Array.isArray(saved.price)) d.price = saved.price.map(Number).filter(function (n) { return n >= 1 && n <= 4; });
+      if (typeof saved.minRating === 'number') d.minRating = saved.minRating;
+      if (typeof saved.minReviews === 'number') d.minReviews = saved.minReviews;
+      if (typeof saved.openNow === 'boolean') d.openNow = saved.openNow;
+      if (typeof saved.distance === 'string') d.distance = saved.distance;
+      if (Array.isArray(saved.dietary)) d.dietary = saved.dietary;
+      if (Array.isArray(saved.dining)) d.dining = saved.dining;
+      return d;
+    }
+    function persist() { store.setPrefs(cur); }
+
+    function buildChips(container, items, key, opts) {
+      opts = opts || {};
+      if (!container) return;
+      clear(container);
+      var withAny = opts.any !== false;
+      if (withAny) {
+        var any = el('button', 'pref-chip is-any' + (cur[key].length === 0 ? ' is-on' : ''), 'Any');
+        any.type = 'button';
+        any.setAttribute('aria-pressed', cur[key].length === 0 ? 'true' : 'false');
+        any.addEventListener('click', function () {
+          cur[key] = []; persist(); buildChips(container, items, key, opts); updateCount();
+        });
+        container.appendChild(any);
+      }
+      items.forEach(function (it) {
+        var val = it[0], label = it[1];
+        var on = cur[key].indexOf(val) !== -1;
+        var c = el('button', 'pref-chip' + (on ? ' is-on' : ''), label);
+        c.type = 'button';
+        c.setAttribute('aria-pressed', on ? 'true' : 'false');
+        c.addEventListener('click', function () {
+          var i = cur[key].indexOf(val);
+          if (i === -1) cur[key].push(val); else cur[key].splice(i, 1);
+          persist(); buildChips(container, items, key, opts); updateCount();
+        });
+        container.appendChild(c);
+      });
+    }
+
+    function buildSeg(container, items, key) {
+      if (!container) return;
+      clear(container);
+      items.forEach(function (it) {
+        var val = it[0], label = it[1];
+        var on = cur[key] === val;
+        var isAny = (val === 0 || val === 'any');
+        var b = el('button', 'seg-btn' + (on ? ' is-on' : '') + (isAny ? ' is-any' : ''), label);
+        b.type = 'button';
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.addEventListener('click', function () {
+          cur[key] = val; persist(); buildSeg(container, items, key); updateCount();
+        });
+        container.appendChild(b);
+      });
+    }
+
+    function buildPrice() {
+      var container = $('pref-price');
+      if (!container) return;
+      clear(container);
+      var any = el('button', 'pref-chip is-any' + (cur.price.length === 0 ? ' is-on' : ''), 'Any');
+      any.type = 'button';
+      any.setAttribute('aria-pressed', cur.price.length === 0 ? 'true' : 'false');
+      any.addEventListener('click', function () { cur.price = []; persist(); buildPrice(); updateCount(); });
+      container.appendChild(any);
+      [1, 2, 3, 4].forEach(function (lvl) {
+        var on = cur.price.indexOf(lvl) !== -1;
+        var c = el('button', 'pref-chip' + (on ? ' is-on' : ''), priceStr(lvl));
+        c.type = 'button';
+        c.setAttribute('aria-pressed', on ? 'true' : 'false');
+        c.setAttribute('aria-label', 'Price level ' + lvl);
+        c.addEventListener('click', function () {
+          var i = cur.price.indexOf(lvl);
+          if (i === -1) cur.price.push(lvl); else cur.price.splice(i, 1);
+          persist(); buildPrice(); updateCount();
+        });
+        container.appendChild(c);
+      });
+    }
+
+    function updateCount() {
+      var countEl = $('prefs-count');
+      if (!countEl) return;
+      // Live preview against the demo catalog (instant, no network) so the
+      // user sees prefs bite immediately. Live mode filters real results too.
+      state.prefs = cur;
+      state.distanceCap = (cur.distance === 'walk') ? 1.2 : (cur.distance === 'drive' ? 5 : null);
+      var pool = demoResults();
+      var n = find.filterByPrefs(pool).length;
+      countEl.textContent = n + ' sample place' + (n === 1 ? '' : 's') + ' match';
+    }
+
+    function render() {
+      current();
+      buildChips($('pref-cuisine'), CUISINES, 'cuisine');
+      buildChips($('pref-dietary'), DIETARY, 'dietary', { any: false });
+      buildChips($('pref-dining'), DINING, 'dining', { any: false });
+      buildPrice();
+      buildSeg($('pref-rating'), RATINGS, 'minRating');
+      buildSeg($('pref-reviews'), REVIEWS, 'minReviews');
+      buildSeg($('pref-distance'), DISTANCES, 'distance');
+      var openTgl = $('pref-open');
+      if (openTgl) openTgl.checked = !!cur.openNow;
+      updateCount();
+    }
+
+    function init() {
+      var form = $('prefs-form');
+      if (form) {
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          persist();
+          find.showDeck();
+        });
+      }
+      var skip = $('prefs-skip');
+      if (skip) skip.addEventListener('click', function () {
+        cur = defaults(); persist(); render(); find.showDeck();
+      });
+      var openTgl = $('pref-open');
+      if (openTgl) openTgl.addEventListener('change', function () {
+        cur.openNow = openTgl.checked; persist(); updateCount();
+      });
+    }
+
+    return { init: init, render: render, current: current, defaults: defaults };
+  })();
+
+  /* ================================================================== *
+   * DECK — Tinder-style swipe stack.
+   *
+   * Cards are absolutely-stacked; the TOP card is the nearest matching
+   * restaurant. Pass (left) reveals the next-nearest; Like (right) opens
+   * the decision screen. Each card has 3 story segments (Vibe/Food/Reviews)
+   * cycled by TAP (distinguished from drag). Full button + keyboard parity.
+   * Drag is transform-only and rAF-throttled for 60fps.
+   * ================================================================== */
+  var deck = (function () {
+    var deckEl = $('deck');
+    var hintEl = $('deck-hint');
+    var controlsEl = $('deck-controls');
+    var decisionEl = $('decision');
+    var endEl = $('deck-end');
+    var btnNo = $('deck-no');
+    var btnYes = $('deck-yes');
+    var btnInfo = $('deck-info');
+
+    var queue = [];
+    var idx = 0;
+    var topCard = null;
+    var animating = false;
+    var keyHandler = null;
+
+    var SEGMENTS = ['vibe', 'food', 'reviews'];
+    var SEG_LABEL = { vibe: 'Vibe', food: 'Food', reviews: 'Reviews' };
+
+    function setMode(mode) {
+      var onDeck = mode === 'deck';
+      if (deckEl) deckEl.style.display = onDeck ? '' : 'none';
+      if (hintEl) hintEl.style.display = onDeck ? '' : 'none';
+      if (controlsEl) controlsEl.style.display = onDeck ? '' : 'none';
+      if (decisionEl) decisionEl.hidden = mode !== 'decision';
+      if (endEl) endEl.hidden = mode !== 'end';
+    }
+
+    function showLoading() {
+      setMode('deck');
+      clear(deckEl);
+      var l = el('div', 'deck-loading');
+      l.appendChild(el('span', 'social-spinner', ''));
+      l.appendChild(el('span', null, 'Finding places near you…'));
+      deckEl.appendChild(l);
+      setControlsEnabled(false);
+    }
+
+    function setControlsEnabled(on) {
+      [btnNo, btnYes, btnInfo].forEach(function (b) { if (b) b.disabled = !on; });
+    }
+
+    function load(matched) {
+      queue = matched || [];
+      idx = 0;
+      clear(deckEl);
+      setMode('deck');
+      if (!queue.length) { showEnd(true); return; }
+      renderStack();
+      setControlsEnabled(true);
+      announce(queue.length + ' places matched. Showing ' + queue[0].name + ', the nearest.');
+    }
+
+    function append(matched) {
+      if (!matched || !matched.length) return;
+      var wasEmpty = idx >= queue.length;
+      queue = queue.concat(matched);
+      if (wasEmpty) { idx = queue.length - matched.length; setMode('deck'); renderStack(); setControlsEnabled(true); }
+      else renderStack();
+    }
+
+    function renderStack() {
+      clear(deckEl);
+      for (var d = 2; d >= 0; d--) {
+        var i = idx + d;
+        if (i >= queue.length) continue;
+        deckEl.appendChild(buildCard(queue[i], d));
+      }
+      topCard = deckEl.querySelector('.swipe-card[data-depth="0"]');
+      if (topCard) prefetchUpcoming();
+    }
+
+    function buildCard(r, depth) {
+      var card = el('article', 'swipe-card');
+      card.dataset.depth = depth === 0 ? '0' : (depth === 1 ? '1' : '2');
+      card.dataset.id = r.id;
+      card.tabIndex = depth === 0 ? 0 : -1;
+      card.setAttribute('role', 'group');
+      card.setAttribute('aria-roledescription', 'restaurant card');
+      card._seg = 0;
+      card._data = r;
+
+      var media = el('div', 'card-media');
+      SEGMENTS.forEach(function (segKey, si) {
+        var panel = el('div', 'card-seg-panel seg-' + segKey + (si === 0 ? ' is-active' : ''));
+        if (segKey === 'reviews') {
+          var rv = el('div', 'card-reviews');
+          var quotes = (r.segments && r.segments.reviews && r.segments.reviews.quotes) || [];
+          if (quotes.length) {
+            quotes.forEach(function (q) {
+              var box = el('div', 'card-review');
+              box.appendChild(el('p', 'card-review-text', '“' + q.text + '”'));
+              var by = el('p', 'card-review-by');
+              by.appendChild(el('span', 'card-review-score', '★ ' + fmtScore(q.score)));
+              by.appendChild(document.createTextNode(' · ' + q.by));
+              box.appendChild(by);
+              rv.appendChild(box);
+            });
+          } else {
+            var note = el('div', 'card-review');
+            note.appendChild(el('p', 'card-review-text', 'No reviews to show yet.'));
+            rv.appendChild(note);
+          }
+          panel.appendChild(rv);
+        } else {
+          var seg = r.segments && r.segments[segKey];
+          if (seg && seg.photoUrl) {
+            // live mode: real Place photo for this segment
+            panel.style.backgroundImage = 'url("' + String(seg.photoUrl).replace(/"/g, '') + '")';
+            panel.style.backgroundSize = 'cover';
+            panel.style.backgroundPosition = 'center';
+          } else if (seg && seg.glyph) {
+            panel.appendChild(el('span', 'card-seg-glyph', seg.glyph));
+          }
+          panel.appendChild(el('span', 'card-seg-kind', SEG_LABEL[segKey]));
+        }
+        media.appendChild(panel);
+      });
+      card.appendChild(media);
+      card.appendChild(el('div', 'card-scrim'));
+
+      var bars = el('div', 'seg-bars');
+      SEGMENTS.forEach(function (s, si) {
+        bars.appendChild(el('span', 'seg-bar' + (si === 0 ? ' is-on' : '')));
+      });
+      card.appendChild(bars);
+
+      var yes = el('div', 'stamp stamp-yes', 'Yes');
+      var no = el('div', 'stamp stamp-no', 'Nope');
+      yes.setAttribute('aria-hidden', 'true');
+      no.setAttribute('aria-hidden', 'true');
+      card.appendChild(yes);
+      card.appendChild(no);
+
+      var ov = el('div', 'card-overlay');
+      ov.appendChild(el('h3', 'ov-name', r.name));
+      var meta = el('div', 'ov-meta');
+      if (r.rating) {
+        var rt = el('span', 'ov-rating');
+        rt.appendChild(el('span', 'ov-star', '★ '));
+        rt.appendChild(document.createTextNode(fmtScore(r.rating * 20)));
+        if (r.reviews) rt.appendChild(document.createTextNode(' (' + r.reviews.toLocaleString() + ')'));
+        meta.appendChild(rt);
+      }
+      if (r.price) {
+        meta.appendChild(el('span', 'ov-dot', '·'));
+        meta.appendChild(el('span', 'ov-price', priceStr(r.price)));
+      }
+      if (r.type) {
+        meta.appendChild(el('span', 'ov-dot', '·'));
+        meta.appendChild(el('span', 'ov-cuisine', r.type));
+      }
+      if (r.distance != null) {
+        meta.appendChild(el('span', 'ov-dot', '·'));
+        meta.appendChild(el('span', 'ov-dist', fmtDist(r.distance) + ' away'));
+      }
+      if (r.open != null) {
+        meta.appendChild(el('span', 'ov-badge' + (r.open ? '' : ' is-closed'), r.open ? 'Open now' : 'Closed'));
+      }
+      ov.appendChild(meta);
+      var tagLine = el('p', 'ov-tags');
+      tagLine.textContent = (r.segments && r.segments.vibe && r.segments.vibe.caption) || '';
+      ov.appendChild(tagLine);
+      card._tagLine = tagLine;
+      card.appendChild(ov);
+
+      card.setAttribute('aria-label', a11ySummary(r));
+
+      if (depth === 0) attachDrag(card);
+      return card;
+    }
+
+    function a11ySummary(r) {
+      var bits = [r.name];
+      if (r.rating) bits.push(fmtScore(r.rating * 20) + ' out of 100');
+      if (r.reviews) bits.push(r.reviews.toLocaleString() + ' reviews');
+      if (r.price) bits.push('price ' + priceStr(r.price));
+      if (r.type) bits.push(r.type);
+      if (r.distance != null) bits.push(fmtDist(r.distance) + ' away');
+      if (r.open != null) bits.push(r.open ? 'open now' : 'closed');
+      return bits.join(', ');
+    }
+
+    function cycleSegment(card) {
+      if (!card) return;
+      card._seg = (card._seg + 1) % SEGMENTS.length;
+      applySegment(card);
+    }
+    function applySegment(card) {
+      var panels = card.querySelectorAll('.card-seg-panel');
+      var bars = card.querySelectorAll('.seg-bar');
+      SEGMENTS.forEach(function (s, i) {
+        if (panels[i]) panels[i].classList.toggle('is-active', i === card._seg);
+        if (bars[i]) bars[i].classList.toggle('is-on', i === card._seg);
+      });
+      var r = card._data;
+      var segKey = SEGMENTS[card._seg];
+      var caption = '';
+      if (segKey === 'vibe') caption = (r.segments && r.segments.vibe && r.segments.vibe.caption) || '';
+      else if (segKey === 'food') caption = (r.segments && r.segments.food && r.segments.food.caption) || '';
+      else caption = 'What people are saying';
+      if (card._tagLine) card._tagLine.textContent = caption;
+      announce(SEG_LABEL[segKey] + ': ' + (caption || r.name));
+    }
+
+    function attachDrag(card) {
+      var startX = 0, startY = 0, dx = 0, dy = 0, dragging = false, moved = false, pid = null;
+      var raf = null;
+      var THRESH = 0.28;
+      var yesStamp = card.querySelector('.stamp-yes');
+      var noStamp = card.querySelector('.stamp-no');
+
+      function paint() {
+        raf = null;
+        var w = card.offsetWidth || 320;
+        var rot = (dx / w) * 16;
+        card.style.transform = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + rot + 'deg)';
+        var p = Math.max(-1, Math.min(1, dx / (w * THRESH)));
+        if (yesStamp) yesStamp.style.opacity = p > 0 ? Math.min(1, p) : 0;
+        if (noStamp) noStamp.style.opacity = p < 0 ? Math.min(1, -p) : 0;
+      }
+      function schedule() { if (raf == null) raf = window.requestAnimationFrame(paint); }
+
+      function down(e) {
+        if (animating) return;
+        if (e.button != null && e.button !== 0) return;
+        dragging = true; moved = false;
+        startX = e.clientX; startY = e.clientY; dx = 0; dy = 0;
+        pid = e.pointerId;
+        card.classList.add('is-dragging');
+        card.classList.remove('is-settling');
+        try { card.setPointerCapture(pid); } catch (err) {}
+      }
+      function move(e) {
+        if (!dragging) return;
+        dx = e.clientX - startX; dy = e.clientY - startY;
+        if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
+        schedule();
+      }
+      function up() {
+        if (!dragging) return;
+        dragging = false;
+        card.classList.remove('is-dragging');
+        try { card.releasePointerCapture(pid); } catch (err) {}
+        var w = card.offsetWidth || 320;
+        var commit = Math.abs(dx) > w * THRESH;
+        if (!moved) { cycleSegment(card); resetCard(); return; }
+        if (commit) fling(dx > 0 ? 'yes' : 'no');
+        else resetCard();
+      }
+      function resetCard() {
+        card.classList.add('is-settling');
+        card.style.transform = '';
+        if (yesStamp) yesStamp.style.opacity = 0;
+        if (noStamp) noStamp.style.opacity = 0;
+        dx = 0; dy = 0;
+      }
+
+      card.addEventListener('pointerdown', down);
+      card.addEventListener('pointermove', move);
+      card.addEventListener('pointerup', up);
+      card.addEventListener('pointercancel', up);
+      card.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+          e.preventDefault();
+          cycleSegment(card);
+        }
+      });
+    }
+
+    function fling(dir) {
+      if (!topCard || animating) return;
+      animating = true;
+      var card = topCard;
+      setControlsEnabled(false);
+
+      if (prefersReducedMotion) {
+        card.classList.add('is-gone');
+      } else {
+        var w = (deckEl.offsetWidth || 360) * 1.4;
+        var x = dir === 'yes' ? w : -w;
+        var rot = dir === 'yes' ? 22 : -22;
+        card.classList.add('is-gone');
+        card.style.transform = 'translate(' + x + 'px, 40px) rotate(' + rot + 'deg)';
+        var st = card.querySelector(dir === 'yes' ? '.stamp-yes' : '.stamp-no');
+        if (st) st.style.opacity = 1;
+      }
+
+      announce(dir === 'yes' ? 'Liked ' + (card._data ? card._data.name : 'this place') : 'Passed');
+
+      var liked = dir === 'yes';
+      var picked = card._data;
+      window.setTimeout(function () {
+        animating = false;
+        if (liked) onLike(picked);
+        else advance();
+      }, prefersReducedMotion ? 200 : 430);
+    }
+
+    function advance() {
+      idx++;
+      if (idx >= queue.length) { showEnd(false); return; }
+      renderStack();
+      setControlsEnabled(true);
+      if (topCard) topCard.focus();
+    }
+
+    function onLike(r) {
+      setMode('decision');
+      var nameEl = $('decision-name');
+      var metaEl = $('decision-meta');
+      var actionsEl = $('decision-actions');
+      if (nameEl) nameEl.textContent = r.name;
+      if (metaEl) {
+        var bits = [];
+        if (r.rating) bits.push('★ ' + fmtScore(r.rating * 20));
+        if (r.price) bits.push(priceStr(r.price));
+        if (r.type) bits.push(r.type);
+        if (r.distance != null) bits.push(fmtDist(r.distance) + ' away');
+        metaEl.textContent = bits.join('  ·  ');
+      }
+      if (actionsEl) {
+        clear(actionsEl);
+        var mapsHref = r.mapsUri ||
+          (r.placeId ? 'https://www.google.com/maps/dir/?api=1&destination_place_id=' + encodeURIComponent(r.placeId) + '&destination=' + encodeURIComponent(r.name) : null) ||
+          'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(r.name);
+        var map = el('a', 'decision-act decision-act--primary', 'Open in Maps · Directions');
+        map.href = mapsHref; map.target = '_blank'; map.rel = 'noopener';
+        actionsEl.appendChild(map);
+        if (r.phone) {
+          var call = el('a', 'decision-act', 'Call');
+          call.href = 'tel:' + r.phone;
+          actionsEl.appendChild(call);
+        }
+        var rate = el('button', 'decision-act', 'I ate here → Rate');
+        rate.type = 'button';
+        rate.addEventListener('click', function () {
+          sheet.openForPlace({ name: r.name, placeId: r.placeId || null, loc: r.location || null, address: r.type || '' });
+        });
+        actionsEl.appendChild(rate);
+      }
+      announce('Tonight: ' + r.name);
+      var nm = $('decision-name');
+      if (nm) { nm.setAttribute('tabindex', '-1'); nm.focus(); }
+    }
+
+    function keepLooking() {
+      setMode('deck');
+      advance();
+    }
+
+    function showEnd(emptyFromStart) {
+      setMode('end');
+      var title = $('deck-end-title');
+      var sub = $('deck-end-sub');
+      if (emptyFromStart) {
+        if (title) title.textContent = 'Nothing matched those filters';
+        if (sub) sub.textContent = 'Try widening your preferences or searching farther.';
+      } else {
+        if (title) title.textContent = 'That’s everywhere nearby that matched';
+        if (sub) sub.textContent = 'You’ve seen every spot within your distance cap.';
+      }
+      var farther = $('end-farther');
+      if (farther) farther.style.display = find.hasFarther() ? '' : 'none';
+      announce(emptyFromStart ? 'No places matched your preferences.' : 'You have reached the end of the deck.');
+      var t = $('deck-end-title');
+      if (t) { t.setAttribute('tabindex', '-1'); t.focus(); }
+    }
+
+    /* ---- live: lazily prefetch details for upcoming cards ----
+       Only the top card and the next two are fetched, so we never request
+       data for cards the user won't see. Cached per place via detailsLoaded.
+       Live-only path: cannot run without a key + network. */
+    function prefetchUpcoming() {
+      if (!store.getKey()) return; // demo cards already carry everything
+      for (var d = 0; d < 3; d++) {
+        var i = idx + d;
+        if (i >= queue.length) break;
+        var r = queue[i];
+        if (r && !r.detailsLoaded) {
+          (function (rr) {
+            rr.detailsLoaded = true; // mark in-flight to avoid duplicate fetches
+            gmaps.fetchDetails(rr, function (err, enriched) {
+              if (err || !enriched) return;
+              var node = deckEl.querySelector('.swipe-card[data-id="' + rr.id + '"]');
+              if (node) renderStack();
+            });
+          })(queue[i]);
+        }
+      }
+    }
+
+    function passTop() { if (!animating && topCard) fling('no'); }
+    function likeTop() { if (!animating && topCard) fling('yes'); }
+    function infoTop() { if (topCard) cycleSegment(topCard); }
+
+    function teardown() {
+      clear(deckEl);
+      queue = []; idx = 0; topCard = null; animating = false;
+      setMode('deck');
+    }
+
+    function init() {
+      if (btnNo) btnNo.addEventListener('click', passTop);
+      if (btnYes) btnYes.addEventListener('click', likeTop);
+      if (btnInfo) btnInfo.addEventListener('click', infoTop);
+
+      var keep = $('decision-keep');
+      if (keep) keep.addEventListener('click', keepLooking);
+
+      var widen = $('end-widen');
+      if (widen) widen.addEventListener('click', function () { find.showPrefs(true); });
+      var restart = $('end-restart');
+      if (restart) restart.addEventListener('click', function () { find.showLanding(); });
+      var farther = $('end-farther');
+      if (farther) farther.addEventListener('click', function () {
+        find.searchFarther(function (more) {
+          if (more && more.length) { setMode('deck'); append(more); }
+          else announce('No more places farther out.');
+        });
+      });
+
+      keyHandler = function (e) {
+        var dw = $('deck-wrap');
+        if (!dw || dw.hidden) return;
+        if (decisionEl && !decisionEl.hidden) return;
+        if (endEl && !endEl.hidden) return;
+        var t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+        if (e.key === 'ArrowLeft') { e.preventDefault(); passTop(); }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); likeTop(); }
+      };
+      document.addEventListener('keydown', keyHandler);
+    }
+
+    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown };
   })();
 
   /* paint a wc-range fill % (shared) */
@@ -895,12 +1471,24 @@
         reviews: p.user_ratings_total || 0,
         price: (typeof p.price_level === 'number' && p.price_level > 0) ? p.price_level : 0,
         type: typeArr(p.types),
+        // Map Google `types` to our Preferences cuisine keys so prefs filter live results.
+        cuisines: cuisineKeys(p.types),
+        diet: [],     // Places doesn't expose dietary flags; left empty (no false filtering)
+        dining: [],   // Places doesn't expose dine-in/takeout/delivery reliably on nearbySearch
         open: openState,
-        phone: null, // not returned by nearbySearch; a Details call would add it
+        phone: null, // not returned by nearbySearch; the Details call (fetchDetails) adds it
         photoUrl: photoUrl,
+        // story segments — populated lazily by fetchDetails (photos + reviews).
+        // Until then they collapse to a labeled watercolor panel.
+        segments: {
+          vibe: { kind: 'vibe', glyph: '✨', caption: '' },
+          food: { kind: 'food', glyph: '🍴', caption: '' },
+          reviews: { kind: 'reviews', quotes: [] }
+        },
         location: loc,
         distance: loc ? haversineMiles(origin, loc) : null,
-        mapsUri: p.place_id ? 'https://www.google.com/maps/place/?q=place_id:' + p.place_id : null
+        mapsUri: p.place_id ? 'https://www.google.com/maps/place/?q=place_id:' + p.place_id : null,
+        detailsLoaded: false
       };
     }
 
@@ -912,6 +1500,26 @@
         .slice(0, 2)
         .map(function (t) { return t.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }); });
       return nice.join(' · ');
+    }
+
+    /* Map Google Place `types` to our Preferences cuisine keys (best effort).
+       Google has limited cuisine granularity, so many places only match
+       generic keys; unmatched places simply won't be excluded unless the
+       user picks a cuisine. */
+    function cuisineKeys(types) {
+      if (!types || !types.length) return [];
+      var MAP = {
+        italian_restaurant: 'italian', japanese_restaurant: 'japanese', sushi_restaurant: 'japanese',
+        ramen_restaurant: 'japanese', mexican_restaurant: 'mexican', thai_restaurant: 'thai',
+        indian_restaurant: 'indian', chinese_restaurant: 'chinese', american_restaurant: 'american',
+        mediterranean_restaurant: 'mediterranean', korean_restaurant: 'korean',
+        vietnamese_restaurant: 'vietnamese', pizza_restaurant: 'pizza', hamburger_restaurant: 'burgers',
+        seafood_restaurant: 'seafood', cafe: 'cafe', bakery: 'cafe', coffee_shop: 'cafe',
+        barbecue_restaurant: 'bbq', vegetarian_restaurant: 'vegetarian'
+      };
+      var out = [];
+      types.forEach(function (t) { if (MAP[t] && out.indexOf(MAP[t]) === -1) out.push(MAP[t]); });
+      return out;
     }
 
     function humanizeStatus(status) {
@@ -956,7 +1564,10 @@
             state.autocomplete.addListener('place_changed', function () {
               var place = state.autocomplete.getPlace();
               if (place && place.geometry && place.geometry.location) {
-                find.searchAt({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng() });
+                state.origin = { lat: place.geometry.location.lat(), lng: place.geometry.location.lng() };
+                if (place.name) state.originLabel = place.name;
+                // a chosen autocomplete location goes to Preferences, then the deck.
+                find.showPrefs(true);
               }
             });
           }).catch(function () {});
@@ -971,11 +1582,81 @@
       return 'Live search failed: ' + msg;
     }
 
+    /* fetchDetails — lazily enrich ONE result's card segments with Place
+       Details (photos + reviews + phone + opening hours). Called by the deck
+       only for the top card and the next two, so we never fetch data for
+       cards the user won't see. Minimal fields are requested. Cached per
+       place via the result's `detailsLoaded` flag (set by the caller).
+
+       Google does NOT label photos as "vibe" vs "food" — so we split the
+       available Place photos across the two segments (first half -> vibe,
+       second half -> food, sharing if only one). Reviews fill the Reviews
+       segment; any segment with no data collapses gracefully in the deck.
+
+       NOTE: live-only; cannot be exercised here without a key + network. */
+    function fetchDetails(r, done) {
+      if (!r || !r.placeId) { done && done(null, null); return; }
+      whenReady(function () {
+        try {
+          google.maps.importLibrary('places').then(function (places) {
+            var service = getService(places);
+            service.getDetails({
+              placeId: r.placeId,
+              // Minimal fields: photos, reviews, phone, hours, name.
+              fields: ['photos', 'reviews', 'formatted_phone_number', 'international_phone_number', 'opening_hours', 'name']
+            }, function (place, status) {
+              var P = google.maps.places;
+              if (status !== P.PlacesServiceStatus.OK || !place) { done && done(humanizeStatus(status), null); return; }
+
+              // phone
+              r.phone = place.international_phone_number || place.formatted_phone_number || r.phone || null;
+
+              // open-now (Details has fresher hours than nearbySearch)
+              try {
+                if (place.opening_hours && typeof place.opening_hours.isOpen === 'function') {
+                  r.open = place.opening_hours.isOpen();
+                }
+              } catch (e) {}
+
+              // photos split across vibe + food segments
+              var urls = [];
+              try {
+                (place.photos || []).slice(0, 6).forEach(function (ph) {
+                  if (typeof ph.getUrl === 'function') urls.push(ph.getUrl({ maxWidth: 800, maxHeight: 1000 }));
+                });
+              } catch (e) {}
+              if (urls.length) {
+                var mid = Math.ceil(urls.length / 2);
+                r.segments.vibe.photoUrl = urls[0] || null;
+                r.segments.food.photoUrl = urls[mid] || urls[0] || null;
+                r.segments.vibe.caption = '';
+                r.segments.food.caption = '';
+              }
+
+              // reviews -> quotes (Google rating is 0-5 -> x20 for our scale)
+              try {
+                r.segments.reviews.quotes = (place.reviews || []).slice(0, 3).map(function (rv) {
+                  return {
+                    by: rv.author_name || 'A diner',
+                    score: Math.round((rv.rating || 0) * 20),
+                    text: (rv.text || '').slice(0, 180)
+                  };
+                });
+              } catch (e) {}
+
+              done && done(null, r);
+            });
+          }).catch(function (e) { done && done(humanizeError(e), null); });
+        } catch (e) { done && done(humanizeError(e), null); }
+      });
+    }
+
     return {
       loadOnce: loadOnce,
       searchNearby: searchNearby,
       geocode: geocode,
-      attachAutocomplete: attachAutocomplete
+      attachAutocomplete: attachAutocomplete,
+      fetchDetails: fetchDetails
     };
   })();
 
