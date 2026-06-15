@@ -64,23 +64,18 @@
         aria-labelledby="tab-find"
         tabindex="0"
       >
-        <!-- CALM LANDING (pre-search) -->
+        <!-- CALM LANDING (pre-search) — stripped to just the bubble + a quiet link -->
         <div class="find-landing" id="find-landing">
-          <p class="landing-kicker">Tap to find somewhere to eat</p>
-
           <button class="find-orb" id="find-near-me" type="button" aria-label="Find food near me">
             <span class="find-orb-pool" aria-hidden="true"></span>
+            <span class="find-orb-sheen" aria-hidden="true"></span>
             <span class="find-orb-inner">
-              <svg class="find-orb-icon" viewBox="0 0 24 24" width="34" height="34" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 21s-6.5-5.3-6.5-10.2A6.5 6.5 0 0 1 12 4.3a6.5 6.5 0 0 1 6.5 6.5C18.5 15.7 12 21 12 21z"></path>
-                <circle cx="12" cy="10.6" r="2.4"></circle>
-              </svg>
-              <span class="find-orb-text">Find food<br />near me</span>
+              <span class="find-orb-text">Find</span>
             </span>
           </button>
 
           <button class="landing-loc-link" id="loc-reveal" type="button" aria-expanded="false" aria-controls="loc-form">
-            or search a specific location
+            search a specific location
           </button>
 
           <form class="loc-form" id="loc-form" autocomplete="off" hidden>
@@ -95,11 +90,6 @@
               <button class="loc-go" id="loc-go" type="submit">Search</button>
             </div>
           </form>
-
-          <p class="landing-demo-hint" id="landing-demo-hint" role="status" hidden>
-            Showing sample places.
-            <button class="hint-link" id="hint-add-key" type="button">Use live data</button>
-          </p>
         </div>
 
         <!-- RESULTS STATE (post-search) -->

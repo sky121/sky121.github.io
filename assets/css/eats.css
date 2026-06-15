@@ -190,99 +190,203 @@ html.evening :focus-visible {
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 1.35rem;
-  /* vertically center in the space above the bottom bar */
-  min-height: min(58vh, 32rem);
+  gap: 1.8rem;
+  /* vertically center in the generous space above the bottom bar */
+  min-height: min(66vh, 34rem);
   padding: 1.5rem 0 0.5rem;
 }
 
-.landing-kicker {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: clamp(1.05rem, 3.4vw, 1.35rem);
-  color: var(--ink-soft);
-  margin: 0;
+/* When the calm Find landing is showing, retire the shared page header
+   (eyebrow + "Peckish" wordmark) so the bubble stands alone. */
+.eats-room.find-landing-on > .room-label,
+.eats-room.find-landing-on > .exhibit-title {
+  display: none;
+}
+.eats-room.find-landing-on .find-landing {
+  min-height: min(74vh, 40rem);
 }
 
-/* The round centerpiece button */
+/* ----- The watercolor BUBBLE button (hero) ----- */
 .find-orb {
   position: relative;
   appearance: none;
   border: 0;
   cursor: pointer;
-  width: clamp(13rem, 52vw, 16.5rem);
-  height: clamp(13rem, 52vw, 16.5rem);
+  width: clamp(11.5rem, 56vw, 15.5rem);
+  height: clamp(11.5rem, 56vw, 15.5rem);
   border-radius: 50%;
   background: transparent;
   display: grid;
   place-items: center;
   isolation: isolate;
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
-/* watercolor pooled disc */
+
+/* the translucent soap-bubble body: drifting iridescence in the palette */
 .find-orb-pool {
   position: absolute;
   inset: 0;
   border-radius: 50%;
   background:
-    radial-gradient(58% 58% at 28% 22%, rgba(217, 139, 160, 0.98) 0%, rgba(217, 139, 160, 0) 58%),
-    radial-gradient(60% 60% at 78% 28%, rgba(162, 146, 196, 0.95) 0%, rgba(162, 146, 196, 0) 60%),
-    radial-gradient(68% 68% at 66% 84%, rgba(147, 180, 139, 0.85) 0%, rgba(147, 180, 139, 0) 62%),
-    radial-gradient(64% 64% at 22% 78%, rgba(205, 184, 120, 0.55) 0%, rgba(205, 184, 120, 0) 60%),
-    radial-gradient(130% 130% at 44% 48%, var(--pond) 0%, var(--pond-deep) 88%);
+    /* sheen highlight (top-left) */
+    radial-gradient(38% 30% at 30% 24%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 60%),
+    /* iridescent palette blooms, translucent */
+    radial-gradient(48% 48% at 24% 30%, rgba(217, 139, 160, 0.55) 0%, rgba(217, 139, 160, 0) 60%),
+    radial-gradient(50% 50% at 78% 26%, rgba(162, 146, 196, 0.5) 0%, rgba(162, 146, 196, 0) 62%),
+    radial-gradient(58% 58% at 70% 82%, rgba(147, 180, 139, 0.42) 0%, rgba(147, 180, 139, 0) 64%),
+    radial-gradient(56% 56% at 22% 80%, rgba(205, 184, 120, 0.4) 0%, rgba(205, 184, 120, 0) 62%),
+    /* glassy pond tint, more transparent toward centre */
+    radial-gradient(120% 120% at 46% 44%, rgba(127, 168, 201, 0.18) 0%, rgba(74, 114, 153, 0.42) 96%);
   box-shadow:
-    0 22px 48px -16px rgba(74, 114, 153, 0.7),
-    0 44px 80px -30px rgba(162, 146, 196, 0.65),
-    inset 0 3px 3px rgba(255, 255, 255, 0.4),
-    inset 0 -16px 34px -10px rgba(46, 58, 72, 0.38);
+    /* outer cast glow */
+    0 24px 54px -18px rgba(74, 114, 153, 0.55),
+    0 50px 90px -34px rgba(162, 146, 196, 0.5),
+    /* rim of light */
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.45),
+    /* top sheen + bottom shading for volume */
+    inset 0 6px 10px rgba(255, 255, 255, 0.55),
+    inset 0 -22px 40px -14px rgba(46, 58, 72, 0.3);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   z-index: -1;
-  animation: orb-breathe 5.5s ease-in-out infinite;
+  animation: orb-wobble 7s ease-in-out infinite;
 }
 html.evening .find-orb-pool {
+  background:
+    radial-gradient(38% 30% at 30% 24%, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 60%),
+    radial-gradient(48% 48% at 24% 30%, rgba(217, 139, 160, 0.5) 0%, rgba(217, 139, 160, 0) 60%),
+    radial-gradient(50% 50% at 78% 26%, rgba(176, 162, 210, 0.5) 0%, rgba(176, 162, 210, 0) 62%),
+    radial-gradient(58% 58% at 70% 82%, rgba(147, 180, 139, 0.4) 0%, rgba(147, 180, 139, 0) 64%),
+    radial-gradient(56% 56% at 22% 80%, rgba(205, 184, 120, 0.42) 0%, rgba(205, 184, 120, 0) 62%),
+    radial-gradient(120% 120% at 46% 44%, rgba(159, 194, 224, 0.16) 0%, rgba(74, 114, 153, 0.5) 96%);
   box-shadow:
-    0 22px 48px -16px rgba(0, 0, 0, 0.6),
-    0 44px 80px -30px rgba(74, 114, 153, 0.6),
-    inset 0 3px 3px rgba(255, 255, 255, 0.3),
-    inset 0 -16px 34px -10px rgba(0, 0, 0, 0.45);
+    0 24px 54px -18px rgba(0, 0, 0, 0.55),
+    0 50px 90px -34px rgba(127, 168, 201, 0.5),
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.4),
+    inset 0 6px 12px rgba(255, 255, 255, 0.4),
+    inset 0 -22px 40px -14px rgba(0, 0, 0, 0.4);
 }
-/* soft outward ripple ring */
+
+/* crisp little soap-bubble specular highlight that drifts slowly */
+.find-orb-sheen {
+  position: absolute;
+  top: 16%;
+  left: 20%;
+  width: 30%;
+  height: 22%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 72%);
+  filter: blur(1px);
+  z-index: 1;
+  pointer-events: none;
+  animation: orb-sheen 7s ease-in-out infinite;
+}
+
+/* soft outward ripple ring (faint rim of light) */
 .find-orb::before {
   content: "";
   position: absolute;
-  inset: -6%;
+  inset: -5%;
   border-radius: 50%;
-  border: 1px solid rgba(127, 168, 201, 0.5);
+  border: 1px solid rgba(127, 168, 201, 0.4);
   z-index: -2;
-  animation: orb-ripple 5.5s ease-out infinite;
+  animation: orb-ripple 7s ease-out infinite;
 }
-html.evening .find-orb::before { border-color: rgba(159, 194, 224, 0.45); }
+html.evening .find-orb::before { border-color: rgba(159, 194, 224, 0.4); }
+
 .find-orb-inner {
+  position: relative;
+  z-index: 2;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--paper);
-  text-shadow: 0 1px 3px rgba(46, 58, 72, 0.45);
+  justify-content: center;
+  /* fixed warm-white that reads on the translucent bubble in BOTH themes */
+  color: #fbf7ee;
+  text-shadow:
+    0 1px 1px rgba(46, 58, 72, 0.35),
+    0 2px 10px rgba(46, 58, 72, 0.45);
 }
-.find-orb-icon { display: block; }
+html.evening .find-orb-inner {
+  color: #f3eee3;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.55),
+    0 2px 12px rgba(0, 0, 0, 0.5);
+}
 .find-orb-text {
   font-family: var(--font-display);
+  font-style: italic;
   font-weight: 500;
-  font-size: clamp(1.3rem, 4.6vw, 1.7rem);
-  line-height: 1.1;
+  font-size: clamp(1.9rem, 6.4vw, 2.5rem);
+  line-height: 1;
   letter-spacing: 0.01em;
 }
-.find-orb:hover { transform: translateY(-4px) scale(1.02); }
-.find-orb:active { transform: translateY(-1px) scale(0.985); }
+.find-orb:hover { transform: translateY(-5px) scale(1.03); }
+.find-orb:active { transform: translateY(-1px) scale(0.97); }
 
-@keyframes orb-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.035); }
+@keyframes orb-wobble {
+  0%, 100% { transform: scale(1) translateY(0); border-radius: 50%; }
+  35%      { transform: scale(1.025) translateY(-3px); border-radius: 49% 51% 52% 48% / 51% 49% 51% 49%; }
+  65%      { transform: scale(0.99) translateY(2px); border-radius: 51% 49% 48% 52% / 49% 52% 48% 51%; }
+}
+@keyframes orb-sheen {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.95; }
+  50%      { transform: translate(8%, 6%) scale(1.08); opacity: 0.75; }
 }
 @keyframes orb-ripple {
-  0% { transform: scale(0.96); opacity: 0.7; }
+  0% { transform: scale(0.97); opacity: 0.55; }
   70% { opacity: 0; }
-  100% { transform: scale(1.18); opacity: 0; }
+  100% { transform: scale(1.16); opacity: 0; }
+}
+
+/* ----- POP: swell then burst + fade ----- */
+.find-orb.is-popping {
+  pointer-events: none;
+  animation: orb-pop 0.46s cubic-bezier(0.3, 0.8, 0.4, 1) forwards;
+}
+.find-orb.is-popping .find-orb-pool {
+  animation: orb-pool-pop 0.46s cubic-bezier(0.3, 0.8, 0.4, 1) forwards;
+}
+.find-orb.is-popping .find-orb-sheen { animation: none; opacity: 0; }
+.find-orb.is-popping .find-orb-inner { animation: orb-inner-pop 0.28s ease forwards; }
+
+@keyframes orb-pop {
+  0%   { transform: scale(1); }
+  28%  { transform: scale(1.12); }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+@keyframes orb-pool-pop {
+  0%   { opacity: 1; filter: blur(0); }
+  28%  { opacity: 1; }
+  100% { opacity: 0; filter: blur(6px); }
+}
+@keyframes orb-inner-pop {
+  0%   { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.3); }
+}
+
+/* transient droplet spray layer (appended to <body>, centred on the orb) */
+.orb-burst {
+  position: fixed;
+  z-index: 130;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.orb-drop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 60% 40% 55% 45% / 50% 60% 40% 50%;
+  opacity: 0.9;
+  transform: translate(-50%, -50%);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.6);
+  animation: orb-drop-fly 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes orb-drop-fly {
+  0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  18%  { opacity: 0.92; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1); opacity: 0; }
 }
 
 .landing-loc-link {
@@ -303,11 +407,6 @@ html.evening .find-orb::before { border-color: rgba(159, 194, 224, 0.45); }
 }
 .landing-loc-link:hover { text-decoration-color: currentColor; }
 
-.landing-demo-hint {
-  font-size: 0.82rem;
-  color: var(--ink-soft);
-  margin: 0;
-}
 .hint-link, .badge-link {
   appearance: none;
   border: 0;
@@ -1365,9 +1464,11 @@ html.evening .settings-msg.is-ok { color: #b6d3af; }
 
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .find-orb, .find-orb-pool, .find-orb::before, .bottab-icon,
+  .find-orb, .find-orb-pool, .find-orb-sheen, .find-orb::before, .bottab-icon,
   .card, .pick-btn, .ctl-switch::after, .card-action, .sheet,
-  .more-btn, .pop-card, .friend-chip, .range-btn {
+  .more-btn, .pop-card, .friend-chip, .range-btn,
+  .find-orb.is-popping, .find-orb.is-popping .find-orb-pool,
+  .find-orb.is-popping .find-orb-inner, .orb-drop {
     transition: none;
     animation: none;
   }

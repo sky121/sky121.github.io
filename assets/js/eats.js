@@ -226,6 +226,7 @@
           if (d.onShow) d.onShow();
         }
       });
+      if (typeof find !== 'undefined' && find.syncHeaderChrome) find.syncHeaderChrome();
     }
 
     function init() {
@@ -408,15 +409,29 @@
 
     function setStatus(msg) { statusEl.textContent = msg; }
 
+    /* Hide the shared page header (eyebrow + "Peckish" wordmark) whenever the
+       calm Find landing is the thing on screen, so the landing reads nearly
+       empty. Other tabs / the results view keep the header. */
+    function syncHeaderChrome() {
+      var room = $('room');
+      if (!room) return;
+      var findTab = $('tab-find');
+      var findActive = findTab ? findTab.getAttribute('aria-selected') === 'true' : true;
+      var landingOn = findActive && landingEl && !landingEl.hidden;
+      room.classList.toggle('find-landing-on', !!landingOn);
+    }
+
     /* ---- View switching: calm landing <-> results ---- */
     function showResultsView() {
       if (landingEl) landingEl.hidden = true;
       if (resultsWrap) resultsWrap.hidden = false;
       updateOrigin();
+      syncHeaderChrome();
     }
     function showLanding() {
       if (resultsWrap) resultsWrap.hidden = true;
       if (landingEl) landingEl.hidden = false;
+      syncHeaderChrome();
       // reset transient search state (keep nothing stale behind the landing)
       state.results = [];
       state.hasMore = false;
@@ -575,9 +590,52 @@
       setResults(list, origin || DEMO_ORIGIN);
     }
 
+    /* --- Watercolor bubble POP, then proceed to search --- */
+    var popping = false;
+    function popAndFind() {
+      if (popping) return;
+      var orb = $('find-near-me');
+      if (!orb || prefersReducedMotion) { findNearMe(); return; }
+      popping = true;
+
+      // Build a transient burst layer centred on the orb.
+      var rect = orb.getBoundingClientRect();
+      var layer = el('div', 'orb-burst');
+      layer.style.left = (rect.left + rect.width / 2) + 'px';
+      layer.style.top = (rect.top + rect.height / 2) + 'px';
+
+      var palette = ['var(--rose)', 'var(--wisteria)', 'var(--sage)', 'var(--gold)', 'var(--pond)'];
+      var DROPS = 14;
+      var base = Math.min(rect.width, rect.height);
+      for (var i = 0; i < DROPS; i++) {
+        var d = el('span', 'orb-drop');
+        var ang = (i / DROPS) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+        var dist = base * (0.34 + Math.random() * 0.32);
+        var size = base * (0.06 + Math.random() * 0.10);
+        d.style.setProperty('--dx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+        d.style.setProperty('--dy', (Math.sin(ang) * dist).toFixed(1) + 'px');
+        d.style.width = size.toFixed(1) + 'px';
+        d.style.height = size.toFixed(1) + 'px';
+        d.style.background = palette[i % palette.length];
+        d.style.animationDelay = (Math.random() * 60).toFixed(0) + 'ms';
+        layer.appendChild(d);
+      }
+      document.body.appendChild(layer);
+
+      orb.classList.add('is-popping');
+
+      // After the pop sequence: clean up and run the real search.
+      window.setTimeout(function () {
+        if (layer.parentNode) layer.parentNode.removeChild(layer);
+        orb.classList.remove('is-popping');
+        popping = false;
+        findNearMe();
+      }, 480);
+    }
+
     function init() {
       var orb = $('find-near-me');
-      if (orb) orb.addEventListener('click', findNearMe);
+      if (orb) orb.addEventListener('click', popAndFind);
 
       var back = $('results-back');
       if (back) back.addEventListener('click', showLanding);
@@ -624,9 +682,10 @@
       if (moreBtn) moreBtn.addEventListener('click', loadMore);
 
       // Start on the calm landing — no results pre-loaded.
+      syncHeaderChrome();
     }
 
-    return { init: init, render: render, setResults: setResults, setStatus: setStatus, renderDemo: renderDemo, searchAt: searchAt, showLanding: showLanding };
+    return { init: init, render: render, setResults: setResults, setStatus: setStatus, renderDemo: renderDemo, searchAt: searchAt, showLanding: showLanding, syncHeaderChrome: syncHeaderChrome };
   })();
 
   /* paint a wc-range fill % (shared) */
