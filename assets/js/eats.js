@@ -46,6 +46,8 @@
   var KEY_GMAPS = 'eats-gmaps-key';
   var KEY_VISITED = 'eats-visited';
   var KEY_PREFS = 'eats-prefs';
+  var KEY_SEEN = 'eats-seen';
+  var SEEN_TTL_MS = 6 * 60 * 60 * 1000; // passes are remembered for ~one outing
 
   var store = {
     getPrefs: function () {
@@ -78,6 +80,37 @@
     },
     setVisited: function (arr) {
       try { localStorage.setItem(KEY_VISITED, JSON.stringify(arr)); return true; } catch (e) { return false; }
+    },
+    /* seen memory — places passed on recently ({id: timestamp}, TTL-pruned) */
+    getSeen: function () {
+      try {
+        var raw = localStorage.getItem(KEY_SEEN);
+        var map = raw ? JSON.parse(raw) : {};
+        if (!map || typeof map !== 'object') return {};
+        var now = Date.now(), out = {}, dirty = false;
+        for (var id in map) {
+          if (now - map[id] < SEEN_TTL_MS) out[id] = map[id];
+          else dirty = true;
+        }
+        if (dirty) localStorage.setItem(KEY_SEEN, JSON.stringify(out));
+        return out;
+      } catch (e) { return {}; }
+    },
+    addSeen: function (id) {
+      if (!id) return;
+      try {
+        var map = this.getSeen();
+        map[id] = Date.now();
+        localStorage.setItem(KEY_SEEN, JSON.stringify(map));
+      } catch (e) {}
+    },
+    removeSeen: function (id) {
+      if (!id) return;
+      try {
+        var map = this.getSeen();
+        delete map[id];
+        localStorage.setItem(KEY_SEEN, JSON.stringify(map));
+      } catch (e) {}
     }
   };
 
@@ -192,6 +225,63 @@
   /* Watercolor panel descriptors (the deck builds gradient panels from these). */
   var DEMO_VIBE_GLYPH = '✨'; // sparkles
   var DEMO_FOOD_GLYPH = '🍴'; // fork & knife with plate
+
+  /* ------------------------------------------------------------------ *
+   * Procedural watercolor panel art — when a card has no real photo,
+   * paint a cuisine-keyed pigment composition instead of a flat gradient.
+   * Vibe = ambient washes; Food = a plate on a table with dish-color
+   * pooling. Seeded per place so every card reads distinct.
+   * ------------------------------------------------------------------ */
+  var CUISINE_ART = {
+    cafe:          ['#c9a97a', '#e8d9bd', '#8a6f4d'],
+    japanese:      ['#5a6c86', '#d98ba0', '#e8e0cf'],
+    italian:       ['#93b48b', '#c25a3a', '#f0e3c8'],
+    mexican:       ['#d97f4e', '#93b48b', '#cdb878'],
+    indian:        ['#d99a3d', '#c2547e', '#8a5a9e'],
+    mediterranean: ['#7fa8c9', '#93b48b', '#e8dfc9'],
+    seafood:       ['#6fa3c4', '#d98ba0', '#dceaf2'],
+    bbq:           ['#8a5a44', '#c25a3a', '#4a4038'],
+    korean:        ['#c2504a', '#3f4a5a', '#e8d9bd'],
+    vietnamese:    ['#88a86f', '#cdb878', '#e9efdb'],
+    thai:          ['#a292c4', '#cdb878', '#93b48b'],
+    burgers:       ['#cda04e', '#a8512f', '#e8d9bd'],
+    pizza:         ['#c25a3a', '#93b48b', '#f0e3c8'],
+    vegetarian:    ['#93b48b', '#b4c98b', '#e9efdb'],
+    american:      ['#7fa8c9', '#cdb878', '#e8dfc9']
+  };
+
+  function hashStr(s) {
+    var h = 2166136261;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 16777619) >>> 0; }
+    return h;
+  }
+
+  function panelArt(r, segKey) {
+    var pal = CUISINE_ART[(r.cuisines || [])[0]] || ['#a292c4', '#7fa8c9', '#e8dfc9'];
+    var h = hashStr((r.name || r.id || '') + segKey);
+    var rnd = function (lo, hi, salt) {
+      var x = ((h >> (salt % 24)) & 255) / 255;
+      return Math.round(lo + x * (hi - lo));
+    };
+    var layers = [];
+    if (segKey === 'food') {
+      // dish pooling on a plate, plate on a table wash
+      var px = rnd(42, 58, 3), py = rnd(40, 52, 7);
+      layers.push('radial-gradient(circle at ' + (px - 6) + '% ' + (py - 4) + '%, ' + pal[1] + 'e6 0%, ' + pal[1] + '00 16%)');
+      layers.push('radial-gradient(circle at ' + (px + 7) + '% ' + (py + 5) + '%, ' + pal[0] + 'd9 0%, ' + pal[0] + '00 14%)');
+      layers.push('radial-gradient(circle at ' + px + '% ' + (py + 8) + '%, ' + pal[2] + 'cc 0%, ' + pal[2] + '00 12%)');
+      layers.push('radial-gradient(circle at ' + px + '% ' + py + '%, #f6f1e7 0 26%, #e6dcc4 26.5% 29%, #f6f1e700 30%)');
+      layers.push('radial-gradient(120% 90% at ' + rnd(20, 80, 11) + '% 110%, ' + pal[0] + '40 0%, ' + pal[0] + '00 60%)');
+      layers.push('linear-gradient(' + rnd(150, 210, 13) + 'deg, #4c4438 0%, #6b5f4d 55%, #57503f 100%)');
+    } else {
+      // ambient room washes: three pigment pools glowing against dusk paper
+      layers.push('radial-gradient(' + rnd(50, 80, 2) + '% ' + rnd(40, 65, 5) + '% at ' + rnd(12, 40, 9) + '% ' + rnd(18, 45, 4) + '%, ' + pal[0] + 'e6 0%, ' + pal[0] + '00 72%)');
+      layers.push('radial-gradient(' + rnd(45, 75, 6) + '% ' + rnd(45, 70, 8) + '% at ' + rnd(60, 88, 10) + '% ' + rnd(25, 60, 12) + '%, ' + pal[1] + 'cc 0%, ' + pal[1] + '00 72%)');
+      layers.push('radial-gradient(' + rnd(55, 90, 14) + '% ' + rnd(38, 58, 16) + '% at ' + rnd(30, 70, 18) + '% ' + rnd(75, 100, 20) + '%, ' + pal[2] + 'a6 0%, ' + pal[2] + '00 74%)');
+      layers.push('linear-gradient(' + rnd(150, 200, 22) + 'deg, #46536a 0%, #4d4a63 55%, #574c60 100%)');
+    }
+    return layers.join(', ');
+  }
 
   // Pre-built demo result objects (with distance to DEMO_ORIGIN).
   function demoResults() {
@@ -500,7 +590,12 @@
         return a.distance - b.distance;
       });
       var matched = filterByPrefs(state.results);
-      deck.load(matched);
+      // seen memory: places you passed on recently sink to the back of the
+      // deck (nearest-first within each group) instead of repeating up front
+      var seen = store.getSeen();
+      var unseen = matched.filter(function (r) { return !seen[r.id]; });
+      var repeats = matched.filter(function (r) { return seen[r.id]; });
+      deck.load(unseen.concat(repeats));
     }
 
     /* Apply the active preferences as filters. Distance cap included. */
@@ -835,12 +930,17 @@
     var btnNo = $('deck-no');
     var btnYes = $('deck-yes');
     var btnInfo = $('deck-info');
+    var btnUndo = $('deck-undo');
+    var shortlistEl = $('shortlist-view');
+    var badgeEl = $('shortlist-badge');
 
     var queue = [];
     var idx = 0;
     var topCard = null;
     var animating = false;
     var keyHandler = null;
+    var history = [];   // swipes this deck: {i, id, dir} — fuels Undo
+    var shortlist = []; // liked-and-saved places for this outing
 
     var SEGMENTS = ['vibe', 'food', 'reviews'];
     var SEG_LABEL = { vibe: 'Vibe', food: 'Food', reviews: 'Reviews' };
@@ -852,6 +952,7 @@
       if (controlsEl) controlsEl.style.display = onDeck ? '' : 'none';
       if (decisionEl) decisionEl.hidden = mode !== 'decision';
       if (endEl) endEl.hidden = mode !== 'end';
+      if (shortlistEl) shortlistEl.hidden = mode !== 'shortlist';
     }
 
     function showLoading() {
@@ -871,6 +972,8 @@
     function load(matched) {
       queue = matched || [];
       idx = 0;
+      history = [];
+      updateUndo();
       clear(deckEl);
       setMode('deck');
       if (!queue.length) { showEnd(true); return; }
@@ -937,8 +1040,9 @@
             panel.style.backgroundImage = 'url("' + String(seg.photoUrl).replace(/"/g, '') + '")';
             panel.style.backgroundSize = 'cover';
             panel.style.backgroundPosition = 'center';
-          } else if (seg && seg.glyph) {
-            panel.appendChild(el('span', 'card-seg-glyph', seg.glyph));
+          } else {
+            // no photo: procedural watercolor composition keyed to the cuisine
+            panel.style.background = panelArt(r, segKey);
           }
           panel.appendChild(el('span', 'card-seg-kind', SEG_LABEL[segKey]));
         }
@@ -1118,11 +1222,32 @@
 
       var liked = dir === 'yes';
       var picked = card._data;
+      history.push({ i: idx, id: picked ? picked.id : null, dir: dir });
+      updateUndo();
+      if (!liked && picked) store.addSeen(picked.id); // remember the pass
       window.setTimeout(function () {
         animating = false;
         if (liked) onLike(picked);
         else advance();
       }, prefersReducedMotion ? 200 : 430);
+    }
+
+    function updateUndo() {
+      if (btnUndo) btnUndo.disabled = !history.length;
+    }
+
+    function undoLast() {
+      if (!history.length || animating) return;
+      var h = history.pop();
+      updateUndo();
+      if (h.dir === 'no' && h.id) store.removeSeen(h.id); // un-remember the pass
+      idx = h.i;
+      setMode('deck');
+      renderStack();
+      setControlsEnabled(true);
+      var r = queue[idx];
+      announce('Brought back ' + (r ? r.name : 'the last place') + '.');
+      if (topCard) topCard.focus();
     }
 
     function advance() {
@@ -1166,6 +1291,18 @@
           sheet.openForPlace({ name: r.name, placeId: r.placeId || null, loc: r.location || null, address: r.type || '' });
         });
         actionsEl.appendChild(rate);
+
+        // not ready to commit: bank it and keep flicking
+        var already = shortlist.some(function (s) { return s.id === r.id; });
+        var save = el('button', 'decision-act', already ? 'On your shortlist ✓' : 'Save to shortlist · keep swiping');
+        save.type = 'button';
+        save.disabled = already;
+        save.addEventListener('click', function () {
+          addToShortlist(r);
+          setMode('deck');
+          advance();
+        });
+        actionsEl.appendChild(save);
       }
       announce('Tonight: ' + r.name);
       var nm = $('decision-name');
@@ -1177,6 +1314,74 @@
       advance();
     }
 
+    /* ---- shortlist: collect a few likes, compare, then commit ---- */
+    function addToShortlist(r) {
+      if (!r || shortlist.some(function (s) { return s.id === r.id; })) return;
+      shortlist.push(r);
+      updateBadge();
+      announce(r.name + ' saved to your shortlist. ' + shortlist.length + ' place' + (shortlist.length === 1 ? '' : 's') + ' saved.');
+    }
+
+    function removeFromShortlist(id) {
+      shortlist = shortlist.filter(function (s) { return s.id !== id; });
+      updateBadge();
+    }
+
+    function updateBadge() {
+      if (!badgeEl) return;
+      badgeEl.hidden = !shortlist.length;
+      var n = badgeEl.querySelector('.shortlist-count');
+      if (n) n.textContent = String(shortlist.length);
+    }
+
+    function backFromShortlist() {
+      if (idx < queue.length) { setMode('deck'); setControlsEnabled(true); if (topCard) topCard.focus(); }
+      else showEnd(false);
+    }
+
+    function renderShortlist() {
+      var listEl = shortlistEl && shortlistEl.querySelector('.shortlist-list');
+      if (!listEl) return;
+      clear(listEl);
+      if (!shortlist.length) { backFromShortlist(); return; }
+      shortlist.forEach(function (r) {
+        var row = el('div', 'sl-item');
+        var body = el('div', 'sl-body');
+        body.appendChild(el('h3', 'sl-name', r.name));
+        var bits = [];
+        if (r.rating) bits.push('★ ' + fmtScore(r.rating * 20));
+        if (r.price) bits.push(priceStr(r.price));
+        if (r.type) bits.push(r.type);
+        if (r.distance != null) bits.push(fmtDist(r.distance) + ' away');
+        body.appendChild(el('p', 'sl-meta', bits.join('  ·  ')));
+        row.appendChild(body);
+        var acts = el('div', 'sl-acts');
+        var pick = el('button', 'sl-pick', 'Tonight');
+        pick.type = 'button';
+        pick.addEventListener('click', function () { onLike(r); });
+        acts.appendChild(pick);
+        var rm = el('button', 'sl-remove', '×');
+        rm.type = 'button';
+        rm.setAttribute('aria-label', 'Remove ' + r.name + ' from shortlist');
+        rm.addEventListener('click', function () {
+          removeFromShortlist(r.id);
+          announce(r.name + ' removed from shortlist.');
+          renderShortlist();
+        });
+        acts.appendChild(rm);
+        row.appendChild(acts);
+        listEl.appendChild(row);
+      });
+    }
+
+    function showShortlist() {
+      if (!shortlist.length) return;
+      setMode('shortlist');
+      renderShortlist();
+      var t = shortlistEl && shortlistEl.querySelector('.shortlist-title');
+      if (t) { t.setAttribute('tabindex', '-1'); t.focus(); }
+    }
+
     function showEnd(emptyFromStart) {
       setMode('end');
       var title = $('deck-end-title');
@@ -1184,12 +1389,21 @@
       if (emptyFromStart) {
         if (title) title.textContent = 'Nothing matched those filters';
         if (sub) sub.textContent = 'Try widening your preferences or searching farther.';
+      } else if (shortlist.length) {
+        if (title) title.textContent = 'Down to your shortlist';
+        if (sub) sub.textContent = 'You’ve seen everything nearby — ' + shortlist.length +
+          ' place' + (shortlist.length === 1 ? ' is' : 's are') + ' waiting on your shortlist.';
       } else {
         if (title) title.textContent = 'That’s everywhere nearby that matched';
         if (sub) sub.textContent = 'You’ve seen every spot within your distance cap.';
       }
       var farther = $('end-farther');
       if (farther) farther.style.display = find.hasFarther() ? '' : 'none';
+      var slBtn = $('end-shortlist');
+      if (slBtn) {
+        slBtn.style.display = shortlist.length ? '' : 'none';
+        slBtn.textContent = 'Compare shortlist (' + shortlist.length + ')';
+      }
       announce(emptyFromStart ? 'No places matched your preferences.' : 'You have reached the end of the deck.');
       var t = $('deck-end-title');
       if (t) { t.setAttribute('tabindex', '-1'); t.focus(); }
@@ -1225,6 +1439,8 @@
     function teardown() {
       clear(deckEl);
       queue = []; idx = 0; topCard = null; animating = false;
+      history = []; shortlist = [];
+      updateUndo(); updateBadge();
       setMode('deck');
     }
 
@@ -1232,6 +1448,13 @@
       if (btnNo) btnNo.addEventListener('click', passTop);
       if (btnYes) btnYes.addEventListener('click', likeTop);
       if (btnInfo) btnInfo.addEventListener('click', infoTop);
+      if (btnUndo) btnUndo.addEventListener('click', undoLast);
+      if (badgeEl) badgeEl.addEventListener('click', showShortlist);
+      var slBack = shortlistEl && shortlistEl.querySelector('.shortlist-back');
+      if (slBack) slBack.addEventListener('click', backFromShortlist);
+      var endSl = $('end-shortlist');
+      if (endSl) endSl.addEventListener('click', showShortlist);
+      updateUndo(); updateBadge();
 
       var keep = $('decision-keep');
       if (keep) keep.addEventListener('click', keepLooking);
@@ -1252,9 +1475,12 @@
         var dw = $('deck-wrap');
         if (!dw || dw.hidden) return;
         if (decisionEl && !decisionEl.hidden) return;
-        if (endEl && !endEl.hidden) return;
         var t = e.target;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+        // undo works from the deck AND the end screen (bring the last card back)
+        if (e.key === 'Backspace' || e.key === 'z' || e.key === 'Z') { e.preventDefault(); undoLast(); return; }
+        if (endEl && !endEl.hidden) return;
+        if (shortlistEl && !shortlistEl.hidden) return;
         if (e.key === 'ArrowLeft') { e.preventDefault(); passTop(); }
         else if (e.key === 'ArrowRight') { e.preventDefault(); likeTop(); }
       };

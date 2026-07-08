@@ -1195,6 +1195,111 @@ html.evening .decision-act--primary:hover { color: #3a1620; }
 }
 .deck-end-actions .btn-ghost, .deck-end-actions .btn-solid { flex: 1 1 8rem; }
 
+/* ----- undo button (small, quiet, left of Pass) ----- */
+.deck-btn--undo { width: 3rem; height: 3rem; color: var(--ink-soft); }
+.deck-btn--undo:hover { color: var(--ink); border-color: var(--pond-ink); }
+
+/* ----- shortlist badge (deck bar) ----- */
+.shortlist-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #45a866;
+  background: rgba(69, 168, 102, 0.1);
+  border: 1px solid rgba(69, 168, 102, 0.4);
+  border-radius: 999px;
+  padding: 0.32rem 0.75rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.shortlist-badge[hidden] { display: none; }
+.shortlist-badge:hover { transform: translateY(-1px); box-shadow: 0 6px 14px -10px rgba(69, 168, 102, 0.8); }
+.shortlist-badge:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
+html.evening .shortlist-badge { color: #7ed49a; background: rgba(69, 168, 102, 0.16); border-color: rgba(126, 212, 154, 0.4); }
+
+/* ----- shortlist compare screen ----- */
+.shortlist { display: flex; justify-content: center; }
+.shortlist[hidden] { display: none; }
+.shortlist-card {
+  width: 100%;
+  background: var(--card-bg);
+  border: 1px solid var(--card-line);
+  border-radius: 22px;
+  box-shadow: var(--card-shadow);
+  padding: 1.6rem 1.3rem;
+  animation: decision-in 0.4s cubic-bezier(0.22,1,0.36,1);
+  text-align: center;
+}
+.shortlist-title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.4rem, 5vw, 1.8rem);
+  color: var(--ink);
+}
+.shortlist-sub {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.98rem;
+  color: var(--ink-soft);
+  margin: 0.3rem 0 1.1rem;
+}
+.shortlist-list { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.1rem; }
+.sl-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  text-align: left;
+  border: 1px solid var(--card-line);
+  border-radius: 14px;
+  padding: 0.7rem 0.8rem;
+  background: rgba(251, 247, 238, 0.5);
+}
+html.evening .sl-item { background: rgba(233, 227, 211, 0.05); }
+.sl-body { flex: 1 1 auto; min-width: 0; }
+.sl-name {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.1rem;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.sl-meta { font-size: 0.8rem; color: var(--ink-soft); margin-top: 0.15rem; }
+.sl-acts { display: flex; align-items: center; gap: 0.4rem; flex: 0 0 auto; }
+.sl-pick {
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--paper);
+  background: linear-gradient(135deg, #45a866, #367f4f);
+  border: 0;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.sl-pick:hover { transform: translateY(-1px); filter: brightness(1.06); }
+.sl-pick:focus-visible, .sl-remove:focus-visible, .shortlist-back:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
+.sl-remove {
+  appearance: none;
+  cursor: pointer;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  border: 1px solid var(--card-line);
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.sl-remove:hover { color: #d8607a; border-color: #d8607a; }
+
 /* ---------- Visited tab ---------- */
 
 .visited-head {
