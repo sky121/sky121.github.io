@@ -65,6 +65,15 @@ Offered as a **1-of-2 pick** every few scales collected:
 ### Screens & polish (done)
 Title (logo + Gary's backstory + how-to + hoard), Loading, in-game HUD (player feathers, charge meter, dragon health+name, scale count, power icons), Power pick, Pause, Death, Victory. Watercolor sky wash + 3-depth parallax clouds, particle blooms, hit-stop / screen-shake / hit-flash / knockback, floating feedback, bloom-wipe transitions, synthesized Web Audio SFX + mute toggle, "← Back to the Lab" link.
 
+### Procedural rigged characters (2026-07-08, second pass)
+The goose and dragon PNG sprites are **no longer drawn** — both characters are now fully procedural, rigged, and animated in code (`Art` module in `assets/js/dragoose.js`):
+
+- **`Art.goose(ctx, opts)`** — vector goose facing up in a 140-unit box: two-joint wing flap with follow-through (tips lag the stroke, downstroke clamped so the top-down silhouette stays birdlike), banking asymmetry (outer wing extends), teardrop body with feather linework, neck/head/wedge-beak, ember glow in the beak while charging, hurt-tint via color lerp. Flap phase (`p.flapPhase`) accumulates with flight speed and races while charging.
+- **`Art.dragon(ctx, opts)`** — vector dragon facing up in a 460-unit box: serpentine 11-segment body drawn as smooth tapered strokes (tail whips with `swayPhase`), swept bat wings with elbow/wrist joints, three membrane fingers and deep scalloped trailing edges that billow in counter-phase, arrow-shaped skull with backswept horns, glowing upswept wedge eyes under hard brow slashes (brighter + veins glow when enraged), spine studs, tail spade. `bow` folds the wings, dips the head and softens the eyes. Palettes for `ember` and `storm` are in `Art.dragonPal` — the storm dragon is a palette swap away.
+- Characters render into per-frame **scratch canvases** (`Fx.scratch`) so one `drawImage` alpha fades the whole figure (i-frames, ghosts, bow) without per-path alpha bookkeeping.
+- **Perf:** the sky backdrop (gradient, god rays, sun, blooms, haze) paints into a **half-res offscreen layer every other frame** and blits once; the vignette + color grade are one pre-baked layer. Headless-software-rendering benchmark: ~56 fps in phase-2 combat vs ~60 for the pre-revamp build (GPU devices lock at 60). Big previews of the rigs: `window.__dragoose.art` is exposed for test harnesses.
+- The old sprite PNGs (`goose.png`, `dragon-*.png`, `fireball.png`) remain in the repo and are still preloaded but unused by the renderer; scale pickups still use their PNGs (with baked lighting).
+
 ### Graphics overhaul (2026-07-08)
 The render layer was rebuilt for a professional look while keeping the watercolor identity. All of it lives in `assets/js/dragoose.js`:
 

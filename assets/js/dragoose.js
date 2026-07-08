@@ -457,15 +457,15 @@
       x.fillStyle = g; x.fillRect(0, 0, VW, VH);
       this.redVignette = rv;
 
-      // color grade: warm light from above, cool depth below
-      var gc = document.createElement("canvas"); gc.width = VW; gc.height = VH;
-      x = gc.getContext("2d");
+      // color grade baked INTO the vignette layer (warm light above, cool
+      // depth below) so the whole screen treatment is one drawImage
+      x = v.getContext("2d");
       g = x.createLinearGradient(0, 0, 0, VH);
-      g.addColorStop(0, "rgba(255,214,160,0.6)");
-      g.addColorStop(0.45, "rgba(255,236,214,0.12)");
-      g.addColorStop(1, "rgba(46,84,138,0.5)");
+      g.addColorStop(0, "rgba(255,214,160,0.16)");
+      g.addColorStop(0.4, "rgba(255,236,214,0.03)");
+      g.addColorStop(1, "rgba(46,84,138,0.16)");
       x.fillStyle = g; x.fillRect(0, 0, VW, VH);
-      this.grade = gc;
+      this.grade = null;
     },
 
     // bake directional lighting into character sprites:
@@ -506,14 +506,26 @@
     },
 
     bakeSprites: function () {
-      var keys = ["goose", "dragonEmber", "dragonStorm", "scale", "scaleEmber", "scaleStorm"];
+      // goose + dragons are now procedural (Art module); only the scale
+      // pickups still use PNG sprites worth lighting
+      var keys = ["scale", "scaleEmber", "scaleStorm"];
       for (var i = 0; i < keys.length; i++) {
         var k = keys[i];
         if (images[k]) this.baked[k] = this.bakeSprite(images[k]);
       }
-      if (this.baked.goose) this.baked.gooseHurt = this.tintSprite(this.baked.goose, "#c25a3a", 0.65);
-      if (this.baked.dragonEmber) this.baked.dragonEmberFlash = this.tintSprite(this.baked.dragonEmber, "#fbf7ee", 0.85);
-      if (this.baked.dragonStorm) this.baked.dragonStormFlash = this.tintSprite(this.baked.dragonStorm, "#fbf7ee", 0.85);
+    },
+
+    // per-frame scratch canvases (characters render here first so a
+    // single drawImage alpha can fade the whole figure cleanly)
+    scratch: function (key, w, h) {
+      var c = this["_sc_" + key];
+      if (!c) {
+        c = this["_sc_" + key] = document.createElement("canvas");
+        c.width = w; c.height = h;
+        c._ctx = c.getContext("2d");
+      }
+      c._ctx.clearRect(0, 0, c.width, c.height);
+      return c;
     },
 
     init: function () {
@@ -641,6 +653,414 @@
       g.restore();
     },
     clear: function () { for (var i = 0; i < this.max; i++) this.pool[i].active = false; }
+  };
+
+  // ---------------------------------------------------------
+  // ART — procedural rigged characters (vector-drawn, animated)
+  // Both are drawn facing UP around (0,0). Goose fits a 140-unit
+  // box, dragon a 460-unit box; callers scale to gameplay size.
+  // ---------------------------------------------------------
+  var Art = {
+    mixCache: {},
+    mix: function (a, b, t) {
+      t = Math.max(0, Math.min(1, t));
+      var q = (t * 20) | 0;
+      var key = a + "|" + b + "|" + q;
+      var c = this.mixCache[key];
+      if (!c) { c = this.mixCache[key] = Game.mix(a, b, q / 20); }
+      return c;
+    },
+
+    // ----- GARY THE GOOSE -----
+    // o: { flap, bank, hurt, charge, simple }
+    goose: function (g, o) {
+      var ink = "#2e3a48";
+      var hurt = Math.max(0, Math.min(1, o.hurt || 0));
+      var CB = hurt ? this.mix("#fdfbf4", "#c25a3a", hurt * 0.6) : "#fdfbf4";   // body
+      var CS = hurt ? this.mix("#e8dfc9", "#a84a34", hurt * 0.55) : "#e8dfc9";  // shade
+      var CW = hurt ? this.mix("#f6f0dd", "#c05a40", hurt * 0.55) : "#f6f0dd";  // wing
+      var fl = o.flap || 0;
+      var bank = o.bank || 0;
+
+      g.save();
+      g.lineJoin = "round"; g.lineCap = "round";
+
+      // ---- wings (under the body), two-joint flap with follow-through ----
+      for (var side = -1; side <= 1; side += 2) {
+        // clamp the downstroke so the top-down silhouette stays birdlike
+        var a = Math.max(-0.45, Math.sin(fl)) - side * bank * 0.5;   // main stroke
+        var b = Math.max(-0.5, Math.sin(fl - 0.8)) - side * bank * 0.4; // tip lags
+        g.save();
+        g.scale(side, 1);
+        var tipX = 52 + a * 7, tipY = -16 - a * 24;
+        var trX = 38, trY = 14 - b * 12;
+        g.beginPath();
+        g.moveTo(8, -12);
+        g.bezierCurveTo(24, -26 - a * 12, 42, tipY - 4, tipX, tipY);
+        g.bezierCurveTo(tipX - 3, tipY + 12, trX + 12, trY - 6, trX, trY);
+        g.bezierCurveTo(26, 24 - b * 6, 14, 20, 6, 12);
+        g.closePath();
+        var wg = g.createLinearGradient(8, -4, tipX, tipY + 8);
+        wg.addColorStop(0, CW);
+        wg.addColorStop(1, CS);
+        g.fillStyle = wg;
+        g.fill();
+        g.strokeStyle = ink; g.globalAlpha = 0.7; g.lineWidth = 2; g.stroke();
+        // primary feather chords running back toward the shoulder
+        if (!o.simple) {
+          g.globalAlpha = 0.26; g.lineWidth = 1.3;
+          g.beginPath();
+          g.moveTo(tipX - 4, tipY + 7);
+          g.quadraticCurveTo((tipX + 16) / 2, (tipY + 12) / 2 + 4, 16, 2);
+          g.moveTo(tipX - 8, tipY + 14);
+          g.quadraticCurveTo((tipX + 18) / 2, (tipY + 22) / 2 + 6, 15, 7);
+          g.stroke();
+        }
+        g.globalAlpha = 1;
+        g.restore();
+      }
+
+      // ---- tail fan ----
+      g.beginPath();
+      g.moveTo(-9, 22);
+      g.quadraticCurveTo(-8, 40, 0, 46);
+      g.quadraticCurveTo(8, 40, 9, 22);
+      g.closePath();
+      g.fillStyle = CS; g.fill();
+      g.strokeStyle = ink; g.globalAlpha = 0.65; g.lineWidth = 2; g.stroke();
+      g.globalAlpha = 1;
+
+      // ---- body: teardrop with soft keel shading ----
+      g.beginPath();
+      g.moveTo(0, -26);
+      g.bezierCurveTo(15, -24, 22, -6, 20, 10);
+      g.bezierCurveTo(18, 27, 8, 33, 0, 33);
+      g.bezierCurveTo(-8, 33, -18, 27, -20, 10);
+      g.bezierCurveTo(-22, -6, -15, -24, 0, -26);
+      g.closePath();
+      var bgd = g.createLinearGradient(-18, -14, 16, 28);
+      bgd.addColorStop(0, CB); bgd.addColorStop(1, CS);
+      g.fillStyle = bgd; g.fill();
+      g.strokeStyle = ink; g.globalAlpha = 0.78; g.lineWidth = 2.2; g.stroke();
+      g.globalAlpha = 1;
+      // folded-feather linework along the back
+      if (!o.simple) {
+        g.globalAlpha = 0.22; g.strokeStyle = ink; g.lineWidth = 1.3;
+        g.beginPath(); g.moveTo(0, -16); g.quadraticCurveTo(2, 6, 0, 26); g.stroke();
+        g.beginPath(); g.moveTo(-8, -12); g.quadraticCurveTo(-10, 6, -6, 24); g.stroke();
+        g.beginPath(); g.moveTo(8, -12); g.quadraticCurveTo(10, 6, 6, 24); g.stroke();
+        g.globalAlpha = 1;
+      }
+
+      // ---- neck (ink under-stroke = outline) + head ----
+      g.strokeStyle = ink; g.lineWidth = 11.5; g.globalAlpha = 0.8;
+      g.beginPath(); g.moveTo(0, -18); g.lineTo(0, -38); g.stroke();
+      g.globalAlpha = 1;
+      g.strokeStyle = CB; g.lineWidth = 8;
+      g.beginPath(); g.moveTo(0, -17); g.lineTo(0, -38); g.stroke();
+
+      g.save();
+      g.translate(0, -43);
+      g.scale(0.92, 1);
+      g.beginPath(); g.arc(0, 0, 9.5, 0, TAU);
+      g.fillStyle = CB; g.fill();
+      g.strokeStyle = ink; g.globalAlpha = 0.8; g.lineWidth = 2; g.stroke();
+      g.globalAlpha = 1;
+      g.restore();
+      // beak: broad wedge with a nail line
+      g.beginPath();
+      g.moveTo(-5, -49.5);
+      g.quadraticCurveTo(-3.5, -57, 0, -58.5);
+      g.quadraticCurveTo(3.5, -57, 5, -49.5);
+      g.quadraticCurveTo(0, -46.5, -5, -49.5);
+      g.closePath();
+      g.fillStyle = "#e8a13c"; g.fill();
+      g.strokeStyle = "#a86a20"; g.lineWidth = 1.3; g.globalAlpha = 0.85; g.stroke();
+      g.globalAlpha = 1;
+      if (!o.simple) {
+        g.strokeStyle = "#a86a20"; g.globalAlpha = 0.6; g.lineWidth = 1;
+        g.beginPath(); g.moveTo(-2.4, -55.4); g.quadraticCurveTo(0, -56.6, 2.4, -55.4); g.stroke();
+        g.globalAlpha = 1;
+        // eyes set to the sides of the skull
+        g.fillStyle = ink;
+        g.beginPath(); g.arc(-5.4, -44.5, 1.7, 0, TAU); g.fill();
+        g.beginPath(); g.arc(5.4, -44.5, 1.7, 0, TAU); g.fill();
+      }
+      // dragonfire smolders in his beak while charging
+      if (o.charge > 0.01) {
+        Fx.drawDot(g, 0, -56, 9 + o.charge * 10, PAL.ember, 0.3 + o.charge * 0.45, true);
+      }
+      g.restore();
+    },
+
+    // ----- THE DRAGONS -----
+    dragonPal: {
+      ember: { hi: "#e89058", lo: "#b04830", belly: "#f2c68c", memHi: "#d96a45", memLo: "#8e2f24", bone: "#ead9a4", boneTip: "#b6a06a", eye: "#ffd97a", spade: "#a83a54", vein: "#d98ba0" },
+      storm: { hi: "#7fa8c9", lo: "#3d6288", belly: "#d3e2ef", memHi: "#5f86ab", memLo: "#2e4d6e", bone: "#dbe6f0", boneTip: "#8fa6bd", eye: "#bfe3ff", spade: "#4f6d94", vein: "#a292c4" }
+    },
+    // o: { t, swayPhase, flapPhase, phase2, flash, bow, variant, simple }
+    dragon: function (g, o) {
+      var ink = "#26313f";
+      var P0 = this.dragonPal[o.variant] || this.dragonPal.ember;
+      var flash = Math.max(0, Math.min(1, o.flash || 0));
+      var self = this;
+      var col = function (c) { return flash > 0 ? self.mix(c, "#fbf7ee", flash) : c; };
+      var sway = o.swayPhase || 0;
+      var fl = o.flapPhase || 0;
+      var bow = Math.max(0, Math.min(1, o.bow || 0));
+      var wingK = Math.sin(fl) * (1 - bow * 0.85);
+      var billow = Math.sin(fl - 0.9) * (1 - bow * 0.85);
+      var i, side;
+
+      // serpentine body chain: head end steady, tail whips
+      // (denser segments = smooth taper, no michelin bumps)
+      var n = 11, segs = [];
+      for (i = 0; i < n; i++) {
+        var ti = i / (n - 1);
+        segs.push({
+          x: Math.sin(sway + ti * 5.1) * (1.5 + ti * ti * 30) * 0.55,
+          y: -64 + i * 24,
+          r: 34 - ti * 23
+        });
+      }
+
+      g.save();
+      g.lineJoin = "round"; g.lineCap = "round";
+
+      // ---- wings (under the body): swept bat wings, scalloped membrane ----
+      for (side = -1; side <= 1; side += 2) {
+        g.save();
+        g.scale(side, 1);
+        if (bow > 0) { g.translate(24, -42); g.scale(1 - bow * 0.32, 1); g.translate(-24, 42); }
+        var S = { x: 24, y: -42 };                                 // shoulder
+        var E = { x: 108, y: -96 + wingK * 30 };                   // elbow
+        var W = { x: 172, y: -70 + wingK * 48 };                   // wrist
+        var F1 = { x: 230 - Math.abs(wingK) * 10, y: -28 + wingK * 62 }; // leading finger tip
+        var F2 = { x: 202 - Math.abs(wingK) * 8, y: 42 + wingK * 34 };
+        var F3 = { x: 134, y: 86 + wingK * 16 };
+        var Tb = { x: 12, y: 74 };                                 // hip root
+        // deep concave scallops between finger tips (pulled toward wrist)
+        var sc1 = { x: (F1.x + F2.x) / 2 - 34, y: (F1.y + F2.y) / 2 - 10 + billow * 16 };
+        var sc2 = { x: (F2.x + F3.x) / 2 - 38, y: (F2.y + F3.y) / 2 - 12 + billow * 12 };
+        var sc3 = { x: (F3.x + Tb.x) / 2 - 18, y: (F3.y + Tb.y) / 2 - 16 + billow * 8 };
+        // membrane
+        g.beginPath();
+        g.moveTo(S.x, S.y);
+        g.quadraticCurveTo((S.x + E.x) / 2 + 6, S.y - 34 + wingK * 9, E.x, E.y);
+        g.quadraticCurveTo((E.x + W.x) / 2 + 8, (E.y + W.y) / 2 - 14, W.x, W.y);
+        g.lineTo(F1.x, F1.y);
+        g.quadraticCurveTo(sc1.x, sc1.y, F2.x, F2.y);
+        g.quadraticCurveTo(sc2.x, sc2.y, F3.x, F3.y);
+        g.quadraticCurveTo(sc3.x, sc3.y, Tb.x, Tb.y);
+        g.closePath();
+        var mg = g.createLinearGradient(S.x, S.y - 20, F1.x, F2.y);
+        mg.addColorStop(0, col(P0.memHi));
+        mg.addColorStop(1, col(P0.memLo));
+        g.fillStyle = mg;
+        g.globalAlpha = 0.96;
+        g.fill();
+        g.strokeStyle = ink; g.lineWidth = 3; g.globalAlpha = 0.75; g.stroke();
+        g.globalAlpha = 1;
+
+        // wing bones: arm, then three membrane fingers
+        g.strokeStyle = col(P0.lo);
+        g.lineWidth = 7;
+        g.beginPath();
+        g.moveTo(S.x, S.y);
+        g.quadraticCurveTo((S.x + E.x) / 2 + 6, S.y - 28 + wingK * 9, E.x, E.y);
+        g.quadraticCurveTo((E.x + W.x) / 2 + 8, (E.y + W.y) / 2 - 14, W.x, W.y);
+        g.stroke();
+        g.lineWidth = 4;
+        g.beginPath(); g.moveTo(W.x, W.y); g.lineTo(F1.x, F1.y); g.stroke();
+        g.lineWidth = 3.2;
+        g.beginPath(); g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + F2.x) / 2 + 10, (W.y + F2.y) / 2, F2.x, F2.y); g.stroke();
+        g.beginPath(); g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + F3.x) / 2 + 2, (W.y + F3.y) / 2, F3.x, F3.y); g.stroke();
+        // wrist talon
+        g.fillStyle = col(P0.bone);
+        g.beginPath();
+        g.moveTo(W.x - 3, W.y - 6);
+        g.lineTo(W.x + 13, W.y - 20);
+        g.lineTo(W.x + 6, W.y - 1);
+        g.closePath();
+        g.fill();
+
+        // enraged: membrane veins glow
+        if (o.phase2 && flash <= 0) {
+          g.save();
+          g.globalCompositeOperation = "lighter";
+          g.globalAlpha = 0.3 + 0.2 * Math.sin((o.t || 0) * 6);
+          g.strokeStyle = P0.vein;
+          g.lineWidth = 2.4;
+          g.beginPath(); g.moveTo(W.x, W.y); g.lineTo(F1.x, F1.y); g.stroke();
+          g.beginPath(); g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + F2.x) / 2 + 10, (W.y + F2.y) / 2, F2.x, F2.y); g.stroke();
+          g.beginPath(); g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + F3.x) / 2 + 2, (W.y + F3.y) / 2, F3.x, F3.y); g.stroke();
+          g.restore();
+        }
+        g.restore();
+      }
+
+      // ---- tail spade ----
+      var tEnd = segs[n - 1], tPrev = segs[n - 2];
+      var ta = Math.atan2(tEnd.y - tPrev.y, tEnd.x - tPrev.x);
+      g.save();
+      g.translate(tEnd.x, tEnd.y);
+      g.rotate(ta - Math.PI / 2);
+      g.beginPath();
+      g.moveTo(0, 2);
+      g.quadraticCurveTo(-17, 14, 0, 38);
+      g.quadraticCurveTo(17, 14, 0, 2);
+      g.closePath();
+      g.fillStyle = col(P0.spade); g.fill();
+      g.strokeStyle = ink; g.lineWidth = 2.6; g.globalAlpha = 0.75; g.stroke();
+      g.globalAlpha = 1;
+      g.restore();
+
+      // ---- body: smooth tapered strokes (ink silhouette underneath) ----
+      var strokeChain = function (pad) {
+        for (var j = 0; j < n - 1; j++) {
+          g.lineWidth = (segs[j].r + segs[j + 1].r) + pad * 2;
+          g.beginPath();
+          g.moveTo(segs[j].x, segs[j].y);
+          g.lineTo(segs[j + 1].x, segs[j + 1].y);
+          g.stroke();
+        }
+      };
+      g.globalAlpha = 0.8; g.strokeStyle = ink;
+      strokeChain(2.4);
+      g.globalAlpha = 1;
+      var bodyGrad = g.createLinearGradient(0, -100, 0, 190);
+      bodyGrad.addColorStop(0, col(P0.hi));
+      bodyGrad.addColorStop(1, col(P0.lo));
+      g.strokeStyle = bodyGrad;
+      strokeChain(0);
+      // subtle belly keel (narrow, close in tone, fades toward the tail)
+      g.strokeStyle = col(P0.belly);
+      g.globalAlpha = 0.55;
+      for (i = 0; i < n - 2; i++) {
+        g.lineWidth = segs[i].r * 0.55;
+        g.beginPath(); g.moveTo(segs[i].x, segs[i].y); g.lineTo(segs[i + 1].x, segs[i + 1].y); g.stroke();
+      }
+      g.globalAlpha = 1;
+      // scale seams across the back
+      if (!o.simple) {
+        g.strokeStyle = ink; g.globalAlpha = 0.18; g.lineWidth = 2;
+        for (i = 1; i < n - 1; i += 2) {
+          var mx = (segs[i - 1].x + segs[i].x) / 2, my = (segs[i - 1].y + segs[i].y) / 2;
+          var pw = segs[i].r * 0.55;
+          g.beginPath(); g.moveTo(mx - pw, my); g.quadraticCurveTo(mx, my + 6, mx + pw, my); g.stroke();
+        }
+        g.globalAlpha = 1;
+      }
+      // spine studs marching down the tail, shrinking as they go
+      g.fillStyle = col(P0.bone);
+      for (i = 1; i < n - 1; i += 1) {
+        var rx = segs[i].x, ry = segs[i].y + segs[i].r * 0.05;
+        var rs = segs[i].r * 0.24;
+        g.beginPath();
+        g.moveTo(rx - rs, ry);
+        g.lineTo(rx, ry - rs * 1.1);
+        g.lineTo(rx + rs, ry);
+        g.lineTo(rx, ry + rs * 1.6);
+        g.closePath();
+        g.fill();
+      }
+
+      // ---- head: arrow-shaped skull, backswept horns ----
+      g.save();
+      g.translate(segs[0].x * 0.6, -102 + bow * 20);
+      g.scale(1.22, 1.22);
+      if (bow > 0) g.rotate(bow * 0.1);
+      // horns sweep back past the shoulders (behind the skull)
+      for (side = -1; side <= 1; side += 2) {
+        g.beginPath();
+        g.moveTo(side * 9, -17);
+        g.quadraticCurveTo(side * 36, -12, side * 50, 26);
+        g.quadraticCurveTo(side * 28, 4, side * 14, -1);
+        g.closePath();
+        var hg = g.createLinearGradient(side * 10, -14, side * 48, 24);
+        hg.addColorStop(0, col(P0.bone)); hg.addColorStop(1, col(P0.boneTip));
+        g.fillStyle = hg; g.fill();
+        g.strokeStyle = ink; g.lineWidth = 2; g.globalAlpha = 0.7; g.stroke();
+        g.globalAlpha = 1;
+        // short secondary spike
+        g.beginPath();
+        g.moveTo(side * 16, -6);
+        g.quadraticCurveTo(side * 30, -8, side * 34, 8);
+        g.quadraticCurveTo(side * 24, 0, side * 15, 2);
+        g.closePath();
+        g.fillStyle = col(P0.boneTip); g.fill();
+      }
+      // skull: tapered arrow — wide cheekbones, narrow snout
+      g.beginPath();
+      g.moveTo(0, -32);
+      g.bezierCurveTo(7, -31, 13, -24, 18, -12);
+      g.bezierCurveTo(22, -3, 21, 6, 14, 11);
+      g.quadraticCurveTo(7, 15, 0, 15.5);
+      g.quadraticCurveTo(-7, 15, -14, 11);
+      g.bezierCurveTo(-21, 6, -22, -3, -18, -12);
+      g.bezierCurveTo(-13, -24, -7, -31, 0, -32);
+      g.closePath();
+      var sg2 = g.createLinearGradient(0, -32, 0, 16);
+      sg2.addColorStop(0, col(P0.hi)); sg2.addColorStop(1, col(P0.lo));
+      g.fillStyle = sg2; g.fill();
+      g.strokeStyle = ink; g.lineWidth = 2.4; g.globalAlpha = 0.8; g.stroke();
+      g.globalAlpha = 1;
+      // cheek spikes flaring from the jaw
+      for (side = -1; side <= 1; side += 2) {
+        g.beginPath();
+        g.moveTo(side * 15, 3);
+        g.lineTo(side * 28, 12);
+        g.lineTo(side * 13, 12);
+        g.closePath();
+        g.fillStyle = col(P0.boneTip); g.fill();
+        g.strokeStyle = ink; g.lineWidth = 1.4; g.globalAlpha = 0.5; g.stroke();
+        g.globalAlpha = 1;
+      }
+      // snout ridge
+      g.fillStyle = col(P0.boneTip);
+      g.beginPath();
+      g.moveTo(-3, -24); g.lineTo(0, -31); g.lineTo(3, -24); g.lineTo(0, -18);
+      g.closePath(); g.fill();
+      // eyes: sharp upswept molten wedges under a hard brow slash
+      var eyeGlow = bow > 0 ? 0.3 : (o.phase2 ? 0.9 : 0.55);
+      var eyeR = o.phase2 ? 15 : 11;
+      for (side = -1; side <= 1; side += 2) {
+        var ex = side * 10, ey = -11;
+        Fx.drawDot(g, ex, ey - 1, eyeR, P0.eye, eyeGlow, true);
+        g.save();
+        g.translate(ex, ey);
+        g.scale(side, 1);
+        g.beginPath();
+        g.moveTo(-6.5, 2.2);
+        g.quadraticCurveTo(-1, -2, 7.5, -5);   // upswept to a point
+        g.quadraticCurveTo(0.5, 3.6, -6.5, 2.2);
+        g.closePath();
+        g.fillStyle = bow > 0 ? this.mix(P0.eye, "#ffffff", 0.35) : P0.eye;
+        g.fill();
+        g.strokeStyle = ink; g.lineWidth = 1.4; g.globalAlpha = 0.9; g.stroke();
+        g.globalAlpha = 1;
+        // hot core of the eye
+        Fx.drawDot(g, 0, -0.6, 3.4, "#fff6d8", 0.85, true);
+        // brow: straight angry slash, inner end low
+        g.strokeStyle = ink; g.globalAlpha = 0.85; g.lineWidth = 3; g.lineCap = "round";
+        g.beginPath();
+        g.moveTo(-8, -1.5);
+        g.lineTo(7, -8.5);
+        g.stroke();
+        g.globalAlpha = 1;
+        g.restore();
+      }
+      // nostrils: slanted slashes venting heat
+      g.strokeStyle = ink; g.globalAlpha = 0.7; g.lineWidth = 1.6; g.lineCap = "round";
+      g.beginPath();
+      g.moveTo(-3.6, -23.5); g.lineTo(-2, -26.5);
+      g.moveTo(3.6, -23.5); g.lineTo(2, -26.5);
+      g.stroke();
+      g.globalAlpha = 1;
+      g.restore();
+
+      g.restore();
+    }
   };
 
   // ---------------------------------------------------------
@@ -1047,6 +1467,8 @@
 
       // facing & banking
       var speed = Math.hypot(p.vx, p.vy);
+      // wing-beat: quickens when flying hard, races while charging
+      p.flapPhase = (p.flapPhase || 0) + dt * TAU * (2.0 + Math.min(2.4, speed * 0.005) + (p.charging ? 1.1 : 0));
       if (speed > 30) {
         var target = Math.atan2(p.vy, p.vx);
         p.facing = this.angleLerp(p.facing, target, 1 - Math.pow(0.0001, dt));
@@ -1180,6 +1602,11 @@
       var d = this.dragon;
       if (!d) return;
       if (d.hitFlash > 0) d.hitFlash -= dt;
+
+      // animation phases: slow powerful wing beats, serpentine tail sway
+      var animSpd = d.phase === 2 ? 1.5 : 1;
+      d.flapPhase = (d.flapPhase || 0) + dt * TAU * 0.42 * animSpd * (d.state === "bow" ? 0.4 : 1);
+      d.swayPhase = (d.swayPhase || 0) + dt * 2.1 * animSpd * (d.state === "bow" ? 0.4 : 1);
 
       // defeated: dissolve into rising golden motes while it bows
       if (d.state === "bow") {
@@ -1675,14 +2102,7 @@
 
       g.restore();
 
-      // cinematic grade: warm key light above, cool depth below
-      if (Fx.grade) {
-        g.save();
-        g.globalCompositeOperation = "overlay";
-        g.globalAlpha = 0.22;
-        g.drawImage(Fx.grade, 0, 0);
-        g.restore();
-      }
+      // screen treatment: vignette + color grade in one pre-baked layer
       if (Fx.vignette) g.drawImage(Fx.vignette, 0, 0);
 
       // hit feedback: pain vignette instead of a flat color slab
@@ -1696,6 +2116,37 @@
     },
 
     drawSky: function (g) {
+      // the slow-drifting backdrop is painted at half resolution every
+      // other frame, then blitted in a single drawImage
+      if (!Fx.skyLayer) {
+        Fx.skyLayer = document.createElement("canvas");
+        Fx.skyLayer.width = VW / 2; Fx.skyLayer.height = VH / 2;
+        Fx.skyLayer._ctx = Fx.skyLayer.getContext("2d");
+      }
+      this._skyTick = (this._skyTick || 0) + 1;
+      if (this._skyTick % 2 === 1) {
+        var x = Fx.skyLayer._ctx;
+        x.save();
+        x.scale(0.5, 0.5);
+        this.paintSky(x);
+        x.restore();
+      }
+      g.drawImage(Fx.skyLayer, 0, 0, VW, VH);
+
+      // dust motes glinting in the light (crisp, so drawn at full res)
+      var mo = this.bg.motes || [];
+      g.save();
+      g.globalCompositeOperation = "lighter";
+      for (var m = 0; m < mo.length; m++) {
+        var mt = mo[m];
+        var tw = 0.5 + 0.5 * Math.sin(this.time * mt.tw * 2 + mt.phase);
+        g.globalAlpha = 0.1 + tw * 0.24;
+        g.drawImage(Fx.dot("#fff7e0"), mt.x - mt.r * 2, mt.y - mt.r * 2, mt.r * 4, mt.r * 4);
+      }
+      g.restore();
+    },
+
+    paintSky: function (g) {
       var grd = g.createLinearGradient(0, 0, 0, VH);
       var t = (Math.sin(this.bg.washPhase) + 1) / 2;
       grd.addColorStop(0, "#e3f0f9");
@@ -1715,11 +2166,8 @@
         var spin = reduceMotion ? 0 : this.time * 0.025;
         var pulse = 0.5 + 0.5 * Math.sin(this.time * 0.35);
         g.rotate(spin);
-        g.globalAlpha = 0.55 + pulse * 0.2;
+        g.globalAlpha = 0.6 + pulse * 0.25;
         var rw = VH * 2.5;
-        g.drawImage(Fx.rays, -rw / 2, -rw / 2, rw, rw);
-        g.rotate(-spin * 1.7);
-        g.globalAlpha = 0.3 + (1 - pulse) * 0.15;
         g.drawImage(Fx.rays, -rw / 2, -rw / 2, rw, rw);
         g.restore();
       }
@@ -1762,18 +2210,6 @@
       g.fillStyle = hzg;
       g.fillRect(0, hz2 - 70, VW, 140);
       g.restore();
-
-      // dust motes glinting in the light
-      var mo = this.bg.motes || [];
-      g.save();
-      g.globalCompositeOperation = "lighter";
-      for (var m = 0; m < mo.length; m++) {
-        var mt = mo[m];
-        var tw = 0.5 + 0.5 * Math.sin(this.time * mt.tw * 2 + mt.phase);
-        g.globalAlpha = 0.1 + tw * 0.24;
-        g.drawImage(Fx.dot("#fff7e0"), mt.x - mt.r * 2, mt.y - mt.r * 2, mt.r * 4, mt.r * 4);
-      }
-      g.restore();
     },
 
     drawClouds: function (g, depthFilter, front) {
@@ -1803,9 +2239,6 @@
 
     drawPlayer: function (g) {
       var p = this.player;
-      var img = Fx.baked.goose || images.goose;
-      if (!img) return;
-      var speed = Math.hypot(p.vx, p.vy);
 
       // altitude shadow drifting on the haze below
       g.save();
@@ -1815,6 +2248,21 @@
       g.drawImage(Fx.dot("#22334c"), -30, -30, 60, 60);
       g.restore();
 
+      // rig Gary into the scratch canvas once per frame
+      var sc = p.hitScale * 0.42;
+      var k = (300 * sc) / 140;
+      var scr = Fx.scratch("goose", 150, 130);
+      var sg = scr._ctx;
+      sg.save();
+      sg.translate(75, 72);
+      Art.goose(sg, {
+        flap: p.flapPhase || 0,
+        bank: p.bank,
+        hurt: Math.min(1, p.hurtFlash * 1.6),
+        charge: p.charging ? p.charge : 0
+      });
+      sg.restore();
+
       // dash afterimages (cool spectral ghosts)
       for (var gi = 0; gi < p.ghosts.length; gi++) {
         var gh = p.ghosts[gi];
@@ -1822,39 +2270,24 @@
         g.save();
         g.translate(gh.x, gh.y);
         g.rotate(gh.facing + Math.PI / 2 + gh.bank * 0.5);
-        g.globalAlpha = gt * 0.28;
-        var gw = 280 * 0.42 * (0.92 + gt * 0.08);
-        g.drawImage(img, -gw / 2, -gw / 2, gw, gw);
+        g.globalAlpha = gt * 0.3;
+        g.scale(k, k);
+        g.drawImage(scr, -75, -72);
         g.restore();
       }
 
       g.save();
-      g.translate(p.x, p.y);
       // gentle hover bob (world-space, before rotation)
-      g.translate(0, Math.sin(this.time * 2.4) * 2.2);
-      // sprite faces UP; rotate so up aligns with facing
-      g.rotate(p.facing + Math.PI / 2);
-      g.rotate(p.bank * 0.5); // banking tilt
-
-      var sc = p.hitScale * 0.42;
-      // wing-beat: subtle squash & stretch, faster when flying hard
-      var flapHz = 7 + Math.min(6, speed * 0.012);
-      var flap = Math.sin(this.time * flapHz);
-      var sw = sc * (1 + flap * 0.045);
-      var sh = sc * (1 - flap * 0.038);
-
+      g.translate(p.x, p.y + Math.sin(this.time * 2.4) * 2.2);
+      // rig is drawn facing UP; rotate so up aligns with facing
+      g.rotate(p.facing + Math.PI / 2 + p.bank * 0.5);
       // i-frame shimmer
       if (p.iframes > 0) {
         var flick = Math.sin(this.time * 40) * 0.5 + 0.5;
         g.globalAlpha = 0.45 + flick * 0.4;
       }
-      var w = 280 * sw, h = 280 * sh;
-      g.drawImage(img, -w / 2, -h / 2, w, h);
-      // hurt red tint (pre-baked tinted sprite, clipped to the goose alone)
-      if (p.hurtFlash > 0 && Fx.baked.gooseHurt) {
-        g.globalAlpha = Math.min(1, p.hurtFlash * 1.4);
-        g.drawImage(Fx.baked.gooseHurt, -w / 2, -h / 2, w, h);
-      }
+      g.scale(k, k);
+      g.drawImage(scr, -75, -72);
       g.restore();
     },
 
@@ -2018,9 +2451,6 @@
 
     drawDragon: function (g) {
       var d = this.dragon;
-      var img = d.type === "ember" ? (Fx.baked.dragonEmber || images.dragonEmber)
-                                   : (Fx.baked.dragonStorm || images.dragonStorm);
-      if (!img) return;
 
       // altitude shadow
       g.save();
@@ -2114,30 +2544,38 @@
       // gentle hover bob (skip while dashing)
       if (d.state !== "dash") g.translate(0, Math.sin(this.time * 1.7) * 5);
 
-      g.rotate(d.facing - Math.PI / 2); // sprite faces UP
+      g.rotate(d.facing - Math.PI / 2); // rig is drawn facing UP
 
       var sc = 0.62;
-      // bow animation — sink & fade slightly
+      var bowP = 0;
+      // bow animation — fold wings, dip the head, sink & fade slightly
       if (d.state === "bow") {
         d.bowT += 1 / 60;
         sc = 0.62 * (1 - Math.min(0.15, d.bowT * 0.1));
-        g.globalAlpha = Math.max(0.5, 1 - d.bowT * 0.18);
+        bowP = Math.min(1, d.bowT * 0.8);
+        g.globalAlpha = Math.max(0.55, 1 - d.bowT * 0.15);
       }
       // phase 2 subtle pulsing
       if (d.phase === 2) sc *= 1 + Math.sin(this.time * 6) * 0.015;
 
-      // slow wing-beat: wings (x) swell as the body (y) settles
-      var beat = Math.sin(this.time * 2.1);
-      var w = 680 * sc * (1 + beat * 0.026);
-      var h = 680 * sc * (1 - beat * 0.02);
-      g.drawImage(img, -w / 2, -h / 2, w, h);
-
-      // hit flash (pre-baked tinted sprite, clipped to the dragon alone)
-      var flashImg = d.type === "ember" ? Fx.baked.dragonEmberFlash : Fx.baked.dragonStormFlash;
-      if (d.hitFlash > 0 && flashImg) {
-        g.globalAlpha = Math.min(1, d.hitFlash * 4);
-        g.drawImage(flashImg, -w / 2, -h / 2, w, h);
-      }
+      // rig the dragon into the scratch canvas once per frame
+      var k = (680 * sc) / 460;
+      var scr = Fx.scratch("dragon", 460, 370);
+      var sg = scr._ctx;
+      sg.save();
+      sg.translate(230, 150);
+      Art.dragon(sg, {
+        t: this.time,
+        swayPhase: d.swayPhase || 0,
+        flapPhase: d.flapPhase || 0,
+        phase2: d.phase === 2,
+        flash: Math.min(1, d.hitFlash * 4),
+        bow: bowP,
+        variant: d.type
+      });
+      sg.restore();
+      g.scale(k, k);
+      g.drawImage(scr, -230, -150);
       g.restore();
     },
 
@@ -2213,7 +2651,7 @@
 
   // expose minimal hooks for automated testing (no globals leaked otherwise)
   window.__dragoose = {
-    game: Game, input: Input,
+    game: Game, input: Input, art: Art,
     forceWin: function () { if (Game.dragon) Game.damageDragon(9999, Game.dragon.x, Game.dragon.y); },
     forceHurt: function () { if (Game.player) { Game.player.iframes = 0; Game.hurtPlayer(99, Game.player.x, Game.player.y + 50); } },
     state: function () { return Game.state; }
