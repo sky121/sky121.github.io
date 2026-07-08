@@ -9,11 +9,13 @@
 
 ---
 
-## Status: v1 vertical slice — SHIPPED & LIVE
+## Status: v1.1 — two-boss gauntlet — SHIPPED & LIVE
 
 - **Play it:** https://sky121.github.io/dragoose.html (best on phone, one-handed)
 - **Discoverable from:** the **Lab** page (`lab.html`) — the Dragoose tile is the first *Live* project.
-- v1 is **one complete, well-tuned fight** against the Ember dragon, start to finish, with the core roguelike loop and persistence. It reads as a finished indie game, cohesive with the site's watercolor aesthetic.
+- A run is now a **gauntlet**: Ember, the Cinder Wyrm → (respect earned, +2 feathers healed) → **Tempest, the Storm Wyrm** → final victory. Powers, scales, and health carry across the two duels; scales are banked per-duel (no double counting).
+- **Storm fight (2026-07-08):** `RUN_BOSSES`/`DRAGONS` config drives the gauntlet. Tempest: 115 HP, faster roam, lightning kit — **fan** (tight bolt spread), **lance** (3–4 fast bolts down one locked line), **nova** (radial thunderclap shell, double wave in phase 2), and in phase 2 the dash body-check which **discharges a mini-nova on exit**. Telegraphs are electric blue (`#bfe3ff`), nova gets a crackling-disc wind-up; enemy bolts are `kind:"zap"` with an indigo rim for readability. New relics: **Gale Feather** (dodge cooldown 0.3 s vs 0.6 s) and **Tempest's Gift** (start runs with Storm Dodge) — granted on Tempest's defeat (≥12 scales collected in the run ⇒ Tempest's Gift). Ember's relic threshold is now ≥8 scales ⇒ Cinder's Gift.
+- Death/pause/retry restart the whole gauntlet (roguelike). The dead-screen taunt names whichever dragon killed you.
 
 ### Files (all committed to `master`)
 | File | What it is |
@@ -72,7 +74,7 @@ The goose and dragon PNG sprites are **no longer drawn** — both characters are
 - **`Art.dragon(ctx, opts)`** — vector dragon facing up in a 460-unit box: serpentine 11-segment body drawn as smooth tapered strokes (tail whips with `swayPhase`), swept bat wings with elbow/wrist joints, three membrane fingers and deep scalloped trailing edges that billow in counter-phase, arrow-shaped skull with backswept horns, glowing upswept wedge eyes under hard brow slashes (brighter + veins glow when enraged), spine studs, tail spade. `bow` folds the wings, dips the head and softens the eyes. Palettes for `ember` and `storm` are in `Art.dragonPal` — the storm dragon is a palette swap away.
 - Characters render into per-frame **scratch canvases** (`Fx.scratch`) so one `drawImage` alpha fades the whole figure (i-frames, ghosts, bow) without per-path alpha bookkeeping.
 - **Perf:** the sky backdrop (gradient, god rays, sun, blooms, haze) paints into a **half-res offscreen layer every other frame** and blits once; the vignette + color grade are one pre-baked layer. Headless-software-rendering benchmark: ~56 fps in phase-2 combat vs ~60 for the pre-revamp build (GPU devices lock at 60). Big previews of the rigs: `window.__dragoose.art` is exposed for test harnesses.
-- The old sprite PNGs (`goose.png`, `dragon-*.png`, `fireball.png`) remain in the repo and are still preloaded but unused by the renderer; scale pickups still use their PNGs (with baked lighting).
+- The old sprite PNGs (`goose.png`, `dragon-*.png`, `fireball.png`, `cloud.png`) remain in the repo but are **no longer preloaded** (2026-07-08) — only the three scale-pickup PNGs load now; everything else is procedural.
 
 ### Graphics overhaul (2026-07-08)
 The render layer was rebuilt for a professional look while keeping the watercolor identity. All of it lives in `assets/js/dragoose.js`:
@@ -92,9 +94,9 @@ The render layer was rebuilt for a professional look while keeping the watercolo
 
 ## Roadmap — deferred features (what to build next)
 
-Ordered roughly by value / readiness. **The storm dragon is the easiest next win** — its sprite (`dragon-storm.png`) and scale variant are already in the repo and the code has hooks for a second fight.
+Ordered roughly by value / readiness.
 
-1. **Second fight: the Storm dragon.** Add it as a follow-up boss (cool palette, lightning attacks, distinct patterns). Assets + hooks ready.
+1. ~~**Second fight: the Storm dragon.**~~ **DONE (2026-07-08)** — Tempest ships as the second boss of the gauntlet (see Status above). Adding a third dragon = add an entry to `DRAGONS`, append to `RUN_BOSSES`, give it an `Art.dragonPal` palette and an attack kit branch in `dragonBeginAttack`/`dragonExecute`.
 2. **Open sky (open world).** A flyable map of dragon *realms*; entering a realm angers that dragon and starts its fight. Pick your route; progress toward defeating all dragons. (This is the big structural step from "one fight" → "the game.")
 3. **More dragons**, each with a unique realm, palette, attack identity, and signature reward.
 4. **Equipment that reskins Gary + grants abilities/attacks** (the spec calls for equipment changing the goose's look as well as powers). Could layer cosmetic sprite pieces over `goose.png` or add variant gooses.

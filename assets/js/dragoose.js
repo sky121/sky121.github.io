@@ -18,15 +18,12 @@
   };
   var SAVE_KEY = "dragoose-save";
 
+  // characters/projectiles/clouds are fully procedural now — only the
+  // scale pickups still ship as PNG sprites
   var IMG_SRC = {
-    goose: "images/dragoose/goose.png",
-    dragonEmber: "images/dragoose/dragon-ember.png",
-    dragonStorm: "images/dragoose/dragon-storm.png",
-    fireball: "images/dragoose/fireball.png",
     scale: "images/dragoose/scale.png",
     scaleEmber: "images/dragoose/scale-ember.png",
-    scaleStorm: "images/dragoose/scale-storm.png",
-    cloud: "images/dragoose/cloud.png"
+    scaleStorm: "images/dragoose/scale-storm.png"
   };
   var images = {};
 
@@ -131,6 +128,10 @@
       src.start(t);
     },
     dodge: function () { this.noise(0.22, 0.18, 2200); this.tone(520, 0.18, "sine", 0.08, 900); },
+    thunder: function (big) {
+      this.noise(0.3 + big * 0.25, 0.16 + big * 0.12, 700);
+      this.tone(90, 0.4 + big * 0.2, "sawtooth", 0.12 + big * 0.06, 50);
+    },
     fireball: function (charge) {
       var base = 150 + charge * 120;
       this.tone(base, 0.28, "sawtooth", 0.18, base * 0.4);
@@ -1110,7 +1111,16 @@
   };
   var RELICS = {
     emberHeart: { name: "Heart of Ember", glyph: "❤️‍🔥", desc: "Begin each run with one extra feather of health." },
-    cinderGift: { name: "Cinder's Gift", glyph: "🔥", desc: "Begin each run already wielding Ember Wake." }
+    cinderGift: { name: "Cinder's Gift", glyph: "🔥", desc: "Begin each run already wielding Ember Wake." },
+    galeFeather: { name: "Gale Feather", glyph: "🪶", desc: "Your dodge recovers in half the time." },
+    stormGift: { name: "Tempest's Gift", glyph: "⚡", desc: "Begin each run already wielding Storm Dodge." }
+  };
+
+  // the gauntlet: dragons faced in order within a single run
+  var RUN_BOSSES = ["ember", "storm"];
+  var DRAGONS = {
+    ember: { name: "Ember, the Cinder Wyrm", health: 100, roamSpeed: 105, enragedSpeed: 150 },
+    storm: { name: "Tempest, the Storm Wyrm", health: 115, roamSpeed: 120, enragedSpeed: 170 }
   };
 
   // ---------------------------------------------------------
@@ -1193,7 +1203,7 @@
       $("btn-resume").addEventListener("click", function () { Game.togglePause(); });
       $("btn-restart-pause").addEventListener("click", function () { Game.startRun(); });
       $("btn-retry").addEventListener("click", function () { Game.startRun(); });
-      $("btn-continue").addEventListener("click", function () { Game.toTitle(); });
+      $("btn-continue").addEventListener("click", function () { Game.continueFromWin(); });
       $("btn-mute").addEventListener("click", function () { Game.toggleMute(); });
     },
 
@@ -1259,6 +1269,9 @@
       PlayerShots.clear(); DragonShots.clear(); Pickups.clear();
       this.floatLayer.innerHTML = "";
       this.scaleProgress = 0;
+      this.scalesBanked = 0;
+      this.bossIndex = 0;
+      this.winIsFinal = false;
       this.nextPowerAt = 3;
       this.powers = {};
       this.shake = 0; this.hitStop = 0; this.flashRed = 0; this.flashWhite = 0;
@@ -1276,33 +1289,62 @@
         ghosts: []
       };
 
-      // relic perk: start with a power
+      // relic perks: start with a power
       if (Save.hasRelic("cinderGift")) { this.powers.emberWake = true; }
+      if (Save.hasRelic("stormGift")) { this.powers.stormDodge = true; }
       this.renderPowers();
 
-      this.dragon = this.makeDragon("ember");
+      this.dragon = this.makeDragon(RUN_BOSSES[0]);
       this.updateHUD();
       this.state = "PLAYING";
+      this.floatText(VW / 2, VH * 0.4, this.dragon.name, PAL.gold);
       this.wipe();
     },
 
     makeDragon: function (type) {
+      var spec = DRAGONS[type] || DRAGONS.ember;
+      var hp = spec.health;
       var d = {
         type: type,
-        name: type === "ember" ? "Ember, the Cinder Wyrm" : "Tempest, the Storm Wyrm",
+        name: spec.name,
         x: VW / 2, y: VH * 0.24,
         vx: 0, vy: 0, r: 110,
-        health: 100, maxHealth: 100,
+        health: hp, maxHealth: hp,
+        roamSpeed: spec.roamSpeed, enragedSpeed: spec.enragedSpeed,
         facing: Math.PI / 2,
         phase: 1,
         state: "roam", stateT: 0, attackCd: 2.2,
         telegraph: 0, telegraphType: null, telegraphMax: 0,
         targetX: VW / 2, targetY: VH * 0.24,
         hitFlash: 0, bowT: 0,
-        dropMilestones: [80, 60, 45, 30, 18, 8], // health thresholds that drop scales
+        // health thresholds that drop scales
+        dropMilestones: [0.8, 0.6, 0.45, 0.3, 0.18, 0.08].map(function (f) { return hp * f; }),
         dashVx: 0, dashVy: 0
       };
       return d;
+    },
+
+    // advance the gauntlet: next dragon in the same run
+    nextFight: function () {
+      this.bossIndex++;
+      var p = this.player;
+      // a breather between duels: preen two feathers back
+      p.health = Math.min(p.maxHealth, p.health + 2);
+      p.x = VW / 2; p.y = VH * 0.72; p.vx = 0; p.vy = 0;
+      p.iframes = 1.2;
+      PlayerShots.clear(); DragonShots.clear(); Pickups.clear();
+      this.dragon = this.makeDragon(RUN_BOSSES[this.bossIndex]);
+      this.updateHUD();
+      this.showScreen(null);
+      hud.hidden = false;
+      this.state = "PLAYING";
+      this.floatText(VW / 2, VH * 0.4, this.dragon.name, PAL.wisteria);
+      this.wipe();
+    },
+
+    continueFromWin: function () {
+      if (this.winIsFinal) this.toTitle();
+      else this.nextFight();
     },
 
     // ----- PAUSE -----
@@ -1531,7 +1573,8 @@
       p.facing = ang;
       p.dashTime = 0.18;
       p.iframes = 0.42;
-      p.dodgeCd = 0.6;
+      // RELIC: gale feather — dodge recovers in half the time
+      p.dodgeCd = Save.hasRelic("galeFeather") ? 0.3 : 0.6;
       p.justDodged = 1.2;
       Audio2.dodge();
       Particles.burst(p.x, p.y, 8, "#cfe3f1", 3, 12, 0.3);
@@ -1618,13 +1661,16 @@
         }
         return;
       }
-      // enraged: shed rising embers + heat
+      // enraged: shed rising embers + heat (static crackle for the storm wyrm)
       if (d.phase === 2 && Math.random() < dt * 14) {
         var ea = Math.random() * TAU, er = d.r * (0.3 + Math.random() * 0.5);
+        var ec = d.type === "storm"
+          ? (Math.random() < 0.4 ? PAL.wisteria : "#8fd0ff")
+          : (Math.random() < 0.4 ? PAL.rose : PAL.ember);
         Particles.glow(d.x + Math.cos(ea) * er, d.y + Math.sin(ea) * er,
           (Math.random() - 0.5) * 0.8, -1.1 - Math.random() * 1.4,
           4 + Math.random() * 7, 0.9, 0.7 + Math.random() * 0.5,
-          Math.random() < 0.4 ? PAL.rose : PAL.ember, 0.55, 0.98);
+          ec, 0.55, 0.98);
       }
 
       // phase transition
@@ -1649,7 +1695,7 @@
           d.targetY = VH * 0.14 + Math.random() * VH * 0.22;
           d.stateT = 0;
         }
-        var sp = d.phase === 2 ? 150 : 105;
+        var sp = d.phase === 2 ? d.enragedSpeed : d.roamSpeed;
         if (dist > 1) { d.vx = (dx / dist) * sp; d.vy = (dy / dist) * sp; }
         d.x += d.vx * dt; d.y += d.vy * dt;
         d.facing = this.angleLerp(d.facing, Math.atan2(this.player.y - d.y, this.player.x - d.x), 1 - Math.pow(0.02, dt));
@@ -1670,7 +1716,7 @@
       else if (d.state === "dash") {
         d.x += d.dashVx * dt; d.y += d.dashVy * dt;
         d.dashVx *= Math.pow(0.2, dt); d.dashVy *= Math.pow(0.2, dt);
-        Particles.spawn(d.x, d.y, 0, 0, 30, 1.3, 0.4, PAL.ember, 0.22, 0.92);
+        Particles.spawn(d.x, d.y, 0, 0, 30, 1.3, 0.4, d.type === "storm" ? "#9fc2e0" : PAL.ember, 0.22, 0.92);
         d.stateT += dt;
         // keep in bounds
         if (d.x < 90) { d.x = 90; d.dashVx = Math.abs(d.dashVx); }
@@ -1704,11 +1750,17 @@
       var d = this.dragon;
       d.state = "telegraph";
       d.stateT = 0;
-      // choose attack
-      var choices = ["volley", "aimed", "breath"];
-      if (d.phase === 2) choices = ["volley", "aimed", "breath", "dash", "dash"];
+      // choose attack — each dragon has its own kit
+      var choices;
+      if (d.type === "storm") {
+        choices = ["fan", "lance", "nova"];
+        if (d.phase === 2) choices = ["fan", "lance", "nova", "dash", "dash"];
+      } else {
+        choices = ["volley", "aimed", "breath"];
+        if (d.phase === 2) choices = ["volley", "aimed", "breath", "dash", "dash"];
+      }
       d.telegraphType = choices[(Math.random() * choices.length) | 0];
-      d.telegraph = d.telegraphType === "dash" ? 0.6 : 0.5;
+      d.telegraph = d.telegraphType === "dash" ? 0.6 : d.telegraphType === "nova" ? 0.7 : 0.5;
       d.telegraphMax = d.telegraph;
       if (d.telegraphType === "breath") {
         d.breathAng = Math.atan2(this.player.y - d.y, this.player.x - d.x);
@@ -1760,10 +1812,73 @@
         d.state = "breath"; d.stateT = 0; d.breathT = 0;
         d.breathAng = Math.atan2(p.y - d.y, p.x - d.x);
       }
+      // ----- storm kit -----
+      else if (t === "fan") {
+        // a crackling fan of bolts — tighter and faster than Ember's volley
+        var fn = d.phase === 2 ? 11 : 7;
+        var fspread = Math.PI * (d.phase === 2 ? 0.7 : 0.48);
+        var fbase = Math.atan2(p.y - d.y, p.x - d.x) - fspread / 2;
+        for (var fi = 0; fi < fn; fi++) {
+          var fa = fbase + fspread * (fi / (fn - 1));
+          DragonShots.spawn({
+            x: d.x, y: d.y, vx: Math.cos(fa) * 350, vy: Math.sin(fa) * 350,
+            r: 15, dmg: 1, life: 2.6, color: "#8fd0ff", rot: fa, kind: "zap"
+          });
+        }
+        Audio2.thunder(0.5);
+        d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.2 : 1.9;
+      } else if (t === "lance") {
+        // three fast bolts down one locked line — sidestep, don't outrun
+        var la = Math.atan2(p.y - d.y, p.x - d.x);
+        var ln = d.phase === 2 ? 4 : 3;
+        for (var ls = 0; ls < ln; ls++) {
+          (function (delay) {
+            setTimeout(function () {
+              if (Game.state !== "PLAYING" || Game.dragon !== d) return;
+              DragonShots.spawn({
+                x: d.x + Math.cos(la) * 70, y: d.y + Math.sin(la) * 70,
+                vx: Math.cos(la) * 600, vy: Math.sin(la) * 600,
+                r: 17, dmg: 1, life: 2.2, color: "#bfe3ff", rot: la, kind: "zap"
+              });
+              Audio2.tone(340, 0.1, "square", 0.08, 180);
+            }, delay);
+          })(ls * 130);
+        }
+        d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.4 : 2.1;
+      } else if (t === "nova") {
+        // thunderclap: a radial shell of bolts from the body
+        this.stormNova(d, d.phase === 2 ? 16 : 12, 255, 0);
+        if (d.phase === 2) {
+          setTimeout(function () {
+            if (Game.state === "PLAYING" && Game.dragon === d) Game.stormNova(d, 16, 255, Math.PI / 16);
+          }, 380);
+        }
+        Audio2.thunder(1);
+        this.addShake(6);
+        d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.5 : 2.3;
+      }
+    },
+
+    stormNova: function (d, n, spd, offset) {
+      for (var i = 0; i < n; i++) {
+        var a = offset + (i / n) * TAU;
+        DragonShots.spawn({
+          x: d.x + Math.cos(a) * d.r * 0.5, y: d.y + Math.sin(a) * d.r * 0.5,
+          vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
+          r: 15, dmg: 1, life: 3, color: "#8fd0ff", rot: a, kind: "zap"
+        });
+      }
+      Particles.ring(d.x, d.y, PAL.wisteria, d.r * 0.6, 900, 0.5, 7);
+      Particles.sparkBurst(d.x, d.y, 10, "#bfe3ff", 480, 0.4);
     },
 
     dragonEndAttack: function () {
       var d = this.dragon;
+      // the storm wyrm discharges as it pulls out of a dash
+      if (d.type === "storm" && d.telegraphType === "dash") {
+        this.stormNova(d, 6, 210, Math.random() * TAU);
+        Audio2.thunder(0.4);
+      }
       d.state = "roam"; d.stateT = 0;
       d.attackCd = d.phase === 2 ? 1.0 : 1.8;
       d.telegraphType = null;
@@ -1998,23 +2113,38 @@
       Particles.sparkBurst(d.x, d.y, 16, PAL.gold, 520, 0.5);
       DragonShots.clear();
       Audio2.victory();
-      // bank scales
-      Save.addScales(this.scaleProgress);
-      // grant relic
-      var relicId = this.scaleProgress >= 12 ? "cinderGift" : "emberHeart";
+      // bank only the scales earned since the previous duel
+      Save.addScales(this.scaleProgress - this.scalesBanked);
+      this.scalesBanked = this.scaleProgress;
+      // grant this dragon's relic
+      var relicId;
+      if (d.type === "storm") relicId = this.scaleProgress >= 12 ? "stormGift" : "galeFeather";
+      else relicId = this.scaleProgress >= 8 ? "cinderGift" : "emberHeart";
       var hadBefore = Save.hasRelic(relicId);
       Save.addRelic(relicId);
 
+      var isFinal = this.bossIndex >= RUN_BOSSES.length - 1;
+      this.winIsFinal = isFinal;
+      var firstName = d.name.split(",")[0];
       var self = this;
       setTimeout(function () {
         self.state = "WIN";
         self.wipe();
         var R = RELICS[relicId];
-        $("win-sub").textContent = "Ember bows its great head. " + self.scaleProgress + " scales now rest in your hoard.";
+        if (isFinal) {
+          $("win-sub").textContent = firstName + " bows amid the quieting sky. Every dragon's respect is yours — " +
+            self.scaleProgress + " scale" + (self.scaleProgress === 1 ? "" : "s") + " rest in your hoard.";
+        } else {
+          var next = DRAGONS[RUN_BOSSES[self.bossIndex + 1]];
+          $("win-sub").textContent = firstName + " bows its great head. But the clouds darken above — " +
+            next.name + " has been watching.";
+        }
         $("relic-grant").innerHTML =
           '<span class="relic-glyph">' + R.glyph + '</span>' +
           '<span><span class="relic-text-name">' + (hadBefore ? "Relic strengthened: " : "Relic gained: ") + R.name + '</span>' +
           '<br><span class="relic-text-desc">' + R.desc + '</span></span>';
+        $("btn-continue").textContent = isFinal ? "Onward"
+          : "Face " + DRAGONS[RUN_BOSSES[self.bossIndex + 1]].name.split(",")[0];
         self.showScreen("win");
       }, reduceMotion ? 600 : 1400);
     },
@@ -2029,10 +2159,11 @@
       var self = this;
       setTimeout(function () {
         self.wipe();
+        var dn = self.dragon ? self.dragon.name.split(",")[0] : "The dragon";
         var lines = [
           "You earned " + Math.floor(self.scaleProgress / 2) + " salvaged scales for the hoard.",
           "The dragon's respect must be won another day.",
-          "Ember snorts. It expected more of a goose."
+          dn + " snorts. It expected more of a goose."
         ];
         $("dead-sub").textContent = lines[(Math.random() * lines.length) | 0];
         self.showScreen("dead");
@@ -2350,16 +2481,17 @@
     },
 
     // jagged, flickering lightning bolt
-    drawBolt: function (g, s) {
+    drawBolt: function (g, s, col) {
+      col = col || PAL.wisteria;
       var ang = s.rot;
       var len = s.r * 3.4;
       var px = Math.cos(ang + Math.PI / 2), py = Math.sin(ang + Math.PI / 2);
-      Fx.drawDot(g, s.x, s.y, s.r * 1.9, PAL.wisteria, 0.5, true);
+      Fx.drawDot(g, s.x, s.y, s.r * 1.9, col, 0.5, true);
       g.save();
       g.globalCompositeOperation = "lighter";
       g.lineCap = "round"; g.lineJoin = "round";
       for (var pass = 0; pass < 2; pass++) {
-        g.strokeStyle = pass === 0 ? Fx.rgba(PAL.wisteria, 0.65) : "rgba(255,255,255,0.92)";
+        g.strokeStyle = pass === 0 ? Fx.rgba(col, 0.65) : "rgba(255,255,255,0.92)";
         g.lineWidth = pass === 0 ? 5.5 : 2.2;
         g.beginPath();
         var segs = 5;
@@ -2400,6 +2532,10 @@
           Fx.drawDot(g, s.x, s.y, s.r * 1.5, PAL.emberDeep, 0.4 * t2 + 0.15, false);
           Fx.drawDot(g, s.x, s.y, s.r * 1.1, PAL.ember, 0.5, true);
           Fx.drawDot(g, s.x, s.y, s.r * 0.5, PAL.gold, 0.55, true);
+        } else if (s.kind === "zap") {
+          // hostile lightning: deep indigo rim keeps it readable on the sky
+          Fx.drawDot(g, s.x, s.y, s.r * 1.8, "#2f3f66", 0.34, false);
+          self.drawBolt(g, s, s.color || "#8fd0ff");
         } else {
           // hostile crimson rim under the flame so enemy fire reads at a glance
           Fx.drawDot(g, s.x, s.y, s.r * 1.7, "#a03428", 0.32, false);
@@ -2463,11 +2599,13 @@
       g.save();
       g.translate(d.x, d.y);
 
-      // enraged: heat aura beneath the body
+      // enraged: heat aura beneath the body (storm: cold static halo)
       if (d.phase === 2 && d.state !== "bow") {
         var hp = 0.5 + Math.sin(this.time * 5) * 0.5;
-        Fx.drawDot(g, 0, 0, d.r * (1.35 + hp * 0.12), PAL.emberDeep, 0.1 + hp * 0.08, true);
-        Fx.drawDot(g, 0, 0, d.r * 0.9, PAL.rose, 0.07 + hp * 0.07, true);
+        var auraA = d.type === "storm" ? "#3d6288" : PAL.emberDeep;
+        var auraB = d.type === "storm" ? PAL.wisteria : PAL.rose;
+        Fx.drawDot(g, 0, 0, d.r * (1.35 + hp * 0.12), auraA, 0.1 + hp * 0.08, true);
+        Fx.drawDot(g, 0, 0, d.r * 0.9, auraB, 0.07 + hp * 0.07, true);
       }
       // bowing: warm golden halo of respect
       if (d.state === "bow") {
@@ -2478,7 +2616,8 @@
       if (d.state === "telegraph") {
         var prog = 1 - d.telegraph / d.telegraphMax;
         var pul = 0.5 + Math.sin(this.time * 18) * 0.5;
-        var tc = d.telegraphType === "dash" ? PAL.rose : PAL.gold;
+        var tc = d.telegraphType === "dash" ? PAL.rose
+               : (d.type === "storm" ? "#bfe3ff" : PAL.gold);
         var aim = d.telegraphType === "breath" ? d.breathAng : Math.atan2(this.player.y - d.y, this.player.x - d.x);
 
         // charging glow gathers on the dragon
@@ -2486,7 +2625,29 @@
 
         g.save();
         g.rotate(aim);
-        if (d.telegraphType === "breath") {
+        if (d.telegraphType === "nova") {
+          // thunderclap wind-up: a swelling disc of static + jittering arcs
+          var nr = d.r * (0.7 + prog * 0.9);
+          var ng = g.createRadialGradient(0, 0, d.r * 0.3, 0, 0, nr);
+          ng.addColorStop(0, Fx.rgba(PAL.wisteria, 0.28 * (0.3 + prog * 0.7)));
+          ng.addColorStop(0.7, Fx.rgba("#8fd0ff", 0.16 * (0.3 + prog * 0.7)));
+          ng.addColorStop(1, Fx.rgba("#8fd0ff", 0));
+          g.fillStyle = ng;
+          g.beginPath(); g.arc(0, 0, nr, 0, TAU); g.fill();
+          g.globalCompositeOperation = "lighter";
+          g.strokeStyle = Fx.rgba("#dff0ff", 0.3 + prog * 0.5 * pul);
+          g.lineWidth = 2.5;
+          for (var zi = 0; zi < 5; zi++) {
+            var za = (zi / 5) * TAU + this.time * 3;
+            var zr1 = d.r * 0.5, zr2 = nr * (0.85 + Math.random() * 0.2);
+            g.beginPath();
+            g.moveTo(Math.cos(za) * zr1, Math.sin(za) * zr1);
+            var zmid = (zr1 + zr2) / 2, zj = (Math.random() - 0.5) * 24;
+            g.lineTo(Math.cos(za) * zmid - Math.sin(za) * zj, Math.sin(za) * zmid + Math.cos(za) * zj);
+            g.lineTo(Math.cos(za) * zr2, Math.sin(za) * zr2);
+            g.stroke();
+          }
+        } else if (d.telegraphType === "breath") {
           // soft cone showing the sweep to come
           var cr = 430, half = 0.62;
           var cg = g.createRadialGradient(0, 0, d.r * 0.4, 0, 0, cr);
