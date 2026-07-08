@@ -283,31 +283,309 @@
   };
 
   // ---------------------------------------------------------
-  // PARTICLE POOL (watercolor blooms)
+  // FX — cached glow sprites, procedural clouds, lighting bakes
+  // ---------------------------------------------------------
+  var TAU = Math.PI * 2;
+  var Fx = {
+    dots: {},          // color -> soft radial glow sprite
+    baked: {},         // sprite key -> lighting-baked canvas
+    cloudSprites: [],  // procedural volumetric clouds
+    vignette: null,
+    redVignette: null,
+    grade: null,
+
+    rgba: function (color, a) {
+      var r, g, b;
+      if (color.charAt(0) === "#") {
+        var h = color.slice(1);
+        if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+        r = parseInt(h.substr(0, 2), 16); g = parseInt(h.substr(2, 2), 16); b = parseInt(h.substr(4, 2), 16);
+      } else {
+        var m = color.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+        if (!m) return color;
+        r = +m[1]; g = +m[2]; b = +m[3];
+      }
+      return "rgba(" + r + "," + g + "," + b + "," + a + ")";
+    },
+
+    // soft radial glow sprite, cached per color
+    dot: function (color) {
+      var c = this.dots[color];
+      if (c) return c;
+      c = document.createElement("canvas");
+      c.width = c.height = 64;
+      var x = c.getContext("2d");
+      var g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+      g.addColorStop(0, this.rgba(color, 1));
+      g.addColorStop(0.38, this.rgba(color, 0.62));
+      g.addColorStop(0.72, this.rgba(color, 0.2));
+      g.addColorStop(1, this.rgba(color, 0));
+      x.fillStyle = g;
+      x.fillRect(0, 0, 64, 64);
+      this.dots[color] = c;
+      return c;
+    },
+
+    drawDot: function (g, x, y, r, color, alpha, additive) {
+      if (r <= 0 || alpha <= 0) return;
+      var prevOp = g.globalCompositeOperation, prevA = g.globalAlpha;
+      if (additive) g.globalCompositeOperation = "lighter";
+      g.globalAlpha = Math.min(1, alpha);
+      g.drawImage(this.dot(color), x - r, y - r, r * 2, r * 2);
+      g.globalCompositeOperation = prevOp;
+      g.globalAlpha = prevA;
+    },
+
+    // volumetric puffy cumulus rendered once to an offscreen canvas:
+    // a flat-bottomed base row with a cauliflower top, shaded underneath.
+    makeCloudSprite: function (w, h) {
+      var c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      var x = c.getContext("2d");
+      var puff = function (px, py, pr, core) {
+        var grad = x.createRadialGradient(px, py - pr * 0.32, pr * 0.06, px, py, pr);
+        grad.addColorStop(0, "rgba(255,255,255," + core + ")");
+        grad.addColorStop(0.62, "rgba(250,252,255," + core * 0.72 + ")");
+        grad.addColorStop(1, "rgba(242,247,253,0)");
+        x.fillStyle = grad;
+        x.beginPath(); x.arc(px, py, pr, 0, TAU); x.fill();
+      };
+      var baseY = h * 0.66;
+      // base row
+      var bases = 4;
+      for (var i = 0; i < bases; i++) {
+        var t = i / (bases - 1);
+        var px = w * (0.2 + 0.6 * t) + (Math.random() - 0.5) * w * 0.05;
+        var pr = h * (0.26 + Math.random() * 0.08) * (1 - Math.abs(t - 0.5) * 0.5);
+        puff(px, baseY - pr * 0.18, pr, 0.98);
+      }
+      // cauliflower top
+      var tops = 6 + ((Math.random() * 4) | 0);
+      for (var j = 0; j < tops; j++) {
+        var tt = j / (tops - 1);
+        var lens = Math.sin(tt * Math.PI);
+        var tx = w * (0.22 + 0.56 * tt) + (Math.random() - 0.5) * w * 0.06;
+        var tr = h * (0.12 + lens * 0.17 * (0.7 + Math.random() * 0.6));
+        var ty = baseY - h * (0.12 + lens * (0.2 + Math.random() * 0.1)) - tr * 0.4;
+        puff(tx, ty, tr, 0.95);
+      }
+      // softly trim to a flatter cloud base (fade fully out before the
+      // sprite edge so no hard line shows)
+      x.globalCompositeOperation = "destination-out";
+      var cut = x.createLinearGradient(0, h * 0.68, 0, h * 0.9);
+      cut.addColorStop(0, "rgba(0,0,0,0)");
+      cut.addColorStop(0.7, "rgba(0,0,0,0.75)");
+      cut.addColorStop(1, "rgba(0,0,0,1)");
+      x.fillStyle = cut; x.fillRect(0, 0, w, h);
+      // and feather the sprite's side edges too
+      var cutL = x.createLinearGradient(0, 0, w * 0.1, 0);
+      cutL.addColorStop(0, "rgba(0,0,0,1)"); cutL.addColorStop(1, "rgba(0,0,0,0)");
+      x.fillStyle = cutL; x.fillRect(0, 0, w * 0.1, h);
+      var cutR = x.createLinearGradient(w, 0, w * 0.9, 0);
+      cutR.addColorStop(0, "rgba(0,0,0,1)"); cutR.addColorStop(1, "rgba(0,0,0,0)");
+      x.fillStyle = cutR; x.fillRect(w * 0.9, 0, w * 0.1, h);
+      // shade the underside (cool ambient bounce)
+      x.globalCompositeOperation = "source-atop";
+      var sg = x.createLinearGradient(0, h * 0.4, 0, h * 0.9);
+      sg.addColorStop(0, "rgba(148,174,206,0)");
+      sg.addColorStop(1, "rgba(132,160,196,0.5)");
+      x.fillStyle = sg; x.fillRect(0, 0, w, h);
+      // kiss the top with warm sunlight
+      var tg = x.createLinearGradient(0, 0, 0, h * 0.5);
+      tg.addColorStop(0, "rgba(255,244,219,0.6)");
+      tg.addColorStop(1, "rgba(255,244,219,0)");
+      x.fillStyle = tg; x.fillRect(0, 0, w, h);
+      x.globalCompositeOperation = "source-over";
+      return c;
+    },
+
+    // pre-blurred god-ray fan, rotated slowly at runtime (soft edges, cheap)
+    makeRaysSprite: function () {
+      var size = 900;
+      var c = document.createElement("canvas");
+      c.width = size; c.height = size;
+      var x = c.getContext("2d");
+      x.translate(size / 2, size / 2);
+      try { x.filter = "blur(14px)"; } catch (e) {}
+      var n = 7, len = size * 0.5 - 20;
+      for (var i = 0; i < n; i++) {
+        var a = i * (TAU / n) + (i % 2) * 0.22;
+        var halfW = 0.1 + (i % 3) * 0.035;
+        x.save();
+        x.rotate(a);
+        var rg = x.createLinearGradient(0, 0, len, 0);
+        rg.addColorStop(0, "rgba(255,241,205,0.16)");
+        rg.addColorStop(0.5, "rgba(255,241,205,0.07)");
+        rg.addColorStop(1, "rgba(255,241,205,0)");
+        x.fillStyle = rg;
+        x.beginPath();
+        x.moveTo(0, 0);
+        x.lineTo(len, -len * halfW);
+        x.lineTo(len, len * halfW);
+        x.closePath();
+        x.fill();
+        x.restore();
+      }
+      return c;
+    },
+
+    buildClouds: function () {
+      this.cloudSprites.length = 0;
+      for (var i = 0; i < 4; i++) this.cloudSprites.push(this.makeCloudSprite(360, 200));
+      this.rays = this.makeRaysSprite();
+    },
+
+    // full-screen layers rendered once
+    buildScreenLayers: function () {
+      // vignette
+      var v = document.createElement("canvas"); v.width = VW; v.height = VH;
+      var x = v.getContext("2d");
+      var g = x.createRadialGradient(VW / 2, VH * 0.46, VH * 0.3, VW / 2, VH * 0.52, VH * 0.8);
+      g.addColorStop(0, "rgba(15,30,54,0)");
+      g.addColorStop(0.72, "rgba(15,30,54,0.08)");
+      g.addColorStop(1, "rgba(15,30,54,0.3)");
+      x.fillStyle = g; x.fillRect(0, 0, VW, VH);
+      this.vignette = v;
+
+      // red hurt vignette (pain closes in from the edges)
+      var rv = document.createElement("canvas"); rv.width = VW; rv.height = VH;
+      x = rv.getContext("2d");
+      g = x.createRadialGradient(VW / 2, VH / 2, VH * 0.22, VW / 2, VH / 2, VH * 0.72);
+      g.addColorStop(0, "rgba(194,60,45,0)");
+      g.addColorStop(0.65, "rgba(194,60,45,0.28)");
+      g.addColorStop(1, "rgba(150,32,30,0.78)");
+      x.fillStyle = g; x.fillRect(0, 0, VW, VH);
+      this.redVignette = rv;
+
+      // color grade: warm light from above, cool depth below
+      var gc = document.createElement("canvas"); gc.width = VW; gc.height = VH;
+      x = gc.getContext("2d");
+      g = x.createLinearGradient(0, 0, 0, VH);
+      g.addColorStop(0, "rgba(255,214,160,0.6)");
+      g.addColorStop(0.45, "rgba(255,236,214,0.12)");
+      g.addColorStop(1, "rgba(46,84,138,0.5)");
+      x.fillStyle = g; x.fillRect(0, 0, VW, VH);
+      this.grade = gc;
+    },
+
+    // bake directional lighting into character sprites:
+    // warm key light from upper-left, cool bounce from lower-right,
+    // plus a soft saturation/contrast lift.
+    bakeSprite: function (img) {
+      if (!img || !img.naturalWidth) return img;
+      var w = img.naturalWidth, h = img.naturalHeight;
+      var c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      var x = c.getContext("2d");
+      try { x.filter = "saturate(1.16) contrast(1.06) brightness(1.02)"; } catch (e) {}
+      x.drawImage(img, 0, 0, w, h);
+      try { x.filter = "none"; } catch (e) {}
+      x.globalCompositeOperation = "source-atop";
+      var lg = x.createLinearGradient(0, 0, w * 0.55, h);
+      lg.addColorStop(0, "rgba(255,238,204,0.30)");
+      lg.addColorStop(0.6, "rgba(255,238,204,0)");
+      x.fillStyle = lg; x.fillRect(0, 0, w, h);
+      var sg = x.createLinearGradient(w, h, w * 0.45, h * 0.25);
+      sg.addColorStop(0, "rgba(66,86,122,0.26)");
+      sg.addColorStop(1, "rgba(66,86,122,0)");
+      x.fillStyle = sg; x.fillRect(0, 0, w, h);
+      return c;
+    },
+
+    // flat-color tinted copy of a sprite (for hurt / hit flashes)
+    tintSprite: function (src, color, amt) {
+      var w = src.width || src.naturalWidth, h = src.height || src.naturalHeight;
+      var c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      var x = c.getContext("2d");
+      x.drawImage(src, 0, 0, w, h);
+      x.globalCompositeOperation = "source-atop";
+      x.fillStyle = this.rgba(color, amt);
+      x.fillRect(0, 0, w, h);
+      return c;
+    },
+
+    bakeSprites: function () {
+      var keys = ["goose", "dragonEmber", "dragonStorm", "scale", "scaleEmber", "scaleStorm"];
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if (images[k]) this.baked[k] = this.bakeSprite(images[k]);
+      }
+      if (this.baked.goose) this.baked.gooseHurt = this.tintSprite(this.baked.goose, "#c25a3a", 0.65);
+      if (this.baked.dragonEmber) this.baked.dragonEmberFlash = this.tintSprite(this.baked.dragonEmber, "#fbf7ee", 0.85);
+      if (this.baked.dragonStorm) this.baked.dragonStormFlash = this.tintSprite(this.baked.dragonStorm, "#fbf7ee", 0.85);
+    },
+
+    init: function () {
+      this.buildClouds();
+      this.buildScreenLayers();
+    }
+  };
+
+  // ---------------------------------------------------------
+  // PARTICLE POOL v2 (soft glows, sparks, shockwave rings)
   // ---------------------------------------------------------
   var Particles = {
-    pool: [], max: 260, idx: 0,
+    pool: [], max: 320, idx: 0,
     init: function () {
       for (var i = 0; i < this.max; i++) {
-        this.pool.push({ active: false, x: 0, y: 0, vx: 0, vy: 0, r: 0, gr: 0, life: 0, maxLife: 1, color: "#fff", alpha: 0.4, drag: 0.9 });
+        this.pool.push({ active: false, x: 0, y: 0, vx: 0, vy: 0, r: 0, gr: 0, life: 0, maxLife: 1, color: "#fff", alpha: 0.4, drag: 0.9, type: "soft", add: false, w: 3, grav: 0 });
       }
     },
-    spawn: function (x, y, vx, vy, r, grow, life, color, alpha, drag) {
+    alloc: function () {
       var p = null;
-      // find inactive starting from idx (round-robin to bound cost)
       for (var i = 0; i < this.max; i++) {
         var j = (this.idx + i) % this.max;
         if (!this.pool[j].active) { p = this.pool[j]; this.idx = (j + 1) % this.max; break; }
       }
       if (!p) { p = this.pool[this.idx]; this.idx = (this.idx + 1) % this.max; }
+      p.type = "soft"; p.add = false; p.w = 3; p.grav = 0;
+      return p;
+    },
+    spawn: function (x, y, vx, vy, r, grow, life, color, alpha, drag, additive) {
+      var p = this.alloc();
       p.active = true; p.x = x; p.y = y; p.vx = vx; p.vy = vy;
       p.r = r; p.gr = grow == null ? 1 : grow; p.life = life; p.maxLife = life;
       p.color = color; p.alpha = alpha == null ? 0.4 : alpha; p.drag = drag == null ? 0.92 : drag;
+      p.add = !!additive;
+      return p;
+    },
+    // additive glow mote
+    glow: function (x, y, vx, vy, r, grow, life, color, alpha, drag) {
+      return this.spawn(x, y, vx, vy, r, grow, life, color, alpha, drag, true);
+    },
+    // hot streak that stretches along its velocity
+    spark: function (x, y, ang, spd, color, life, width) {
+      var p = this.alloc();
+      p.active = true; p.type = "spark"; p.add = true;
+      p.x = x; p.y = y;
+      p.vx = Math.cos(ang) * spd; p.vy = Math.sin(ang) * spd;
+      p.r = width == null ? 2.6 : width; p.gr = 1;
+      p.life = life == null ? 0.42 : life; p.maxLife = p.life;
+      p.color = color; p.alpha = 0.9; p.drag = 0.9; p.grav = 240;
+      return p;
+    },
+    sparkBurst: function (x, y, n, color, spd, life) {
+      for (var i = 0; i < n; i++) {
+        var a = Math.random() * TAU;
+        this.spark(x, y, a, spd * (0.4 + Math.random() * 0.9), color, (life || 0.42) * (0.6 + Math.random() * 0.7));
+      }
+    },
+    // expanding shockwave ring
+    ring: function (x, y, color, r0, speed, life, width, additive) {
+      var p = this.alloc();
+      p.active = true; p.type = "ring"; p.add = additive !== false;
+      p.x = x; p.y = y; p.vx = 0; p.vy = 0;
+      p.r = r0; p.gr = speed;               // gr = expansion px/s for rings
+      p.life = life; p.maxLife = life;
+      p.color = color; p.alpha = 0.85; p.drag = 1;
+      p.w = width == null ? 5 : width;
+      return p;
     },
     burst: function (x, y, n, color, spread, baseR, alpha) {
       n = Math.min(n, 22);
       for (var i = 0; i < n; i++) {
-        var a = Math.random() * Math.PI * 2;
+        var a = Math.random() * TAU;
         var s = (0.3 + Math.random()) * spread;
         this.spawn(x, y, Math.cos(a) * s, Math.sin(a) * s,
           baseR * (0.6 + Math.random() * 0.8), 1.25, 0.4 + Math.random() * 0.4,
@@ -320,23 +598,45 @@
         if (!p.active) continue;
         p.life -= dt;
         if (p.life <= 0) { p.active = false; continue; }
-        p.x += p.vx * dt * 60; p.y += p.vy * dt * 60;
+        if (p.type === "ring") {
+          p.r += p.gr * dt;
+          continue;
+        }
+        p.x += p.vx * dt * (p.type === "spark" ? 1 : 60);
+        p.y += p.vy * dt * (p.type === "spark" ? 1 : 60);
+        if (p.type === "spark") { p.vy += p.grav * dt; }
         p.vx *= p.drag; p.vy *= p.drag;
-        p.r *= (1 + (p.gr - 1) * dt * 4);
+        if (p.type !== "spark") p.r *= (1 + (p.gr - 1) * dt * 4);
       }
     },
     draw: function (g) {
       g.save();
-      g.globalCompositeOperation = "source-over";
       for (var i = 0; i < this.max; i++) {
         var p = this.pool[i];
         if (!p.active) continue;
         var t = p.life / p.maxLife;
-        g.globalAlpha = p.alpha * t;
-        g.fillStyle = p.color;
-        g.beginPath();
-        g.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        g.fill();
+        if (p.type === "ring") {
+          g.globalCompositeOperation = p.add ? "lighter" : "source-over";
+          g.globalAlpha = p.alpha * t;
+          g.strokeStyle = p.color;
+          g.lineWidth = Math.max(1, p.w * t);
+          g.beginPath(); g.arc(p.x, p.y, p.r, 0, TAU); g.stroke();
+        } else if (p.type === "spark") {
+          g.globalCompositeOperation = "lighter";
+          g.globalAlpha = Math.min(1, p.alpha * t * 1.4);
+          g.strokeStyle = p.color;
+          g.lineWidth = Math.max(0.8, p.r * t);
+          g.lineCap = "round";
+          g.beginPath();
+          g.moveTo(p.x, p.y);
+          g.lineTo(p.x - p.vx * 0.045, p.y - p.vy * 0.045);
+          g.stroke();
+        } else {
+          g.globalCompositeOperation = p.add ? "lighter" : "source-over";
+          g.globalAlpha = p.alpha * t;
+          var img = Fx.dot(p.color);
+          g.drawImage(img, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+        }
       }
       g.restore();
     },
@@ -359,6 +659,8 @@
             p.r = cfg.r; p.dmg = cfg.dmg; p.life = cfg.life; p.color = cfg.color;
             p.rot = cfg.rot || 0; p.spin = cfg.spin || 0; p.kind = cfg.kind || "fire";
             p.power = cfg.power || null;
+            p.seed = Math.random() * TAU;
+            if (p.trail) p.trail.length = 0; else p.trail = [];
             return p;
           }
         }
@@ -417,6 +719,7 @@
       root.appendChild(this.floatLayer);
 
       Save.load();
+      Fx.init();
       Particles.init();
       Input.init();
       this.muted = false;
@@ -433,9 +736,9 @@
     initClouds: function () {
       this.bg.clouds.length = 0;
       var layers = [
-        { depth: 0.25, count: 4, scale: 1.6, alpha: 0.32 },
-        { depth: 0.5, count: 4, scale: 1.1, alpha: 0.42 },
-        { depth: 0.85, count: 3, scale: 0.75, alpha: 0.5 }
+        { depth: 0.25, count: 4, scale: 1.7, alpha: 0.26 },
+        { depth: 0.5, count: 3, scale: 1.15, alpha: 0.38 },
+        { depth: 0.85, count: 3, scale: 0.8, alpha: 0.52 }
       ];
       for (var L = 0; L < layers.length; L++) {
         var ly = layers[L];
@@ -444,9 +747,23 @@
             x: Math.random() * VW,
             y: Math.random() * (VH + 300) - 150,
             depth: ly.depth, scale: ly.scale * (0.7 + Math.random() * 0.6),
-            alpha: ly.alpha, speed: 8 + ly.depth * 26
+            alpha: ly.alpha, speed: 8 + ly.depth * 26,
+            variant: (Math.random() * 4) | 0,
+            driftPhase: Math.random() * TAU,
+            flip: Math.random() < 0.5
           });
         }
+      }
+      // drifting light motes (dust caught in the sun)
+      this.bg.motes = [];
+      for (var m = 0; m < 22; m++) {
+        this.bg.motes.push({
+          x: Math.random() * VW, y: Math.random() * VH,
+          r: 1.2 + Math.random() * 2.6,
+          spd: 6 + Math.random() * 16,
+          phase: Math.random() * TAU,
+          tw: 0.6 + Math.random() * 1.6
+        });
       }
     },
 
@@ -535,7 +852,8 @@
         r: 30, health: startHealth, maxHealth: startHealth,
         iframes: 0, dodgeCd: 0, dashTime: 0,
         charge: 0, charging: false, justDodged: 0,
-        invulnFlash: 0, hurtFlash: 0, hitScale: 1
+        invulnFlash: 0, hurtFlash: 0, hitScale: 1,
+        ghosts: []
       };
 
       // relic perk: start with a power
@@ -636,7 +954,20 @@
       var c = this.bg.clouds;
       for (var i = 0; i < c.length; i++) {
         c[i].y += c[i].speed * dt;
-        if (c[i].y - 120 > VH) { c[i].y = -150 - Math.random() * 120; c[i].x = Math.random() * VW; }
+        c[i].x += Math.sin(this.time * 0.14 + c[i].driftPhase) * 3.2 * dt;
+        if (c[i].y - 140 > VH) {
+          c[i].y = -170 - Math.random() * 120;
+          c[i].x = Math.random() * VW;
+          c[i].variant = (Math.random() * 4) | 0;
+          c[i].flip = Math.random() < 0.5;
+        }
+      }
+      var mo = this.bg.motes || [];
+      for (var m = 0; m < mo.length; m++) {
+        var mt = mo[m];
+        mt.y += mt.spd * dt;
+        mt.x += Math.sin(this.time * mt.tw + mt.phase) * 8 * dt;
+        if (mt.y - 6 > VH) { mt.y = -6; mt.x = Math.random() * VW; }
       }
     },
 
@@ -723,9 +1054,35 @@
       var targetBank = Math.max(-0.5, Math.min(0.5, p.vx / 700));
       p.bank += (targetBank - p.bank) * (1 - Math.pow(0.001, dt));
 
-      // dash trail
+      // dash trail: afterimages + cool mist + streaks
       if (p.dashTime > 0) {
-        Particles.spawn(p.x, p.y, 0, 0, 22, 1.4, 0.4, "#cfe3f1", 0.3, 0.9);
+        p.ghosts.push({ x: p.x, y: p.y, facing: p.facing, bank: p.bank, life: 0.3, maxLife: 0.3 });
+        if (p.ghosts.length > 9) p.ghosts.shift();
+        Particles.spawn(p.x, p.y, 0, 0, 20, 1.5, 0.35, "#cfe3f1", 0.26, 0.9);
+        if (Math.random() < 0.6) {
+          Particles.spark(p.x, p.y, p.facing + Math.PI + (Math.random() - 0.5) * 0.6, 260 + Math.random() * 200, "#eaf4fc", 0.25, 2);
+        }
+      }
+      // fade afterimages
+      for (var gi = p.ghosts.length - 1; gi >= 0; gi--) {
+        p.ghosts[gi].life -= dt;
+        if (p.ghosts[gi].life <= 0) p.ghosts.splice(gi, 1);
+      }
+
+      // charging: pull in sparks + shed heat
+      if (p.charging && p.charge > 0.05) {
+        if (Math.random() < dt * (18 + p.charge * 30)) {
+          var ca = Math.random() * TAU, cd = 52 + Math.random() * 46;
+          var gp = Particles.glow(
+            p.x + Math.cos(ca) * cd, p.y + Math.sin(ca) * cd,
+            -Math.cos(ca) * (2.2 + p.charge * 1.6), -Math.sin(ca) * (2.2 + p.charge * 1.6),
+            4 + Math.random() * 5, 0.85, 0.32, Math.random() < 0.5 ? PAL.gold : PAL.ember, 0.75, 0.98
+          );
+          if (gp) gp.grav = 0;
+        }
+        if (p.charge >= 0.98 && Math.random() < dt * 8) {
+          Particles.ring(p.x, p.y, PAL.gold, 20, 240, 0.34, 3);
+        }
       }
     },
 
@@ -755,7 +1112,9 @@
       p.dodgeCd = 0.6;
       p.justDodged = 1.2;
       Audio2.dodge();
-      Particles.burst(p.x, p.y, 10, "#cfe3f1", 3, 12, 0.32);
+      Particles.burst(p.x, p.y, 8, "#cfe3f1", 3, 12, 0.3);
+      Particles.ring(p.x, p.y, "#eaf4fc", 14, 460, 0.32, 4);
+      Particles.sparkBurst(p.x, p.y, 6, "#eaf4fc", 420, 0.3);
 
       // POWER: storm dodge -> lightning
       if (this.powers.stormDodge) this.stormDodgeBurst();
@@ -808,7 +1167,11 @@
         });
       }
       Audio2.fireball(charge);
+      // muzzle flash: glow bloom + sparks + (charged) shockwave ring
+      Particles.glow(sx, sy, 0, 0, 20 * size, 1.6, 0.22, PAL.gold, 0.8, 0.9);
       Particles.burst(sx, sy, big ? 10 : 5, big ? PAL.rose : PAL.ember, 2.5, 12 * size, 0.34);
+      Particles.sparkBurst(sx, sy, big ? 10 : 5, big ? PAL.rose : PAL.gold, 380 + charge * 300, 0.32);
+      if (charge > 0.55) Particles.ring(sx, sy, big ? PAL.rose : PAL.ember, 16, 520, 0.35, 5);
       p.hitScale = 0.86; // recoil pop
     },
 
@@ -817,6 +1180,25 @@
       var d = this.dragon;
       if (!d) return;
       if (d.hitFlash > 0) d.hitFlash -= dt;
+
+      // defeated: dissolve into rising golden motes while it bows
+      if (d.state === "bow") {
+        if (Math.random() < dt * 26) {
+          var ba = Math.random() * TAU, br = Math.random() * d.r * 0.7;
+          Particles.glow(d.x + Math.cos(ba) * br, d.y + Math.sin(ba) * br,
+            (Math.random() - 0.5) * 0.6, -0.9 - Math.random() * 1.2,
+            5 + Math.random() * 9, 0.9, 1.1 + Math.random() * 0.6, PAL.gold, 0.6, 0.985);
+        }
+        return;
+      }
+      // enraged: shed rising embers + heat
+      if (d.phase === 2 && Math.random() < dt * 14) {
+        var ea = Math.random() * TAU, er = d.r * (0.3 + Math.random() * 0.5);
+        Particles.glow(d.x + Math.cos(ea) * er, d.y + Math.sin(ea) * er,
+          (Math.random() - 0.5) * 0.8, -1.1 - Math.random() * 1.4,
+          4 + Math.random() * 7, 0.9, 0.7 + Math.random() * 0.5,
+          Math.random() < 0.4 ? PAL.rose : PAL.ember, 0.55, 0.98);
+      }
 
       // phase transition
       if (d.phase === 1 && d.health <= d.maxHealth * 0.5) {
@@ -968,6 +1350,11 @@
         s.x += s.vx * dt; s.y += s.vy * dt;
         s.rot += s.spin * dt;
         s.life -= dt;
+        s.trail.unshift({ x: s.x, y: s.y });
+        if (s.trail.length > 7) s.trail.pop();
+        if (s.kind === "fire" && Math.random() < dt * 10) {
+          Particles.spark(s.x, s.y, s.rot + Math.PI + (Math.random() - 0.5) * 0.9, 120 + Math.random() * 120, PAL.gold, 0.3, 1.8);
+        }
         if (s.life <= 0 || s.x < -40 || s.x > VW + 40 || s.y < -40 || s.y > VH + 40) { s.active = false; return; }
         // hit dragon
         if (d && d.state !== "bow") {
@@ -984,6 +1371,8 @@
         s.x += s.vx * dt; s.y += s.vy * dt;
         s.rot += 3 * dt;
         s.life -= dt;
+        s.trail.unshift({ x: s.x, y: s.y });
+        if (s.trail.length > 5) s.trail.pop();
         if (s.life <= 0 || s.x < -50 || s.x > VW + 50 || s.y < -50 || s.y > VH + 50) { s.active = false; return; }
         // hit player
         if (p.iframes <= 0) {
@@ -1011,9 +1400,13 @@
       d.health = Math.max(0, d.health - dmg);
       d.hitFlash = 0.16;
       Particles.burst(x, y, Math.min(12, 4 + dmg), PAL.ember, 3, 14, 0.36);
-      Particles.burst(x, y, 4, PAL.gold, 2, 10, 0.3);
+      Particles.glow(x, y, 0, 0, 16 + dmg * 1.4, 1.5, 0.24, PAL.gold, 0.7, 0.9);
+      Particles.sparkBurst(x, y, Math.min(10, 3 + (dmg | 0)), PAL.gold, 360, 0.34);
       Audio2.hitDragon();
-      if (dmg > 9) { this.hitStop = 0.06; this.addShake(4); }
+      if (dmg > 9) {
+        this.hitStop = 0.06; this.addShake(4);
+        Particles.ring(x, y, PAL.gold, 18, 560, 0.4, 6);
+      }
 
       // scale drops on milestones
       var ms = d.dropMilestones;
@@ -1050,6 +1443,8 @@
       this.hitStop = 0.05;
       Audio2.hurt();
       Particles.burst(p.x, p.y, 12, PAL.rose, 4, 16, 0.4);
+      Particles.ring(p.x, p.y, PAL.rose, 20, 620, 0.42, 6);
+      Particles.sparkBurst(p.x, p.y, 8, PAL.rose, 420, 0.36);
       // knockback away from source
       var kdx = p.x - x, kdy = p.y - y;
       var kl = Math.hypot(kdx, kdy) || 1;
@@ -1096,6 +1491,8 @@
       this.scaleProgress++;
       Audio2.scale();
       Particles.burst(this.player.x, this.player.y, 8, PAL.gold, 3, 12, 0.4);
+      Particles.ring(this.player.x, this.player.y, PAL.gold, 12, 360, 0.32, 3);
+      Particles.sparkBurst(this.player.x, this.player.y, 6, PAL.gold, 300, 0.3);
       this.floatText(this.player.x, this.player.y - 30, "+1 scale", PAL.gold);
       this.updateHUD();
       if (this.scaleProgress >= this.nextPowerAt) {
@@ -1169,6 +1566,9 @@
       this.addShake(14);
       this.hitStop = 0.12;
       Particles.burst(d.x, d.y, 22, PAL.gold, 5, 26, 0.45);
+      Particles.ring(d.x, d.y, PAL.gold, 30, 700, 0.7, 8);
+      Particles.ring(d.x, d.y, "#fff6dd", 16, 460, 0.55, 4);
+      Particles.sparkBurst(d.x, d.y, 16, PAL.gold, 520, 0.5);
       DragonShots.clear();
       Audio2.victory();
       // bank scales
@@ -1275,10 +1675,20 @@
 
       g.restore();
 
-      // hit flashes (full screen)
-      if (this.flashRed > 0) {
-        g.save(); g.globalAlpha = this.flashRed * 0.5;
-        g.fillStyle = "#c25a3a"; g.fillRect(0, 0, VW, VH); g.restore();
+      // cinematic grade: warm key light above, cool depth below
+      if (Fx.grade) {
+        g.save();
+        g.globalCompositeOperation = "overlay";
+        g.globalAlpha = 0.22;
+        g.drawImage(Fx.grade, 0, 0);
+        g.restore();
+      }
+      if (Fx.vignette) g.drawImage(Fx.vignette, 0, 0);
+
+      // hit feedback: pain vignette instead of a flat color slab
+      if (this.flashRed > 0 && Fx.redVignette) {
+        g.save(); g.globalAlpha = Math.min(1, this.flashRed * 1.1);
+        g.drawImage(Fx.redVignette, 0, 0); g.restore();
       }
       if (this.flashWhite > 0) {
         g.save(); g.globalAlpha = this.flashWhite; g.fillStyle = "#fbf7ee"; g.fillRect(0, 0, VW, VH); g.restore();
@@ -1288,75 +1698,162 @@
     drawSky: function (g) {
       var grd = g.createLinearGradient(0, 0, 0, VH);
       var t = (Math.sin(this.bg.washPhase) + 1) / 2;
-      grd.addColorStop(0, "#cfe3f1");
-      grd.addColorStop(0.4, this.mix("#aecbe4", "#bcd4ea", t));
-      grd.addColorStop(0.75, this.mix("#7fa8c9", "#86b0cf", t));
-      grd.addColorStop(1, "#5b86ad");
+      grd.addColorStop(0, "#e3f0f9");
+      grd.addColorStop(0.34, this.mix("#b9d5eb", "#c4dcef", t));
+      grd.addColorStop(0.68, this.mix("#83abce", "#8cb3d2", t));
+      grd.addColorStop(1, "#4f7ba0");
       g.fillStyle = grd;
       g.fillRect(0, 0, VW, VH);
-      // soft watercolor blooms drifting
+
+      var sx = VW * 0.78, sy = VH * 0.1;
+
+      // god rays sweeping slowly from the sun (pre-blurred fan)
+      if (Fx.rays) {
+        g.save();
+        g.globalCompositeOperation = "lighter";
+        g.translate(sx, sy);
+        var spin = reduceMotion ? 0 : this.time * 0.025;
+        var pulse = 0.5 + 0.5 * Math.sin(this.time * 0.35);
+        g.rotate(spin);
+        g.globalAlpha = 0.55 + pulse * 0.2;
+        var rw = VH * 2.5;
+        g.drawImage(Fx.rays, -rw / 2, -rw / 2, rw, rw);
+        g.rotate(-spin * 1.7);
+        g.globalAlpha = 0.3 + (1 - pulse) * 0.15;
+        g.drawImage(Fx.rays, -rw / 2, -rw / 2, rw, rw);
+        g.restore();
+      }
+
+      // the sun itself: layered bloom
+      Fx.drawDot(g, sx, sy, 230, "#f7e9c4", 0.5, true);
+      Fx.drawDot(g, sx, sy, 120, "#fbf0d2", 0.7, true);
+      Fx.drawDot(g, sx, sy, 58, "#fffdf4", 0.95, true);
+
+      // soft watercolor pigment blooms drifting
       g.save();
-      g.globalAlpha = 0.1;
+      g.globalAlpha = 0.09;
       var blobs = [
-        { x: VW * 0.2, y: VH * 0.3, r: 200, c: PAL.wisteria },
-        { x: VW * 0.8, y: VH * 0.6, r: 230, c: PAL.sage },
-        { x: VW * 0.5, y: VH * 0.85, r: 200, c: PAL.rose }
+        { x: VW * 0.18, y: VH * 0.32, r: 210, c: PAL.wisteria },
+        { x: VW * 0.82, y: VH * 0.6, r: 240, c: PAL.sage },
+        { x: VW * 0.45, y: VH * 0.86, r: 210, c: PAL.rose }
       ];
       for (var i = 0; i < blobs.length; i++) {
         var b = blobs[i];
-        var rg = g.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
-        rg.addColorStop(0, b.c); rg.addColorStop(1, "rgba(0,0,0,0)");
-        g.fillStyle = rg;
-        g.beginPath();
-        g.arc(b.x + Math.sin(this.bg.washPhase + i) * 24, b.y + Math.cos(this.bg.washPhase + i * 1.3) * 20, b.r, 0, Math.PI * 2);
-        g.fill();
+        var bx = b.x + Math.sin(this.bg.washPhase + i) * 24;
+        var by = b.y + Math.cos(this.bg.washPhase + i * 1.3) * 20;
+        g.drawImage(Fx.dot(b.c), bx - b.r, by - b.r, b.r * 2, b.r * 2);
+      }
+      g.restore();
+
+      // horizontal haze bands (atmospheric depth)
+      g.save();
+      var hz1 = VH * (0.5 + 0.02 * Math.sin(this.time * 0.2));
+      var hzg = g.createLinearGradient(0, hz1 - 90, 0, hz1 + 90);
+      hzg.addColorStop(0, "rgba(232,242,250,0)");
+      hzg.addColorStop(0.5, "rgba(232,242,250,0.13)");
+      hzg.addColorStop(1, "rgba(232,242,250,0)");
+      g.fillStyle = hzg;
+      g.fillRect(0, hz1 - 90, VW, 180);
+      var hz2 = VH * (0.82 + 0.015 * Math.cos(this.time * 0.16));
+      hzg = g.createLinearGradient(0, hz2 - 70, 0, hz2 + 70);
+      hzg.addColorStop(0, "rgba(214,231,244,0)");
+      hzg.addColorStop(0.5, "rgba(214,231,244,0.12)");
+      hzg.addColorStop(1, "rgba(214,231,244,0)");
+      g.fillStyle = hzg;
+      g.fillRect(0, hz2 - 70, VW, 140);
+      g.restore();
+
+      // dust motes glinting in the light
+      var mo = this.bg.motes || [];
+      g.save();
+      g.globalCompositeOperation = "lighter";
+      for (var m = 0; m < mo.length; m++) {
+        var mt = mo[m];
+        var tw = 0.5 + 0.5 * Math.sin(this.time * mt.tw * 2 + mt.phase);
+        g.globalAlpha = 0.1 + tw * 0.24;
+        g.drawImage(Fx.dot("#fff7e0"), mt.x - mt.r * 2, mt.y - mt.r * 2, mt.r * 4, mt.r * 4);
       }
       g.restore();
     },
 
     drawClouds: function (g, depthFilter, front) {
       var c = this.bg.clouds;
-      var img = images.cloud;
-      if (!img) return;
+      if (!Fx.cloudSprites.length) return;
       g.save();
       for (var i = 0; i < c.length; i++) {
         var cl = c[i];
         var isFront = cl.depth >= 0.8;
         if (front && !isFront) continue;
         if (!front && isFront) continue;
+        var img = Fx.cloudSprites[cl.variant % Fx.cloudSprites.length];
         g.globalAlpha = cl.alpha;
-        var w = 300 * cl.scale, h = 180 * cl.scale;
-        g.drawImage(img, cl.x - w / 2, cl.y - h / 2, w, h);
+        var w = 360 * cl.scale, h = 200 * cl.scale;
+        if (cl.flip) {
+          g.save();
+          g.translate(cl.x, cl.y);
+          g.scale(-1, 1);
+          g.drawImage(img, -w / 2, -h / 2, w, h);
+          g.restore();
+        } else {
+          g.drawImage(img, cl.x - w / 2, cl.y - h / 2, w, h);
+        }
       }
       g.restore();
     },
 
     drawPlayer: function (g) {
       var p = this.player;
-      var img = images.goose;
+      var img = Fx.baked.goose || images.goose;
       if (!img) return;
+      var speed = Math.hypot(p.vx, p.vy);
+
+      // altitude shadow drifting on the haze below
+      g.save();
+      g.translate(p.x + 14, p.y + 34);
+      g.scale(1.25, 0.55);
+      g.globalAlpha = 0.16;
+      g.drawImage(Fx.dot("#22334c"), -30, -30, 60, 60);
+      g.restore();
+
+      // dash afterimages (cool spectral ghosts)
+      for (var gi = 0; gi < p.ghosts.length; gi++) {
+        var gh = p.ghosts[gi];
+        var gt = gh.life / gh.maxLife;
+        g.save();
+        g.translate(gh.x, gh.y);
+        g.rotate(gh.facing + Math.PI / 2 + gh.bank * 0.5);
+        g.globalAlpha = gt * 0.28;
+        var gw = 280 * 0.42 * (0.92 + gt * 0.08);
+        g.drawImage(img, -gw / 2, -gw / 2, gw, gw);
+        g.restore();
+      }
+
       g.save();
       g.translate(p.x, p.y);
+      // gentle hover bob (world-space, before rotation)
+      g.translate(0, Math.sin(this.time * 2.4) * 2.2);
       // sprite faces UP; rotate so up aligns with facing
       g.rotate(p.facing + Math.PI / 2);
       g.rotate(p.bank * 0.5); // banking tilt
+
       var sc = p.hitScale * 0.42;
+      // wing-beat: subtle squash & stretch, faster when flying hard
+      var flapHz = 7 + Math.min(6, speed * 0.012);
+      var flap = Math.sin(this.time * flapHz);
+      var sw = sc * (1 + flap * 0.045);
+      var sh = sc * (1 - flap * 0.038);
+
       // i-frame shimmer
       if (p.iframes > 0) {
         var flick = Math.sin(this.time * 40) * 0.5 + 0.5;
         g.globalAlpha = 0.45 + flick * 0.4;
       }
-      if (p.hurtFlash > 0) {
-        g.globalAlpha = Math.min(1, g.globalAlpha) ;
-      }
-      var w = 280 * sc, h = 280 * sc;
+      var w = 280 * sw, h = 280 * sh;
       g.drawImage(img, -w / 2, -h / 2, w, h);
-      // hurt red tint
-      if (p.hurtFlash > 0) {
-        g.globalCompositeOperation = "source-atop";
-        g.globalAlpha = p.hurtFlash * 0.6;
-        g.fillStyle = "#c25a3a";
-        g.fillRect(-w / 2, -h / 2, w, h);
+      // hurt red tint (pre-baked tinted sprite, clipped to the goose alone)
+      if (p.hurtFlash > 0 && Fx.baked.gooseHurt) {
+        g.globalAlpha = Math.min(1, p.hurtFlash * 1.4);
+        g.drawImage(Fx.baked.gooseHurt, -w / 2, -h / 2, w, h);
       }
       g.restore();
     },
@@ -1364,72 +1861,117 @@
     drawChargeUI: function (g) {
       var p = this.player;
       if (p.charge <= 0.02) return;
+      var full = p.charge >= 0.98;
       g.save();
       g.translate(p.x, p.y);
-      var radius = 36 + p.charge * 16;
-      // glow ring
-      g.globalAlpha = 0.25 + p.charge * 0.35;
-      var rg = g.createRadialGradient(0, 0, radius * 0.5, 0, 0, radius);
-      rg.addColorStop(0, "rgba(224,138,90,0)");
-      rg.addColorStop(0.7, this.mix(PAL.ember, PAL.rose, p.charge));
-      rg.addColorStop(1, "rgba(224,138,90,0)");
-      g.fillStyle = rg;
-      g.beginPath(); g.arc(0, 0, radius, 0, Math.PI * 2); g.fill();
-      // arc meter
-      g.globalAlpha = 0.85;
-      g.strokeStyle = p.charge >= 0.98 ? PAL.gold : "#fbf7ee";
-      g.lineWidth = 4;
+      var radius = 36 + p.charge * 18;
+
+      // gathering heat: layered additive aura, breathing with the charge
+      var breathe = 1 + Math.sin(this.time * (6 + p.charge * 8)) * 0.06;
+      var auraCol = this.mix(PAL.ember, PAL.rose, p.charge);
+      Fx.drawDot(g, 0, 0, radius * 1.5 * breathe, PAL.ember, 0.12 + p.charge * 0.22, true);
+      Fx.drawDot(g, 0, 0, radius * 0.9 * breathe, auraCol, 0.1 + p.charge * 0.3, true);
+      if (full) Fx.drawDot(g, 0, 0, radius * 0.55, "#fff3d6", 0.5 + Math.sin(this.time * 12) * 0.2, true);
+
+      // arc meter with a soft glow underlay
+      g.globalCompositeOperation = "lighter";
+      g.lineCap = "round";
+      g.globalAlpha = 0.35;
+      g.strokeStyle = auraCol;
+      g.lineWidth = 9;
       g.beginPath();
-      g.arc(0, 0, radius + 4, -Math.PI / 2, -Math.PI / 2 + p.charge * Math.PI * 2);
+      g.arc(0, 0, radius + 5, -Math.PI / 2, -Math.PI / 2 + p.charge * TAU);
       g.stroke();
+      g.globalCompositeOperation = "source-over";
+      g.globalAlpha = 0.95;
+      g.strokeStyle = full ? PAL.gold : "#fbf7ee";
+      g.lineWidth = 3.5;
+      g.beginPath();
+      g.arc(0, 0, radius + 5, -Math.PI / 2, -Math.PI / 2 + p.charge * TAU);
+      g.stroke();
+      // faint full-track guide
+      g.globalAlpha = 0.18;
+      g.lineWidth = 1.5;
+      g.beginPath(); g.arc(0, 0, radius + 5, 0, TAU); g.stroke();
+      g.restore();
+    },
+
+    // layered procedural fireball: smoky base, additive flame body, hot core
+    drawFireball: function (g, s, hotColor, dim) {
+      var t = this.time;
+      var flick = 0.92 + Math.sin(t * 26 + s.seed * 7) * 0.08;
+      // trail: tapering embers along recent path
+      var tr = s.trail;
+      for (var i = 1; i < tr.length; i++) {
+        var tt = 1 - i / tr.length;
+        Fx.drawDot(g, tr[i].x, tr[i].y, s.r * (0.4 + tt * 0.55), hotColor, tt * (dim ? 0.16 : 0.24), true);
+      }
+      // smoky underlayer keeps the flame readable on a bright sky
+      Fx.drawDot(g, s.x, s.y, s.r * 1.28, PAL.emberDeep, dim ? 0.5 : 0.6, false);
+      // flame body streams slightly behind the direction of travel
+      var bx = -Math.cos(s.rot) * s.r * 0.34, by = -Math.sin(s.rot) * s.r * 0.34;
+      Fx.drawDot(g, s.x, s.y, s.r * 1.9 * flick, hotColor, dim ? 0.3 : 0.4, true);
+      Fx.drawDot(g, s.x + bx, s.y + by, s.r * 1.05, hotColor, 0.75, true);
+      Fx.drawDot(g, s.x, s.y, s.r * 0.72 * flick, PAL.gold, 0.85, true);
+      Fx.drawDot(g, s.x + bx * 0.3, s.y + by * 0.3, s.r * 0.4 * flick, "#fffbe9", 0.95, true);
+    },
+
+    // jagged, flickering lightning bolt
+    drawBolt: function (g, s) {
+      var ang = s.rot;
+      var len = s.r * 3.4;
+      var px = Math.cos(ang + Math.PI / 2), py = Math.sin(ang + Math.PI / 2);
+      Fx.drawDot(g, s.x, s.y, s.r * 1.9, PAL.wisteria, 0.5, true);
+      g.save();
+      g.globalCompositeOperation = "lighter";
+      g.lineCap = "round"; g.lineJoin = "round";
+      for (var pass = 0; pass < 2; pass++) {
+        g.strokeStyle = pass === 0 ? Fx.rgba(PAL.wisteria, 0.65) : "rgba(255,255,255,0.92)";
+        g.lineWidth = pass === 0 ? 5.5 : 2.2;
+        g.beginPath();
+        var segs = 5;
+        for (var i = 0; i <= segs; i++) {
+          var ti = i / segs;
+          var jit = (i === 0 || i === segs) ? 0 : (Math.random() - 0.5) * s.r * 1.1;
+          var lx = s.x + Math.cos(ang) * (ti - 0.5) * len + px * jit;
+          var ly = s.y + Math.sin(ang) * (ti - 0.5) * len + py * jit;
+          if (i === 0) g.moveTo(lx, ly); else g.lineTo(lx, ly);
+        }
+        g.stroke();
+      }
       g.restore();
     },
 
     drawPlayerShots: function (g) {
-      var img = images.fireball;
+      var self = this;
       PlayerShots.forEach(function (s) {
-        g.save();
-        g.translate(s.x, s.y);
-        g.rotate(s.rot);
         if (s.kind === "bolt") {
-          // lightning bolt — wisteria glow
-          g.globalAlpha = 0.8;
-          var rg = g.createRadialGradient(0, 0, 0, 0, 0, s.r * 1.6);
-          rg.addColorStop(0, "#ffffff");
-          rg.addColorStop(0.4, PAL.wisteria);
-          rg.addColorStop(1, "rgba(162,146,196,0)");
-          g.fillStyle = rg;
-          g.beginPath(); g.arc(0, 0, s.r * 1.6, 0, Math.PI * 2); g.fill();
-        } else if (img) {
-          var sz = s.r * 2.6;
+          self.drawBolt(g, s);
+        } else {
+          var hot = s.color === PAL.rose ? PAL.rose : PAL.ember;
+          self.drawFireball(g, s, hot, false);
+          // charged rose blasts get an extra corona
           if (s.color === PAL.rose) {
-            g.globalAlpha = 0.4;
-            g.drawImage(img, -sz * 0.62, -sz * 0.62, sz * 1.24, sz * 1.24);
-            g.globalAlpha = 1;
+            Fx.drawDot(g, s.x, s.y, s.r * 2.5, PAL.rose, 0.16 + Math.sin(self.time * 18 + s.seed) * 0.05, true);
           }
-          g.drawImage(img, -sz / 2, -sz / 2, sz, sz);
         }
-        g.restore();
       });
     },
 
     drawDragonShots: function (g) {
-      var img = images.fireball;
-      var d = this.dragon;
+      var self = this;
       DragonShots.forEach(function (s) {
-        g.save();
-        g.translate(s.x, s.y);
-        g.rotate(s.rot);
-        var sz = s.r * 2.4;
-        if (img) {
-          // tint enemy shots toward deep ember
-          g.globalAlpha = 0.92;
-          g.drawImage(img, -sz / 2, -sz / 2, sz, sz);
+        if (s.kind === "breath") {
+          // breath cone droplets: soft, smoky, painterly
+          var t2 = s.life / 2.4;
+          Fx.drawDot(g, s.x, s.y, s.r * 1.5, PAL.emberDeep, 0.4 * t2 + 0.15, false);
+          Fx.drawDot(g, s.x, s.y, s.r * 1.1, PAL.ember, 0.5, true);
+          Fx.drawDot(g, s.x, s.y, s.r * 0.5, PAL.gold, 0.55, true);
         } else {
-          g.fillStyle = PAL.emberDeep;
-          g.beginPath(); g.arc(0, 0, s.r, 0, Math.PI * 2); g.fill();
+          // hostile crimson rim under the flame so enemy fire reads at a glance
+          Fx.drawDot(g, s.x, s.y, s.r * 1.7, "#a03428", 0.32, false);
+          self.drawFireball(g, s, s.color === PAL.emberDeep ? PAL.emberDeep : PAL.ember, true);
         }
-        g.restore();
       });
     },
 
@@ -1437,21 +1979,37 @@
       var img;
       for (var i = 0; i < Pickups.list.length; i++) {
         var s = Pickups.list[i];
-        img = s.type === "ember" ? images.scaleEmber : (s.type === "storm" ? images.scaleStorm : images.scale);
+        img = s.type === "ember" ? (Fx.baked.scaleEmber || images.scaleEmber)
+            : (s.type === "storm" ? (Fx.baked.scaleStorm || images.scaleStorm) : (Fx.baked.scale || images.scale));
         if (!img) continue;
         g.save();
         g.translate(s.x, s.y);
         var bob = Math.sin(s.t * 5) * 4;
         g.translate(0, bob);
+
+        // pulsing treasure glow
+        var pulse = 0.5 + Math.sin(s.t * 6) * 0.2;
+        Fx.drawDot(g, 0, 0, 40, PAL.gold, pulse * 0.55, true);
+        Fx.drawDot(g, 0, 0, 20, "#fff3cf", pulse * 0.5, true);
+
+        // rotating four-point gleam
+        g.save();
+        g.globalCompositeOperation = "lighter";
+        g.rotate(s.t * 0.9);
+        g.strokeStyle = "rgba(255,244,208,0.75)";
+        g.lineCap = "round";
+        for (var k = 0; k < 2; k++) {
+          var gl = k === 0 ? 26 + pulse * 8 : 15;
+          g.lineWidth = k === 0 ? 2 : 1.4;
+          g.beginPath();
+          g.moveTo(-gl, 0); g.lineTo(gl, 0);
+          g.moveTo(0, -gl); g.lineTo(0, gl);
+          g.stroke();
+          g.rotate(Math.PI / 4);
+        }
+        g.restore();
+
         g.rotate(Math.sin(s.t * 2) * 0.3);
-        // glow
-        g.globalAlpha = 0.5 + Math.sin(s.t * 6) * 0.18;
-        var rg = g.createRadialGradient(0, 0, 0, 0, 0, 34);
-        rg.addColorStop(0, "rgba(205,184,120,0.9)");
-        rg.addColorStop(1, "rgba(205,184,120,0)");
-        g.fillStyle = rg;
-        g.beginPath(); g.arc(0, 0, 34, 0, Math.PI * 2); g.fill();
-        g.globalAlpha = 1;
         var sz = 56;
         g.drawImage(img, -sz / 2, -sz / 2, sz, sz);
         g.restore();
@@ -1460,34 +2018,101 @@
 
     drawDragon: function (g) {
       var d = this.dragon;
-      var img = d.type === "ember" ? images.dragonEmber : images.dragonStorm;
+      var img = d.type === "ember" ? (Fx.baked.dragonEmber || images.dragonEmber)
+                                   : (Fx.baked.dragonStorm || images.dragonStorm);
       if (!img) return;
+
+      // altitude shadow
+      g.save();
+      g.translate(d.x + 26, d.y + 64);
+      g.scale(1.5, 0.6);
+      g.globalAlpha = 0.15;
+      g.drawImage(Fx.dot("#22334c"), -80, -80, 160, 160);
+      g.restore();
+
       g.save();
       g.translate(d.x, d.y);
 
-      // telegraph indicator (wind-up tint + aim line)
+      // enraged: heat aura beneath the body
+      if (d.phase === 2 && d.state !== "bow") {
+        var hp = 0.5 + Math.sin(this.time * 5) * 0.5;
+        Fx.drawDot(g, 0, 0, d.r * (1.35 + hp * 0.12), PAL.emberDeep, 0.1 + hp * 0.08, true);
+        Fx.drawDot(g, 0, 0, d.r * 0.9, PAL.rose, 0.07 + hp * 0.07, true);
+      }
+      // bowing: warm golden halo of respect
+      if (d.state === "bow") {
+        Fx.drawDot(g, 0, 0, d.r * 1.5, PAL.gold, 0.2 + Math.sin(this.time * 3) * 0.06, true);
+      }
+
+      // ----- telegraphs: painterly, readable wind-ups -----
       if (d.state === "telegraph") {
         var prog = 1 - d.telegraph / d.telegraphMax;
-        g.save();
-        g.globalAlpha = 0.25 + prog * 0.3;
-        var tg = g.createRadialGradient(0, 0, d.r * 0.4, 0, 0, d.r * 1.3);
+        var pul = 0.5 + Math.sin(this.time * 18) * 0.5;
         var tc = d.telegraphType === "dash" ? PAL.rose : PAL.gold;
-        tg.addColorStop(0, tc);
-        tg.addColorStop(1, "rgba(0,0,0,0)");
-        g.fillStyle = tg;
-        g.beginPath(); g.arc(0, 0, d.r * 1.3, 0, Math.PI * 2); g.fill();
-        // aim line toward player
-        g.globalAlpha = 0.35 + Math.sin(this.time * 20) * 0.2;
-        g.strokeStyle = tc;
-        g.lineWidth = 3 + prog * 4;
-        g.setLineDash([12, 10]);
-        g.beginPath();
-        g.moveTo(0, 0);
         var aim = d.telegraphType === "breath" ? d.breathAng : Math.atan2(this.player.y - d.y, this.player.x - d.x);
-        g.lineTo(Math.cos(aim) * 360, Math.sin(aim) * 360);
-        g.stroke();
+
+        // charging glow gathers on the dragon
+        Fx.drawDot(g, 0, 0, d.r * (0.9 + prog * 0.5), tc, 0.16 + prog * 0.24, true);
+
+        g.save();
+        g.rotate(aim);
+        if (d.telegraphType === "breath") {
+          // soft cone showing the sweep to come
+          var cr = 430, half = 0.62;
+          var cg = g.createRadialGradient(0, 0, d.r * 0.4, 0, 0, cr);
+          cg.addColorStop(0, Fx.rgba(PAL.ember, 0.34 * (0.4 + prog * 0.6)));
+          cg.addColorStop(0.6, Fx.rgba(PAL.ember, 0.14 * (0.4 + prog * 0.6)));
+          cg.addColorStop(1, Fx.rgba(PAL.ember, 0));
+          g.fillStyle = cg;
+          g.beginPath();
+          g.moveTo(0, 0);
+          g.arc(0, 0, cr, -half, half);
+          g.closePath();
+          g.fill();
+        } else if (d.telegraphType === "dash") {
+          // rushing chevrons along the dash line
+          g.globalCompositeOperation = "lighter";
+          for (var ci = 0; ci < 3; ci++) {
+            var cd2 = 120 + ci * 74 + prog * 40;
+            var ca2 = (0.25 + prog * 0.55) * (1 - ci * 0.22) * (0.5 + pul * 0.5);
+            g.strokeStyle = Fx.rgba(tc, ca2);
+            g.lineWidth = 7 - ci * 1.6;
+            g.lineCap = "round";
+            g.beginPath();
+            g.moveTo(cd2 - 26, -26);
+            g.lineTo(cd2, 0);
+            g.lineTo(cd2 - 26, 26);
+            g.stroke();
+          }
+        } else {
+          // aimed / volley: tapered light beam toward the player
+          var bl = Math.min(560, Math.hypot(this.player.x - d.x, this.player.y - d.y) + 60);
+          var bg2 = g.createLinearGradient(0, 0, bl, 0);
+          bg2.addColorStop(0, Fx.rgba(tc, 0.4 * (0.3 + prog * 0.7)));
+          bg2.addColorStop(1, Fx.rgba(tc, 0));
+          g.fillStyle = bg2;
+          g.beginPath();
+          g.moveTo(d.r * 0.5, -2 - prog * 7);
+          g.lineTo(bl, -1);
+          g.lineTo(bl, 1);
+          g.lineTo(d.r * 0.5, 2 + prog * 7);
+          g.closePath();
+          g.fill();
+        }
+        g.restore();
+
+        // pulsing warning ring
+        g.save();
+        g.globalCompositeOperation = "lighter";
+        g.globalAlpha = 0.25 + prog * 0.3 * pul;
+        g.strokeStyle = tc;
+        g.lineWidth = 3;
+        g.beginPath(); g.arc(0, 0, d.r * (1.05 + prog * 0.18), 0, TAU); g.stroke();
         g.restore();
       }
+
+      // gentle hover bob (skip while dashing)
+      if (d.state !== "dash") g.translate(0, Math.sin(this.time * 1.7) * 5);
 
       g.rotate(d.facing - Math.PI / 2); // sprite faces UP
 
@@ -1501,15 +2126,17 @@
       // phase 2 subtle pulsing
       if (d.phase === 2) sc *= 1 + Math.sin(this.time * 6) * 0.015;
 
-      var w = 680 * sc, h = 680 * sc;
+      // slow wing-beat: wings (x) swell as the body (y) settles
+      var beat = Math.sin(this.time * 2.1);
+      var w = 680 * sc * (1 + beat * 0.026);
+      var h = 680 * sc * (1 - beat * 0.02);
       g.drawImage(img, -w / 2, -h / 2, w, h);
 
-      // hit flash
-      if (d.hitFlash > 0) {
-        g.globalCompositeOperation = "source-atop";
-        g.globalAlpha = d.hitFlash * 3;
-        g.fillStyle = "#fbf7ee";
-        g.fillRect(-w / 2, -h / 2, w, h);
+      // hit flash (pre-baked tinted sprite, clipped to the dragon alone)
+      var flashImg = d.type === "ember" ? Fx.baked.dragonEmberFlash : Fx.baked.dragonStormFlash;
+      if (d.hitFlash > 0 && flashImg) {
+        g.globalAlpha = Math.min(1, d.hitFlash * 4);
+        g.drawImage(flashImg, -w / 2, -h / 2, w, h);
       }
       g.restore();
     },
@@ -1569,6 +2196,7 @@
   function boot() {
     Game.init();
     preload(function () {
+      Fx.bakeSprites();
       setTimeout(function () {
         Game.toTitle();
         Game.wipe();

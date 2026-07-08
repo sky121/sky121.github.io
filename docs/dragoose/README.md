@@ -5,7 +5,7 @@
 > until a goose is named **Dragoose**, ruler of the skies.
 >
 > This document is the single source of truth so we can pick up exactly where we
-> left off. Last updated: **2026-06-14**.
+> left off. Last updated: **2026-07-08**.
 
 ---
 
@@ -64,6 +64,17 @@ Offered as a **1-of-2 pick** every few scales collected:
 
 ### Screens & polish (done)
 Title (logo + Gary's backstory + how-to + hoard), Loading, in-game HUD (player feathers, charge meter, dragon health+name, scale count, power icons), Power pick, Pause, Death, Victory. Watercolor sky wash + 3-depth parallax clouds, particle blooms, hit-stop / screen-shake / hit-flash / knockback, floating feedback, bloom-wipe transitions, synthesized Web Audio SFX + mute toggle, "← Back to the Lab" link.
+
+### Graphics overhaul (2026-07-08)
+The render layer was rebuilt for a professional look while keeping the watercolor identity. All of it lives in `assets/js/dragoose.js`:
+
+- **`Fx` module** — cached soft-glow dot sprites (`Fx.dot(color)`), procedural volumetric cumulus clouds (4 variants, flat-bottomed, sun-kissed tops, shaded undersides), a pre-blurred god-ray fan (`Fx.rays`), pre-rendered vignette / red hurt-vignette / warm-top-cool-bottom color-grade layers, and **sprite lighting bakes** (`Fx.bakeSprites()`: saturation lift + warm key light upper-left + cool bounce lower-right, baked once at load). Hurt/hit flashes use pre-baked *tinted sprite copies* (`gooseHurt`, `dragonEmberFlash`, …) — never `source-atop` on the main canvas (that tints a whole rect of sky).
+- **Sky** — layered gradient, sun with layered bloom at (0.78 VW, 0.10 VH), two counter-rotating pre-blurred god-ray fans (additive), drifting pigment blooms, two sine-drifting haze bands, 22 twinkling dust motes.
+- **Particles v2** — types: `soft` (glow-sprite blobs), `spark` (additive velocity streaks with gravity), `ring` (expanding shockwaves); helpers `glow/spark/sparkBurst/ring`. Pool of 320.
+- **Projectiles** — procedural layered fireballs (smoky base → additive flame body → gold → white-hot core, flicker + trail ring-buffer of recent positions, shed sparks); enemy fire gets a crimson rim, breath is smokier; lightning is a jagged 2-pass polyline with glow. `fireball.png` is no longer drawn (still preloaded).
+- **Characters** — altitude shadows, hover bob, wing-beat squash-&-stretch (goose speeds up with flight speed), dash afterimage ghosts, charge = converging sparks + breathing additive aura + glowing arc meter; dragon: painterly telegraphs (breath = soft cone, dash = rushing chevrons + rose ring, aimed = tapered light beam), phase-2 heat aura + rising embers, bow = golden halo + dissolving gold motes.
+- **Screen** — cinematic grade (`overlay` at 0.22) + vignette every frame; hurt = red *vignette* pulse (not a flat slab); boss bar has an animated shine sweep (CSS).
+- Verified via Playwright screenshots at 420×760: title, combat, charge, fireball, dodge, hurt, bow — 0 console errors (the only failing request locally is Google Fonts, which is sandbox-specific).
 
 ### Verified
 `node --check` passes; HTML parses; CSS balanced; all 8 sprite paths resolve; loads with **0 console errors**; dragon takes damage, player can be hit, scales drop/collect, a power grants, win/death/retry transition, hoard persists across reloads, mute + pause + keyboard all work, no page overflow. Tested desktop 540×960 and mobile 390×844.
