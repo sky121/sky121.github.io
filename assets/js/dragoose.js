@@ -49,6 +49,12 @@
   var reduceMotion = false;
   try { reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
 
+  // haptic tap (phones only; silently a no-op elsewhere)
+  function buzz(pattern) {
+    if (reduceMotion) return;
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+  }
+
   // ---------------------------------------------------------
   // SAVE MODULE (localStorage hoard)
   // ---------------------------------------------------------
@@ -132,6 +138,41 @@
       this.noise(0.3 + big * 0.25, 0.16 + big * 0.12, 700);
       this.tone(90, 0.4 + big * 0.2, "sawtooth", 0.12 + big * 0.06, 50);
     },
+
+    /* ---- ambient music: slow airy chords drifting like the clouds ---- */
+    musicTimer: null,
+    musicStep: 0,
+    musicStart: function () {
+      if (!this.ready || this.musicTimer) return;
+      var self = this;
+      var CHORD_LEN = 7.5;
+      // gentle pentatonic-ish pads in the site's dreamy register
+      var CHORDS = [
+        [196.0, 246.9, 293.7, 392.0],   // G  B  D  G
+        [174.6, 220.0, 261.6, 349.2],   // F  A  C  F
+        [146.8, 196.0, 246.9, 293.7],   // D  G  B  D
+        [164.8, 207.7, 261.6, 329.6]    // E  Ab C  E  (soft color)
+      ];
+      var playChord = function () {
+        if (!self.ready || self.muted) return;
+        var t = self.ctx.currentTime;
+        var notes = CHORDS[self.musicStep % CHORDS.length];
+        self.musicStep++;
+        for (var i = 0; i < notes.length; i++) {
+          var o = self.ctx.createOscillator();
+          var g = self.ctx.createGain();
+          o.type = "sine";
+          o.frequency.value = notes[i] * (1 + (Math.random() - 0.5) * 0.002); // faint drift
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.linearRampToValueAtTime(0.028 - i * 0.004, t + CHORD_LEN * 0.4);
+          g.gain.linearRampToValueAtTime(0.0001, t + CHORD_LEN * 1.05);
+          o.connect(g); g.connect(self.master);
+          o.start(t); o.stop(t + CHORD_LEN * 1.1);
+        }
+      };
+      playChord();
+      this.musicTimer = window.setInterval(playChord, CHORD_LEN * 1000);
+    },
     fireball: function (charge) {
       var base = 150 + charge * 120;
       this.tone(base, 0.28, "sawtooth", 0.18, base * 0.4);
@@ -208,7 +249,7 @@
     },
     onDown: function (e) {
       if (Game.state !== "PLAYING") return;
-      Audio2.init(); Audio2.resume();
+      Audio2.init(); Audio2.resume(); Audio2.musicStart();
       this.pointerDown = true;
       this.moved = false;
       this.downTime = performance.now();
@@ -248,7 +289,7 @@
           this.keys.space = true;
           this.downTime = performance.now();
           this.holding = false;
-          Audio2.init(); Audio2.resume();
+          Audio2.init(); Audio2.resume(); Audio2.musicStart();
         } else if (!down && this.keys.space) { // release
           this.keys.space = false;
           var held = performance.now() - this.downTime;
@@ -1263,8 +1304,10 @@
 
     // ----- START A RUN -----
     startRun: function () {
+      Audio2.init(); Audio2.resume(); Audio2.musicStart();
       this.showScreen(null);
       hud.hidden = false;
+      this.runStats = { time: 0, dmg: 0, dodges: 0 };
       Particles.clear();
       PlayerShots.clear(); DragonShots.clear(); Pickups.clear();
       this.floatLayer.innerHTML = "";
@@ -1347,6 +1390,14 @@
       else this.nextFight();
     },
 
+    fmtRunStats: function () {
+      var st = this.runStats || { time: 0, dmg: 0, dodges: 0 };
+      var m = Math.floor(st.time / 60), s = Math.round(st.time % 60);
+      return (m > 0 ? m + "m " : "") + s + "s in the sky · " +
+        Math.round(st.dmg) + " damage dealt · " +
+        st.dodges + " dodge" + (st.dodges === 1 ? "" : "s");
+    },
+
     // ----- PAUSE -----
     togglePause: function (force) {
       if (this.state === "PLAYING") {
@@ -1397,6 +1448,8 @@
 
       // hit-stop freezes gameplay briefly
       if (this.hitStop > 0) { this.hitStop -= dt; if (this.hitStop > 0) return; }
+
+      if (this.runStats) this.runStats.time += dt;
 
       this.updatePlayer(dt);
       this.updateDragon(dt);
@@ -1576,6 +1629,8 @@
       // RELIC: gale feather — dodge recovers in half the time
       p.dodgeCd = Save.hasRelic("galeFeather") ? 0.3 : 0.6;
       p.justDodged = 1.2;
+      if (this.runStats) this.runStats.dodges++;
+      buzz(12);
       Audio2.dodge();
       Particles.burst(p.x, p.y, 8, "#cfe3f1", 3, 12, 0.3);
       Particles.ring(p.x, p.y, "#eaf4fc", 14, 460, 0.32, 4);
@@ -1940,6 +1995,7 @@
       if (!d || d.state === "bow") return;
       var before = d.health;
       d.health = Math.max(0, d.health - dmg);
+      if (this.runStats) this.runStats.dmg += Math.min(dmg, before);
       d.hitFlash = 0.16;
       Particles.burst(x, y, Math.min(12, 4 + dmg), PAL.ember, 3, 14, 0.36);
       Particles.glow(x, y, 0, 0, 16 + dmg * 1.4, 1.5, 0.24, PAL.gold, 0.7, 0.9);
@@ -1983,6 +2039,7 @@
       this.flashRed = 0.6;
       this.addShake(12);
       this.hitStop = 0.05;
+      buzz(35);
       Audio2.hurt();
       Particles.burst(p.x, p.y, 12, PAL.rose, 4, 16, 0.4);
       Particles.ring(p.x, p.y, PAL.rose, 20, 620, 0.42, 6);
@@ -2031,6 +2088,7 @@
 
     collectScale: function (s) {
       this.scaleProgress++;
+      buzz(8);
       Audio2.scale();
       Particles.burst(this.player.x, this.player.y, 8, PAL.gold, 3, 12, 0.4);
       Particles.ring(this.player.x, this.player.y, PAL.gold, 12, 360, 0.32, 3);
@@ -2112,6 +2170,7 @@
       Particles.ring(d.x, d.y, "#fff6dd", 16, 460, 0.55, 4);
       Particles.sparkBurst(d.x, d.y, 16, PAL.gold, 520, 0.5);
       DragonShots.clear();
+      buzz([20, 60, 40]);
       Audio2.victory();
       // bank only the scales earned since the previous duel
       Save.addScales(this.scaleProgress - this.scalesBanked);
@@ -2145,6 +2204,7 @@
           '<br><span class="relic-text-desc">' + R.desc + '</span></span>';
         $("btn-continue").textContent = isFinal ? "Onward"
           : "Face " + DRAGONS[RUN_BOSSES[self.bossIndex + 1]].name.split(",")[0];
+        $("win-stats").textContent = self.fmtRunStats();
         self.showScreen("win");
       }, reduceMotion ? 600 : 1400);
     },
@@ -2166,6 +2226,7 @@
           dn + " snorts. It expected more of a goose."
         ];
         $("dead-sub").textContent = lines[(Math.random() * lines.length) | 0];
+        $("dead-stats").textContent = self.fmtRunStats();
         self.showScreen("dead");
       }, reduceMotion ? 300 : 700);
     },

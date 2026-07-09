@@ -365,6 +365,16 @@
     return row;
   }
 
+  /* Your own Visited entry for a place, matched by name (case-insensitive). */
+  function myRatingFor(name) {
+    if (!name) return null;
+    var n = String(name).toLowerCase();
+    var hits = (state.visited || []).filter(function (v) {
+      return String(v.name || '').toLowerCase() === n;
+    });
+    return hits.length ? hits[0] : null;
+  }
+
   /* Relative time from an ISO date or a Date, e.g. "3 days ago". */
   function relTime(when) {
     var then = (when instanceof Date) ? when : new Date(when);
@@ -1090,6 +1100,12 @@
         meta.appendChild(el('span', 'ov-badge' + (r.open ? '' : ' is-closed'), r.open ? 'Open now' : 'Closed'));
       }
       ov.appendChild(meta);
+      // your own Visited score, if you've eaten here before
+      var mine = myRatingFor(r.name);
+      if (mine) {
+        var you = el('span', 'ov-you', 'You rated this ' + fmtScore(overallOf(mine)));
+        ov.appendChild(you);
+      }
       var tagLine = el('p', 'ov-tags');
       tagLine.textContent = (r.segments && r.segments.vibe && r.segments.vibe.caption) || '';
       ov.appendChild(tagLine);
@@ -1110,6 +1126,8 @@
       if (r.type) bits.push(r.type);
       if (r.distance != null) bits.push(fmtDist(r.distance) + ' away');
       if (r.open != null) bits.push(r.open ? 'open now' : 'closed');
+      var mine = myRatingFor(r.name);
+      if (mine) bits.push('you rated it ' + fmtScore(overallOf(mine)) + ' before');
       return bits.join(', ');
     }
 
@@ -1270,6 +1288,8 @@
         if (r.price) bits.push(priceStr(r.price));
         if (r.type) bits.push(r.type);
         if (r.distance != null) bits.push(fmtDist(r.distance) + ' away');
+        var mine = myRatingFor(r.name);
+        if (mine) bits.push('you rated it ' + fmtScore(overallOf(mine)));
         metaEl.textContent = bits.join('  ·  ');
       }
       if (actionsEl) {

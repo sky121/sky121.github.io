@@ -81,7 +81,7 @@ Fixed **bottom tab bar** (Find / Visited / Friends / Popular, icons + labels, sa
 - ~~**Undo last swipe**, and a "seen already" memory~~ **DONE 2026-07-08** (see Swipe QoL above).
 - More preference facets (outdoor seating, reservations, good-for-groups, serves alcohol, kid-friendly) — Google attributes exist for some.
 - Real **food/vibe photo classification** (e.g., a lightweight model or heuristic) if we ever want the live 3-way split to be truly categorized.
-- Surface **your Visited ratings on the swipe cards** ("you rated this 88") and let Friends' scores show on cards once the backend exists.
+- ~~Surface **your Visited ratings on the swipe cards**~~ **DONE 2026-07-08** — cards, the decision screen, and the a11y summary all show "You rated this NN" (gold pill / meta line), matched by place name against the Visited log. Friends' scores on cards still wait on the backend.
 - Optional: richer map view / walking time, share a pick with a friend.
 
 ---

@@ -503,6 +503,19 @@ body { position: fixed; inset: 0; }
   margin: 6px auto 16px;
   max-width: 32ch;
 }
+
+/* the run's scoreboard line under the sub copy */
+.overlay-stats {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  opacity: 0.55;
+  margin: -6px auto 16px;
+}
+.overlay-stats:empty { display: none; }
 .power-choices {
   display: flex;
   flex-direction: column;
