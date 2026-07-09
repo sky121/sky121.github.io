@@ -1317,7 +1317,6 @@
       this.floatLayer.innerHTML = "";
       this.scaleProgress = 0;
       this.scalesBanked = 0;
-      this.bossIndex = 0;
       this.winIsFinal = false;
       this.nextPowerAt = 3;
       this.powers = {};
@@ -1342,10 +1341,88 @@
       if (Save.hasRelic("verdantGift")) { this.powers.split = true; }
       this.renderPowers();
 
-      this.dragon = this.makeDragon(RUN_BOSSES[0]);
+      // the open sky: no dragon yet — fly into a realm to anger its ruler
+      this.dragon = null;
+      this.mode = "sky";
+      this.initSky();
+      this.player.y = VH * 0.82;
       this.updateHUD();
       this.state = "PLAYING";
+      this.floatText(VW / 2, VH * 0.62, "Fly into a realm to challenge its dragon", PAL.gold);
+      this.wipe();
+    },
+
+    // ----- THE OPEN SKY (realm hub) -----
+    initSky: function () {
+      var pals = {
+        ember: { a: PAL.ember, b: PAL.emberDeep },
+        storm: { a: "#7fa8c9", b: "#3d6288" },
+        verdant: { a: PAL.sage, b: "#597a52" }
+      };
+      var spots = [
+        { x: VW * 0.24, y: VH * 0.26 },
+        { x: VW * 0.76, y: VH * 0.26 },
+        { x: VW * 0.5, y: VH * 0.52 }
+      ];
+      this.sky = { grace: 1.0, realms: [] };
+      for (var i = 0; i < RUN_BOSSES.length; i++) {
+        var t = RUN_BOSSES[i];
+        this.sky.realms.push({
+          type: t,
+          name: DRAGONS[t].name.split(",")[0],
+          x: spots[i].x, y: spots[i].y, r: 88,
+          pal: pals[t] || pals.ember,
+          defeated: false,
+          phase: Math.random() * TAU
+        });
+      }
+    },
+
+    updateSky: function (dt) {
+      var sky = this.sky;
+      if (!sky) return;
+      if (sky.grace > 0) { sky.grace -= dt; return; }
+      var p = this.player;
+      for (var i = 0; i < sky.realms.length; i++) {
+        var rm = sky.realms[i];
+        if (rm.defeated) continue;
+        var dx = p.x - rm.x, dy = p.y - rm.y;
+        if (dx * dx + dy * dy < (rm.r * 0.72) * (rm.r * 0.72)) {
+          this.enterRealm(rm);
+          return;
+        }
+      }
+    },
+
+    enterRealm: function (realm) {
+      var p = this.player;
+      this.mode = "duel";
+      PlayerShots.clear(); DragonShots.clear();
+      p.x = VW / 2; p.y = VH * 0.72; p.vx = 0; p.vy = 0;
+      p.iframes = 1.2;
+      p.charge = 0; p.charging = false;
+      Audio2.chargeStop();
+      this.dragon = this.makeDragon(realm.type);
+      this.updateHUD();
       this.floatText(VW / 2, VH * 0.4, this.dragon.name, PAL.gold);
+      this.wipe();
+    },
+
+    returnToSky: function () {
+      var p = this.player;
+      this.mode = "sky";
+      this.dragon = null;
+      PlayerShots.clear(); DragonShots.clear(); Pickups.clear();
+      // a breather between duels: preen two feathers back
+      p.health = Math.min(p.maxHealth, p.health + 2);
+      p.x = VW / 2; p.y = VH * 0.82; p.vx = 0; p.vy = 0;
+      p.iframes = 1.0;
+      if (this.sky) this.sky.grace = 0.9;
+      this.updateHUD();
+      this.showScreen(null);
+      hud.hidden = false;
+      this.state = "PLAYING";
+      this.floatText(VW / 2, VH * 0.62, "Choose your next realm", PAL.wisteria);
       this.wipe();
     },
 
@@ -1372,27 +1449,9 @@
       return d;
     },
 
-    // advance the gauntlet: next dragon in the same run
-    nextFight: function () {
-      this.bossIndex++;
-      var p = this.player;
-      // a breather between duels: preen two feathers back
-      p.health = Math.min(p.maxHealth, p.health + 2);
-      p.x = VW / 2; p.y = VH * 0.72; p.vx = 0; p.vy = 0;
-      p.iframes = 1.2;
-      PlayerShots.clear(); DragonShots.clear(); Pickups.clear();
-      this.dragon = this.makeDragon(RUN_BOSSES[this.bossIndex]);
-      this.updateHUD();
-      this.showScreen(null);
-      hud.hidden = false;
-      this.state = "PLAYING";
-      this.floatText(VW / 2, VH * 0.4, this.dragon.name, PAL.wisteria);
-      this.wipe();
-    },
-
     continueFromWin: function () {
       if (this.winIsFinal) this.toTitle();
-      else this.nextFight();
+      else this.returnToSky();
     },
 
     fmtRunStats: function () {
@@ -1457,6 +1516,7 @@
       if (this.runStats) this.runStats.time += dt;
 
       this.updatePlayer(dt);
+      if (this.mode === "sky") this.updateSky(dt);
       this.updateDragon(dt);
       this.updateShots(dt);
       this.updatePickups(dt);
@@ -2270,7 +2330,16 @@
       var hadBefore = Save.hasRelic(relicId);
       Save.addRelic(relicId);
 
-      var isFinal = this.bossIndex >= RUN_BOSSES.length - 1;
+      // mark this realm at peace
+      var remaining = 0;
+      if (this.sky) {
+        for (var ri = 0; ri < this.sky.realms.length; ri++) {
+          var rm = this.sky.realms[ri];
+          if (rm.type === d.type) rm.defeated = true;
+          else if (!rm.defeated) remaining++;
+        }
+      }
+      var isFinal = remaining === 0;
       this.winIsFinal = isFinal;
       var firstName = d.name.split(",")[0];
       var self = this;
@@ -2280,18 +2349,17 @@
         var R = RELICS[relicId];
         if (isFinal) {
           $("win-sub").textContent = firstName + " bows amid the quieting sky. Every dragon's respect is yours — " +
+            "the skies name you Dragoose, and " +
             self.scaleProgress + " scale" + (self.scaleProgress === 1 ? "" : "s") + " rest in your hoard.";
         } else {
-          var next = DRAGONS[RUN_BOSSES[self.bossIndex + 1]];
-          $("win-sub").textContent = firstName + " bows its great head. But the clouds darken above — " +
-            next.name + " has been watching.";
+          $("win-sub").textContent = firstName + " bows its great head. The sky opens again — " +
+            remaining + " realm" + (remaining === 1 ? " still waits" : "s still wait") + " for you.";
         }
         $("relic-grant").innerHTML =
           '<span class="relic-glyph">' + R.glyph + '</span>' +
           '<span><span class="relic-text-name">' + (hadBefore ? "Relic strengthened: " : "Relic gained: ") + R.name + '</span>' +
           '<br><span class="relic-text-desc">' + R.desc + '</span></span>';
-        $("btn-continue").textContent = isFinal ? "Onward"
-          : "Face " + DRAGONS[RUN_BOSSES[self.bossIndex + 1]].name.split(",")[0];
+        $("btn-continue").textContent = isFinal ? "Onward" : "Return to the sky";
         $("win-stats").textContent = self.fmtRunStats();
         self.showScreen("win");
       }, reduceMotion ? 600 : 1400);
@@ -2322,6 +2390,9 @@
     // ----- HUD -----
     updateHUD: function () {
       var d = this.dragon, p = this.player;
+      // no duel, no boss bar (the open sky hides it)
+      var bossBar = this._bossBarEl || (this._bossBarEl = document.querySelector(".boss-bar"));
+      if (bossBar) bossBar.style.visibility = d ? "visible" : "hidden";
       if (d) {
         var pct = Math.max(0, d.health / d.maxHealth) * 100;
         var fill = $("boss-fill");
@@ -2369,6 +2440,7 @@
       this.drawClouds(g, 0.5);   // far/mid clouds behind action
 
       if (this.state === "PLAYING" || this.state === "PAUSED" || this.state === "POWER" || this.state === "DEAD" || this.state === "WIN") {
+        if (this.mode === "sky" && this.sky) this.drawRealms(g);
         if (this.dragon) this.drawDragon(g);
         Particles.draw(g);
         this.drawDragonShots(g);
@@ -2745,6 +2817,68 @@
         g.rotate(Math.sin(s.t * 2) * 0.3);
         var sz = 56;
         g.drawImage(img, -sz / 2, -sz / 2, sz, sz);
+        g.restore();
+      }
+    },
+
+    // the open sky's realm vortexes — swirling pools of each dragon's pigment
+    drawRealms: function (g) {
+      var t = this.time;
+      for (var i = 0; i < this.sky.realms.length; i++) {
+        var rm = this.sky.realms[i];
+        var bob = Math.sin(t * 0.9 + rm.phase) * 6;
+        var x = rm.x, y = rm.y + bob;
+        var breathe = 1 + Math.sin(t * 1.6 + rm.phase) * 0.05;
+
+        if (rm.defeated) {
+          // at peace: a calm golden bloom
+          Fx.drawDot(g, x, y, rm.r * 1.15, PAL.gold, 0.16, true);
+          Fx.drawDot(g, x, y, rm.r * 0.55, "#fff3d6", 0.22, true);
+          g.save();
+          g.globalAlpha = 0.5;
+          g.strokeStyle = PAL.gold;
+          g.lineWidth = 2;
+          g.beginPath(); g.arc(x, y, rm.r * 0.8, 0, TAU); g.stroke();
+          g.restore();
+        } else {
+          // pigment pool: layered washes + a slowly turning ragged ring
+          Fx.drawDot(g, x, y, rm.r * 1.6 * breathe, rm.pal.a, 0.18, true);
+          Fx.drawDot(g, x, y, rm.r * 1.05 * breathe, rm.pal.b, 0.3, false);
+          Fx.drawDot(g, x, y, rm.r * 0.55, rm.pal.b, 0.32, false);
+          Fx.drawDot(g, x, y, rm.r * 0.32, rm.pal.a, 0.3, true);
+
+          g.save();
+          g.translate(x, y);
+          g.rotate(t * 0.35 + rm.phase);
+          g.strokeStyle = Fx.rgba(rm.pal.b, 0.5);
+          g.lineWidth = 2.5;
+          g.lineCap = "round";
+          for (var s2 = 0; s2 < 5; s2++) {
+            g.beginPath();
+            g.arc(0, 0, rm.r * 0.82, s2 * (TAU / 5), s2 * (TAU / 5) + 0.8);
+            g.stroke();
+          }
+          // orbiting motes drawn into the swirl
+          g.globalCompositeOperation = "lighter";
+          for (var m2 = 0; m2 < 3; m2++) {
+            var ma = t * (0.7 + m2 * 0.23) + m2 * 2.1 + rm.phase;
+            Fx.drawDot(g, Math.cos(ma) * rm.r * 0.62, Math.sin(ma) * rm.r * 0.62,
+              7 + m2 * 2, "#fff7e0", 0.5, true);
+          }
+          g.restore();
+        }
+
+        // realm label
+        g.save();
+        g.textAlign = "center";
+        g.font = 'italic 500 21px "Cormorant Garamond", Georgia, serif';
+        g.fillStyle = Fx.rgba("#2e3a48", rm.defeated ? 0.5 : 0.8);
+        g.fillText(rm.name, x, y + rm.r + 26);
+        if (rm.defeated) {
+          g.font = '600 10px Karla, sans-serif';
+          g.fillStyle = Fx.rgba("#8a7940", 0.85);
+          g.fillText("R E S P E C T E D", x, y + rm.r + 43);
+        }
         g.restore();
       }
     },

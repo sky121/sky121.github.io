@@ -9,11 +9,11 @@
 
 ---
 
-## Status: v1.2 — three-boss gauntlet — SHIPPED & LIVE
+## Status: v2 — OPEN SKY (three realms, pick your route) — SHIPPED & LIVE
 
 - **Play it:** https://sky121.github.io/dragoose.html (best on phone, one-handed)
 - **Discoverable from:** the **Lab** page (`lab.html`) — the Dragoose tile is the first *Live* project.
-- A run is now a **gauntlet**: Ember, the Cinder Wyrm → **Tempest, the Storm Wyrm** → **Sorrel, the Verdant Wyrm** → final victory. +2 feathers healed between duels; powers, scales, and health carry across; scales are banked per-duel (no double counting).
+- **OPEN SKY (2026-07-08):** "Take flight" now drops Gary into a flyable **sky hub** with three swirling **realm vortexes** (Ember / Tempest / Sorrel, tinted pigment pools with rotating ragged rings + serif name labels). **Fly into a realm to anger its dragon** — any order, your route. Winning returns you to the sky (+2 feathers healed, realm turns a calm gold ring labeled *respected* and can't be re-entered); bow all three → **"the skies name you Dragoose"** final victory. Death restarts the whole sky, all realms angry again. Implementation: the sky **is** the `PLAYING` state with `Game.mode = "sky" | "duel"` and `Game.dragon = null` — all input/pause/render machinery reused; `initSky/updateSky/enterRealm/returnToSky/drawRealms`, boss bar auto-hides via `updateHUD` when there's no dragon. Powers, scales, and health carry across the run; scales bank per-duel (no double counting).
 - **Storm fight (2026-07-08):** `RUN_BOSSES`/`DRAGONS` config drives the gauntlet. Tempest: 115 HP, faster roam, lightning kit — **fan** (tight bolt spread), **lance** (3–4 fast bolts down one locked line), **nova** (radial thunderclap shell, double wave in phase 2), and in phase 2 the dash body-check which **discharges a mini-nova on exit**. Telegraphs are electric blue (`#bfe3ff`), nova gets a crackling-disc wind-up; enemy bolts are `kind:"zap"` with an indigo rim for readability. New relics: **Gale Feather** (dodge cooldown 0.3 s vs 0.6 s) and **Tempest's Gift** (start runs with Storm Dodge) — granted on Tempest's defeat (≥12 scales collected in the run ⇒ Tempest's Gift). Ember's relic threshold is now ≥8 scales ⇒ Cinder's Gift.
 - Death/pause/retry restart the whole gauntlet (roguelike). The dead-screen taunt names whichever dragon killed you.
 - **Verdant fight (2026-07-08):** Sorrel — 130 HP, moss/gold palette (`Art.dragonPal.verdant`), nature kit: **petal spiral** (rotating arm of petal shots wheels out over ~1.4 s; two counter-arms + faster emission in phase 2), **seed pods** (3–4 slow homing pods that steer toward you and **burst into a 6-petal ring** on fuse or proximity — kite them, then dodge the bloom), and the phase-2 dash. Green radial telegraph for the spiral, sage dash trail, petal-shed enrage ambience. Relics: **Thistle Down** (scale magnet radius 150 → 300) and **Sorrel's Gift** (start runs with Forked Flame; ≥16 scales in the run to earn it). Generic `scale.png` is used for its drops.
@@ -99,7 +99,7 @@ The render layer was rebuilt for a professional look while keeping the watercolo
 Ordered roughly by value / readiness.
 
 1. ~~**Second fight: the Storm dragon.**~~ **DONE (2026-07-08)** — Tempest ships as the second boss; **Sorrel, the Verdant Wyrm** shipped the same day as the third. Adding a fourth dragon = add an entry to `DRAGONS`, append to `RUN_BOSSES`, give it an `Art.dragonPal` palette and an attack kit branch in `dragonBeginAttack`/`dragonExecute` (+ optional per-kind projectile draw in `drawDragonShots`).
-2. **Open sky (open world).** A flyable map of dragon *realms*; entering a realm angers that dragon and starts its fight. Pick your route; progress toward defeating all dragons. (This is the big structural step from "one fight" → "the game.")
+2. ~~**Open sky (open world).**~~ **DONE (2026-07-08)** — shipped as the realm-hub sky (see Status). A future pass could grow it into a scrolling world with a camera, but the pick-your-route structure is live.
 3. **More dragons**, each with a unique realm, palette, attack identity, and signature reward.
 4. **Equipment that reskins Gary + grants abilities/attacks** (the spec calls for equipment changing the goose's look as well as powers). Could layer cosmetic sprite pieces over `goose.png` or add variant gooses.
 5. **Rematches / ceremonial duels.** After earning a dragon's respect, return to challenge it again for rarer drops. **Dragons adapt between rematches** — evolve attacks, gain phases/counters to your build, get more aggressive.
