@@ -838,7 +838,8 @@
     // ----- THE DRAGONS -----
     dragonPal: {
       ember: { hi: "#e89058", lo: "#b04830", belly: "#f2c68c", memHi: "#d96a45", memLo: "#8e2f24", bone: "#ead9a4", boneTip: "#b6a06a", eye: "#ffd97a", spade: "#a83a54", vein: "#d98ba0" },
-      storm: { hi: "#7fa8c9", lo: "#3d6288", belly: "#d3e2ef", memHi: "#5f86ab", memLo: "#2e4d6e", bone: "#dbe6f0", boneTip: "#8fa6bd", eye: "#bfe3ff", spade: "#4f6d94", vein: "#a292c4" }
+      storm: { hi: "#7fa8c9", lo: "#3d6288", belly: "#d3e2ef", memHi: "#5f86ab", memLo: "#2e4d6e", bone: "#dbe6f0", boneTip: "#8fa6bd", eye: "#bfe3ff", spade: "#4f6d94", vein: "#a292c4" },
+      verdant: { hi: "#93b48b", lo: "#597a52", belly: "#e9efdb", memHi: "#7a9a6f", memLo: "#42603d", bone: "#e3e8cf", boneTip: "#9aa87f", eye: "#e5f0a8", spade: "#6e8a4f", vein: "#cdb878" }
     },
     // o: { t, swayPhase, flapPhase, phase2, flash, bow, variant, simple }
     dragon: function (g, o) {
@@ -1154,14 +1155,17 @@
     emberHeart: { name: "Heart of Ember", glyph: "❤️‍🔥", desc: "Begin each run with one extra feather of health." },
     cinderGift: { name: "Cinder's Gift", glyph: "🔥", desc: "Begin each run already wielding Ember Wake." },
     galeFeather: { name: "Gale Feather", glyph: "🪶", desc: "Your dodge recovers in half the time." },
-    stormGift: { name: "Tempest's Gift", glyph: "⚡", desc: "Begin each run already wielding Storm Dodge." }
+    stormGift: { name: "Tempest's Gift", glyph: "⚡", desc: "Begin each run already wielding Storm Dodge." },
+    thistleDown: { name: "Thistle Down", glyph: "🌾", desc: "Fallen scales drift to you from much farther away." },
+    verdantGift: { name: "Sorrel's Gift", glyph: "🌿", desc: "Begin each run already wielding Forked Flame." }
   };
 
   // the gauntlet: dragons faced in order within a single run
-  var RUN_BOSSES = ["ember", "storm"];
+  var RUN_BOSSES = ["ember", "storm", "verdant"];
   var DRAGONS = {
     ember: { name: "Ember, the Cinder Wyrm", health: 100, roamSpeed: 105, enragedSpeed: 150 },
-    storm: { name: "Tempest, the Storm Wyrm", health: 115, roamSpeed: 120, enragedSpeed: 170 }
+    storm: { name: "Tempest, the Storm Wyrm", health: 115, roamSpeed: 120, enragedSpeed: 170 },
+    verdant: { name: "Sorrel, the Verdant Wyrm", health: 130, roamSpeed: 112, enragedSpeed: 160 }
   };
 
   // ---------------------------------------------------------
@@ -1335,6 +1339,7 @@
       // relic perks: start with a power
       if (Save.hasRelic("cinderGift")) { this.powers.emberWake = true; }
       if (Save.hasRelic("stormGift")) { this.powers.stormDodge = true; }
+      if (Save.hasRelic("verdantGift")) { this.powers.split = true; }
       this.renderPowers();
 
       this.dragon = this.makeDragon(RUN_BOSSES[0]);
@@ -1721,6 +1726,8 @@
         var ea = Math.random() * TAU, er = d.r * (0.3 + Math.random() * 0.5);
         var ec = d.type === "storm"
           ? (Math.random() < 0.4 ? PAL.wisteria : "#8fd0ff")
+          : d.type === "verdant"
+          ? (Math.random() < 0.4 ? PAL.rose : PAL.sage)   // petals shaken loose
           : (Math.random() < 0.4 ? PAL.rose : PAL.ember);
         Particles.glow(d.x + Math.cos(ea) * er, d.y + Math.sin(ea) * er,
           (Math.random() - 0.5) * 0.8, -1.1 - Math.random() * 1.4,
@@ -1771,7 +1778,8 @@
       else if (d.state === "dash") {
         d.x += d.dashVx * dt; d.y += d.dashVy * dt;
         d.dashVx *= Math.pow(0.2, dt); d.dashVy *= Math.pow(0.2, dt);
-        Particles.spawn(d.x, d.y, 0, 0, 30, 1.3, 0.4, d.type === "storm" ? "#9fc2e0" : PAL.ember, 0.22, 0.92);
+        Particles.spawn(d.x, d.y, 0, 0, 30, 1.3, 0.4,
+          d.type === "storm" ? "#9fc2e0" : d.type === "verdant" ? PAL.sage : PAL.ember, 0.22, 0.92);
         d.stateT += dt;
         // keep in bounds
         if (d.x < 90) { d.x = 90; d.dashVx = Math.abs(d.dashVx); }
@@ -1799,6 +1807,28 @@
         }
         if (d.stateT > (d.phase === 2 ? 1.7 : 1.3)) this.dragonEndAttack();
       }
+      // ----- blooming petal spiral (verdant) -----
+      else if (d.state === "spiral") {
+        d.stateT += dt;
+        d.vx *= 0.94; d.vy *= 0.94;
+        d.x += d.vx * dt; d.y += d.vy * dt;
+        d.spiralT = (d.spiralT || 0) + dt;
+        var emitEvery = d.phase === 2 ? 0.07 : 0.09;
+        while (d.spiralT > emitEvery) {
+          d.spiralT -= emitEvery;
+          d.spiralAng += 0.62;
+          var arms = d.phase === 2 ? 2 : 1;
+          for (var ai = 0; ai < arms; ai++) {
+            var pa = d.spiralAng + ai * Math.PI;
+            DragonShots.spawn({
+              x: d.x + Math.cos(pa) * d.r * 0.45, y: d.y + Math.sin(pa) * d.r * 0.45,
+              vx: Math.cos(pa) * 295, vy: Math.sin(pa) * 295,
+              r: 13, dmg: 1, life: 2.6, color: "#d98ba0", rot: pa, kind: "petal"
+            });
+          }
+        }
+        if (d.stateT > (d.phase === 2 ? 1.8 : 1.4)) this.dragonEndAttack();
+      }
     },
 
     dragonBeginAttack: function () {
@@ -1810,12 +1840,16 @@
       if (d.type === "storm") {
         choices = ["fan", "lance", "nova"];
         if (d.phase === 2) choices = ["fan", "lance", "nova", "dash", "dash"];
+      } else if (d.type === "verdant") {
+        choices = ["spiral", "seeds", "spiral", "seeds"];
+        if (d.phase === 2) choices = ["spiral", "seeds", "spiral", "dash", "dash"];
       } else {
         choices = ["volley", "aimed", "breath"];
         if (d.phase === 2) choices = ["volley", "aimed", "breath", "dash", "dash"];
       }
       d.telegraphType = choices[(Math.random() * choices.length) | 0];
-      d.telegraph = d.telegraphType === "dash" ? 0.6 : d.telegraphType === "nova" ? 0.7 : 0.5;
+      d.telegraph = d.telegraphType === "dash" ? 0.6
+        : (d.telegraphType === "nova" || d.telegraphType === "spiral") ? 0.7 : 0.5;
       d.telegraphMax = d.telegraph;
       if (d.telegraphType === "breath") {
         d.breathAng = Math.atan2(this.player.y - d.y, this.player.x - d.x);
@@ -1912,6 +1946,45 @@
         this.addShake(6);
         d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.5 : 2.3;
       }
+      // ----- verdant kit -----
+      else if (t === "spiral") {
+        // a blooming spiral of petals wheels out from the body over time
+        d.state = "spiral"; d.stateT = 0; d.spiralT = 0;
+        d.spiralAng = Math.atan2(p.y - d.y, p.x - d.x);
+        Audio2.tone(320, 0.3, "sine", 0.1, 180);
+      } else if (t === "seeds") {
+        // lob three slow seed pods that drift toward you, then burst
+        var sa = Math.atan2(p.y - d.y, p.x - d.x);
+        var offs = d.phase === 2 ? [-0.7, -0.23, 0.23, 0.7] : [-0.55, 0, 0.55];
+        for (var si = 0; si < offs.length; si++) {
+          var seedAng = sa + offs[si];
+          var seed = DragonShots.spawn({
+            x: d.x + Math.cos(seedAng) * 60, y: d.y + Math.sin(seedAng) * 60,
+            vx: Math.cos(seedAng) * 130, vy: Math.sin(seedAng) * 130,
+            r: 20, dmg: 1, life: 6, color: "#93b48b", rot: seedAng, kind: "seed"
+          });
+          if (seed) seed.fuse = 2.1 + si * 0.25;
+        }
+        Audio2.tone(240, 0.25, "sine", 0.1, 130);
+        d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.6 : 2.4;
+      }
+    },
+
+    // seed pod detonation: a ring of petals
+    burstSeed: function (s) {
+      s.active = false;
+      var n = 6;
+      var off = Math.random() * TAU;
+      for (var i = 0; i < n; i++) {
+        var a = off + (i / n) * TAU;
+        DragonShots.spawn({
+          x: s.x, y: s.y, vx: Math.cos(a) * 265, vy: Math.sin(a) * 265,
+          r: 13, dmg: 1, life: 1.6, color: "#d98ba0", rot: a, kind: "petal"
+        });
+      }
+      Particles.burst(s.x, s.y, 8, PAL.sage, 3, 14, 0.4);
+      Particles.ring(s.x, s.y, PAL.sage, 14, 420, 0.35, 4);
+      Audio2.noise(0.16, 0.12, 1600);
     },
 
     stormNova: function (d, n, spd, offset) {
@@ -1965,6 +2038,18 @@
       });
 
       DragonShots.forEach(function (s) {
+        // seed pods drift toward the player, then burst into petals
+        if (s.kind === "seed") {
+          var sdx = p.x - s.x, sdy = p.y - s.y;
+          var sl = Math.hypot(sdx, sdy) || 1;
+          var steer = 220;
+          s.vx += (sdx / sl) * steer * dt; s.vy += (sdy / sl) * steer * dt;
+          var spd2 = Math.hypot(s.vx, s.vy);
+          var maxSpd = 185;
+          if (spd2 > maxSpd) { s.vx = s.vx / spd2 * maxSpd; s.vy = s.vy / spd2 * maxSpd; }
+          s.fuse -= dt;
+          if (s.fuse <= 0 || sl < 64) { self.burstSeed(s); return; }
+        }
         s.x += s.vx * dt; s.y += s.vy * dt;
         s.rot += 3 * dt;
         s.life -= dt;
@@ -2066,7 +2151,9 @@
         // gravity-ish settle then magnet toward player
         var dx = p.x - s.x, dy = p.y - s.y;
         var dist = Math.hypot(dx, dy);
-        if (dist < 150 || s.magnet) {
+        // RELIC: thistle down — scales drift in from much farther away
+        var magnetR = Save.hasRelic("thistleDown") ? 300 : 150;
+        if (dist < magnetR || s.magnet) {
           s.magnet = true;
           var pull = 520;
           s.vx += (dx / dist) * pull * dt;
@@ -2177,7 +2264,8 @@
       this.scalesBanked = this.scaleProgress;
       // grant this dragon's relic
       var relicId;
-      if (d.type === "storm") relicId = this.scaleProgress >= 12 ? "stormGift" : "galeFeather";
+      if (d.type === "verdant") relicId = this.scaleProgress >= 16 ? "verdantGift" : "thistleDown";
+      else if (d.type === "storm") relicId = this.scaleProgress >= 12 ? "stormGift" : "galeFeather";
       else relicId = this.scaleProgress >= 8 ? "cinderGift" : "emberHeart";
       var hadBefore = Save.hasRelic(relicId);
       Save.addRelic(relicId);
@@ -2597,6 +2685,21 @@
           // hostile lightning: deep indigo rim keeps it readable on the sky
           Fx.drawDot(g, s.x, s.y, s.r * 1.8, "#2f3f66", 0.34, false);
           self.drawBolt(g, s, s.color || "#8fd0ff");
+        } else if (s.kind === "seed") {
+          // drifting seed pod: dark husk, pulsing green heart, gold fuse glint
+          var pu = 0.5 + Math.sin(self.time * (6 + s.seed) ) * 0.5;
+          Fx.drawDot(g, s.x, s.y, s.r * 1.7, "#3c4f36", 0.5, false);
+          Fx.drawDot(g, s.x, s.y, s.r * 1.15, PAL.sage, 0.75, true);
+          Fx.drawDot(g, s.x, s.y, s.r * (0.5 + pu * 0.2), "#e5f0a8", 0.6 + pu * 0.3, true);
+          for (var ti2 = 1; ti2 < s.trail.length; ti2++) {
+            var tt2 = 1 - ti2 / s.trail.length;
+            Fx.drawDot(g, s.trail[ti2].x, s.trail[ti2].y, s.r * 0.5 * tt2, PAL.sage, tt2 * 0.2, true);
+          }
+        } else if (s.kind === "petal") {
+          // whirling petal: rose bloom over a moss rim
+          Fx.drawDot(g, s.x, s.y, s.r * 1.6, "#5e4a4a", 0.3, false);
+          Fx.drawDot(g, s.x, s.y, s.r * 1.25, PAL.rose, 0.7, true);
+          Fx.drawDot(g, s.x, s.y, s.r * 0.55, "#f3d9de", 0.8, true);
         } else {
           // hostile crimson rim under the flame so enemy fire reads at a glance
           Fx.drawDot(g, s.x, s.y, s.r * 1.7, "#a03428", 0.32, false);
@@ -2663,8 +2766,8 @@
       // enraged: heat aura beneath the body (storm: cold static halo)
       if (d.phase === 2 && d.state !== "bow") {
         var hp = 0.5 + Math.sin(this.time * 5) * 0.5;
-        var auraA = d.type === "storm" ? "#3d6288" : PAL.emberDeep;
-        var auraB = d.type === "storm" ? PAL.wisteria : PAL.rose;
+        var auraA = d.type === "storm" ? "#3d6288" : d.type === "verdant" ? "#597a52" : PAL.emberDeep;
+        var auraB = d.type === "storm" ? PAL.wisteria : d.type === "verdant" ? PAL.gold : PAL.rose;
         Fx.drawDot(g, 0, 0, d.r * (1.35 + hp * 0.12), auraA, 0.1 + hp * 0.08, true);
         Fx.drawDot(g, 0, 0, d.r * 0.9, auraB, 0.07 + hp * 0.07, true);
       }
@@ -2678,7 +2781,9 @@
         var prog = 1 - d.telegraph / d.telegraphMax;
         var pul = 0.5 + Math.sin(this.time * 18) * 0.5;
         var tc = d.telegraphType === "dash" ? PAL.rose
-               : (d.type === "storm" ? "#bfe3ff" : PAL.gold);
+               : d.type === "storm" ? "#bfe3ff"
+               : d.type === "verdant" ? "#d9ecc2"
+               : PAL.gold;
         var aim = d.telegraphType === "breath" ? d.breathAng : Math.atan2(this.player.y - d.y, this.player.x - d.x);
 
         // charging glow gathers on the dragon
@@ -2686,17 +2791,19 @@
 
         g.save();
         g.rotate(aim);
-        if (d.telegraphType === "nova") {
-          // thunderclap wind-up: a swelling disc of static + jittering arcs
+        if (d.telegraphType === "nova" || d.telegraphType === "spiral") {
+          // radial wind-up: a swelling disc + jittering arcs (static or vines)
+          var rc1 = d.telegraphType === "spiral" ? PAL.sage : PAL.wisteria;
+          var rc2 = d.telegraphType === "spiral" ? "#d9ecc2" : "#8fd0ff";
           var nr = d.r * (0.7 + prog * 0.9);
           var ng = g.createRadialGradient(0, 0, d.r * 0.3, 0, 0, nr);
-          ng.addColorStop(0, Fx.rgba(PAL.wisteria, 0.28 * (0.3 + prog * 0.7)));
-          ng.addColorStop(0.7, Fx.rgba("#8fd0ff", 0.16 * (0.3 + prog * 0.7)));
-          ng.addColorStop(1, Fx.rgba("#8fd0ff", 0));
+          ng.addColorStop(0, Fx.rgba(rc1, 0.28 * (0.3 + prog * 0.7)));
+          ng.addColorStop(0.7, Fx.rgba(rc2, 0.16 * (0.3 + prog * 0.7)));
+          ng.addColorStop(1, Fx.rgba(rc2, 0));
           g.fillStyle = ng;
           g.beginPath(); g.arc(0, 0, nr, 0, TAU); g.fill();
           g.globalCompositeOperation = "lighter";
-          g.strokeStyle = Fx.rgba("#dff0ff", 0.3 + prog * 0.5 * pul);
+          g.strokeStyle = Fx.rgba(d.telegraphType === "spiral" ? "#eef5da" : "#dff0ff", 0.3 + prog * 0.5 * pul);
           g.lineWidth = 2.5;
           for (var zi = 0; zi < 5; zi++) {
             var za = (zi / 5) * TAU + this.time * 3;
