@@ -293,6 +293,26 @@ body { position: fixed; inset: 0; }
   line-height: 1.35;
 }
 
+/* ceremonial plume selector (cycles Gary's cosmetic coat) */
+.plume-btn {
+  margin-top: 6px;
+  align-self: center;
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #8a7940;
+  background: rgba(253, 251, 244, 0.55);
+  border: 1px solid rgba(205, 184, 120, 0.55);
+  border-radius: 999px;
+  padding: 5px 14px;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.plume-btn:hover { transform: translateY(-1px); background: rgba(253, 251, 244, 0.85); }
+.plume-btn:focus-visible { outline: 2px solid #a8924f; outline-offset: 2px; }
+
 .howto {
   list-style: none;
   display: flex;

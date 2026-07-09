@@ -59,7 +59,7 @@
   // SAVE MODULE (localStorage hoard)
   // ---------------------------------------------------------
   var Save = {
-    data: { scales: 0, relics: [], wins: 0 },
+    data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "" },
     load: function () {
       try {
         var raw = localStorage.getItem(SAVE_KEY);
@@ -69,6 +69,9 @@
             this.data.scales = p.scales | 0;
             this.data.relics = Array.isArray(p.relics) ? p.relics : [];
             this.data.wins = p.wins | 0;
+            this.data.duels = (p.duels && typeof p.duels === "object") ? p.duels : {};
+            this.data.plumes = Array.isArray(p.plumes) ? p.plumes : [];
+            this.data.plume = typeof p.plume === "string" ? p.plume : "";
           }
         }
       } catch (e) {}
@@ -81,7 +84,15 @@
       if (this.data.relics.indexOf(id) === -1) this.data.relics.push(id);
       this.data.wins++; this.save();
     },
-    hasRelic: function (id) { return this.data.relics.indexOf(id) !== -1; }
+    hasRelic: function (id) { return this.data.relics.indexOf(id) !== -1; },
+    duelCount: function (type) { return this.data.duels[type] | 0; },
+    addDuel: function (type) { this.data.duels[type] = this.duelCount(type) + 1; this.save(); },
+    addPlume: function (id) {
+      var isNew = this.data.plumes.indexOf(id) === -1;
+      if (isNew) { this.data.plumes.push(id); this.data.plume = id; }
+      this.save();
+      return isNew;
+    }
   };
 
   // ---------------------------------------------------------
@@ -721,6 +732,12 @@
       var CB = hurt ? this.mix("#fdfbf4", "#c25a3a", hurt * 0.6) : "#fdfbf4";   // body
       var CS = hurt ? this.mix("#e8dfc9", "#a84a34", hurt * 0.55) : "#e8dfc9";  // shade
       var CW = hurt ? this.mix("#f6f0dd", "#c05a40", hurt * 0.55) : "#f6f0dd";  // wing
+      // plume: a subtle ceremonial wash over the coat (cosmetic only)
+      if (o.tint && !hurt) {
+        CB = this.mix(CB, o.tint, 0.14);
+        CS = this.mix(CS, o.tint, 0.22);
+        CW = this.mix(CW, o.tint, 0.18);
+      }
       var fl = o.flap || 0;
       var bank = o.bank || 0;
 
@@ -1160,6 +1177,21 @@
     verdantGift: { name: "Sorrel's Gift", glyph: "🌿", desc: "Begin each run already wielding Forked Flame." }
   };
 
+  // ceremonial-duel trophies: cosmetic washes for Gary's coat (no power)
+  var PLUMES = {
+    cinderPlume: { name: "Cinder Plume", glyph: "🌹", color: "#d98ba0", desc: "Gary wears a rose-washed coat, a gift of Ember's ceremony." },
+    tempestPlume: { name: "Tempest Plume", glyph: "🌀", color: "#7fa8c9", desc: "Gary wears a storm-blue coat, a gift of Tempest's ceremony." },
+    sorrelPlume: { name: "Sorrel Plume", glyph: "🍃", color: "#93b48b", desc: "Gary wears a moss-green coat, a gift of Sorrel's ceremony." }
+  };
+  var DRAGON_PLUME = { ember: "cinderPlume", storm: "tempestPlume", verdant: "sorrelPlume" };
+  // every attack in the game, for ceremonial cross-kit stealing
+  var ALL_ATTACKS = ["volley", "aimed", "breath", "fan", "lance", "nova", "spiral", "seeds"];
+  var BASE_KIT = {
+    ember: ["volley", "aimed", "breath"],
+    storm: ["fan", "lance", "nova"],
+    verdant: ["spiral", "seeds"]
+  };
+
   // the gauntlet: dragons faced in order within a single run
   var RUN_BOSSES = ["ember", "storm", "verdant"];
   var DRAGONS = {
@@ -1249,6 +1281,7 @@
       $("btn-restart-pause").addEventListener("click", function () { Game.startRun(); });
       $("btn-retry").addEventListener("click", function () { Game.startRun(); });
       $("btn-continue").addEventListener("click", function () { Game.continueFromWin(); });
+      $("plume-btn").addEventListener("click", function () { Game.cyclePlume(); });
       $("btn-mute").addEventListener("click", function () { Game.toggleMute(); });
     },
 
@@ -1304,6 +1337,28 @@
       } else {
         box.hidden = true;
       }
+      // plume selector: cycle through ceremonial coats you've earned
+      var pb = $("plume-btn");
+      if (d.plumes && d.plumes.length > 0) {
+        box.hidden = false;
+        pb.hidden = false;
+        var cur = PLUMES[d.plume];
+        pb.textContent = "Plume: " + (cur ? cur.glyph + " " + cur.name : "None") + " ▸";
+      } else {
+        pb.hidden = true;
+      }
+    },
+
+    cyclePlume: function () {
+      var owned = Save.data.plumes;
+      if (!owned.length) return;
+      var order = [""].concat(owned);
+      var i = order.indexOf(Save.data.plume);
+      Save.data.plume = order[(i + 1) % order.length];
+      Save.save();
+      this.renderHoard();
+      Audio2.init(); Audio2.resume();
+      Audio2.tone(520, 0.12, "sine", 0.07, 700);
     },
 
     // ----- START A RUN -----
@@ -1385,16 +1440,16 @@
       var p = this.player;
       for (var i = 0; i < sky.realms.length; i++) {
         var rm = sky.realms[i];
-        if (rm.defeated) continue;
         var dx = p.x - rm.x, dy = p.y - rm.y;
         if (dx * dx + dy * dy < (rm.r * 0.72) * (rm.r * 0.72)) {
-          this.enterRealm(rm);
+          // a respected realm can be re-entered for a ceremonial duel
+          this.enterRealm(rm, rm.defeated);
           return;
         }
       }
     },
 
-    enterRealm: function (realm) {
+    enterRealm: function (realm, ceremonial) {
       var p = this.player;
       this.mode = "duel";
       PlayerShots.clear(); DragonShots.clear();
@@ -1402,9 +1457,10 @@
       p.iframes = 1.2;
       p.charge = 0; p.charging = false;
       Audio2.chargeStop();
-      this.dragon = this.makeDragon(realm.type);
+      this.dragon = this.makeDragon(realm.type, ceremonial);
       this.updateHUD();
-      this.floatText(VW / 2, VH * 0.4, this.dragon.name, PAL.gold);
+      this.floatText(VW / 2, VH * 0.4,
+        ceremonial ? "Ceremonial duel — it has been studying you" : this.dragon.name, PAL.gold);
       this.wipe();
     },
 
@@ -1426,12 +1482,30 @@
       this.wipe();
     },
 
-    makeDragon: function (type) {
+    makeDragon: function (type, ceremonial) {
       var spec = DRAGONS[type] || DRAGONS.ember;
       var hp = spec.health;
+      var roam = spec.roamSpeed, enraged = spec.enragedSpeed;
+      var tier = 0, stolen = null, punishDodge = false;
+      if (ceremonial) {
+        // the dragon has been studying you since it bowed
+        tier = Save.duelCount(type);
+        hp = Math.round(hp * Math.min(2, 1.2 + tier * 0.12));
+        roam *= 1.12; enraged *= 1.12;
+        // it evolves: borrow one move from another dragon's kit
+        var own = BASE_KIT[type] || [];
+        var pool = ALL_ATTACKS.filter(function (a) { return own.indexOf(a) === -1; });
+        stolen = pool[tier % pool.length];
+        // and it counters a dodge-centric build
+        punishDodge = !!(this.powers.stormDodge || this.powers.emberWake);
+      }
       var d = {
         type: type,
-        name: spec.name,
+        ceremonial: !!ceremonial,
+        tier: tier,
+        stolen: stolen,
+        punishDodge: punishDodge,
+        name: (ceremonial ? "⟡ " : "") + spec.name,
         x: VW / 2, y: VH * 0.24,
         vx: 0, vy: 0, r: 110,
         health: hp, maxHealth: hp,
@@ -1703,6 +1777,22 @@
 
       // POWER: storm dodge -> lightning
       if (this.powers.stormDodge) this.stormDodgeBurst();
+
+      // CEREMONIAL COUNTER: a studied dragon punishes your dodge habit
+      var d = this.dragon;
+      if (d && d.ceremonial && d.punishDodge && d.state !== "bow") {
+        var dd = d;
+        setTimeout(function () {
+          if (Game.state !== "PLAYING" || Game.dragon !== dd || dd.state === "bow") return;
+          var pa = Math.atan2(Game.player.y - dd.y, Game.player.x - dd.x);
+          DragonShots.spawn({
+            x: dd.x + Math.cos(pa) * 70, y: dd.y + Math.sin(pa) * 70,
+            vx: Math.cos(pa) * 520, vy: Math.sin(pa) * 520,
+            r: 18, dmg: 1, life: 2.4, color: PAL.gold, rot: pa, kind: "fire"
+          });
+          Audio2.tone(300, 0.1, "square", 0.08, 160);
+        }, 320);
+      }
     },
 
     stormDodgeBurst: function () {
@@ -1795,8 +1885,8 @@
           ec, 0.55, 0.98);
       }
 
-      // phase transition
-      if (d.phase === 1 && d.health <= d.maxHealth * 0.5) {
+      // phase transition (ceremonial dragons enrage earlier)
+      if (d.phase === 1 && d.health <= d.maxHealth * (d.ceremonial ? 0.6 : 0.5)) {
         d.phase = 2;
         d.telegraph = 0; d.telegraphType = null;
         d.attackCd = 1.0;
@@ -1822,7 +1912,8 @@
         d.x += d.vx * dt; d.y += d.vy * dt;
         d.facing = this.angleLerp(d.facing, Math.atan2(this.player.y - d.y, this.player.x - d.x), 1 - Math.pow(0.02, dt));
 
-        d.attackCd -= dt;
+        // ceremonial dragons cycle their attacks noticeably faster
+        d.attackCd -= dt * (d.ceremonial ? 1.3 : 1);
         if (d.attackCd <= 0) this.dragonBeginAttack();
       }
       // ----- telegraph (wind-up) -----
@@ -1907,6 +1998,8 @@
         choices = ["volley", "aimed", "breath"];
         if (d.phase === 2) choices = ["volley", "aimed", "breath", "dash", "dash"];
       }
+      // ceremonial adaptation: it has evolved a move from another dragon's kit
+      if (d.ceremonial && d.stolen) { choices = choices.concat([d.stolen, d.stolen]); }
       d.telegraphType = choices[(Math.random() * choices.length) | 0];
       d.telegraph = d.telegraphType === "dash" ? 0.6
         : (d.telegraphType === "nova" || d.telegraphType === "spiral") ? 0.7 : 0.5;
@@ -2322,6 +2415,41 @@
       // bank only the scales earned since the previous duel
       Save.addScales(this.scaleProgress - this.scalesBanked);
       this.scalesBanked = this.scaleProgress;
+
+      // ----- ceremonial victory: bonus scales + a plume, no relic, no crown -----
+      if (d.ceremonial) {
+        var bonus = 3 + d.tier;
+        Save.addScales(bonus);
+        Save.addDuel(d.type);
+        var plumeId = DRAGON_PLUME[d.type];
+        var gotPlume = plumeId ? Save.addPlume(plumeId) : false;
+        this.winIsFinal = false;
+        var cName = d.name.replace("⟡ ", "").split(",")[0];
+        var self2 = this;
+        setTimeout(function () {
+          self2.state = "WIN";
+          self2.wipe();
+          $("win-sub").textContent = cName + " bows once more, honored by the ceremony. " +
+            bonus + " bonus scales join your hoard.";
+          if (gotPlume && PLUMES[plumeId]) {
+            var PL = PLUMES[plumeId];
+            $("relic-grant").innerHTML =
+              '<span class="relic-glyph">' + PL.glyph + '</span>' +
+              '<span><span class="relic-text-name">Plume gained: ' + PL.name + '</span>' +
+              '<br><span class="relic-text-desc">' + PL.desc + '</span></span>';
+          } else {
+            $("relic-grant").innerHTML =
+              '<span class="relic-glyph">✨</span>' +
+              '<span><span class="relic-text-name">The ceremony deepens</span>' +
+              '<br><span class="relic-text-desc">It will fight harder next time — and reward you better.</span></span>';
+          }
+          $("btn-continue").textContent = "Return to the sky";
+          $("win-stats").textContent = self2.fmtRunStats();
+          self2.showScreen("win");
+        }, reduceMotion ? 600 : 1400);
+        return;
+      }
+
       // grant this dragon's relic
       var relicId;
       if (d.type === "verdant") relicId = this.scaleProgress >= 16 ? "verdantGift" : "thistleDown";
@@ -2607,11 +2735,13 @@
       var sg = scr._ctx;
       sg.save();
       sg.translate(75, 72);
+      var plume = PLUMES[Save.data.plume];
       Art.goose(sg, {
         flap: p.flapPhase || 0,
         bank: p.bank,
         hurt: Math.min(1, p.hurtFlash * 1.6),
-        charge: p.charging ? p.charge : 0
+        charge: p.charging ? p.charge : 0,
+        tint: plume ? plume.color : null
       });
       sg.restore();
 
@@ -2878,6 +3008,9 @@
           g.font = '600 10px Karla, sans-serif';
           g.fillStyle = Fx.rgba("#8a7940", 0.85);
           g.fillText("R E S P E C T E D", x, y + rm.r + 43);
+          g.font = 'italic 14px "Cormorant Garamond", Georgia, serif';
+          g.fillStyle = Fx.rgba("#2e3a48", 0.55);
+          g.fillText("enter for a ceremonial duel", x, y + rm.r + 61);
         }
         g.restore();
       }
