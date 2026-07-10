@@ -476,6 +476,10 @@
       room.classList.toggle('find-landing-on', !!landingOn);
     }
 
+    /* When true, the next batch of results goes to the Surprise-me roulette
+       instead of the swipe deck ("Surprise me" on the Preferences screen). */
+    var surprisePending = false;
+
     /* ---- Screen switching ---- */
     function hideAll() {
       if (landingEl) landingEl.hidden = true;
@@ -484,6 +488,7 @@
     }
     function showLanding() {
       hideAll();
+      surprisePending = false;
       if (landingEl) landingEl.hidden = false;
       deck.teardown();
       state.results = [];
@@ -495,6 +500,7 @@
     }
     function showPrefs(focusFirst) {
       hideAll();
+      surprisePending = false;
       if (prefsWrap) prefsWrap.hidden = false;
       prefs.render();
       syncHeaderChrome();
@@ -505,6 +511,16 @@
     }
     function showDeck() {
       hideAll();
+      surprisePending = false;
+      if (deckWrap) deckWrap.hidden = false;
+      syncHeaderChrome();
+      startSearch();
+    }
+    /* "Surprise me": same search pipeline, but deliver() hands the matches
+       to the roulette rather than the deck. */
+    function showSurprise() {
+      hideAll();
+      surprisePending = true;
       if (deckWrap) deckWrap.hidden = false;
       syncHeaderChrome();
       startSearch();
@@ -605,7 +621,9 @@
       var seen = store.getSeen();
       var unseen = matched.filter(function (r) { return !seen[r.id]; });
       var repeats = matched.filter(function (r) { return seen[r.id]; });
-      deck.load(unseen.concat(repeats));
+      var ordered = unseen.concat(repeats);
+      if (surprisePending) { surprisePending = false; deck.surprise(ordered); }
+      else deck.load(ordered);
     }
 
     /* Apply the active preferences as filters. Distance cap included. */
@@ -752,6 +770,7 @@
       showLanding: showLanding,
       showPrefs: showPrefs,
       showDeck: showDeck,
+      showSurprise: showSurprise,
       syncHeaderChrome: syncHeaderChrome,
       startSearch: startSearch,
       searchFarther: searchFarther,
@@ -913,6 +932,10 @@
       if (skip) skip.addEventListener('click', function () {
         cur = defaults(); persist(); render(); find.showDeck();
       });
+      var surprise = $('prefs-surprise');
+      if (surprise) surprise.addEventListener('click', function () {
+        current(); persist(); find.showSurprise();
+      });
       var openTgl = $('pref-open');
       if (openTgl) openTgl.addEventListener('change', function () {
         cur.openNow = openTgl.checked; persist(); updateCount();
@@ -943,6 +966,8 @@
     var btnUndo = $('deck-undo');
     var shortlistEl = $('shortlist-view');
     var badgeEl = $('shortlist-badge');
+    var rouletteEl = $('deck-roulette');
+    var rouletteName = $('roulette-name');
 
     var queue = [];
     var idx = 0;
@@ -963,9 +988,11 @@
       if (decisionEl) decisionEl.hidden = mode !== 'decision';
       if (endEl) endEl.hidden = mode !== 'end';
       if (shortlistEl) shortlistEl.hidden = mode !== 'shortlist';
+      if (rouletteEl) rouletteEl.hidden = mode !== 'roulette';
     }
 
     function showLoading() {
+      clearRoulette();
       setMode('deck');
       clear(deckEl);
       var l = el('div', 'deck-loading');
@@ -980,6 +1007,7 @@
     }
 
     function load(matched) {
+      clearRoulette();
       queue = matched || [];
       idx = 0;
       history = [];
@@ -987,7 +1015,7 @@
       clear(deckEl);
       setMode('deck');
       if (!queue.length) { showEnd(true); return; }
-      renderStack();
+      renderStack(true); // deal the opening hand onto the table
       setControlsEnabled(true);
       announce(queue.length + ' places matched. Showing ' + queue[0].name + ', the nearest.');
     }
@@ -1000,15 +1028,32 @@
       else renderStack();
     }
 
-    function renderStack() {
+    /* renderStack(deal) — `deal` staggers the cards in with a rise-and-settle
+       "laid on the table" animation (fresh deck loads only; CSS swaps it for
+       a plain fade under prefers-reduced-motion). */
+    function renderStack(deal) {
       clear(deckEl);
       for (var d = 2; d >= 0; d--) {
         var i = idx + d;
         if (i >= queue.length) continue;
-        deckEl.appendChild(buildCard(queue[i], d));
+        var card = buildCard(queue[i], d);
+        if (deal) {
+          card.classList.add('is-dealing');
+          // bottom of the stack lands first, top card last
+          card.style.animationDelay = ((2 - d) * 95) + 'ms';
+          card.addEventListener('animationend', onDealEnd);
+        }
+        deckEl.appendChild(card);
       }
       topCard = deckEl.querySelector('.swipe-card[data-depth="0"]');
       if (topCard) prefetchUpcoming();
+    }
+
+    function onDealEnd(e) {
+      var c = e.currentTarget;
+      c.classList.remove('is-dealing');
+      c.style.animationDelay = '';
+      c.removeEventListener('animationend', onDealEnd);
     }
 
     function buildCard(r, depth) {
@@ -1141,7 +1186,10 @@
       var bars = card.querySelectorAll('.seg-bar');
       SEGMENTS.forEach(function (s, i) {
         if (panels[i]) panels[i].classList.toggle('is-active', i === card._seg);
-        if (bars[i]) bars[i].classList.toggle('is-on', i === card._seg);
+        if (bars[i]) {
+          bars[i].classList.toggle('is-on', i === card._seg);
+          bars[i].classList.toggle('is-done', i < card._seg); // earlier chapters stay filled
+        }
       });
       var r = card._data;
       var segKey = SEGMENTS[card._seg];
@@ -1179,6 +1227,7 @@
         pid = e.pointerId;
         card.classList.add('is-dragging');
         card.classList.remove('is-settling');
+        card.classList.remove('is-dealing'); // grabbing a card ends its deal-in
         try { card.setPointerCapture(pid); } catch (err) {}
       }
       function move(e) {
@@ -1276,8 +1325,47 @@
       if (topCard) topCard.focus();
     }
 
+    /* ---- watercolor bloom celebration behind the decision card ----
+       A few soft pigment droplets bloom outward from behind "Tonight:",
+       in the same spirit as the landing orb burst. Skipped entirely under
+       prefers-reduced-motion (the decision card's own fade is enough). */
+    var celebrateTimer = null;
+    function celebrate() {
+      if (prefersReducedMotion || !decisionEl) return;
+      var cardEl = decisionEl.querySelector('.decision-card');
+      if (!cardEl) return;
+      var old = cardEl.querySelector('.bloom-burst');
+      if (old) old.parentNode.removeChild(old);
+      if (celebrateTimer) { window.clearTimeout(celebrateTimer); celebrateTimer = null; }
+
+      var layer = el('div', 'bloom-burst');
+      layer.setAttribute('aria-hidden', 'true');
+      var palette = ['var(--rose)', 'var(--wisteria)', 'var(--sage)', 'var(--gold)', 'var(--pond)'];
+      var DROPS = 9;
+      for (var i = 0; i < DROPS; i++) {
+        var d = el('span', 'bloom-drop');
+        var ang = (i / DROPS) * Math.PI * 2 + (Math.random() - 0.5) * 0.8;
+        var dist = 62 + Math.random() * 88;
+        var size = 26 + Math.random() * 52;
+        d.style.setProperty('--bx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+        d.style.setProperty('--by', (Math.sin(ang) * dist * 0.72).toFixed(1) + 'px');
+        d.style.width = size.toFixed(1) + 'px';
+        d.style.height = (size * 0.92).toFixed(1) + 'px';
+        d.style.background = palette[i % palette.length];
+        d.style.animationDelay = (60 + Math.random() * 220).toFixed(0) + 'ms';
+        d.style.animationDuration = (950 + Math.random() * 450).toFixed(0) + 'ms';
+        layer.appendChild(d);
+      }
+      cardEl.appendChild(layer);
+      celebrateTimer = window.setTimeout(function () {
+        celebrateTimer = null;
+        if (layer.parentNode) layer.parentNode.removeChild(layer);
+      }, 1900);
+    }
+
     function onLike(r) {
       setMode('decision');
+      celebrate();
       var nameEl = $('decision-name');
       var metaEl = $('decision-meta');
       var actionsEl = $('decision-actions');
@@ -1332,6 +1420,78 @@
     function keepLooking() {
       setMode('deck');
       advance();
+    }
+
+    /* ---- "Surprise me": skip swiping, roulette-shuffle to a random pick ----
+       The full matched list still becomes the deck queue (with the pick moved
+       to the front), so "Keep looking" / "Save to shortlist · keep swiping"
+       flow straight into the rest of the deck afterwards. */
+    var rouletteTimers = [];
+    function clearRoulette() {
+      rouletteTimers.forEach(function (t) { window.clearTimeout(t); });
+      rouletteTimers = [];
+    }
+
+    function surprise(matched) {
+      clearRoulette();
+      history = [];
+      updateUndo();
+      clear(deckEl);
+      topCard = null;
+      queue = (matched || []).slice();
+      idx = 0;
+      if (!queue.length) { showEnd(true); return; } // zero matches: same graceful end screen
+      var pi = Math.floor(Math.random() * queue.length);
+      var pick = queue[pi];
+      queue.splice(pi, 1);
+      queue.unshift(pick); // pick to the front; "keep looking" advances past it
+      if (prefersReducedMotion || queue.length === 1) {
+        announce('Surprise pick: ' + pick.name);
+        onLike(pick);
+        return;
+      }
+      setMode('roulette');
+      announce('Choosing a place for you…');
+      runRoulette(pick, function () {
+        var dw = $('deck-wrap');
+        if (!dw || dw.hidden) return; // user navigated away mid-shuffle
+        onLike(pick);
+      });
+    }
+
+    /* Rapid name shuffle that decelerates and lands on the pick. */
+    function runRoulette(pick, done) {
+      var names = queue.map(function (r) { return r.name; });
+      var ticks = Math.min(12, 5 + names.length);
+      var t = 0;
+      var last = null;
+      var setName = function (n) {
+        if (!rouletteName) return;
+        rouletteName.textContent = n;
+        rouletteName.classList.remove('is-tick');
+        void rouletteName.offsetWidth; // restart the tick animation
+        rouletteName.classList.add('is-tick');
+      };
+      for (var i = 0; i < ticks; i++) {
+        t += 55 + i * 16; // gaps widen — the wheel slows to a stop
+        (function (i, at) {
+          rouletteTimers.push(window.setTimeout(function () {
+            var n;
+            if (i === ticks - 1) {
+              n = pick.name;
+              if (rouletteEl) rouletteEl.classList.add('is-landed');
+            } else {
+              do { n = names[Math.floor(Math.random() * names.length)]; }
+              while (names.length > 1 && n === last);
+            }
+            last = n;
+            setName(n);
+          }, at));
+        })(i, t);
+      }
+      if (rouletteEl) rouletteEl.classList.remove('is-landed');
+      setName('…');
+      rouletteTimers.push(window.setTimeout(done, t + 650));
     }
 
     /* ---- shortlist: collect a few likes, compare, then commit ---- */
@@ -1457,6 +1617,8 @@
     function infoTop() { if (topCard) cycleSegment(topCard); }
 
     function teardown() {
+      clearRoulette();
+      if (rouletteEl) rouletteEl.classList.remove('is-landed');
       clear(deckEl);
       queue = []; idx = 0; topCard = null; animating = false;
       history = []; shortlist = [];
@@ -1497,6 +1659,7 @@
         if (decisionEl && !decisionEl.hidden) return;
         var t = e.target;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+        if (rouletteEl && !rouletteEl.hidden) return; // roulette is spinning — hands off
         // undo works from the deck AND the end screen (bring the last card back)
         if (e.key === 'Backspace' || e.key === 'z' || e.key === 'Z') { e.preventDefault(); undoLast(); return; }
         if (endEl && !endEl.hidden) return;
@@ -1507,7 +1670,7 @@
       document.addEventListener('keydown', keyHandler);
     }
 
-    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown };
+    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown, surprise: surprise };
   })();
 
   /* paint a wc-range fill % (shared) */
@@ -2203,10 +2366,20 @@
 
       if (!arr.length) {
         statsEl.textContent = '';
-        var empty = el('div', 'empty');
-        empty.appendChild(el('div', 'empty-glyph', '📓'));
-        empty.appendChild(el('p', 'empty-title', 'No visits yet'));
-        empty.appendChild(el('p', 'empty-sub', 'Rate a place to start your log.'));
+        // painterly empty state — a CSS-drawn place setting waiting for its
+        // first meal (steam wisps pause under prefers-reduced-motion)
+        var empty = el('div', 'empty empty--visited');
+        var art = el('div', 'empty-table');
+        art.setAttribute('aria-hidden', 'true');
+        art.appendChild(el('span', 'empty-steam s1'));
+        art.appendChild(el('span', 'empty-steam s2'));
+        art.appendChild(el('span', 'empty-steam s3'));
+        art.appendChild(el('span', 'empty-plate'));
+        art.appendChild(el('span', 'empty-fork'));
+        art.appendChild(el('span', 'empty-spoon'));
+        empty.appendChild(art);
+        empty.appendChild(el('p', 'empty-title', 'Your table is set'));
+        empty.appendChild(el('p', 'empty-sub', 'Rate the first place you eat and it will live here, watercolor bars and all.'));
         var addBtn = el('button', 'add-place-btn', '+ Add a place');
         addBtn.type = 'button';
         addBtn.addEventListener('click', function () { sheet.openBlank(); });

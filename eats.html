@@ -153,6 +153,10 @@
             <div class="prefs-actions">
               <button type="button" class="btn-ghost" id="prefs-skip">Skip</button>
               <button type="submit" class="btn-solid" id="prefs-start">Start swiping</button>
+              <button type="button" class="btn-ghost btn-surprise" id="prefs-surprise">
+                <span class="surprise-spark" aria-hidden="true">&#10022;</span>
+                Surprise me
+              </button>
             </div>
           </form>
         </div>
@@ -220,6 +224,15 @@
                 <button class="btn-ghost" id="end-farther" type="button">Search farther</button>
                 <button class="btn-solid" id="end-restart" type="button">Start over</button>
               </div>
+            </div>
+          </div>
+
+          <!-- SURPRISE-ME roulette (rapid name shuffle before the decision) -->
+          <div class="roulette" id="deck-roulette" hidden role="status" aria-label="Choosing a place for you">
+            <div class="roulette-card">
+              <span class="roulette-spark" aria-hidden="true">&#10022;</span>
+              <p class="roulette-eyebrow">Choosing for you</p>
+              <p class="roulette-name" id="roulette-name">&hellip;</p>
             </div>
           </div>
 
