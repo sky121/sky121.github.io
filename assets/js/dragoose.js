@@ -59,7 +59,7 @@
   // SAVE MODULE (localStorage hoard)
   // ---------------------------------------------------------
   var Save = {
-    data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "" },
+    data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "", regalia: [] },
     load: function () {
       try {
         var raw = localStorage.getItem(SAVE_KEY);
@@ -72,6 +72,7 @@
             this.data.duels = (p.duels && typeof p.duels === "object") ? p.duels : {};
             this.data.plumes = Array.isArray(p.plumes) ? p.plumes : [];
             this.data.plume = typeof p.plume === "string" ? p.plume : "";
+            this.data.regalia = Array.isArray(p.regalia) ? p.regalia : [];
           }
         }
       } catch (e) {}
@@ -91,6 +92,12 @@
       var isNew = this.data.plumes.indexOf(id) === -1;
       if (isNew) { this.data.plumes.push(id); this.data.plume = id; }
       this.save();
+      return isNew;
+    },
+    hasRegalia: function (id) { return this.data.regalia.indexOf(id) !== -1; },
+    addRegalia: function (id) {
+      var isNew = this.data.regalia.indexOf(id) === -1;
+      if (isNew) { this.data.regalia.push(id); this.save(); }
       return isNew;
     }
   };
@@ -789,6 +796,23 @@
       g.strokeStyle = ink; g.globalAlpha = 0.65; g.lineWidth = 2; g.stroke();
       g.globalAlpha = 1;
 
+      // REGALIA: Tempest's Spade — a storm-blue dragon spade past the tail fan
+      if (o.gear && o.gear.spade) {
+        g.strokeStyle = ink; g.globalAlpha = 0.7; g.lineWidth = 2.4;
+        g.beginPath(); g.moveTo(0, 44); g.lineTo(0, 52); g.stroke();
+        g.globalAlpha = 1;
+        g.beginPath();
+        g.moveTo(0, 50);
+        g.quadraticCurveTo(6.5, 55, 0, 64);
+        g.quadraticCurveTo(-6.5, 55, 0, 50);
+        g.closePath();
+        g.fillStyle = "#4f6d94"; g.fill();
+        g.strokeStyle = ink; g.globalAlpha = 0.7; g.lineWidth = 1.8; g.stroke();
+        g.globalAlpha = 0.5; g.strokeStyle = "#bfe3ff"; g.lineWidth = 1;
+        g.beginPath(); g.moveTo(0, 52); g.lineTo(0, 61); g.stroke();
+        g.globalAlpha = 1;
+      }
+
       // ---- body: teardrop with soft keel shading ----
       g.beginPath();
       g.moveTo(0, -26);
@@ -811,6 +835,29 @@
         g.globalAlpha = 1;
       }
 
+      // REGALIA: Sorrel's Mantle — a leaf-woven collar over the shoulders
+      if (o.gear && o.gear.mantle) {
+        for (var ls = -1; ls <= 1; ls += 2) {
+          for (var li = 0; li < 2; li++) {
+            g.save();
+            g.translate(ls * (7 + li * 6), -16 + li * 5);
+            g.rotate(ls * (0.5 + li * 0.35));
+            g.beginPath();
+            g.moveTo(0, -7);
+            g.quadraticCurveTo(5.5, -2, 0, 8);
+            g.quadraticCurveTo(-5.5, -2, 0, -7);
+            g.closePath();
+            g.fillStyle = li === 0 ? "#93b48b" : "#7a9a6f";
+            g.globalAlpha = 0.92; g.fill();
+            g.strokeStyle = ink; g.globalAlpha = 0.45; g.lineWidth = 1.2; g.stroke();
+            g.globalAlpha = 0.4; g.strokeStyle = "#42603d"; g.lineWidth = 0.9;
+            g.beginPath(); g.moveTo(0, -5); g.lineTo(0, 6); g.stroke();
+            g.globalAlpha = 1;
+            g.restore();
+          }
+        }
+      }
+
       // ---- neck (ink under-stroke = outline) + head ----
       g.strokeStyle = ink; g.lineWidth = 11.5; g.globalAlpha = 0.8;
       g.beginPath(); g.moveTo(0, -18); g.lineTo(0, -38); g.stroke();
@@ -820,6 +867,19 @@
 
       g.save();
       g.translate(0, -43);
+      // REGALIA: Ember's Horns — backswept cinder-bone horns behind the skull
+      if (o.gear && o.gear.horns) {
+        for (var hs = -1; hs <= 1; hs += 2) {
+          g.beginPath();
+          g.moveTo(hs * 5.5, -3);
+          g.quadraticCurveTo(hs * 14, 0, hs * 17, 9);
+          g.quadraticCurveTo(hs * 11.5, 6.5, hs * 7.5, 3.5);
+          g.closePath();
+          g.fillStyle = "#ead9a4"; g.fill();
+          g.strokeStyle = "#b6a06a"; g.globalAlpha = 0.9; g.lineWidth = 1.4; g.stroke();
+          g.globalAlpha = 1;
+        }
+      }
       g.scale(0.92, 1);
       g.beginPath(); g.arc(0, 0, 9.5, 0, TAU);
       g.fillStyle = CB; g.fill();
@@ -1184,6 +1244,15 @@
     sorrelPlume: { name: "Sorrel Plume", glyph: "🍃", color: "#93b48b", desc: "Gary wears a moss-green coat, a gift of Sorrel's ceremony." }
   };
   var DRAGON_PLUME = { ember: "cinderPlume", storm: "tempestPlume", verdant: "sorrelPlume" };
+
+  // regalia: hoard equipment that changes Gary's silhouette AND his fight
+  // (earned at the second ceremonial victory against each dragon)
+  var REGALIA = {
+    emberHorns: { name: "Ember's Horns", glyph: "🐏", dragon: "ember", desc: "Backswept horns of cinder-bone — your dodge dash now rams dragons for damage." },
+    tempestSpade: { name: "Tempest's Spade", glyph: "🌩️", dragon: "storm", desc: "A storm-forged tail spade — fully charged shots loose a rearward fan of lightning." },
+    sorrelMantle: { name: "Sorrel's Mantle", glyph: "🍂", dragon: "verdant", desc: "A leaf-woven mantle — it slowly grows a ward that blocks one hit." }
+  };
+  var DRAGON_REGALIA = { ember: "emberHorns", storm: "tempestSpade", verdant: "sorrelMantle" };
   // every attack in the game, for ceremonial cross-kit stealing
   var ALL_ATTACKS = ["volley", "aimed", "breath", "fan", "lance", "nova", "spiral", "seeds"];
   var BASE_KIT = {
@@ -1333,6 +1402,10 @@
           var rn = d.relics.map(function (id) { return RELICS[id] ? RELICS[id].glyph + " " + RELICS[id].name : id; });
           parts.push("Relics: " + rn.join(", "));
         }
+        if (d.regalia && d.regalia.length > 0) {
+          var gn = d.regalia.map(function (id) { return REGALIA[id] ? REGALIA[id].glyph + " " + REGALIA[id].name : id; });
+          parts.push("Regalia: " + gn.join(", "));
+        }
         $("hoard-stats").textContent = parts.join(" · ");
       } else {
         box.hidden = true;
@@ -1387,6 +1460,7 @@
         iframes: 0, dodgeCd: 0, dashTime: 0,
         charge: 0, charging: false, justDodged: 0,
         invulnFlash: 0, hurtFlash: 0, hitScale: 1,
+        ward: false, wardCd: 8, ramHit: false,
         ghosts: []
       };
 
@@ -1710,6 +1784,33 @@
       var targetBank = Math.max(-0.5, Math.min(0.5, p.vx / 700));
       p.bank += (targetBank - p.bank) * (1 - Math.pow(0.001, dt));
 
+      // REGALIA: Sorrel's Mantle slowly regrows a one-hit leaf ward
+      if (Save.hasRegalia("sorrelMantle") && !p.ward) {
+        p.wardCd = (p.wardCd == null ? 8 : p.wardCd) - dt;
+        if (p.wardCd <= 0) {
+          p.ward = true;
+          this.floatText(p.x, p.y - 40, "leaf ward", PAL.sage);
+          Particles.ring(p.x, p.y, PAL.sage, 16, 380, 0.35, 4);
+        }
+      }
+
+      // REGALIA: Ember's Horns — the dodge dash rams dragons
+      if (p.dashTime > 0 && !p.ramHit && Save.hasRegalia("emberHorns")) {
+        var rd = this.dragon;
+        if (rd && rd.state !== "bow") {
+          var rdx = p.x - rd.x, rdy = p.y - rd.y;
+          var rrr = rd.r * 0.55 + p.r * 0.8;
+          if (rdx * rdx + rdy * rdy < rrr * rrr) {
+            p.ramHit = true;
+            this.damageDragon(7, p.x, p.y);
+            this.addShake(6);
+            this.hitStop = 0.04;
+            Particles.sparkBurst(p.x, p.y, 10, PAL.ember, 460, 0.35);
+            this.floatText(p.x, p.y - 30, "ram!", PAL.ember);
+          }
+        }
+      }
+
       // dash trail: afterimages + cool mist + streaks
       if (p.dashTime > 0) {
         p.ghosts.push({ x: p.x, y: p.y, facing: p.facing, bank: p.bank, life: 0.3, maxLife: 0.3 });
@@ -1768,6 +1869,7 @@
       // RELIC: gale feather — dodge recovers in half the time
       p.dodgeCd = Save.hasRelic("galeFeather") ? 0.3 : 0.6;
       p.justDodged = 1.2;
+      p.ramHit = false; // Ember's Horns may connect once per dash
       if (this.runStats) this.runStats.dodges++;
       buzz(12);
       Audio2.dodge();
@@ -1840,6 +1942,19 @@
           r: 26 * size, dmg: dmg, life: 2.2, color: big ? PAL.rose : PAL.ember,
           rot: shots[i].ang, spin: 6, kind: "fire"
         });
+      }
+
+      // REGALIA: Tempest's Spade — a full charge cracks lightning off the tail
+      if (charge >= 0.98 && Save.hasRegalia("tempestSpade")) {
+        for (var ti = -1; ti <= 1; ti++) {
+          var ta = ang + Math.PI + ti * 0.35;
+          PlayerShots.spawn({
+            x: p.x - Math.cos(ang) * 26, y: p.y - Math.sin(ang) * 26,
+            vx: Math.cos(ta) * 540, vy: Math.sin(ta) * 540,
+            r: 14, dmg: 2.4, life: 0.7, color: PAL.wisteria, rot: ta, kind: "bolt"
+          });
+        }
+        Audio2.thunder(0.3);
       }
       Audio2.fireball(charge);
       // muzzle flash: glow bloom + sparks + (charged) shockwave ring
@@ -2270,6 +2385,20 @@
     hurtPlayer: function (dmg, x, y) {
       var p = this.player;
       if (p.iframes > 0) return;
+      // REGALIA: Sorrel's Mantle — the leaf ward drinks one blow
+      if (p.ward) {
+        p.ward = false;
+        p.wardCd = 12;
+        p.iframes = 0.8;
+        Particles.burst(p.x, p.y, 10, PAL.sage, 4, 16, 0.4);
+        Particles.ring(p.x, p.y, PAL.sage, 20, 540, 0.4, 5);
+        this.floatText(p.x, p.y - 34, "ward spent", PAL.sage);
+        Audio2.noise(0.14, 0.1, 1800);
+        var wdx = p.x - x, wdy = p.y - y;
+        var wl = Math.hypot(wdx, wdy) || 1;
+        p.vx += (wdx / wl) * 200; p.vy += (wdy / wl) * 200;
+        return;
+      }
       p.health -= dmg;
       p.iframes = 0.9;       // brief mercy invuln
       p.hurtFlash = 0.5;
@@ -2416,13 +2545,16 @@
       Save.addScales(this.scaleProgress - this.scalesBanked);
       this.scalesBanked = this.scaleProgress;
 
-      // ----- ceremonial victory: bonus scales + a plume, no relic, no crown -----
+      // ----- ceremonial victory: bonus scales + trophies, no relic, no crown -----
       if (d.ceremonial) {
         var bonus = 3 + d.tier;
         Save.addScales(bonus);
         Save.addDuel(d.type);
+        // trophy ladder: 1st ceremony = plume, 2nd = regalia, then scales
         var plumeId = DRAGON_PLUME[d.type];
         var gotPlume = plumeId ? Save.addPlume(plumeId) : false;
+        var regId = DRAGON_REGALIA[d.type];
+        var gotRegalia = (!gotPlume && d.tier >= 1 && regId) ? Save.addRegalia(regId) : false;
         this.winIsFinal = false;
         var cName = d.name.replace("⟡ ", "").split(",")[0];
         var self2 = this;
@@ -2437,6 +2569,12 @@
               '<span class="relic-glyph">' + PL.glyph + '</span>' +
               '<span><span class="relic-text-name">Plume gained: ' + PL.name + '</span>' +
               '<br><span class="relic-text-desc">' + PL.desc + '</span></span>';
+          } else if (gotRegalia && REGALIA[regId]) {
+            var RG = REGALIA[regId];
+            $("relic-grant").innerHTML =
+              '<span class="relic-glyph">' + RG.glyph + '</span>' +
+              '<span><span class="relic-text-name">Regalia gained: ' + RG.name + '</span>' +
+              '<br><span class="relic-text-desc">' + RG.desc + '</span></span>';
           } else {
             $("relic-grant").innerHTML =
               '<span class="relic-glyph">✨</span>' +
@@ -2741,7 +2879,12 @@
         bank: p.bank,
         hurt: Math.min(1, p.hurtFlash * 1.6),
         charge: p.charging ? p.charge : 0,
-        tint: plume ? plume.color : null
+        tint: plume ? plume.color : null,
+        gear: {
+          horns: Save.hasRegalia("emberHorns"),
+          spade: Save.hasRegalia("tempestSpade"),
+          mantle: Save.hasRegalia("sorrelMantle")
+        }
       });
       sg.restore();
 
@@ -2771,6 +2914,24 @@
       g.scale(k, k);
       g.drawImage(scr, -75, -72);
       g.restore();
+
+      // REGALIA: the leaf ward shimmers as a slow ring of green light
+      if (p.ward) {
+        g.save();
+        g.translate(p.x, p.y);
+        g.rotate(this.time * 1.1);
+        g.globalCompositeOperation = "lighter";
+        g.strokeStyle = Fx.rgba(PAL.sage, 0.4 + Math.sin(this.time * 4) * 0.12);
+        g.lineWidth = 2.5;
+        g.lineCap = "round";
+        for (var wi = 0; wi < 4; wi++) {
+          g.beginPath();
+          g.arc(0, 0, 42, wi * (TAU / 4), wi * (TAU / 4) + 1.0);
+          g.stroke();
+        }
+        Fx.drawDot(g, 0, 0, 50, PAL.sage, 0.08, true);
+        g.restore();
+      }
     },
 
     drawChargeUI: function (g) {
