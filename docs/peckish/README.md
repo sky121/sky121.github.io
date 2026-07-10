@@ -44,6 +44,9 @@
 - **Swipe deck:** cards nearest-first, expanding outward. Drag **left = pass / right = like** (rotation + green YES / red NOPE stamps, peeking next card); also ✗/♥ buttons + ArrowLeft/ArrowRight; reduced-motion uses fades. **Tap the card to cycle story segments: Vibe → Food → Reviews.** Card overlay: name, 0–100 rating + review count, price, cuisine, distance, open-now.
 - **Decision screen** (on like): "Tonight: <name>" → Open in Maps (Directions), Call (if phone), "I ate here → Rate" (opens the rating sheet), **Save to shortlist · keep swiping**, Keep looking. **End-of-deck** screen → Compare shortlist (if any) / Widen preferences / Search farther (live) / Start over.
 
+### Three-at-once cards (2026-07-08)
+Swipe cards now show **all three segments at the same time**: the hero panel (full card) plus two **mini peek tiles** (top-right rail) previewing the other two — photos/watercolor art for Vibe/Food, the first review quote for Reviews. **A single tap rotates all three at once** (hero → peek, next peek → hero) with a settle animation; segment bars still track the hero. Implemented in `buildCard`/`updatePeeks`/`peekContent` (eats.js) + `.card-peeks`/`.peek*` (eats.css); peeks are aria-hidden (the announce line names the featured segment), reduced-motion skips the tile animation.
+
 ### Motion & delight (added 2026-07-08)
 - **Deck deal-in** — cards deal onto the table with a staggered rise-and-settle when a deck loads (reduced-motion: fade).
 - **Decision celebration** — choosing a place blooms soft watercolor droplets behind the "Tonight" card.

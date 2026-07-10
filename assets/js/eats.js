@@ -1112,6 +1112,16 @@
       });
       card.appendChild(bars);
 
+      // three-at-once: mini previews of the two non-hero segments;
+      // a single tap rotates all three (hero -> peek, next peek -> hero)
+      var peeks = el('div', 'card-peeks');
+      peeks.setAttribute('aria-hidden', 'true');
+      peeks.appendChild(el('div', 'peek'));
+      peeks.appendChild(el('div', 'peek'));
+      card.appendChild(peeks);
+      card._peeks = peeks;
+      updatePeeks(card);
+
       var yes = el('div', 'stamp stamp-yes', 'Yes');
       var no = el('div', 'stamp stamp-no', 'Nope');
       yes.setAttribute('aria-hidden', 'true');
@@ -1181,6 +1191,39 @@
       card._seg = (card._seg + 1) % SEGMENTS.length;
       applySegment(card);
     }
+
+    /* fill one mini preview tile with a compact rendering of a segment */
+    function peekContent(node, r, segKey) {
+      clear(node);
+      node.className = 'peek peek-' + segKey;
+      var seg = r.segments && r.segments[segKey];
+      if (segKey === 'reviews') {
+        node.style.background = '';
+        var q = seg && seg.quotes && seg.quotes[0];
+        node.appendChild(el('span', 'peek-quote', q ? '“' + q.text + '”' : 'What people say'));
+      } else if (seg && seg.photoUrl) {
+        node.style.background = 'url("' + String(seg.photoUrl).replace(/"/g, '') + '") center / cover';
+      } else {
+        node.style.background = panelArt(r, segKey);
+      }
+      node.appendChild(el('span', 'peek-label', SEG_LABEL[segKey]));
+    }
+
+    /* the two peeks always show whatever the hero is not */
+    function updatePeeks(card) {
+      if (!card._peeks) return;
+      var r = card._data;
+      var tiles = card._peeks.children;
+      for (var i = 0; i < 2; i++) {
+        var segKey = SEGMENTS[(card._seg + 1 + i) % SEGMENTS.length];
+        peekContent(tiles[i], r, segKey);
+        if (!prefersReducedMotion) {
+          tiles[i].classList.remove('is-in');
+          void tiles[i].offsetWidth;
+          tiles[i].classList.add('is-in');
+        }
+      }
+    }
     function applySegment(card) {
       var panels = card.querySelectorAll('.card-seg-panel');
       var bars = card.querySelectorAll('.seg-bar');
@@ -1198,7 +1241,8 @@
       else if (segKey === 'food') caption = (r.segments && r.segments.food && r.segments.food.caption) || '';
       else caption = 'What people are saying';
       if (card._tagLine) card._tagLine.textContent = caption;
-      announce(SEG_LABEL[segKey] + ': ' + (caption || r.name));
+      updatePeeks(card);
+      announce(SEG_LABEL[segKey] + ' featured: ' + (caption || r.name));
     }
 
     function attachDrag(card) {
