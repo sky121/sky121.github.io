@@ -40,6 +40,45 @@
   var prefersReducedMotion = false;
   try { prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
 
+  /* Small transient toast (paper pill above the tab bar) — visual companion
+     to announce(); screen readers get the live region, sighted users get this. */
+  var toastTimer = null;
+  function toast(msg) {
+    try {
+      var t = $('eats-toast');
+      if (!t) {
+        t = el('div', 'eats-toast');
+        t.id = 'eats-toast';
+        t.setAttribute('aria-hidden', 'true'); // announce() covers a11y
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      t.classList.remove('is-show');
+      void t.offsetWidth; // restart the fade if a toast is already up
+      t.classList.add('is-show');
+      if (toastTimer) window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(function () {
+        toastTimer = null;
+        t.classList.remove('is-show');
+      }, 1900);
+    } catch (e) { /* purely decorative — never break the flow */ }
+  }
+
+  /* Staggered list entrance (Friends feed / Popular rows) — soft rise + fade,
+     ~40ms apart. The class is stripped on animationend so the cards' hover
+     transforms work again afterwards. No-op under prefers-reduced-motion. */
+  function enterStagger(node, i) {
+    if (prefersReducedMotion) return;
+    node.classList.add('social-enter');
+    node.style.setProperty('--enter-delay', (i * 40) + 'ms');
+    node.addEventListener('animationend', function onEnd(e) {
+      if (e.target !== node || e.animationName !== 'social-rise') return;
+      node.classList.remove('social-enter');
+      node.style.removeProperty('--enter-delay');
+      node.removeEventListener('animationend', onEnd);
+    });
+  }
+
   /* ------------------------------------------------------------------ *
    * store — localStorage CRUD (graceful when storage is blocked)
    * ------------------------------------------------------------------ */
@@ -144,80 +183,80 @@
      rating (0-5), reviews, price (1-4), cuisine tag(s), open, distance,
      phone, plus per-segment story content: `vibe`/`food` (watercolor panel
      captions, since we have no real photos) and 2-3 review quotes, and
-     dietary / dining flags so Preferences visibly filter the deck.
+     dietary / dining / extras flags so Preferences visibly filter the deck.
      `cuisines` are normalized keys matching the Preferences chips. Spread at
      varied distances so the nearest-first expansion + distance cap read well. */
   var DEMO_RESTAURANTS = [
     { name: 'Little Wren Bakery', rating: 4.8, reviews: 1340, price: 1, type: 'Bakery · Café', cuisines: ['cafe'], lat: 37.7959, lng: -122.3949, open: true, phone: '+14155550178',
-      diet: ['vegetarian'], dining: ['dine-in', 'takeout'],
+      diet: ['vegetarian'], dining: ['dine-in', 'takeout'], extras: ['kids'],
       vibe: 'Sunlit corner café, marble counters, fresh flowers', food: 'Morning buns, laminated pastries, flat whites',
       reviews_q: [ { by: 'Maya O.', score: 96, text: 'The morning bun is a religious experience. Get there early.' }, { by: 'Devin P.', score: 90, text: 'Cozy, sunny, perfect for a slow Saturday.' } ] },
     { name: 'Tonkotsu Lane', rating: 4.7, reviews: 1582, price: 2, type: 'Ramen · Japanese', cuisines: ['japanese'], lat: 37.7948, lng: -122.3958, open: true, phone: '+14155550133',
-      diet: [], dining: ['dine-in'],
+      diet: [], dining: ['dine-in'], extras: ['alcohol'],
       vibe: 'Tiny steamy counter, paper lanterns, jazz on vinyl', food: 'Rich tonkotsu, chashu, soft egg, chili oil',
       reviews_q: [ { by: 'Hana S.', score: 94, text: 'Broth so silky it ruined other ramen for me.' }, { by: 'Leo C.', score: 88, text: 'Tiny room, worth the wait. The chashu melts.' }, { by: 'Priya R.', score: 90, text: 'Order the spicy miso. Trust me.' } ] },
     { name: 'Marigold & Sage', rating: 4.6, reviews: 812, price: 3, type: 'Californian · Farm-to-table', cuisines: ['american', 'mediterranean'], lat: 37.7929, lng: -122.3971, open: true, phone: '+14155550142',
-      diet: ['vegetarian', 'gluten-free'], dining: ['dine-in'],
+      diet: ['vegetarian', 'gluten-free'], dining: ['dine-in'], extras: ['outdoor', 'alcohol'],
       vibe: 'Linen tablecloths, candlelight, garden patio', food: 'Heirloom tomato, roast chicken, market salads',
       reviews_q: [ { by: 'Theo B.', score: 92, text: 'Tasting menu was a quiet, beautiful treat.' }, { by: 'Maya O.', score: 89, text: 'Everything tastes like it was picked this morning.' } ] },
     { name: 'Casa Poblana', rating: 4.5, reviews: 967, price: 2, type: 'Mexican · Taquería', cuisines: ['mexican'], lat: 37.7901, lng: -122.4003, open: true, phone: '+14155550110',
-      diet: ['vegetarian', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups', 'alcohol', 'kids'],
       vibe: 'Bright tiles, mariachi murals, buzzy and loud', food: 'Al pastor tacos, fresh salsa, horchata',
       reviews_q: [ { by: 'Leo C.', score: 93, text: 'Al pastor for days. Bring cash, bring friends.' }, { by: 'Devin P.', score: 85, text: 'Lines out the door for a reason.' } ] },
     { name: 'Verde Trattoria', rating: 4.5, reviews: 1104, price: 3, type: 'Italian · Pasta', cuisines: ['italian'], lat: 37.7966, lng: -122.3902, open: true, phone: '+14155550121',
-      diet: ['vegetarian'], dining: ['dine-in', 'takeout'],
+      diet: ['vegetarian'], dining: ['dine-in', 'takeout'], extras: ['alcohol'],
       vibe: 'Warm trattoria, exposed brick, cozy two-tops', food: 'Cacio e pepe, fresh pappardelle, tiramisu',
       reviews_q: [ { by: 'Hana S.', score: 91, text: 'Cacio e pepe done exactly right. Cozy little room.' }, { by: 'Theo B.', score: 87, text: 'The pasta is hand-rolled and it shows.' } ] },
     { name: 'Saffron House', rating: 4.6, reviews: 729, price: 2, type: 'Indian · Curry house', cuisines: ['indian'], lat: 37.7937, lng: -122.4012, open: true, phone: '+14155550188',
-      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups', 'kids'],
       vibe: 'Jewel-tone walls, brass lanterns, fragrant air', food: 'Butter chicken, garlic naan, dal makhani',
       reviews_q: [ { by: 'Priya R.', score: 90, text: 'Butter chicken was rich; staff were lovely.' }, { by: 'Maya O.', score: 88, text: 'Best dal in the city, and lots of vegan options.' } ] },
     { name: 'Foggy Bell Coffee', rating: 4.4, reviews: 455, price: 1, type: 'Coffee · Light bites', cuisines: ['cafe'], lat: 37.7972, lng: -122.3985, open: true, phone: '+14155550144',
-      diet: ['vegetarian', 'vegan'], dining: ['takeout', 'dine-in'],
+      diet: ['vegetarian', 'vegan'], dining: ['takeout', 'dine-in'], extras: ['outdoor'],
       vibe: 'Minimalist, big windows, foggy-day calm', food: 'Single-origin pour-overs, oat lattes, scones',
       reviews_q: [ { by: 'Devin P.', score: 86, text: 'Flat white + a window seat. My new spot.' }, { by: 'Leo C.', score: 82, text: 'Quiet enough to actually get work done.' } ] },
     { name: 'Olive & Thyme', rating: 4.3, reviews: 388, price: 3, type: 'Mediterranean', cuisines: ['mediterranean'], lat: 37.7918, lng: -122.3949, open: true, phone: '+14155550155',
-      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout'],
+      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout'], extras: ['outdoor', 'groups', 'alcohol'],
       vibe: 'Whitewashed walls, olive branches, sea-blue tile', food: 'Mezze platters, lamb kebab, lemony hummus',
       reviews_q: [ { by: 'Theo B.', score: 86, text: 'The mezze spread is a feast for two.' }, { by: 'Priya R.', score: 84, text: 'Great for a group with mixed diets.' } ] },
     { name: 'The Copper Kettle', rating: 4.2, reviews: 642, price: 2, type: 'Brunch · American', cuisines: ['american'], lat: 37.7983, lng: -122.3962, open: false, phone: '+14155550166',
-      diet: ['vegetarian'], dining: ['dine-in'],
+      diet: ['vegetarian'], dining: ['dine-in'], extras: ['groups', 'kids'],
       vibe: 'Copper pots, checkered floor, weekend bustle', food: 'Buttermilk pancakes, hash, bottomless coffee',
       reviews_q: [ { by: 'Hana S.', score: 83, text: 'Classic diner energy and giant pancakes.' }, { by: 'Maya O.', score: 80, text: 'Go on a weekday to skip the wait.' } ] },
     { name: 'Pier 9 Oyster Co.', rating: 4.4, reviews: 521, price: 4, type: 'Seafood · Raw bar', cuisines: ['seafood'], lat: 37.7995, lng: -122.3915, open: false, phone: '+14155550199',
-      diet: ['gluten-free'], dining: ['dine-in'],
+      diet: ['gluten-free'], dining: ['dine-in'], extras: ['outdoor', 'alcohol'],
       vibe: 'Waterfront deck, string lights, sunset views', food: 'Oysters, cioppino, grilled day-boat fish',
       reviews_q: [ { by: 'Leo C.', score: 88, text: 'Sunset on the patio is unbeatable.' }, { by: 'Devin P.', score: 78, text: 'Pricey and service lagged, but the view…' } ] },
     { name: 'Smoke & Ember BBQ', rating: 4.6, reviews: 980, price: 2, type: 'BBQ · Smokehouse', cuisines: ['bbq', 'american'], lat: 37.7912, lng: -122.3886, open: true, phone: '+14155550201',
-      diet: [], dining: ['dine-in', 'takeout'],
+      diet: [], dining: ['dine-in', 'takeout'], extras: ['outdoor', 'groups', 'alcohol'],
       vibe: 'Reclaimed wood, smoke in the air, picnic tables', food: 'Brisket, burnt ends, smoked ribs, slaw',
       reviews_q: [ { by: 'Theo B.', score: 92, text: 'The brisket falls apart. Come hungry.' }, { by: 'Hana S.', score: 87, text: 'Burnt ends sell out by 2pm. Get there early.' } ] },
     { name: 'Seoul & Stone', rating: 4.5, reviews: 712, price: 2, type: 'Korean · BBQ', cuisines: ['korean'], lat: 37.8002, lng: -122.4001, open: true, phone: '+14155550213',
-      diet: ['vegetarian'], dining: ['dine-in'],
+      diet: ['vegetarian'], dining: ['dine-in'], extras: ['groups', 'alcohol'],
       vibe: 'Tabletop grills, neon glow, lively groups', food: 'Galbi, bibimbap, bubbling kimchi jjigae',
       reviews_q: [ { by: 'Priya R.', score: 90, text: 'Tabletop grill is so fun for a group.' }, { by: 'Maya O.', score: 85, text: 'The banchan alone is worth coming for.' } ] },
     { name: 'Pho & Lantern', rating: 4.4, reviews: 533, price: 1, type: 'Vietnamese · Noodles', cuisines: ['vietnamese'], lat: 37.7886, lng: -122.3961, open: true, phone: '+14155550224',
-      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['kids'],
       vibe: 'Steamy storefront, herbs on every table', food: 'Beef pho, fresh rolls, lemongrass tofu',
       reviews_q: [ { by: 'Devin P.', score: 88, text: 'Broth simmered all day — you can taste it.' }, { by: 'Leo C.', score: 84, text: 'Cheap, fast, and deeply comforting.' } ] },
     { name: 'Bangkok Orchid', rating: 4.5, reviews: 604, price: 2, type: 'Thai · Street food', cuisines: ['thai'], lat: 37.8021, lng: -122.3958, open: true, phone: '+14155550235',
-      diet: ['vegetarian', 'vegan'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian', 'vegan'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups'],
       vibe: 'Orchids, gold accents, gentle chimes', food: 'Pad see ew, green curry, mango sticky rice',
       reviews_q: [ { by: 'Hana S.', score: 89, text: 'Green curry with real heat — finally.' }, { by: 'Priya R.', score: 86, text: 'Mango sticky rice is the perfect finish.' } ] },
     { name: 'The Stacked Patty', rating: 4.3, reviews: 1190, price: 1, type: 'Burgers · American', cuisines: ['burgers', 'american'], lat: 37.7869, lng: -122.3922, open: true, phone: '+14155550246',
-      diet: ['vegetarian'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups', 'kids'],
       vibe: 'Retro diner booths, chrome, milkshake machines', food: 'Smash burgers, crispy fries, thick shakes',
       reviews_q: [ { by: 'Theo B.', score: 87, text: 'Smash burger with the crispy edges. Yes.' }, { by: 'Maya O.', score: 82, text: 'Killer veggie burger too, not an afterthought.' } ] },
     { name: 'Crosta Pizzeria', rating: 4.6, reviews: 1420, price: 2, type: 'Pizza · Neapolitan', cuisines: ['pizza', 'italian'], lat: 37.7849, lng: -122.4005, open: true, phone: '+14155550257',
-      diet: ['vegetarian'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups', 'alcohol', 'kids'],
       vibe: 'Wood-fired oven glow, communal tables', food: 'Blistered margherita, burrata, charred crust',
       reviews_q: [ { by: 'Leo C.', score: 91, text: 'Leopard-spotted crust, perfect char.' }, { by: 'Devin P.', score: 88, text: 'The margherita is all you need.' } ] },
     { name: 'Garden & Grain', rating: 4.4, reviews: 410, price: 2, type: 'Vegetarian · Bowls', cuisines: ['vegetarian', 'mediterranean'], lat: 37.8035, lng: -122.3902, open: true, phone: '+14155550268',
-      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['outdoor', 'kids'],
       vibe: 'Leafy, airy, reclaimed-wood and plants', food: 'Grain bowls, roasted veg, tahini everything',
       reviews_q: [ { by: 'Priya R.', score: 89, text: 'Finally a veg spot that feels indulgent.' }, { by: 'Hana S.', score: 85, text: 'Everything is vegan and you would not guess.' } ] },
     { name: 'Lupo Rosso', rating: 4.7, reviews: 860, price: 3, type: 'Italian · Wine bar', cuisines: ['italian'], lat: 37.7831, lng: -122.3948, open: false, phone: '+14155550279',
-      diet: ['vegetarian'], dining: ['dine-in'],
+      diet: ['vegetarian'], dining: ['dine-in'], extras: ['alcohol'],
       vibe: 'Dim, romantic, candle-lit wine cellar', food: 'Handmade ravioli, natural wine, affogato',
       reviews_q: [ { by: 'Maya O.', score: 93, text: 'Date-night perfection. The ravioli, swoon.' }, { by: 'Theo B.', score: 89, text: 'Ask the somm to pick — never wrong.' } ] }
   ];
@@ -296,6 +335,7 @@
         cuisines: r.cuisines || [],
         diet: r.diet || [],
         dining: r.dining || [],
+        extras: r.extras || [], // live results leave this undefined (not fetched)
         open: r.open,
         phone: r.phone,
         photoUrl: null, // watercolor placeholder
@@ -654,6 +694,14 @@
           var anyDine = p.dining.some(function (d) { return dn.indexOf(d) !== -1; });
           if (!anyDine) return false;
         }
+        // extras: ALL selected must match (like dietary). Live (Google Places)
+        // results don't carry these attributes — when r.extras is undefined
+        // the place passes unfiltered rather than vanishing.
+        if (p.extras && p.extras.length && r.extras !== undefined) {
+          var ex = r.extras || [];
+          var allExtras = p.extras.every(function (x) { return ex.indexOf(x) !== -1; });
+          if (!allExtras) return false;
+        }
         return true;
       });
     }
@@ -793,6 +841,10 @@
     ];
     var DIETARY = [['vegetarian', 'Vegetarian'], ['vegan', 'Vegan'], ['gluten-free', 'Gluten-free']];
     var DINING = [['dine-in', 'Dine-in'], ['takeout', 'Takeout'], ['delivery', 'Delivery']];
+    var EXTRAS = [
+      ['outdoor', 'Outdoor seating'], ['groups', 'Good for groups'],
+      ['alcohol', 'Serves alcohol'], ['kids', 'Kid-friendly']
+    ];
     var RATINGS = [[0, 'Any'], [70, '70+'], [80, '80+'], [90, '90+']];
     var REVIEWS = [[0, 'Any'], [100, '100+'], [500, '500+'], [1000, '1000+']];
     var DISTANCES = [['walk', 'Walking'], ['drive', 'Short drive'], ['any', 'Anywhere']];
@@ -800,7 +852,7 @@
     function defaults() {
       return {
         cuisine: [], price: [], minRating: 0, minReviews: 0,
-        openNow: false, distance: 'any', dietary: [], dining: []
+        openNow: false, distance: 'any', dietary: [], dining: [], extras: []
       };
     }
 
@@ -819,6 +871,7 @@
       if (typeof saved.distance === 'string') d.distance = saved.distance;
       if (Array.isArray(saved.dietary)) d.dietary = saved.dietary;
       if (Array.isArray(saved.dining)) d.dining = saved.dining;
+      if (Array.isArray(saved.extras)) d.extras = saved.extras;
       return d;
     }
     function persist() { store.setPrefs(cur); }
@@ -910,6 +963,7 @@
       buildChips($('pref-cuisine'), CUISINES, 'cuisine');
       buildChips($('pref-dietary'), DIETARY, 'dietary', { any: false });
       buildChips($('pref-dining'), DINING, 'dining', { any: false });
+      buildChips($('pref-extras'), EXTRAS, 'extras', { any: false });
       buildPrice();
       buildSeg($('pref-rating'), RATINGS, 'minRating');
       buildSeg($('pref-reviews'), REVIEWS, 'minReviews');
@@ -1407,6 +1461,44 @@
       }, 1900);
     }
 
+    /* ---- Share the pick ----
+       navigator.share when the platform offers it; otherwise copy the text +
+       maps link to the clipboard with a "Copied!" toast. Everything is
+       guarded — if both APIs are missing the button says so and the decision
+       screen carries on untouched. */
+    function buildShareAction(r, metaLine, mapsHref) {
+      var share = el('button', 'decision-act', 'Share');
+      share.type = 'button';
+      var shareText = r.name + (metaLine ? ' — ' + metaLine : '');
+      share.addEventListener('click', function () {
+        // 1) Native share sheet
+        try {
+          if (navigator.share) {
+            navigator.share({ title: 'Tonight: ' + r.name, text: shareText, url: mapsHref })
+              .catch(function () { /* user dismissed the sheet — not an error */ });
+            return;
+          }
+        } catch (e) { /* fall through to clipboard */ }
+        // 2) Clipboard fallback
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(shareText + '\n' + mapsHref).then(function () {
+              announce('Copied ' + r.name + ' and the maps link to your clipboard');
+              toast('Copied!');
+            }, function () {
+              announce('Couldn’t copy — long-press the Maps link instead');
+              toast('Couldn’t copy');
+            });
+            return;
+          }
+        } catch (e) { /* fall through to the quiet notice */ }
+        // 3) Neither API exists — say so gently, never break the screen
+        announce('Sharing isn’t available in this browser');
+        toast('Sharing isn’t available here');
+      });
+      return share;
+    }
+
     function onLike(r) {
       setMode('decision');
       celebrate();
@@ -1414,21 +1506,20 @@
       var metaEl = $('decision-meta');
       var actionsEl = $('decision-actions');
       if (nameEl) nameEl.textContent = r.name;
-      if (metaEl) {
-        var bits = [];
-        if (r.rating) bits.push('★ ' + fmtScore(r.rating * 20));
-        if (r.price) bits.push(priceStr(r.price));
-        if (r.type) bits.push(r.type);
-        if (r.distance != null) bits.push(fmtDist(r.distance) + ' away');
-        var mine = myRatingFor(r.name);
-        if (mine) bits.push('you rated it ' + fmtScore(overallOf(mine)));
-        metaEl.textContent = bits.join('  ·  ');
-      }
+      var bits = [];
+      if (r.rating) bits.push('★ ' + fmtScore(r.rating * 20));
+      if (r.price) bits.push(priceStr(r.price));
+      if (r.type) bits.push(r.type);
+      if (r.distance != null) bits.push(fmtDist(r.distance) + ' away');
+      var mine = myRatingFor(r.name);
+      if (mine) bits.push('you rated it ' + fmtScore(overallOf(mine)));
+      var metaLine = bits.join('  ·  ');
+      if (metaEl) metaEl.textContent = metaLine;
+      var mapsHref = r.mapsUri ||
+        (r.placeId ? 'https://www.google.com/maps/dir/?api=1&destination_place_id=' + encodeURIComponent(r.placeId) + '&destination=' + encodeURIComponent(r.name) : null) ||
+        'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(r.name);
       if (actionsEl) {
         clear(actionsEl);
-        var mapsHref = r.mapsUri ||
-          (r.placeId ? 'https://www.google.com/maps/dir/?api=1&destination_place_id=' + encodeURIComponent(r.placeId) + '&destination=' + encodeURIComponent(r.name) : null) ||
-          'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(r.name);
         var map = el('a', 'decision-act decision-act--primary', 'Open in Maps · Directions');
         map.href = mapsHref; map.target = '_blank'; map.rel = 'noopener';
         actionsEl.appendChild(map);
@@ -1437,6 +1528,7 @@
           call.href = 'tel:' + r.phone;
           actionsEl.appendChild(call);
         }
+        actionsEl.appendChild(buildShareAction(r, metaLine, mapsHref));
         var rate = el('button', 'decision-act', 'I ate here → Rate');
         rate.type = 'button';
         rate.addEventListener('click', function () {
@@ -2681,7 +2773,11 @@
           listEl.appendChild(empty);
           return;
         }
-        list.forEach(function (e) { listEl.appendChild(buildEntry(e)); });
+        list.forEach(function (e, i) {
+          var entry = buildEntry(e);
+          enterStagger(entry, i);
+          listEl.appendChild(entry);
+        });
         announce(list.length + ' friend ratings shown');
       }).catch(function () {
         if (token === state2.token) showError();
@@ -2783,7 +2879,25 @@
       social.getPopular({ range: state3.range }).then(function (list) {
         if (token !== state3.token) return; // stale response
         clear(listEl);
-        list.forEach(function (item) { listEl.appendChild(buildRow(item)); });
+        list.forEach(function (item, i) {
+          var row = buildRow(item);
+          enterStagger(row, i);
+          // top-3 rank badges bloom softly just after their row lands
+          if (!prefersReducedMotion && item.rank <= 3) {
+            var badge = row.querySelector('.pop-rank');
+            if (badge) {
+              badge.classList.add('is-blooming');
+              badge.style.animationDelay = (i * 40 + 380) + 'ms';
+              badge.addEventListener('animationend', function onBloom(e2) {
+                if (e2.animationName !== 'rank-bloom') return;
+                badge.classList.remove('is-blooming');
+                badge.style.animationDelay = '';
+                badge.removeEventListener('animationend', onBloom);
+              });
+            }
+          }
+          listEl.appendChild(row);
+        });
         var label = state3.range === 'today' ? 'today' : (state3.range === 'month' ? 'this month' : 'this year');
         announce('Top ' + list.length + ' places ' + label);
       }).catch(function () {

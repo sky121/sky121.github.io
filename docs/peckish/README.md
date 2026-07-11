@@ -44,6 +44,11 @@
 - **Swipe deck:** cards nearest-first, expanding outward. Drag **left = pass / right = like** (rotation + green YES / red NOPE stamps, peeking next card); also ✗/♥ buttons + ArrowLeft/ArrowRight; reduced-motion uses fades. **Tap the card to cycle story segments: Vibe → Food → Reviews.** Card overlay: name, 0–100 rating + review count, price, cuisine, distance, open-now.
 - **Decision screen** (on like): "Tonight: <name>" → Open in Maps (Directions), Call (if phone), "I ate here → Rate" (opens the rating sheet), **Save to shortlist · keep swiping**, Keep looking. **End-of-deck** screen → Compare shortlist (if any) / Widen preferences / Search farther (live) / Start over.
 
+### Wave 3 (2026-07-08)
+- **Share a pick** — the decision screen has a Share action: native `navigator.share` sheet where available (title/text/maps URL), clipboard fallback with a paper-pill "Copied!" toast + live-region announcement; fully guarded, never breaks the screen.
+- **Friends/Popular motion** — feed entries and leaderboard rows enter with a ~40ms staggered rise (`enterStagger`/`.social-enter`, class stripped on animationend); top-3 Popular rank badges bloom on first render. Reduced-motion: everything instant.
+- **Extras preference facet** — outdoor seating / good for groups / serves alcohol / kid-friendly chips on Preferences; every demo restaurant carries `extras` flags; filter requires ALL selected (like dietary). Live Google Places results don't carry these attributes, so the extras check is skipped when `r.extras` is undefined.
+
 ### Three-at-once cards (2026-07-08)
 Swipe cards now show **all three segments at the same time**: the hero panel (full card) plus two **mini peek tiles** (top-right rail) previewing the other two — photos/watercolor art for Vibe/Food, the first review quote for Reviews. **A single tap rotates all three at once** (hero → peek, next peek → hero) with a settle animation; segment bars still track the hero. Implemented in `buildCard`/`updatePeeks`/`peekContent` (eats.js) + `.card-peeks`/`.peek*` (eats.css); peeks are aria-hidden (the announce line names the featured segment), reduced-motion skips the tile animation.
 
