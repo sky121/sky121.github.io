@@ -17,6 +17,8 @@
     ember: "#e08a5a", emberDeep: "#c25a3a"
   };
   var SAVE_KEY = "dragoose-save";
+  // lustrous-scale shimmer cycle (picked by time index — no string building)
+  var LUSTRE = [PAL.gold, PAL.rose, PAL.wisteria];
 
   // characters/projectiles/clouds are fully procedural now — only the
   // scale pickups still ship as PNG sprites
@@ -970,6 +972,30 @@
         g.beginPath(); g.arc(-5.4, -44.5, 1.7, 0, TAU); g.fill();
         g.beginPath(); g.arc(5.4, -44.5, 1.7, 0, TAU); g.fill();
       }
+      // CROWNED: a tiny three-point gold circlet resting just above the eyes
+      // (drawn last so it sits atop the head — the highest point from above)
+      if (o.gear && o.gear.crown) {
+        g.save();
+        g.translate(0, -46.5);
+        g.beginPath();
+        g.moveTo(-5, 1.6);
+        g.bezierCurveTo(-2.6, 0.4, 2.6, 0.4, 5, 1.6);  // rim curves with the skull
+        g.lineTo(4.5, -0.7);
+        g.lineTo(3.2, -3.3);   // right point
+        g.lineTo(1.9, -0.9);
+        g.lineTo(0, -4.4);     // center point
+        g.lineTo(-1.9, -0.9);
+        g.lineTo(-3.2, -3.3);  // left point
+        g.lineTo(-4.5, -0.7);
+        g.closePath();
+        g.fillStyle = "#cdb878"; g.globalAlpha = 0.95; g.fill();
+        g.strokeStyle = "#a8863c"; g.globalAlpha = 0.8; g.lineWidth = 1; g.stroke();
+        // a single soft gleam on the band
+        g.globalAlpha = 0.85; g.fillStyle = "#f6ecd0";
+        g.beginPath(); g.arc(0, 0.4, 0.8, 0, TAU); g.fill();
+        g.globalAlpha = 1;
+        g.restore();
+      }
       // dragonfire smolders in his beak while charging
       if (o.charge > 0.01) {
         Fx.drawDot(g, 0, -56, 9 + o.charge * 10, PAL.ember, 0.3 + o.charge * 0.45, true);
@@ -1508,7 +1534,8 @@
           horns: Save.hasRegalia("emberHorns"),
           spade: Save.hasRegalia("tempestSpade"),
           mantle: Save.hasRegalia("sorrelMantle"),
-          crest: Save.hasRegalia("gildedCrest")
+          crest: Save.hasRegalia("gildedCrest"),
+          crown: Save.data.crowned
         }
       });
       g.restore();
@@ -1572,6 +1599,7 @@
       this.scaleProgress = 0;
       this.scalesBanked = 0;
       this.winIsFinal = false;
+      this.introT = 0; this.introDur = 0;
       this.nextPowerAt = 3;
       this.powers = {};
       this.shake = 0; this.hitStop = 0; this.flashRed = 0; this.flashWhite = 0;
@@ -1640,7 +1668,7 @@
         { x: VW * 0.78, y: VH * 0.375 },  // right
         { x: VW * 0.5, y: VH * 0.585 }    // bottom (nearest the player)
       ];
-      this.sky = { grace: 1.0, realms: [] };
+      this.sky = { grace: 1.0, realms: [], tint: { color: "", k: 0, x: 0, y: 0 } };
       for (var i = 0; i < RUN_BOSSES.length; i++) {
         var t = RUN_BOSSES[i];
         this.sky.realms.push({
@@ -1657,8 +1685,22 @@
     updateSky: function (dt) {
       var sky = this.sky;
       if (!sky) return;
-      if (sky.grace > 0) { sky.grace -= dt; return; }
       var p = this.player;
+      // realm-proximity tinting: the sky warms toward the nearest realm's
+      // pigment (full within r*1.2, faded out by r*3); paintSky reads this
+      var tint = sky.tint;
+      tint.k = 0;
+      for (var ti = 0; ti < sky.realms.length; ti++) {
+        var trm = sky.realms[ti];
+        var tdx = p.x - trm.x, tdy = p.y - trm.y;
+        var tk = 1 - (Math.sqrt(tdx * tdx + tdy * tdy) - trm.r * 1.2) / (trm.r * 1.8);
+        if (tk > 1) tk = 1;
+        if (tk > tint.k) {
+          tint.k = tk; tint.color = trm.pal.a;
+          tint.x = trm.x; tint.y = trm.y;
+        }
+      }
+      if (sky.grace > 0) { sky.grace -= dt; return; }
       for (var i = 0; i < sky.realms.length; i++) {
         var rm = sky.realms[i];
         var dx = p.x - rm.x, dy = p.y - rm.y;
@@ -1679,9 +1721,14 @@
       p.charge = 0; p.charging = false;
       Audio2.chargeStop();
       this.dragon = this.makeDragon(realm.type, ceremonial);
+      // boss-intro flyby: a short non-interactive entrance — the dragon
+      // swoops in from off-screen and holds its fire under a name card
+      var d = this.dragon;
+      this.introDur = reduceMotion ? 0.5 : 1.4;
+      this.introT = this.introDur;
+      d.introToX = d.x; d.introToY = d.y;
+      if (!reduceMotion) d.y = -d.r; // starts above the sky, swoops down
       this.updateHUD();
-      this.floatText(VW / 2, VH * 0.4,
-        ceremonial ? "Ceremonial duel — it has been studying you" : this.dragon.name, PAL.gold);
       // first-duel tutorial hint (one-time)
       if (!ceremonial && !Save.data.seenHints.duel) {
         Save.data.seenHints.duel = true;
@@ -1827,6 +1874,9 @@
       if (this.hitStop > 0) { this.hitStop -= dt; if (this.hitStop > 0) return; }
 
       if (this.runStats) this.runStats.time += dt;
+
+      // boss-intro flyby countdown (dragon holds fire while it runs)
+      if (this.introT > 0) this.introT -= dt;
 
       this.updatePlayer(dt);
       if (this.mode === "sky") this.updateSky(dt);
@@ -2152,6 +2202,23 @@
         }
         return;
       }
+
+      // ----- boss-intro flyby: swoop to the arena spot, hold fire -----
+      if (this.introT > 0) {
+        d.state = "roam"; d.stateT = 0;
+        d.telegraph = 0; d.telegraphType = null;
+        var it = 1 - this.introT / (this.introDur || 1);
+        if (it < 0) it = 0; else if (it > 1) it = 1;
+        if (!reduceMotion) {
+          var ie = 1 - Math.pow(1 - it, 3); // smooth cubic ease-out
+          d.y = -d.r + (d.introToY + d.r) * ie;
+          d.x = d.introToX + Math.sin(it * Math.PI) * 26;
+        }
+        d.facing = this.angleLerp(d.facing,
+          Math.atan2(this.player.y - d.y, this.player.x - d.x), 1 - Math.pow(0.05, dt));
+        return; // no attack cooldown ticks during the entrance
+      }
+
       // enraged: shed rising embers + heat (static crackle for the storm wyrm)
       if (d.phase === 2 && Math.random() < dt * 14) {
         var ea = Math.random() * TAU, er = d.r * (0.3 + Math.random() * 0.5);
@@ -2632,12 +2699,15 @@
 
     dropScale: function (x, y) {
       var ang = Math.random() * Math.PI * 2;
+      // 1 in 10 scales falls lustrous — bigger, iridescent, worth +3
+      var rare = Math.random() < 0.1;
       Pickups.list.push({
         x: x, y: y, vx: Math.cos(ang) * 90, vy: Math.sin(ang) * 90 - 60,
-        r: 22, t: 0, collected: false, magnet: false,
+        r: 22, t: 0, collected: false, magnet: false, rare: rare,
         type: this.dragon.type
       });
-      Particles.burst(x, y, 6, PAL.gold, 3, 12, 0.4);
+      Particles.burst(x, y, rare ? 12 : 6, rare ? PAL.wisteria : PAL.gold, 3, rare ? 16 : 12, 0.4);
+      if (rare) Particles.ring(x, y, PAL.rose, 14, 420, 0.36, 4);
     },
 
     hurtPlayer: function (dmg, x, y) {
@@ -2714,16 +2784,20 @@
     },
 
     collectScale: function (s) {
-      // REGALIA: gilded crest — scales are worth double while unhurt
-      var worth = 1;
-      if (Save.hasRegalia("gildedCrest") && this.player.health === this.player.maxHealth) worth = 2;
+      // lustrous scales bank 3; the gilded crest doubles AFTER the rare bonus
+      var worth = s.rare ? 3 : 1;
+      if (Save.hasRegalia("gildedCrest") && this.player.health === this.player.maxHealth) worth *= 2;
       this.scaleProgress += worth;
       buzz(8);
       Audio2.scale();
       Particles.burst(this.player.x, this.player.y, 8, PAL.gold, 3, 12, 0.4);
       Particles.ring(this.player.x, this.player.y, PAL.gold, 12, 360, 0.32, 3);
       Particles.sparkBurst(this.player.x, this.player.y, 6, PAL.gold, 300, 0.3);
-      this.floatText(this.player.x, this.player.y - 30, "+" + worth + " scale" + (worth > 1 ? "s" : ""), PAL.gold);
+      if (s.rare) {
+        this.floatText(this.player.x, this.player.y - 30, "+" + worth + " lustrous!", PAL.rose);
+      } else {
+        this.floatText(this.player.x, this.player.y - 30, "+" + worth + " scale" + (worth > 1 ? "s" : ""), PAL.gold);
+      }
       this.updateHUD();
       if (this.scaleProgress >= this.nextPowerAt) {
         this.nextPowerAt += 4;
@@ -3003,6 +3077,12 @@
 
       g.restore();
 
+      // boss-intro name card (steady — drawn outside the shake transform)
+      if (this.introT > 0 && this.mode === "duel" && this.dragon &&
+          (this.state === "PLAYING" || this.state === "PAUSED")) {
+        this.drawIntroCard(g);
+      }
+
       // screen treatment: vignette + color grade in one pre-baked layer
       if (Fx.vignette) g.drawImage(Fx.vignette, 0, 0);
 
@@ -3056,6 +3136,17 @@
       grd.addColorStop(1, "#4f7ba0");
       g.fillStyle = grd;
       g.fillRect(0, 0, VW, VH);
+
+      // realm-proximity tint: nearing a realm warms the sky toward its pigment
+      var tint = (this.mode === "sky" && this.sky) ? this.sky.tint : null;
+      if (tint && tint.k > 0.02) {
+        var tg = g.createRadialGradient(tint.x, tint.y, 0, tint.x, tint.y, VH * 0.85);
+        tg.addColorStop(0, Fx.rgba(tint.color, 0.12 * tint.k));
+        tg.addColorStop(0.55, Fx.rgba(tint.color, 0.05 * tint.k));
+        tg.addColorStop(1, Fx.rgba(tint.color, 0));
+        g.fillStyle = tg;
+        g.fillRect(0, 0, VW, VH);
+      }
 
       var sx = VW * 0.78, sy = VH * 0.1;
 
@@ -3166,7 +3257,8 @@
         gear: {
           horns: Save.hasRegalia("emberHorns"),
           spade: Save.hasRegalia("tempestSpade"),
-          mantle: Save.hasRegalia("sorrelMantle")
+          mantle: Save.hasRegalia("sorrelMantle"),
+          crown: Save.data.crowned
         }
       });
       sg.restore();
@@ -3404,10 +3496,17 @@
         var bob = Math.sin(s.t * 5) * 4;
         g.translate(0, bob);
 
-        // pulsing treasure glow
+        // pulsing treasure glow (lustrous: iridescent hue-shifting shimmer)
         var pulse = 0.5 + Math.sin(s.t * 6) * 0.2;
-        Fx.drawDot(g, 0, 0, 40, PAL.gold, pulse * 0.55, true);
-        Fx.drawDot(g, 0, 0, 20, "#fff3cf", pulse * 0.5, true);
+        if (s.rare) {
+          var li = (s.t * 2.4) | 0;
+          Fx.drawDot(g, 0, 0, 54, LUSTRE[li % 3], pulse * 0.6, true);
+          Fx.drawDot(g, 0, 0, 30, LUSTRE[(li + 1) % 3], pulse * 0.5, true);
+          Fx.drawDot(g, 0, 0, 20, "#fff3cf", pulse * 0.55, true);
+        } else {
+          Fx.drawDot(g, 0, 0, 40, PAL.gold, pulse * 0.55, true);
+          Fx.drawDot(g, 0, 0, 20, "#fff3cf", pulse * 0.5, true);
+        }
 
         // rotating four-point gleam
         g.save();
@@ -3427,10 +3526,44 @@
         g.restore();
 
         g.rotate(Math.sin(s.t * 2) * 0.3);
-        var sz = 56;
+        var sz = s.rare ? 72 : 56;
         g.drawImage(img, -sz / 2, -sz / 2, sz, sz);
         g.restore();
       }
+    },
+
+    // boss-intro name card: serif name over a thin gold rule, fading with introT
+    drawIntroCard: function (g) {
+      var d = this.dragon;
+      var t = 1 - this.introT / (this.introDur || 1);
+      if (t < 0) t = 0; else if (t > 1) t = 1;
+      // fade in over the first ~18%, out over the last ~28%
+      var a = Math.min(1, t / 0.18, (1 - t) / 0.28);
+      if (a <= 0.01) return;
+      var cy = VH * 0.45;
+      g.save();
+      // a soft paper wash so the serif reads on any sky
+      Fx.drawDot(g, VW / 2, cy + 6, 190, "#f6f1e7", 0.55 * a, false);
+      g.globalAlpha = a;
+      g.textAlign = "center";
+      g.font = 'italic 600 33px "Cormorant Garamond", Georgia, serif';
+      g.fillStyle = Fx.rgba(PAL.ink, 0.9);
+      var nm = d.ceremonial ? d.name.replace("⟡ ", "") : d.name;
+      g.fillText(nm, VW / 2, cy);
+      // thin gold rule, drawing itself wider as the card settles
+      var rw = 110 * (0.45 + 0.55 * Math.min(1, t / 0.4));
+      g.strokeStyle = Fx.rgba(PAL.gold, 0.95);
+      g.lineWidth = 1.4;
+      g.beginPath();
+      g.moveTo(VW / 2 - rw, cy + 16);
+      g.lineTo(VW / 2 + rw, cy + 16);
+      g.stroke();
+      if (d.ceremonial) {
+        g.font = 'italic 500 20px "Cormorant Garamond", Georgia, serif';
+        g.fillStyle = Fx.rgba("#8a7940", 0.95);
+        g.fillText("⟡ Ceremonial duel", VW / 2, cy + 42);
+      }
+      g.restore();
     },
 
     // the open sky's realm vortexes — swirling pools of each dragon's pigment
