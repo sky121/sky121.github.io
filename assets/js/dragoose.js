@@ -59,7 +59,7 @@
   // SAVE MODULE (localStorage hoard)
   // ---------------------------------------------------------
   var Save = {
-    data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "", regalia: [], crowned: false, seenHints: {} },
+    data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "", regalia: [], crowned: false, seenHints: {}, gentle: false },
     load: function () {
       try {
         var raw = localStorage.getItem(SAVE_KEY);
@@ -75,6 +75,7 @@
             this.data.regalia = Array.isArray(p.regalia) ? p.regalia : [];
             this.data.crowned = !!p.crowned;
             this.data.seenHints = (p.seenHints && typeof p.seenHints === "object") ? p.seenHints : {};
+            this.data.gentle = !!p.gentle;
           }
         }
       } catch (e) {}
@@ -108,7 +109,7 @@
   // AUDIO MODULE (Web Audio, synthesized)
   // ---------------------------------------------------------
   var Audio2 = {
-    ctx: null, master: null, muted: false, ready: false, chargeOsc: null, chargeGain: null,
+    ctx: null, master: null, duelBus: null, muted: false, ready: false, chargeOsc: null, chargeGain: null,
     init: function () {
       if (this.ready) return;
       try {
@@ -118,6 +119,12 @@
         this.master = this.ctx.createGain();
         this.master.gain.value = this.muted ? 0 : 0.5;
         this.master.connect(this.ctx.destination);
+        // duel bus: an intensity layer that swells in during duels and
+        // fades to silence in the open sky / title (routes through master,
+        // so it honors the mute toggle for free)
+        this.duelBus = this.ctx.createGain();
+        this.duelBus.gain.value = 0;
+        this.duelBus.connect(this.master);
         this.ready = true;
       } catch (e) {}
     },
@@ -188,6 +195,46 @@
           g.gain.linearRampToValueAtTime(0.0001, t + CHORD_LEN * 1.05);
           o.connect(g); g.connect(self.master);
           o.start(t); o.stop(t + CHORD_LEN * 1.1);
+        }
+        // ---- duel intensity layer (fed into the duel bus) ----
+        // the bus itself glides toward its target so entering/leaving a
+        // duel mid-chord fades smoothly (~1.5s) with no clicks
+        if (self.duelBus) {
+          var inDuel = Game.state === "PLAYING" && Game.mode === "duel";
+          var phase2 = inDuel && Game.dragon && Game.dragon.phase === 2;
+          self.duelBus.gain.setTargetAtTime(inDuel ? (phase2 ? 0.7 : 0.5) : 0, t, 0.5);
+          if (inDuel) {
+            // a deep sine root an octave under the chord
+            var lo = self.ctx.createOscillator();
+            var lg = self.ctx.createGain();
+            lo.type = "sine";
+            lo.frequency.value = notes[0] / 2;
+            lg.gain.setValueAtTime(0.0001, t);
+            lg.gain.linearRampToValueAtTime(0.055, t + CHORD_LEN * 0.35);
+            lg.gain.linearRampToValueAtTime(0.0001, t + CHORD_LEN * 1.05);
+            lo.connect(lg); lg.connect(self.duelBus);
+            lo.start(t); lo.stop(t + CHORD_LEN * 1.1);
+            // a very quiet triangle at the root, pulsing like a heartbeat
+            // (tremolo: a slow LFO wobbles the note's gain — faster in phase 2)
+            var pu = self.ctx.createOscillator();
+            var trem = self.ctx.createGain();
+            var pg = self.ctx.createGain();
+            pu.type = "triangle";
+            pu.frequency.value = notes[0];
+            trem.gain.value = 0.6;
+            pg.gain.setValueAtTime(0.0001, t);
+            pg.gain.linearRampToValueAtTime(0.02, t + CHORD_LEN * 0.4);
+            pg.gain.linearRampToValueAtTime(0.0001, t + CHORD_LEN * 1.05);
+            var lfo = self.ctx.createOscillator();
+            var lfoG = self.ctx.createGain();
+            lfo.type = "sine";
+            lfo.frequency.value = phase2 ? 3.2 : 2.2;
+            lfoG.gain.value = 0.4;
+            lfo.connect(lfoG); lfoG.connect(trem.gain);
+            pu.connect(trem); trem.connect(pg); pg.connect(self.duelBus);
+            pu.start(t); pu.stop(t + CHORD_LEN * 1.1);
+            lfo.start(t); lfo.stop(t + CHORD_LEN * 1.1);
+          }
         }
       };
       playChord();
@@ -1377,6 +1424,7 @@
       $("btn-retry").addEventListener("click", function () { Game.startRun(); });
       $("btn-continue").addEventListener("click", function () { Game.continueFromWin(); });
       $("plume-btn").addEventListener("click", function () { Game.cyclePlume(); });
+      $("gentle-btn").addEventListener("click", function () { Game.toggleGentle(); });
       $("btn-mute").addEventListener("click", function () { Game.toggleMute(); });
     },
 
@@ -1419,6 +1467,51 @@
         ? "Ruler of the skies · a watercolor flying roguelike"
         : "A watercolor flying roguelike";
       this.renderHoard();
+      this.renderTitleGoose();
+      this.renderGentle();
+    },
+
+    // 'Gentle breeze' assist: slower dragon attack cycling + 1 extra feather
+    renderGentle: function () {
+      var b = $("gentle-btn");
+      if (b) b.setAttribute("aria-pressed", Save.data.gentle ? "true" : "false");
+    },
+
+    toggleGentle: function () {
+      Save.data.gentle = !Save.data.gentle;
+      Save.save();
+      this.renderGentle();
+      Audio2.init(); Audio2.resume();
+      Audio2.tone(Save.data.gentle ? 440 : 330, 0.12, "sine", 0.07, Save.data.gentle ? 620 : 250);
+    },
+
+    // Gary on the title card, wearing the equipped plume + owned regalia
+    // (plain Gary when the hoard is empty). Redrawn on plume cycling so
+    // the button gives instant feedback.
+    renderTitleGoose: function () {
+      var c = $("title-goose");
+      if (!c) return;
+      var g = c.getContext("2d");
+      g.clearRect(0, 0, c.width, c.height);
+      g.save();
+      // the rig fits a 140-unit box around the origin (~y -60..+64)
+      g.translate(90, 80);
+      g.scale(1.15, 1.15);
+      var plume = PLUMES[Save.data.plume];
+      Art.goose(g, {
+        flap: 2.1,
+        bank: 0.08,
+        hurt: 0,
+        charge: 0,
+        tint: plume ? plume.color : null,
+        gear: {
+          horns: Save.hasRegalia("emberHorns"),
+          spade: Save.hasRegalia("tempestSpade"),
+          mantle: Save.hasRegalia("sorrelMantle"),
+          crest: Save.hasRegalia("gildedCrest")
+        }
+      });
+      g.restore();
     },
 
     renderHoard: function () {
@@ -1462,6 +1555,7 @@
       Save.data.plume = order[(i + 1) % order.length];
       Save.save();
       this.renderHoard();
+      this.renderTitleGoose();
       Audio2.init(); Audio2.resume();
       Audio2.tone(520, 0.12, "sine", 0.07, 700);
     },
@@ -1484,6 +1578,7 @@
 
       var startHealth = 4;
       if (Save.hasRelic("emberHeart")) startHealth = 5;
+      if (Save.data.gentle) startHealth += 1; // gentle breeze assist
 
       this.player = {
         x: VW / 2, y: VH * 0.72, vx: 0, vy: 0,
@@ -2100,8 +2195,9 @@
         d.x += d.vx * dt; d.y += d.vy * dt;
         d.facing = this.angleLerp(d.facing, Math.atan2(this.player.y - d.y, this.player.x - d.x), 1 - Math.pow(0.02, dt));
 
-        // ceremonial dragons cycle their attacks noticeably faster
-        d.attackCd -= dt * (d.ceremonial ? 1.3 : 1);
+        // ceremonial dragons cycle their attacks noticeably faster;
+        // the gentle-breeze assist slows every dragon's cycle ~25%
+        d.attackCd -= dt * (d.ceremonial ? 1.3 : 1) * (Save.data.gentle ? 0.78 : 1);
         if (d.attackCd <= 0) this.dragonBeginAttack();
       }
       // ----- telegraph (wind-up) -----
@@ -3226,11 +3322,30 @@
       var self = this;
       DragonShots.forEach(function (s) {
         if (s.kind === "breath") {
-          // breath cone droplets: soft, smoky, painterly
-          var t2 = s.life / 2.4;
-          Fx.drawDot(g, s.x, s.y, s.r * 1.5, PAL.emberDeep, 0.4 * t2 + 0.15, false);
-          Fx.drawDot(g, s.x, s.y, s.r * 1.1, PAL.ember, 0.5, true);
-          Fx.drawDot(g, s.x, s.y, s.r * 0.5, PAL.gold, 0.55, true);
+          // breath droplets as pooled watercolor: each is a ragged pigment
+          // blot — offset soft pools (stable per-droplet via the seed), a
+          // darker edge settling behind the travel direction, and an alpha
+          // ease so blots bloom wet then dry away
+          var isRay2 = s.color === PAL.gold;                 // gilded sun-beam vs ember breath
+          var maxL2 = isRay2 ? 0.95 : 2.4;
+          var age2 = 1 - Math.max(0, s.life) / maxL2;        // 0 fresh -> 1 spent
+          var ease2 = age2 < 0.22 ? age2 / 0.22 : 1 - (age2 - 0.22) / 0.78;
+          if (ease2 < 0) ease2 = 0;
+          var spread2 = 1 + age2 * 0.55;                     // pigment soaks outward
+          var sd2 = s.seed;
+          var bx3 = -Math.cos(s.rot) * s.r * 0.55;           // opposite travel
+          var by3 = -Math.sin(s.rot) * s.r * 0.55;
+          var edgeC2 = isRay2 ? "#a8863c" : PAL.emberDeep;
+          var bodyC2 = isRay2 ? PAL.gold : PAL.ember;
+          var coreC2 = isRay2 ? "#fff3c4" : PAL.gold;
+          // wet base wash + darker edge pooling at the trailing rim
+          Fx.drawDot(g, s.x + bx3 * 0.4, s.y + by3 * 0.4, s.r * 1.55 * spread2, edgeC2, 0.08 + 0.26 * ease2, false);
+          Fx.drawDot(g, s.x + bx3, s.y + by3, s.r * 0.8 * spread2, edgeC2, 0.34 * ease2, false);
+          // ragged blot: offset pigment pools of varying radius
+          Fx.drawDot(g, s.x + Math.cos(sd2) * s.r * 0.42, s.y + Math.sin(sd2) * s.r * 0.42, s.r * 1.05 * spread2, bodyC2, 0.42 * ease2, true);
+          Fx.drawDot(g, s.x + Math.cos(sd2 * 2.3) * s.r * 0.55, s.y + Math.sin(sd2 * 2.3) * s.r * 0.55, s.r * 0.72 * spread2, bodyC2, 0.38 * ease2, true);
+          Fx.drawDot(g, s.x + Math.cos(sd2 * 3.7) * s.r * 0.3, s.y + Math.sin(sd2 * 3.7) * s.r * 0.3, s.r * 0.5 * spread2, coreC2, 0.5 * ease2, true);
+          Fx.drawDot(g, s.x, s.y, s.r * 0.34, coreC2, 0.55 * ease2, true);
         } else if (s.kind === "zap") {
           // hostile lightning: deep indigo rim keeps it readable on the sky
           Fx.drawDot(g, s.x, s.y, s.r * 1.8, "#2f3f66", 0.34, false);
