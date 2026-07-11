@@ -276,6 +276,17 @@
           </div>
         </div>
 
+        <!-- quick filter — only shown once the log outgrows a glance (>5 entries) -->
+        <div class="visited-filter" id="visited-filter" hidden>
+          <input
+            class="loc-input visited-filter-input"
+            id="visited-filter-input"
+            type="search"
+            placeholder="Filter your places…"
+            aria-label="Filter visited places by name, note, or location"
+          />
+        </div>
+
         <div class="visited-list" id="visited-list"></div>
       </section>
 

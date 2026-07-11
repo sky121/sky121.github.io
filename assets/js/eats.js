@@ -40,6 +40,16 @@
   var prefersReducedMotion = false;
   try { prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
 
+  /* Tiny haptic tap (Android Chrome etc.). Silent no-op where vibration is
+     unsupported, and skipped under prefers-reduced-motion — a vibration is
+     motion you can feel. Never throws. */
+  function haptic(ms) {
+    if (prefersReducedMotion) return;
+    try {
+      if (navigator.vibrate) navigator.vibrate(ms);
+    } catch (e) { /* purely decorative — never break the flow */ }
+  }
+
   /* Small transient toast (paper pill above the tab bar) — visual companion
      to announce(); screen readers get the live region, sighted users get this. */
   var toastTimer = null;
@@ -171,6 +181,14 @@
     if (mi == null) return '';
     if (mi < 0.1) return (Math.round(mi * 5280)) + ' ft';
     return mi.toFixed(mi < 10 ? 1 : 0) + ' mi';
+  }
+  /* Friendly travel hint alongside the raw distance: close places as walking
+     minutes (~3.1 mph), farther ones as urban driving minutes (~16 mph).
+     Rounded up, never below 1 minute. */
+  function fmtTravel(mi) {
+    if (mi == null) return '';
+    if (mi <= 1.3) return Math.max(1, Math.ceil((mi / 3.1) * 60)) + ' min walk';
+    return Math.max(1, Math.ceil((mi / 16) * 60)) + ' min drive';
   }
 
   /* ------------------------------------------------------------------ *
@@ -1202,8 +1220,15 @@
         meta.appendChild(el('span', 'ov-cuisine', r.type));
       }
       if (r.distance != null) {
+        // "away" dropped here — the travel chip right after says it better.
+        // dist · travel live in one non-wrapping group so a narrow screen
+        // never strands the separator dot at the end of a line.
         meta.appendChild(el('span', 'ov-dot', '·'));
-        meta.appendChild(el('span', 'ov-dist', fmtDist(r.distance) + ' away'));
+        var dg = el('span', 'ov-distgroup');
+        dg.appendChild(el('span', 'ov-dist', fmtDist(r.distance)));
+        dg.appendChild(el('span', 'ov-dot', '·'));
+        dg.appendChild(el('span', 'ov-travel', fmtTravel(r.distance)));
+        meta.appendChild(dg);
       }
       if (r.open != null) {
         meta.appendChild(el('span', 'ov-badge' + (r.open ? '' : ' is-closed'), r.open ? 'Open now' : 'Closed'));
@@ -1233,7 +1258,10 @@
       if (r.reviews) bits.push(r.reviews.toLocaleString() + ' reviews');
       if (r.price) bits.push('price ' + priceStr(r.price));
       if (r.type) bits.push(r.type);
-      if (r.distance != null) bits.push(fmtDist(r.distance) + ' away');
+      if (r.distance != null) {
+        bits.push(fmtDist(r.distance) + ' away');
+        bits.push('about ' + fmtTravel(r.distance));
+      }
       if (r.open != null) bits.push(r.open ? 'open now' : 'closed');
       var mine = myRatingFor(r.name);
       if (mine) bits.push('you rated it ' + fmtScore(overallOf(mine)) + ' before');
@@ -1370,6 +1398,7 @@
       animating = true;
       var card = topCard;
       setControlsEnabled(false);
+      haptic(10); // a committed swipe lands with a tap you can feel
 
       if (prefersReducedMotion) {
         card.classList.add('is-gone');
@@ -1403,6 +1432,7 @@
 
     function undoLast() {
       if (!history.length || animating) return;
+      haptic(6); // soft nudge — the card slides back
       var h = history.pop();
       updateUndo();
       if (h.dir === 'no' && h.id) store.removeSeen(h.id); // un-remember the pass
@@ -1501,6 +1531,7 @@
 
     function onLike(r) {
       setMode('decision');
+      haptic(18); // arrival: the decision screen is the payoff moment
       celebrate();
       var nameEl = $('decision-name');
       var metaEl = $('decision-meta');
@@ -1510,7 +1541,10 @@
       if (r.rating) bits.push('★ ' + fmtScore(r.rating * 20));
       if (r.price) bits.push(priceStr(r.price));
       if (r.type) bits.push(r.type);
-      if (r.distance != null) bits.push(fmtDist(r.distance) + ' away');
+      if (r.distance != null) {
+        bits.push(fmtDist(r.distance));
+        bits.push(fmtTravel(r.distance));
+      }
       var mine = myRatingFor(r.name);
       if (mine) bits.push('you rated it ' + fmtScore(overallOf(mine)));
       var metaLine = bits.join('  ·  ');
@@ -1668,7 +1702,10 @@
         if (r.rating) bits.push('★ ' + fmtScore(r.rating * 20));
         if (r.price) bits.push(priceStr(r.price));
         if (r.type) bits.push(r.type);
-        if (r.distance != null) bits.push(fmtDist(r.distance) + ' away');
+        if (r.distance != null) {
+          bits.push(fmtDist(r.distance));
+          bits.push(fmtTravel(r.distance));
+        }
         body.appendChild(el('p', 'sl-meta', bits.join('  ·  ')));
         row.appendChild(body);
         var acts = el('div', 'sl-acts');
@@ -2375,6 +2412,9 @@
     var statsEl = $('visited-stats');
     var sortSel = $('visited-sort');
     var tabCount = $('visited-tab-count');
+    var filterWrap = $('visited-filter');
+    var filterInput = $('visited-filter-input');
+    var filterQ = ''; // live quick-filter text (only offered when the log > 5)
 
     function load() {
       var v = store.getVisited();
@@ -2491,14 +2531,41 @@
       return card;
     }
 
+    /* quick-filter match: case-insensitive substring on name / note / location */
+    function matchesFilter(e, q) {
+      return (e.name || '').toLowerCase().indexOf(q) !== -1 ||
+             (e.note || '').toLowerCase().indexOf(q) !== -1 ||
+             (e.loc || '').toLowerCase().indexOf(q) !== -1;
+    }
+
     function render() {
       if (!listEl) return;
       clear(listEl);
-      var arr = sorted();
 
       // tab count + stats
       var n = state.visited.length;
       if (tabCount) tabCount.textContent = n ? '(' + n + ')' : '';
+
+      // quick filter: only worth offering once the log outgrows a glance
+      var canFilter = n > 5;
+      if (filterWrap) filterWrap.hidden = !canFilter;
+      if (!canFilter && filterQ) {
+        filterQ = '';
+        if (filterInput) filterInput.value = '';
+      }
+
+      var arr = sorted();
+      var q = canFilter ? filterQ.trim().toLowerCase() : '';
+      if (q) arr = arr.filter(function (e) { return matchesFilter(e, q); });
+
+      if (n && !arr.length) {
+        // entries exist, the filter just matched none — say so plainly
+        // (stats stay up: they describe the whole log, not the filtered view)
+        var avgAll = state.visited.reduce(function (s, e) { return s + overallOf(e); }, 0) / n;
+        renderStats(n, avgAll);
+        listEl.appendChild(el('p', 'visited-nomatch', 'No matches for “' + filterQ.trim() + '”'));
+        return;
+      }
 
       if (!arr.length) {
         statsEl.textContent = '';
@@ -2524,19 +2591,30 @@
         return;
       }
 
-      var avg = arr.reduce(function (s, e) { return s + overallOf(e); }, 0) / arr.length;
+      var avg = state.visited.reduce(function (s, e) { return s + overallOf(e); }, 0) / n;
+      renderStats(n, avg);
+
+      arr.forEach(function (e) { listEl.appendChild(buildCard(e)); });
+    }
+
+    function renderStats(n, avg) {
+      if (!statsEl) return;
       statsEl.innerHTML = '';
       statsEl.appendChild(document.createTextNode('You’ve logged '));
       statsEl.appendChild(el('strong', null, String(n)));
       statsEl.appendChild(document.createTextNode(' place' + (n === 1 ? '' : 's') + ' · average overall '));
       statsEl.appendChild(el('strong', null, fmtScore(avg)));
-
-      arr.forEach(function (e) { listEl.appendChild(buildCard(e)); });
     }
 
     function init() {
       load();
       if (sortSel) sortSel.addEventListener('change', function () { state.sort = sortSel.value; render(); });
+      if (filterInput) {
+        filterInput.addEventListener('input', function () {
+          filterQ = filterInput.value || '';
+          render();
+        });
+      }
       var addBtn = $('add-place');
       if (addBtn) addBtn.addEventListener('click', function () { sheet.openBlank(); });
       // initialise tab count

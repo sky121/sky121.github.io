@@ -899,6 +899,31 @@ html.evening .swipe-card { box-shadow: 0 18px 42px -20px rgba(0,0,0,0.75), inset
 }
 .card-seg-panel.is-active { opacity: 1; transform: scale(1); }
 
+/* Drifting wash: a soft paper-light pool breathing slowly across the art,
+   so the procedural watercolor panels feel alive. Transform/opacity only
+   (composited — no repaints), overflow clipped by the card, and it only
+   runs on the visible (is-active) panel. On live photos it reads as a
+   faint sheen — subtle enough not to touch legibility. */
+.card-seg-panel { overflow: hidden; }
+.card-seg-panel::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(38% 32% at 32% 30%, rgba(246,241,231,0.15) 0%, rgba(246,241,231,0) 70%),
+    radial-gradient(30% 26% at 70% 68%, rgba(246,241,231,0.08) 0%, rgba(246,241,231,0) 72%);
+  opacity: 0;
+  pointer-events: none;
+}
+.card-seg-panel.is-active::before {
+  animation: wash-drift 14s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+@keyframes wash-drift {
+  0%, 100% { transform: translate3d(-3.5%, -2.5%, 0) scale(1); opacity: 0.45; }
+  50%      { transform: translate3d(3%, 2.5%, 0) scale(1.08); opacity: 0.95; }
+}
+
 .seg-vibe {
   background:
     radial-gradient(70% 60% at 22% 24%, rgba(162,146,196,0.85) 0%, rgba(162,146,196,0) 62%),
@@ -1102,7 +1127,10 @@ html.evening .card-review { background: rgba(43,49,64,0.92); }
 .ov-rating .ov-star { color: var(--gold); }
 .ov-price { color: #cfe8c7; font-weight: 500; }
 .ov-cuisine { opacity: 0.92; }
-.ov-dist { opacity: 0.92; }
+.ov-dist { opacity: 0.92; white-space: nowrap; }
+.ov-travel { opacity: 0.92; white-space: nowrap; } /* "12 min walk" / "9 min drive" */
+/* distance + travel hint stay glued together when the meta line wraps */
+.ov-distgroup { display: inline-flex; align-items: baseline; gap: 0.55rem; white-space: nowrap; }
 .card-overlay .ov-dot { opacity: 0.55; }
 .ov-badge {
   display: inline-flex;
@@ -1548,6 +1576,26 @@ html.evening .sl-item { background: rgba(233, 227, 211, 0.05); }
   padding: 0.45rem 0.6rem;
   min-height: 40px;
 }
+/* quick filter above the log (JS shows it once the log has > 5 entries) —
+   borrows .loc-input's paper-field look, sized down a notch */
+.visited-filter { margin: -0.4rem 0 1.1rem; }
+.visited-filter-input {
+  display: block;
+  width: 100%;
+  max-width: 22rem;
+  padding: 0.5rem 0.85rem;
+  min-height: 40px;
+  font-size: 0.92rem;
+}
+.visited-nomatch {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--ink-soft);
+  padding: 1.6rem 0.2rem;
+  text-align: center;
+}
+
 .add-place-btn {
   appearance: none;
   cursor: pointer;
@@ -2299,6 +2347,8 @@ html.evening .settings-msg.is-ok { color: #b6d3af; }
   /* segment swap: plain quick crossfade, no zoom */
   .card-seg-panel { transition: opacity 0.15s ease; transform: none; }
   .card-seg-panel.is-active { transform: none; }
+  /* the drifting wash holds still */
+  .card-seg-panel.is-active::before { animation: none; opacity: 0; }
   .seg-bar::after { transition: none; }
   /* tab switch: fade only, no rise */
   .eats-panel { animation: panel-fade 0.18s ease; }
