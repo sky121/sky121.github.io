@@ -17,7 +17,9 @@
     <meta name="theme-color" content="#9fc2e0" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://sky121.github.io/dragoose.html" />
-    <meta property="og:image" content="https://sky121.github.io/images/og-card.png" />
+    <meta property="og:image" content="https://sky121.github.io/images/og-dragoose.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:title" content="Dragoose — a watercolor flying roguelike" />
     <meta
       property="og:description"
@@ -49,6 +51,7 @@
         <div class="title-card">
           <p class="title-kicker">A watercolor flying roguelike</p>
           <h1 class="title-logo">Dragoose</h1>
+          <canvas id="title-goose" class="title-goose" width="180" height="170" aria-hidden="true"></canvas>
           <p class="title-tag">
             Gary is a goose who dreams of the skies. A fallen dragon scale gave him
             dragonfire &mdash; now he must earn the respect of the dragons who rule the clouds.
@@ -59,6 +62,8 @@
           <div id="hoard-summary" class="hoard" hidden>
             <span class="hoard-label">Your hoard</span>
             <span id="hoard-stats" class="hoard-stats"></span>
+            <span id="hoard-records" class="hoard-records" hidden></span>
+            <button id="plume-btn" class="plume-btn" type="button" hidden></button>
           </div>
 
           <ul class="howto" aria-label="How to play">
@@ -66,6 +71,10 @@
             <li><span class="howto-key">tap</span> dodge</li>
             <li><span class="howto-key">hold</span> charge fire</li>
           </ul>
+
+          <button id="gentle-btn" class="gentle-btn" type="button" aria-pressed="false">
+            Gentle breeze &mdash; slower dragons, +1 feather
+          </button>
 
           <a class="back-link" href="lab.html">&larr; Back to the Lab</a>
         </div>
@@ -125,6 +134,7 @@
           <p class="overlay-kicker overlay-kicker--dark">defeat</p>
           <h2 class="overlay-title">The sky claims another goose&hellip;</h2>
           <p id="dead-sub" class="overlay-sub"></p>
+          <p id="dead-stats" class="overlay-stats"></p>
           <button id="btn-retry" class="btn btn--primary" type="button">Try again</button>
           <a class="back-link" href="lab.html">&larr; Back to the Lab</a>
         </div>
@@ -136,6 +146,7 @@
           <p class="overlay-kicker overlay-kicker--gold">respect earned</p>
           <h2 class="overlay-title">You have earned its respect</h2>
           <p id="win-sub" class="overlay-sub"></p>
+          <p id="win-stats" class="overlay-stats"></p>
           <div id="relic-grant" class="relic-grant"></div>
           <button id="btn-continue" class="btn btn--primary" type="button">Onward</button>
           <a class="back-link" href="lab.html">&larr; Back to the Lab</a>

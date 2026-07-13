@@ -203,6 +203,15 @@ body { position: fixed; inset: 0; }
   filter: drop-shadow(0 3px 0 rgba(46, 58, 72, 0.06));
 }
 
+/* Gary preview on the title card — wears your equipped plume + regalia */
+.title-goose {
+  display: block;
+  width: 90px;
+  height: auto;
+  margin: 0 auto 8px;
+  filter: drop-shadow(0 7px 9px rgba(46, 58, 72, 0.28));
+}
+
 .title-tag {
   font-family: var(--serif);
   font-size: clamp(15px, 4.2vw, 19px);
@@ -291,6 +300,63 @@ body { position: fixed; inset: 0; }
   font-size: 17px;
   color: var(--ink);
   line-height: 1.35;
+}
+
+/* quiet lifetime records line beneath the hoard */
+.hoard-records {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #8a7940;
+  opacity: 0.9;
+}
+
+/* ceremonial plume selector (cycles Gary's cosmetic coat) */
+.plume-btn {
+  margin-top: 6px;
+  align-self: center;
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #8a7940;
+  background: rgba(253, 251, 244, 0.55);
+  border: 1px solid rgba(205, 184, 120, 0.55);
+  border-radius: 999px;
+  padding: 5px 14px;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.plume-btn:hover { transform: translateY(-1px); background: rgba(253, 251, 244, 0.85); }
+.plume-btn:focus-visible { outline: 2px solid #a8924f; outline-offset: 2px; }
+
+/* Gentle breeze assist toggle: a quiet ghost pill under the how-to list */
+.gentle-btn {
+  display: block;
+  margin: 10px auto 0;
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--pond-deep);
+  background: rgba(253, 251, 244, 0.4);
+  border: 1px solid rgba(74, 114, 153, 0.35);
+  border-radius: 999px;
+  padding: 5px 14px;
+  opacity: 0.85;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.gentle-btn:hover { transform: translateY(-1px); background: rgba(253, 251, 244, 0.8); }
+.gentle-btn:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
+.gentle-btn[aria-pressed="true"] {
+  color: #fdfbf4;
+  background: var(--pond-deep);
+  border-color: var(--pond-deep);
+  opacity: 1;
 }
 
 .howto {
@@ -503,6 +569,19 @@ body { position: fixed; inset: 0; }
   margin: 6px auto 16px;
   max-width: 32ch;
 }
+
+/* the run's scoreboard line under the sub copy */
+.overlay-stats {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  opacity: 0.55;
+  margin: -6px auto 16px;
+}
+.overlay-stats:empty { display: none; }
 .power-choices {
   display: flex;
   flex-direction: column;
@@ -608,6 +687,10 @@ body { position: fixed; inset: 0; }
 }
 .bloom-wipe.is-wiping {
   animation: bloom-wipe 0.7s ease-in-out both;
+}
+/* the crowning's one golden transition */
+.bloom-wipe.is-golden {
+  background: radial-gradient(circle at 50% 55%, rgba(255, 250, 232, 0.98) 0%, rgba(205, 184, 120, 0.92) 38%, rgba(216, 154, 61, 0.9) 70%, rgba(90, 66, 20, 0.95) 100%);
 }
 @keyframes bloom-wipe {
   0% { opacity: 0; transform: scale(0.2); }

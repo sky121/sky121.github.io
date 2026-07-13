@@ -40,12 +40,137 @@
   var prefersReducedMotion = false;
   try { prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
 
+  /* Tiny haptic tap (Android Chrome etc.). Silent no-op where vibration is
+     unsupported, and skipped under prefers-reduced-motion — a vibration is
+     motion you can feel. Never throws. */
+  function haptic(ms) {
+    if (prefersReducedMotion) return;
+    try {
+      if (navigator.vibrate) navigator.vibrate(ms);
+    } catch (e) { /* purely decorative — never break the flow */ }
+  }
+
+  /* Watercolor droplet burst at a fixed screen point (same spirit as the
+     landing orb pop). Decorative; skipped under reduced motion. */
+  function dropletBurst(cx, cy, base) {
+    if (prefersReducedMotion) return;
+    try {
+      var layer = el('div', 'orb-burst');
+      layer.style.left = cx + 'px';
+      layer.style.top = cy + 'px';
+      var palette = ['var(--rose)', 'var(--wisteria)', 'var(--sage)', 'var(--gold)', 'var(--pond)'];
+      var DROPS = 12;
+      for (var i = 0; i < DROPS; i++) {
+        var d = el('span', 'orb-drop');
+        var ang = (i / DROPS) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+        var dist = base * (0.34 + Math.random() * 0.32);
+        var size = base * (0.06 + Math.random() * 0.10);
+        d.style.setProperty('--dx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+        d.style.setProperty('--dy', (Math.sin(ang) * dist).toFixed(1) + 'px');
+        d.style.width = size.toFixed(1) + 'px';
+        d.style.height = size.toFixed(1) + 'px';
+        d.style.background = palette[i % palette.length];
+        d.style.animationDelay = (Math.random() * 60).toFixed(0) + 'ms';
+        layer.appendChild(d);
+      }
+      document.body.appendChild(layer);
+      window.setTimeout(function () { if (layer.parentNode) layer.parentNode.removeChild(layer); }, 600);
+    } catch (e) { /* decorative */ }
+  }
+
+  /* Small transient toast (paper pill above the tab bar) — visual companion
+     to announce(); screen readers get the live region, sighted users get this. */
+  var toastTimer = null;
+  function toast(msg) {
+    try {
+      var t = $('eats-toast');
+      if (!t) {
+        t = el('div', 'eats-toast');
+        t.id = 'eats-toast';
+        t.setAttribute('aria-hidden', 'true'); // announce() covers a11y
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      t.classList.remove('is-show');
+      void t.offsetWidth; // restart the fade if a toast is already up
+      t.classList.add('is-show');
+      if (toastTimer) window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(function () {
+        toastTimer = null;
+        t.classList.remove('is-show');
+      }, 1900);
+    } catch (e) { /* purely decorative — never break the flow */ }
+  }
+
+  /* Staggered list entrance (Friends feed / Popular rows) — soft rise + fade,
+     ~40ms apart. The class is stripped on animationend so the cards' hover
+     transforms work again afterwards. No-op under prefers-reduced-motion. */
+  function enterStagger(node, i) {
+    if (prefersReducedMotion) return;
+    node.classList.add('social-enter');
+    node.style.setProperty('--enter-delay', (i * 40) + 'ms');
+    node.addEventListener('animationend', function onEnd(e) {
+      if (e.target !== node || e.animationName !== 'social-rise') return;
+      node.classList.remove('social-enter');
+      node.style.removeProperty('--enter-delay');
+      node.removeEventListener('animationend', onEnd);
+    });
+  }
+
+  /* Tiny 7-point trend sparkline (Popular rows) — a stroke-only line over
+     a soft area wash at 12% opacity, ~64x20. Built from real SVG nodes (no
+     innerHTML). `color` is any CSS color, including var(...) tokens, so the
+     evening theme restyles it for free. Decorative: aria-hidden (the trend
+     arrow next to it already carries the semantics). */
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  function svgSparkline(points, color) {
+    var W = 64, H = 20, PAD = 2.5;
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('width', String(W));
+    svg.setAttribute('height', String(H));
+    svg.setAttribute('class', 'pop-spark');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    var pts = (points || []).map(Number).filter(function (n) { return isFinite(n); });
+    if (pts.length < 2) return svg; // nothing to draw — empty, invisible svg
+    var min = Math.min.apply(null, pts);
+    var max = Math.max.apply(null, pts);
+    var span = (max - min) || 1;
+    var step = (W - PAD * 2) / (pts.length - 1);
+    var coords = pts.map(function (v, i) {
+      var x = PAD + i * step;
+      var y = H - PAD - ((v - min) / span) * (H - PAD * 2);
+      return [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
+    });
+    var line = coords.map(function (c, i) { return (i ? 'L' : 'M') + c[0] + ' ' + c[1]; }).join(' ');
+    var area = document.createElementNS(SVG_NS, 'path');
+    area.setAttribute('d', line +
+      ' L' + coords[coords.length - 1][0] + ' ' + (H - 1) +
+      ' L' + coords[0][0] + ' ' + (H - 1) + ' Z');
+    area.setAttribute('stroke', 'none');
+    area.setAttribute('fill-opacity', '0.12');
+    area.style.fill = color;
+    svg.appendChild(area);
+    var path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', line);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    path.style.stroke = color;
+    svg.appendChild(path);
+    return svg;
+  }
+
   /* ------------------------------------------------------------------ *
    * store — localStorage CRUD (graceful when storage is blocked)
    * ------------------------------------------------------------------ */
   var KEY_GMAPS = 'eats-gmaps-key';
   var KEY_VISITED = 'eats-visited';
   var KEY_PREFS = 'eats-prefs';
+  var KEY_SEEN = 'eats-seen';
+  var SEEN_TTL_MS = 6 * 60 * 60 * 1000; // passes are remembered for ~one outing
 
   var store = {
     getPrefs: function () {
@@ -78,6 +203,37 @@
     },
     setVisited: function (arr) {
       try { localStorage.setItem(KEY_VISITED, JSON.stringify(arr)); return true; } catch (e) { return false; }
+    },
+    /* seen memory — places passed on recently ({id: timestamp}, TTL-pruned) */
+    getSeen: function () {
+      try {
+        var raw = localStorage.getItem(KEY_SEEN);
+        var map = raw ? JSON.parse(raw) : {};
+        if (!map || typeof map !== 'object') return {};
+        var now = Date.now(), out = {}, dirty = false;
+        for (var id in map) {
+          if (now - map[id] < SEEN_TTL_MS) out[id] = map[id];
+          else dirty = true;
+        }
+        if (dirty) localStorage.setItem(KEY_SEEN, JSON.stringify(out));
+        return out;
+      } catch (e) { return {}; }
+    },
+    addSeen: function (id) {
+      if (!id) return;
+      try {
+        var map = this.getSeen();
+        map[id] = Date.now();
+        localStorage.setItem(KEY_SEEN, JSON.stringify(map));
+      } catch (e) {}
+    },
+    removeSeen: function (id) {
+      if (!id) return;
+      try {
+        var map = this.getSeen();
+        delete map[id];
+        localStorage.setItem(KEY_SEEN, JSON.stringify(map));
+      } catch (e) {}
     }
   };
 
@@ -100,6 +256,14 @@
     if (mi < 0.1) return (Math.round(mi * 5280)) + ' ft';
     return mi.toFixed(mi < 10 ? 1 : 0) + ' mi';
   }
+  /* Friendly travel hint alongside the raw distance: close places as walking
+     minutes (~3.1 mph), farther ones as urban driving minutes (~16 mph).
+     Rounded up, never below 1 minute. */
+  function fmtTravel(mi) {
+    if (mi == null) return '';
+    if (mi <= 1.3) return Math.max(1, Math.ceil((mi / 3.1) * 60)) + ' min walk';
+    return Math.max(1, Math.ceil((mi / 16) * 60)) + ' min drive';
+  }
 
   /* ------------------------------------------------------------------ *
    * demo — sample data (San Francisco)
@@ -111,80 +275,80 @@
      rating (0-5), reviews, price (1-4), cuisine tag(s), open, distance,
      phone, plus per-segment story content: `vibe`/`food` (watercolor panel
      captions, since we have no real photos) and 2-3 review quotes, and
-     dietary / dining flags so Preferences visibly filter the deck.
+     dietary / dining / extras flags so Preferences visibly filter the deck.
      `cuisines` are normalized keys matching the Preferences chips. Spread at
      varied distances so the nearest-first expansion + distance cap read well. */
   var DEMO_RESTAURANTS = [
     { name: 'Little Wren Bakery', rating: 4.8, reviews: 1340, price: 1, type: 'Bakery · Café', cuisines: ['cafe'], lat: 37.7959, lng: -122.3949, open: true, phone: '+14155550178',
-      diet: ['vegetarian'], dining: ['dine-in', 'takeout'],
+      diet: ['vegetarian'], dining: ['dine-in', 'takeout'], extras: ['kids'],
       vibe: 'Sunlit corner café, marble counters, fresh flowers', food: 'Morning buns, laminated pastries, flat whites',
       reviews_q: [ { by: 'Maya O.', score: 96, text: 'The morning bun is a religious experience. Get there early.' }, { by: 'Devin P.', score: 90, text: 'Cozy, sunny, perfect for a slow Saturday.' } ] },
     { name: 'Tonkotsu Lane', rating: 4.7, reviews: 1582, price: 2, type: 'Ramen · Japanese', cuisines: ['japanese'], lat: 37.7948, lng: -122.3958, open: true, phone: '+14155550133',
-      diet: [], dining: ['dine-in'],
+      diet: [], dining: ['dine-in'], extras: ['alcohol'],
       vibe: 'Tiny steamy counter, paper lanterns, jazz on vinyl', food: 'Rich tonkotsu, chashu, soft egg, chili oil',
       reviews_q: [ { by: 'Hana S.', score: 94, text: 'Broth so silky it ruined other ramen for me.' }, { by: 'Leo C.', score: 88, text: 'Tiny room, worth the wait. The chashu melts.' }, { by: 'Priya R.', score: 90, text: 'Order the spicy miso. Trust me.' } ] },
     { name: 'Marigold & Sage', rating: 4.6, reviews: 812, price: 3, type: 'Californian · Farm-to-table', cuisines: ['american', 'mediterranean'], lat: 37.7929, lng: -122.3971, open: true, phone: '+14155550142',
-      diet: ['vegetarian', 'gluten-free'], dining: ['dine-in'],
+      diet: ['vegetarian', 'gluten-free'], dining: ['dine-in'], extras: ['outdoor', 'alcohol'],
       vibe: 'Linen tablecloths, candlelight, garden patio', food: 'Heirloom tomato, roast chicken, market salads',
       reviews_q: [ { by: 'Theo B.', score: 92, text: 'Tasting menu was a quiet, beautiful treat.' }, { by: 'Maya O.', score: 89, text: 'Everything tastes like it was picked this morning.' } ] },
     { name: 'Casa Poblana', rating: 4.5, reviews: 967, price: 2, type: 'Mexican · Taquería', cuisines: ['mexican'], lat: 37.7901, lng: -122.4003, open: true, phone: '+14155550110',
-      diet: ['vegetarian', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups', 'alcohol', 'kids'],
       vibe: 'Bright tiles, mariachi murals, buzzy and loud', food: 'Al pastor tacos, fresh salsa, horchata',
       reviews_q: [ { by: 'Leo C.', score: 93, text: 'Al pastor for days. Bring cash, bring friends.' }, { by: 'Devin P.', score: 85, text: 'Lines out the door for a reason.' } ] },
     { name: 'Verde Trattoria', rating: 4.5, reviews: 1104, price: 3, type: 'Italian · Pasta', cuisines: ['italian'], lat: 37.7966, lng: -122.3902, open: true, phone: '+14155550121',
-      diet: ['vegetarian'], dining: ['dine-in', 'takeout'],
+      diet: ['vegetarian'], dining: ['dine-in', 'takeout'], extras: ['alcohol'],
       vibe: 'Warm trattoria, exposed brick, cozy two-tops', food: 'Cacio e pepe, fresh pappardelle, tiramisu',
       reviews_q: [ { by: 'Hana S.', score: 91, text: 'Cacio e pepe done exactly right. Cozy little room.' }, { by: 'Theo B.', score: 87, text: 'The pasta is hand-rolled and it shows.' } ] },
     { name: 'Saffron House', rating: 4.6, reviews: 729, price: 2, type: 'Indian · Curry house', cuisines: ['indian'], lat: 37.7937, lng: -122.4012, open: true, phone: '+14155550188',
-      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups', 'kids'],
       vibe: 'Jewel-tone walls, brass lanterns, fragrant air', food: 'Butter chicken, garlic naan, dal makhani',
       reviews_q: [ { by: 'Priya R.', score: 90, text: 'Butter chicken was rich; staff were lovely.' }, { by: 'Maya O.', score: 88, text: 'Best dal in the city, and lots of vegan options.' } ] },
     { name: 'Foggy Bell Coffee', rating: 4.4, reviews: 455, price: 1, type: 'Coffee · Light bites', cuisines: ['cafe'], lat: 37.7972, lng: -122.3985, open: true, phone: '+14155550144',
-      diet: ['vegetarian', 'vegan'], dining: ['takeout', 'dine-in'],
+      diet: ['vegetarian', 'vegan'], dining: ['takeout', 'dine-in'], extras: ['outdoor'],
       vibe: 'Minimalist, big windows, foggy-day calm', food: 'Single-origin pour-overs, oat lattes, scones',
       reviews_q: [ { by: 'Devin P.', score: 86, text: 'Flat white + a window seat. My new spot.' }, { by: 'Leo C.', score: 82, text: 'Quiet enough to actually get work done.' } ] },
     { name: 'Olive & Thyme', rating: 4.3, reviews: 388, price: 3, type: 'Mediterranean', cuisines: ['mediterranean'], lat: 37.7918, lng: -122.3949, open: true, phone: '+14155550155',
-      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout'],
+      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout'], extras: ['outdoor', 'groups', 'alcohol'],
       vibe: 'Whitewashed walls, olive branches, sea-blue tile', food: 'Mezze platters, lamb kebab, lemony hummus',
       reviews_q: [ { by: 'Theo B.', score: 86, text: 'The mezze spread is a feast for two.' }, { by: 'Priya R.', score: 84, text: 'Great for a group with mixed diets.' } ] },
     { name: 'The Copper Kettle', rating: 4.2, reviews: 642, price: 2, type: 'Brunch · American', cuisines: ['american'], lat: 37.7983, lng: -122.3962, open: false, phone: '+14155550166',
-      diet: ['vegetarian'], dining: ['dine-in'],
+      diet: ['vegetarian'], dining: ['dine-in'], extras: ['groups', 'kids'],
       vibe: 'Copper pots, checkered floor, weekend bustle', food: 'Buttermilk pancakes, hash, bottomless coffee',
       reviews_q: [ { by: 'Hana S.', score: 83, text: 'Classic diner energy and giant pancakes.' }, { by: 'Maya O.', score: 80, text: 'Go on a weekday to skip the wait.' } ] },
     { name: 'Pier 9 Oyster Co.', rating: 4.4, reviews: 521, price: 4, type: 'Seafood · Raw bar', cuisines: ['seafood'], lat: 37.7995, lng: -122.3915, open: false, phone: '+14155550199',
-      diet: ['gluten-free'], dining: ['dine-in'],
+      diet: ['gluten-free'], dining: ['dine-in'], extras: ['outdoor', 'alcohol'],
       vibe: 'Waterfront deck, string lights, sunset views', food: 'Oysters, cioppino, grilled day-boat fish',
       reviews_q: [ { by: 'Leo C.', score: 88, text: 'Sunset on the patio is unbeatable.' }, { by: 'Devin P.', score: 78, text: 'Pricey and service lagged, but the view…' } ] },
     { name: 'Smoke & Ember BBQ', rating: 4.6, reviews: 980, price: 2, type: 'BBQ · Smokehouse', cuisines: ['bbq', 'american'], lat: 37.7912, lng: -122.3886, open: true, phone: '+14155550201',
-      diet: [], dining: ['dine-in', 'takeout'],
+      diet: [], dining: ['dine-in', 'takeout'], extras: ['outdoor', 'groups', 'alcohol'],
       vibe: 'Reclaimed wood, smoke in the air, picnic tables', food: 'Brisket, burnt ends, smoked ribs, slaw',
       reviews_q: [ { by: 'Theo B.', score: 92, text: 'The brisket falls apart. Come hungry.' }, { by: 'Hana S.', score: 87, text: 'Burnt ends sell out by 2pm. Get there early.' } ] },
     { name: 'Seoul & Stone', rating: 4.5, reviews: 712, price: 2, type: 'Korean · BBQ', cuisines: ['korean'], lat: 37.8002, lng: -122.4001, open: true, phone: '+14155550213',
-      diet: ['vegetarian'], dining: ['dine-in'],
+      diet: ['vegetarian'], dining: ['dine-in'], extras: ['groups', 'alcohol'],
       vibe: 'Tabletop grills, neon glow, lively groups', food: 'Galbi, bibimbap, bubbling kimchi jjigae',
       reviews_q: [ { by: 'Priya R.', score: 90, text: 'Tabletop grill is so fun for a group.' }, { by: 'Maya O.', score: 85, text: 'The banchan alone is worth coming for.' } ] },
     { name: 'Pho & Lantern', rating: 4.4, reviews: 533, price: 1, type: 'Vietnamese · Noodles', cuisines: ['vietnamese'], lat: 37.7886, lng: -122.3961, open: true, phone: '+14155550224',
-      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['kids'],
       vibe: 'Steamy storefront, herbs on every table', food: 'Beef pho, fresh rolls, lemongrass tofu',
       reviews_q: [ { by: 'Devin P.', score: 88, text: 'Broth simmered all day — you can taste it.' }, { by: 'Leo C.', score: 84, text: 'Cheap, fast, and deeply comforting.' } ] },
     { name: 'Bangkok Orchid', rating: 4.5, reviews: 604, price: 2, type: 'Thai · Street food', cuisines: ['thai'], lat: 37.8021, lng: -122.3958, open: true, phone: '+14155550235',
-      diet: ['vegetarian', 'vegan'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian', 'vegan'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups'],
       vibe: 'Orchids, gold accents, gentle chimes', food: 'Pad see ew, green curry, mango sticky rice',
       reviews_q: [ { by: 'Hana S.', score: 89, text: 'Green curry with real heat — finally.' }, { by: 'Priya R.', score: 86, text: 'Mango sticky rice is the perfect finish.' } ] },
     { name: 'The Stacked Patty', rating: 4.3, reviews: 1190, price: 1, type: 'Burgers · American', cuisines: ['burgers', 'american'], lat: 37.7869, lng: -122.3922, open: true, phone: '+14155550246',
-      diet: ['vegetarian'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups', 'kids'],
       vibe: 'Retro diner booths, chrome, milkshake machines', food: 'Smash burgers, crispy fries, thick shakes',
       reviews_q: [ { by: 'Theo B.', score: 87, text: 'Smash burger with the crispy edges. Yes.' }, { by: 'Maya O.', score: 82, text: 'Killer veggie burger too, not an afterthought.' } ] },
     { name: 'Crosta Pizzeria', rating: 4.6, reviews: 1420, price: 2, type: 'Pizza · Neapolitan', cuisines: ['pizza', 'italian'], lat: 37.7849, lng: -122.4005, open: true, phone: '+14155550257',
-      diet: ['vegetarian'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups', 'alcohol', 'kids'],
       vibe: 'Wood-fired oven glow, communal tables', food: 'Blistered margherita, burrata, charred crust',
       reviews_q: [ { by: 'Leo C.', score: 91, text: 'Leopard-spotted crust, perfect char.' }, { by: 'Devin P.', score: 88, text: 'The margherita is all you need.' } ] },
     { name: 'Garden & Grain', rating: 4.4, reviews: 410, price: 2, type: 'Vegetarian · Bowls', cuisines: ['vegetarian', 'mediterranean'], lat: 37.8035, lng: -122.3902, open: true, phone: '+14155550268',
-      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'],
+      diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['outdoor', 'kids'],
       vibe: 'Leafy, airy, reclaimed-wood and plants', food: 'Grain bowls, roasted veg, tahini everything',
       reviews_q: [ { by: 'Priya R.', score: 89, text: 'Finally a veg spot that feels indulgent.' }, { by: 'Hana S.', score: 85, text: 'Everything is vegan and you would not guess.' } ] },
     { name: 'Lupo Rosso', rating: 4.7, reviews: 860, price: 3, type: 'Italian · Wine bar', cuisines: ['italian'], lat: 37.7831, lng: -122.3948, open: false, phone: '+14155550279',
-      diet: ['vegetarian'], dining: ['dine-in'],
+      diet: ['vegetarian'], dining: ['dine-in'], extras: ['alcohol'],
       vibe: 'Dim, romantic, candle-lit wine cellar', food: 'Handmade ravioli, natural wine, affogato',
       reviews_q: [ { by: 'Maya O.', score: 93, text: 'Date-night perfection. The ravioli, swoon.' }, { by: 'Theo B.', score: 89, text: 'Ask the somm to pick — never wrong.' } ] }
   ];
@@ -192,6 +356,63 @@
   /* Watercolor panel descriptors (the deck builds gradient panels from these). */
   var DEMO_VIBE_GLYPH = '✨'; // sparkles
   var DEMO_FOOD_GLYPH = '🍴'; // fork & knife with plate
+
+  /* ------------------------------------------------------------------ *
+   * Procedural watercolor panel art — when a card has no real photo,
+   * paint a cuisine-keyed pigment composition instead of a flat gradient.
+   * Vibe = ambient washes; Food = a plate on a table with dish-color
+   * pooling. Seeded per place so every card reads distinct.
+   * ------------------------------------------------------------------ */
+  var CUISINE_ART = {
+    cafe:          ['#c9a97a', '#e8d9bd', '#8a6f4d'],
+    japanese:      ['#5a6c86', '#d98ba0', '#e8e0cf'],
+    italian:       ['#93b48b', '#c25a3a', '#f0e3c8'],
+    mexican:       ['#d97f4e', '#93b48b', '#cdb878'],
+    indian:        ['#d99a3d', '#c2547e', '#8a5a9e'],
+    mediterranean: ['#7fa8c9', '#93b48b', '#e8dfc9'],
+    seafood:       ['#6fa3c4', '#d98ba0', '#dceaf2'],
+    bbq:           ['#8a5a44', '#c25a3a', '#4a4038'],
+    korean:        ['#c2504a', '#3f4a5a', '#e8d9bd'],
+    vietnamese:    ['#88a86f', '#cdb878', '#e9efdb'],
+    thai:          ['#a292c4', '#cdb878', '#93b48b'],
+    burgers:       ['#cda04e', '#a8512f', '#e8d9bd'],
+    pizza:         ['#c25a3a', '#93b48b', '#f0e3c8'],
+    vegetarian:    ['#93b48b', '#b4c98b', '#e9efdb'],
+    american:      ['#7fa8c9', '#cdb878', '#e8dfc9']
+  };
+
+  function hashStr(s) {
+    var h = 2166136261;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 16777619) >>> 0; }
+    return h;
+  }
+
+  function panelArt(r, segKey) {
+    var pal = CUISINE_ART[(r.cuisines || [])[0]] || ['#a292c4', '#7fa8c9', '#e8dfc9'];
+    var h = hashStr((r.name || r.id || '') + segKey);
+    var rnd = function (lo, hi, salt) {
+      var x = ((h >> (salt % 24)) & 255) / 255;
+      return Math.round(lo + x * (hi - lo));
+    };
+    var layers = [];
+    if (segKey === 'food') {
+      // dish pooling on a plate, plate on a table wash
+      var px = rnd(42, 58, 3), py = rnd(40, 52, 7);
+      layers.push('radial-gradient(circle at ' + (px - 6) + '% ' + (py - 4) + '%, ' + pal[1] + 'e6 0%, ' + pal[1] + '00 16%)');
+      layers.push('radial-gradient(circle at ' + (px + 7) + '% ' + (py + 5) + '%, ' + pal[0] + 'd9 0%, ' + pal[0] + '00 14%)');
+      layers.push('radial-gradient(circle at ' + px + '% ' + (py + 8) + '%, ' + pal[2] + 'cc 0%, ' + pal[2] + '00 12%)');
+      layers.push('radial-gradient(circle at ' + px + '% ' + py + '%, #f6f1e7 0 26%, #e6dcc4 26.5% 29%, #f6f1e700 30%)');
+      layers.push('radial-gradient(120% 90% at ' + rnd(20, 80, 11) + '% 110%, ' + pal[0] + '40 0%, ' + pal[0] + '00 60%)');
+      layers.push('linear-gradient(' + rnd(150, 210, 13) + 'deg, #4c4438 0%, #6b5f4d 55%, #57503f 100%)');
+    } else {
+      // ambient room washes: three pigment pools glowing against dusk paper
+      layers.push('radial-gradient(' + rnd(50, 80, 2) + '% ' + rnd(40, 65, 5) + '% at ' + rnd(12, 40, 9) + '% ' + rnd(18, 45, 4) + '%, ' + pal[0] + 'e6 0%, ' + pal[0] + '00 72%)');
+      layers.push('radial-gradient(' + rnd(45, 75, 6) + '% ' + rnd(45, 70, 8) + '% at ' + rnd(60, 88, 10) + '% ' + rnd(25, 60, 12) + '%, ' + pal[1] + 'cc 0%, ' + pal[1] + '00 72%)');
+      layers.push('radial-gradient(' + rnd(55, 90, 14) + '% ' + rnd(38, 58, 16) + '% at ' + rnd(30, 70, 18) + '% ' + rnd(75, 100, 20) + '%, ' + pal[2] + 'a6 0%, ' + pal[2] + '00 74%)');
+      layers.push('linear-gradient(' + rnd(150, 200, 22) + 'deg, #46536a 0%, #4d4a63 55%, #574c60 100%)');
+    }
+    return layers.join(', ');
+  }
 
   // Pre-built demo result objects (with distance to DEMO_ORIGIN).
   function demoResults() {
@@ -206,6 +427,7 @@
         cuisines: r.cuisines || [],
         diet: r.diet || [],
         dining: r.dining || [],
+        extras: r.extras || [], // live results leave this undefined (not fetched)
         open: r.open,
         phone: r.phone,
         photoUrl: null, // watercolor placeholder
@@ -273,6 +495,16 @@
     row.appendChild(track);
     row.appendChild(el('span', 'val', fmtScore(value)));
     return row;
+  }
+
+  /* Your own Visited entry for a place, matched by name (case-insensitive). */
+  function myRatingFor(name) {
+    if (!name) return null;
+    var n = String(name).toLowerCase();
+    var hits = (state.visited || []).filter(function (v) {
+      return String(v.name || '').toLowerCase() === n;
+    });
+    return hits.length ? hits[0] : null;
   }
 
   /* Relative time from an ISO date or a Date, e.g. "3 days ago". */
@@ -376,6 +608,10 @@
       room.classList.toggle('find-landing-on', !!landingOn);
     }
 
+    /* When true, the next batch of results goes to the Surprise-me roulette
+       instead of the swipe deck ("Surprise me" on the Preferences screen). */
+    var surprisePending = false;
+
     /* ---- Screen switching ---- */
     function hideAll() {
       if (landingEl) landingEl.hidden = true;
@@ -384,6 +620,7 @@
     }
     function showLanding() {
       hideAll();
+      surprisePending = false;
       if (landingEl) landingEl.hidden = false;
       deck.teardown();
       state.results = [];
@@ -395,6 +632,7 @@
     }
     function showPrefs(focusFirst) {
       hideAll();
+      surprisePending = false;
       if (prefsWrap) prefsWrap.hidden = false;
       prefs.render();
       syncHeaderChrome();
@@ -405,6 +643,16 @@
     }
     function showDeck() {
       hideAll();
+      surprisePending = false;
+      if (deckWrap) deckWrap.hidden = false;
+      syncHeaderChrome();
+      startSearch();
+    }
+    /* "Surprise me": same search pipeline, but deliver() hands the matches
+       to the roulette rather than the deck. */
+    function showSurprise() {
+      hideAll();
+      surprisePending = true;
       if (deckWrap) deckWrap.hidden = false;
       syncHeaderChrome();
       startSearch();
@@ -500,7 +748,14 @@
         return a.distance - b.distance;
       });
       var matched = filterByPrefs(state.results);
-      deck.load(matched);
+      // seen memory: places you passed on recently sink to the back of the
+      // deck (nearest-first within each group) instead of repeating up front
+      var seen = store.getSeen();
+      var unseen = matched.filter(function (r) { return !seen[r.id]; });
+      var repeats = matched.filter(function (r) { return seen[r.id]; });
+      var ordered = unseen.concat(repeats);
+      if (surprisePending) { surprisePending = false; deck.surprise(ordered); }
+      else deck.load(ordered);
     }
 
     /* Apply the active preferences as filters. Distance cap included. */
@@ -530,6 +785,14 @@
           var dn = r.dining || [];
           var anyDine = p.dining.some(function (d) { return dn.indexOf(d) !== -1; });
           if (!anyDine) return false;
+        }
+        // extras: ALL selected must match (like dietary). Live (Google Places)
+        // results don't carry these attributes — when r.extras is undefined
+        // the place passes unfiltered rather than vanishing.
+        if (p.extras && p.extras.length && r.extras !== undefined) {
+          var ex = r.extras || [];
+          var allExtras = p.extras.every(function (x) { return ex.indexOf(x) !== -1; });
+          if (!allExtras) return false;
         }
         return true;
       });
@@ -647,6 +910,7 @@
       showLanding: showLanding,
       showPrefs: showPrefs,
       showDeck: showDeck,
+      showSurprise: showSurprise,
       syncHeaderChrome: syncHeaderChrome,
       startSearch: startSearch,
       searchFarther: searchFarther,
@@ -669,6 +933,10 @@
     ];
     var DIETARY = [['vegetarian', 'Vegetarian'], ['vegan', 'Vegan'], ['gluten-free', 'Gluten-free']];
     var DINING = [['dine-in', 'Dine-in'], ['takeout', 'Takeout'], ['delivery', 'Delivery']];
+    var EXTRAS = [
+      ['outdoor', 'Outdoor seating'], ['groups', 'Good for groups'],
+      ['alcohol', 'Serves alcohol'], ['kids', 'Kid-friendly']
+    ];
     var RATINGS = [[0, 'Any'], [70, '70+'], [80, '80+'], [90, '90+']];
     var REVIEWS = [[0, 'Any'], [100, '100+'], [500, '500+'], [1000, '1000+']];
     var DISTANCES = [['walk', 'Walking'], ['drive', 'Short drive'], ['any', 'Anywhere']];
@@ -676,7 +944,7 @@
     function defaults() {
       return {
         cuisine: [], price: [], minRating: 0, minReviews: 0,
-        openNow: false, distance: 'any', dietary: [], dining: []
+        openNow: false, distance: 'any', dietary: [], dining: [], extras: []
       };
     }
 
@@ -695,6 +963,7 @@
       if (typeof saved.distance === 'string') d.distance = saved.distance;
       if (Array.isArray(saved.dietary)) d.dietary = saved.dietary;
       if (Array.isArray(saved.dining)) d.dining = saved.dining;
+      if (Array.isArray(saved.extras)) d.extras = saved.extras;
       return d;
     }
     function persist() { store.setPrefs(cur); }
@@ -786,6 +1055,7 @@
       buildChips($('pref-cuisine'), CUISINES, 'cuisine');
       buildChips($('pref-dietary'), DIETARY, 'dietary', { any: false });
       buildChips($('pref-dining'), DINING, 'dining', { any: false });
+      buildChips($('pref-extras'), EXTRAS, 'extras', { any: false });
       buildPrice();
       buildSeg($('pref-rating'), RATINGS, 'minRating');
       buildSeg($('pref-reviews'), REVIEWS, 'minReviews');
@@ -807,6 +1077,10 @@
       var skip = $('prefs-skip');
       if (skip) skip.addEventListener('click', function () {
         cur = defaults(); persist(); render(); find.showDeck();
+      });
+      var surprise = $('prefs-surprise');
+      if (surprise) surprise.addEventListener('click', function () {
+        current(); persist(); find.showSurprise();
       });
       var openTgl = $('pref-open');
       if (openTgl) openTgl.addEventListener('change', function () {
@@ -835,12 +1109,19 @@
     var btnNo = $('deck-no');
     var btnYes = $('deck-yes');
     var btnInfo = $('deck-info');
+    var btnUndo = $('deck-undo');
+    var shortlistEl = $('shortlist-view');
+    var badgeEl = $('shortlist-badge');
+    var rouletteEl = $('deck-roulette');
+    var rouletteName = $('roulette-name');
 
     var queue = [];
     var idx = 0;
     var topCard = null;
     var animating = false;
     var keyHandler = null;
+    var history = [];   // swipes this deck: {i, id, dir} — fuels Undo
+    var shortlist = []; // liked-and-saved places for this outing
 
     var SEGMENTS = ['vibe', 'food', 'reviews'];
     var SEG_LABEL = { vibe: 'Vibe', food: 'Food', reviews: 'Reviews' };
@@ -852,9 +1133,12 @@
       if (controlsEl) controlsEl.style.display = onDeck ? '' : 'none';
       if (decisionEl) decisionEl.hidden = mode !== 'decision';
       if (endEl) endEl.hidden = mode !== 'end';
+      if (shortlistEl) shortlistEl.hidden = mode !== 'shortlist';
+      if (rouletteEl) rouletteEl.hidden = mode !== 'roulette';
     }
 
     function showLoading() {
+      clearRoulette();
       setMode('deck');
       clear(deckEl);
       var l = el('div', 'deck-loading');
@@ -869,12 +1153,15 @@
     }
 
     function load(matched) {
+      clearRoulette();
       queue = matched || [];
       idx = 0;
+      history = [];
+      updateUndo();
       clear(deckEl);
       setMode('deck');
       if (!queue.length) { showEnd(true); return; }
-      renderStack();
+      renderStack(true); // deal the opening hand onto the table
       setControlsEnabled(true);
       announce(queue.length + ' places matched. Showing ' + queue[0].name + ', the nearest.');
     }
@@ -887,15 +1174,32 @@
       else renderStack();
     }
 
-    function renderStack() {
+    /* renderStack(deal) — `deal` staggers the cards in with a rise-and-settle
+       "laid on the table" animation (fresh deck loads only; CSS swaps it for
+       a plain fade under prefers-reduced-motion). */
+    function renderStack(deal) {
       clear(deckEl);
       for (var d = 2; d >= 0; d--) {
         var i = idx + d;
         if (i >= queue.length) continue;
-        deckEl.appendChild(buildCard(queue[i], d));
+        var card = buildCard(queue[i], d);
+        if (deal) {
+          card.classList.add('is-dealing');
+          // bottom of the stack lands first, top card last
+          card.style.animationDelay = ((2 - d) * 95) + 'ms';
+          card.addEventListener('animationend', onDealEnd);
+        }
+        deckEl.appendChild(card);
       }
       topCard = deckEl.querySelector('.swipe-card[data-depth="0"]');
       if (topCard) prefetchUpcoming();
+    }
+
+    function onDealEnd(e) {
+      var c = e.currentTarget;
+      c.classList.remove('is-dealing');
+      c.style.animationDelay = '';
+      c.removeEventListener('animationend', onDealEnd);
     }
 
     function buildCard(r, depth) {
@@ -937,8 +1241,9 @@
             panel.style.backgroundImage = 'url("' + String(seg.photoUrl).replace(/"/g, '') + '")';
             panel.style.backgroundSize = 'cover';
             panel.style.backgroundPosition = 'center';
-          } else if (seg && seg.glyph) {
-            panel.appendChild(el('span', 'card-seg-glyph', seg.glyph));
+          } else {
+            // no photo: procedural watercolor composition keyed to the cuisine
+            panel.style.background = panelArt(r, segKey);
           }
           panel.appendChild(el('span', 'card-seg-kind', SEG_LABEL[segKey]));
         }
@@ -952,6 +1257,16 @@
         bars.appendChild(el('span', 'seg-bar' + (si === 0 ? ' is-on' : '')));
       });
       card.appendChild(bars);
+
+      // three-at-once: mini previews of the two non-hero segments;
+      // a single tap rotates all three (hero -> peek, next peek -> hero)
+      var peeks = el('div', 'card-peeks');
+      peeks.setAttribute('aria-hidden', 'true');
+      peeks.appendChild(el('div', 'peek'));
+      peeks.appendChild(el('div', 'peek'));
+      card.appendChild(peeks);
+      card._peeks = peeks;
+      updatePeeks(card);
 
       var yes = el('div', 'stamp stamp-yes', 'Yes');
       var no = el('div', 'stamp stamp-no', 'Nope');
@@ -979,13 +1294,26 @@
         meta.appendChild(el('span', 'ov-cuisine', r.type));
       }
       if (r.distance != null) {
+        // "away" dropped here — the travel chip right after says it better.
+        // dist · travel live in one non-wrapping group so a narrow screen
+        // never strands the separator dot at the end of a line.
         meta.appendChild(el('span', 'ov-dot', '·'));
-        meta.appendChild(el('span', 'ov-dist', fmtDist(r.distance) + ' away'));
+        var dg = el('span', 'ov-distgroup');
+        dg.appendChild(el('span', 'ov-dist', fmtDist(r.distance)));
+        dg.appendChild(el('span', 'ov-dot', '·'));
+        dg.appendChild(el('span', 'ov-travel', fmtTravel(r.distance)));
+        meta.appendChild(dg);
       }
       if (r.open != null) {
         meta.appendChild(el('span', 'ov-badge' + (r.open ? '' : ' is-closed'), r.open ? 'Open now' : 'Closed'));
       }
       ov.appendChild(meta);
+      // your own Visited score, if you've eaten here before
+      var mine = myRatingFor(r.name);
+      if (mine) {
+        var you = el('span', 'ov-you', 'You rated this ' + fmtScore(overallOf(mine)));
+        ov.appendChild(you);
+      }
       var tagLine = el('p', 'ov-tags');
       tagLine.textContent = (r.segments && r.segments.vibe && r.segments.vibe.caption) || '';
       ov.appendChild(tagLine);
@@ -1004,8 +1332,13 @@
       if (r.reviews) bits.push(r.reviews.toLocaleString() + ' reviews');
       if (r.price) bits.push('price ' + priceStr(r.price));
       if (r.type) bits.push(r.type);
-      if (r.distance != null) bits.push(fmtDist(r.distance) + ' away');
+      if (r.distance != null) {
+        bits.push(fmtDist(r.distance) + ' away');
+        bits.push('about ' + fmtTravel(r.distance));
+      }
       if (r.open != null) bits.push(r.open ? 'open now' : 'closed');
+      var mine = myRatingFor(r.name);
+      if (mine) bits.push('you rated it ' + fmtScore(overallOf(mine)) + ' before');
       return bits.join(', ');
     }
 
@@ -1014,12 +1347,48 @@
       card._seg = (card._seg + 1) % SEGMENTS.length;
       applySegment(card);
     }
+
+    /* fill one mini preview tile with a compact rendering of a segment */
+    function peekContent(node, r, segKey) {
+      clear(node);
+      node.className = 'peek peek-' + segKey;
+      var seg = r.segments && r.segments[segKey];
+      if (segKey === 'reviews') {
+        node.style.background = '';
+        var q = seg && seg.quotes && seg.quotes[0];
+        node.appendChild(el('span', 'peek-quote', q ? '“' + q.text + '”' : 'What people say'));
+      } else if (seg && seg.photoUrl) {
+        node.style.background = 'url("' + String(seg.photoUrl).replace(/"/g, '') + '") center / cover';
+      } else {
+        node.style.background = panelArt(r, segKey);
+      }
+      node.appendChild(el('span', 'peek-label', SEG_LABEL[segKey]));
+    }
+
+    /* the two peeks always show whatever the hero is not */
+    function updatePeeks(card) {
+      if (!card._peeks) return;
+      var r = card._data;
+      var tiles = card._peeks.children;
+      for (var i = 0; i < 2; i++) {
+        var segKey = SEGMENTS[(card._seg + 1 + i) % SEGMENTS.length];
+        peekContent(tiles[i], r, segKey);
+        if (!prefersReducedMotion) {
+          tiles[i].classList.remove('is-in');
+          void tiles[i].offsetWidth;
+          tiles[i].classList.add('is-in');
+        }
+      }
+    }
     function applySegment(card) {
       var panels = card.querySelectorAll('.card-seg-panel');
       var bars = card.querySelectorAll('.seg-bar');
       SEGMENTS.forEach(function (s, i) {
         if (panels[i]) panels[i].classList.toggle('is-active', i === card._seg);
-        if (bars[i]) bars[i].classList.toggle('is-on', i === card._seg);
+        if (bars[i]) {
+          bars[i].classList.toggle('is-on', i === card._seg);
+          bars[i].classList.toggle('is-done', i < card._seg); // earlier chapters stay filled
+        }
       });
       var r = card._data;
       var segKey = SEGMENTS[card._seg];
@@ -1028,7 +1397,8 @@
       else if (segKey === 'food') caption = (r.segments && r.segments.food && r.segments.food.caption) || '';
       else caption = 'What people are saying';
       if (card._tagLine) card._tagLine.textContent = caption;
-      announce(SEG_LABEL[segKey] + ': ' + (caption || r.name));
+      updatePeeks(card);
+      announce(SEG_LABEL[segKey] + ' featured: ' + (caption || r.name));
     }
 
     function attachDrag(card) {
@@ -1057,6 +1427,7 @@
         pid = e.pointerId;
         card.classList.add('is-dragging');
         card.classList.remove('is-settling');
+        card.classList.remove('is-dealing'); // grabbing a card ends its deal-in
         try { card.setPointerCapture(pid); } catch (err) {}
       }
       function move(e) {
@@ -1101,6 +1472,7 @@
       animating = true;
       var card = topCard;
       setControlsEnabled(false);
+      haptic(10); // a committed swipe lands with a tap you can feel
 
       if (prefersReducedMotion) {
         card.classList.add('is-gone');
@@ -1118,11 +1490,33 @@
 
       var liked = dir === 'yes';
       var picked = card._data;
+      history.push({ i: idx, id: picked ? picked.id : null, dir: dir });
+      updateUndo();
+      if (!liked && picked) store.addSeen(picked.id); // remember the pass
       window.setTimeout(function () {
         animating = false;
         if (liked) onLike(picked);
         else advance();
       }, prefersReducedMotion ? 200 : 430);
+    }
+
+    function updateUndo() {
+      if (btnUndo) btnUndo.disabled = !history.length;
+    }
+
+    function undoLast() {
+      if (!history.length || animating) return;
+      haptic(6); // soft nudge — the card slides back
+      var h = history.pop();
+      updateUndo();
+      if (h.dir === 'no' && h.id) store.removeSeen(h.id); // un-remember the pass
+      idx = h.i;
+      setMode('deck');
+      renderStack();
+      setControlsEnabled(true);
+      var r = queue[idx];
+      announce('Brought back ' + (r ? r.name : 'the last place') + '.');
+      if (topCard) topCard.focus();
     }
 
     function advance() {
@@ -1133,25 +1527,107 @@
       if (topCard) topCard.focus();
     }
 
+    /* ---- watercolor bloom celebration behind the decision card ----
+       A few soft pigment droplets bloom outward from behind "Tonight:",
+       in the same spirit as the landing orb burst. Skipped entirely under
+       prefers-reduced-motion (the decision card's own fade is enough). */
+    var celebrateTimer = null;
+    function celebrate() {
+      if (prefersReducedMotion || !decisionEl) return;
+      var cardEl = decisionEl.querySelector('.decision-card');
+      if (!cardEl) return;
+      var old = cardEl.querySelector('.bloom-burst');
+      if (old) old.parentNode.removeChild(old);
+      if (celebrateTimer) { window.clearTimeout(celebrateTimer); celebrateTimer = null; }
+
+      var layer = el('div', 'bloom-burst');
+      layer.setAttribute('aria-hidden', 'true');
+      var palette = ['var(--rose)', 'var(--wisteria)', 'var(--sage)', 'var(--gold)', 'var(--pond)'];
+      var DROPS = 9;
+      for (var i = 0; i < DROPS; i++) {
+        var d = el('span', 'bloom-drop');
+        var ang = (i / DROPS) * Math.PI * 2 + (Math.random() - 0.5) * 0.8;
+        var dist = 62 + Math.random() * 88;
+        var size = 26 + Math.random() * 52;
+        d.style.setProperty('--bx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+        d.style.setProperty('--by', (Math.sin(ang) * dist * 0.72).toFixed(1) + 'px');
+        d.style.width = size.toFixed(1) + 'px';
+        d.style.height = (size * 0.92).toFixed(1) + 'px';
+        d.style.background = palette[i % palette.length];
+        d.style.animationDelay = (60 + Math.random() * 220).toFixed(0) + 'ms';
+        d.style.animationDuration = (950 + Math.random() * 450).toFixed(0) + 'ms';
+        layer.appendChild(d);
+      }
+      cardEl.appendChild(layer);
+      celebrateTimer = window.setTimeout(function () {
+        celebrateTimer = null;
+        if (layer.parentNode) layer.parentNode.removeChild(layer);
+      }, 1900);
+    }
+
+    /* ---- Share the pick ----
+       navigator.share when the platform offers it; otherwise copy the text +
+       maps link to the clipboard with a "Copied!" toast. Everything is
+       guarded — if both APIs are missing the button says so and the decision
+       screen carries on untouched. */
+    function buildShareAction(r, metaLine, mapsHref) {
+      var share = el('button', 'decision-act', 'Share');
+      share.type = 'button';
+      var shareText = r.name + (metaLine ? ' — ' + metaLine : '');
+      share.addEventListener('click', function () {
+        // 1) Native share sheet
+        try {
+          if (navigator.share) {
+            navigator.share({ title: 'Tonight: ' + r.name, text: shareText, url: mapsHref })
+              .catch(function () { /* user dismissed the sheet — not an error */ });
+            return;
+          }
+        } catch (e) { /* fall through to clipboard */ }
+        // 2) Clipboard fallback
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(shareText + '\n' + mapsHref).then(function () {
+              announce('Copied ' + r.name + ' and the maps link to your clipboard');
+              toast('Copied!');
+            }, function () {
+              announce('Couldn’t copy — long-press the Maps link instead');
+              toast('Couldn’t copy');
+            });
+            return;
+          }
+        } catch (e) { /* fall through to the quiet notice */ }
+        // 3) Neither API exists — say so gently, never break the screen
+        announce('Sharing isn’t available in this browser');
+        toast('Sharing isn’t available here');
+      });
+      return share;
+    }
+
     function onLike(r) {
       setMode('decision');
+      haptic(18); // arrival: the decision screen is the payoff moment
+      celebrate();
       var nameEl = $('decision-name');
       var metaEl = $('decision-meta');
       var actionsEl = $('decision-actions');
       if (nameEl) nameEl.textContent = r.name;
-      if (metaEl) {
-        var bits = [];
-        if (r.rating) bits.push('★ ' + fmtScore(r.rating * 20));
-        if (r.price) bits.push(priceStr(r.price));
-        if (r.type) bits.push(r.type);
-        if (r.distance != null) bits.push(fmtDist(r.distance) + ' away');
-        metaEl.textContent = bits.join('  ·  ');
+      var bits = [];
+      if (r.rating) bits.push('★ ' + fmtScore(r.rating * 20));
+      if (r.price) bits.push(priceStr(r.price));
+      if (r.type) bits.push(r.type);
+      if (r.distance != null) {
+        bits.push(fmtDist(r.distance));
+        bits.push(fmtTravel(r.distance));
       }
+      var mine = myRatingFor(r.name);
+      if (mine) bits.push('you rated it ' + fmtScore(overallOf(mine)));
+      var metaLine = bits.join('  ·  ');
+      if (metaEl) metaEl.textContent = metaLine;
+      var mapsHref = r.mapsUri ||
+        (r.placeId ? 'https://www.google.com/maps/dir/?api=1&destination_place_id=' + encodeURIComponent(r.placeId) + '&destination=' + encodeURIComponent(r.name) : null) ||
+        'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(r.name);
       if (actionsEl) {
         clear(actionsEl);
-        var mapsHref = r.mapsUri ||
-          (r.placeId ? 'https://www.google.com/maps/dir/?api=1&destination_place_id=' + encodeURIComponent(r.placeId) + '&destination=' + encodeURIComponent(r.name) : null) ||
-          'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(r.name);
         var map = el('a', 'decision-act decision-act--primary', 'Open in Maps · Directions');
         map.href = mapsHref; map.target = '_blank'; map.rel = 'noopener';
         actionsEl.appendChild(map);
@@ -1160,12 +1636,25 @@
           call.href = 'tel:' + r.phone;
           actionsEl.appendChild(call);
         }
+        actionsEl.appendChild(buildShareAction(r, metaLine, mapsHref));
         var rate = el('button', 'decision-act', 'I ate here → Rate');
         rate.type = 'button';
         rate.addEventListener('click', function () {
           sheet.openForPlace({ name: r.name, placeId: r.placeId || null, loc: r.location || null, address: r.type || '' });
         });
         actionsEl.appendChild(rate);
+
+        // not ready to commit: bank it and keep flicking
+        var already = shortlist.some(function (s) { return s.id === r.id; });
+        var save = el('button', 'decision-act', already ? 'On your shortlist ✓' : 'Save to shortlist · keep swiping');
+        save.type = 'button';
+        save.disabled = already;
+        save.addEventListener('click', function () {
+          addToShortlist(r);
+          setMode('deck');
+          advance();
+        });
+        actionsEl.appendChild(save);
       }
       announce('Tonight: ' + r.name);
       var nm = $('decision-name');
@@ -1177,6 +1666,181 @@
       advance();
     }
 
+    /* ---- "Surprise me": skip swiping, roulette-shuffle to a random pick ----
+       The full matched list still becomes the deck queue (with the pick moved
+       to the front), so "Keep looking" / "Save to shortlist · keep swiping"
+       flow straight into the rest of the deck afterwards. */
+    var rouletteTimers = [];
+    function clearRoulette() {
+      rouletteTimers.forEach(function (t) { window.clearTimeout(t); });
+      rouletteTimers = [];
+    }
+
+    function surprise(matched) {
+      clearRoulette();
+      history = [];
+      updateUndo();
+      clear(deckEl);
+      topCard = null;
+      queue = (matched || []).slice();
+      idx = 0;
+      if (!queue.length) { showEnd(true); return; } // zero matches: same graceful end screen
+      var pi = Math.floor(Math.random() * queue.length);
+      var pick = queue[pi];
+      queue.splice(pi, 1);
+      queue.unshift(pick); // pick to the front; "keep looking" advances past it
+      if (prefersReducedMotion || queue.length === 1) {
+        announce('Surprise pick: ' + pick.name);
+        onLike(pick);
+        return;
+      }
+      setMode('roulette');
+      announce('Choosing a place for you…');
+      runRoulette(pick, function () {
+        var dw = $('deck-wrap');
+        if (!dw || dw.hidden) return; // user navigated away mid-shuffle
+        onLike(pick);
+      });
+    }
+
+    /* Rapid name shuffle that decelerates and lands on the pick. */
+    function runRoulette(pick, done) {
+      var names = queue.map(function (r) { return r.name; });
+      var ticks = Math.min(12, 5 + names.length);
+      var t = 0;
+      var last = null;
+      var setName = function (n) {
+        if (!rouletteName) return;
+        rouletteName.textContent = n;
+        rouletteName.classList.remove('is-tick');
+        void rouletteName.offsetWidth; // restart the tick animation
+        rouletteName.classList.add('is-tick');
+      };
+      for (var i = 0; i < ticks; i++) {
+        t += 55 + i * 16; // gaps widen — the wheel slows to a stop
+        (function (i, at) {
+          rouletteTimers.push(window.setTimeout(function () {
+            var n;
+            if (i === ticks - 1) {
+              n = pick.name;
+              if (rouletteEl) rouletteEl.classList.add('is-landed');
+            } else {
+              do { n = names[Math.floor(Math.random() * names.length)]; }
+              while (names.length > 1 && n === last);
+            }
+            last = n;
+            setName(n);
+          }, at));
+        })(i, t);
+      }
+      if (rouletteEl) rouletteEl.classList.remove('is-landed');
+      setName('…');
+      rouletteTimers.push(window.setTimeout(done, t + 650));
+    }
+
+    /* ---- shortlist: collect a few likes, compare, then commit ---- */
+    function addToShortlist(r) {
+      if (!r || shortlist.some(function (s) { return s.id === r.id; })) return;
+      shortlist.push(r);
+      updateBadge();
+      announce(r.name + ' saved to your shortlist. ' + shortlist.length + ' place' + (shortlist.length === 1 ? '' : 's') + ' saved.');
+    }
+
+    function removeFromShortlist(id) {
+      shortlist = shortlist.filter(function (s) { return s.id !== id; });
+      updateBadge();
+    }
+
+    function updateBadge() {
+      if (!badgeEl) return;
+      badgeEl.hidden = !shortlist.length;
+      var n = badgeEl.querySelector('.shortlist-count');
+      if (n) n.textContent = String(shortlist.length);
+    }
+
+    function backFromShortlist() {
+      if (idx < queue.length) { setMode('deck'); setControlsEnabled(true); if (topCard) topCard.focus(); }
+      else showEnd(false);
+    }
+
+    function renderShortlist() {
+      var listEl = shortlistEl && shortlistEl.querySelector('.shortlist-list');
+      if (!listEl) return;
+      clear(listEl);
+      if (!shortlist.length) { backFromShortlist(); return; }
+      shortlist.forEach(function (r) {
+        var row = el('div', 'sl-item');
+        var body = el('div', 'sl-body');
+        body.appendChild(el('h3', 'sl-name', r.name));
+        var bits = [];
+        if (r.rating) bits.push('★ ' + fmtScore(r.rating * 20));
+        if (r.price) bits.push(priceStr(r.price));
+        if (r.type) bits.push(r.type);
+        if (r.distance != null) {
+          bits.push(fmtDist(r.distance));
+          bits.push(fmtTravel(r.distance));
+        }
+        var mineSl = myRatingFor(r.name);
+        if (mineSl) bits.push('you rated it ' + fmtScore(overallOf(mineSl)));
+        body.appendChild(el('p', 'sl-meta', bits.join('  ·  ')));
+        row.appendChild(body);
+        var acts = el('div', 'sl-acts');
+        var pick = el('button', 'sl-pick', 'Tonight');
+        pick.type = 'button';
+        pick.addEventListener('click', function () { onLike(r); });
+        acts.appendChild(pick);
+        var rm = el('button', 'sl-remove', '×');
+        rm.type = 'button';
+        rm.setAttribute('aria-label', 'Remove ' + r.name + ' from shortlist');
+        rm.addEventListener('click', function () {
+          removeFromShortlist(r.id);
+          announce(r.name + ' removed from shortlist.');
+          renderShortlist();
+        });
+        acts.appendChild(rm);
+        row.appendChild(acts);
+        listEl.appendChild(row);
+      });
+    }
+
+    function showShortlist() {
+      if (!shortlist.length) return;
+      setMode('shortlist');
+      renderShortlist();
+      var t = shortlistEl && shortlistEl.querySelector('.shortlist-title');
+      if (t) { t.setAttribute('tabindex', '-1'); t.focus(); }
+    }
+
+    /* Share the whole shortlist as a numbered plain-text list. */
+    function shareShortlist() {
+      if (!shortlist.length) return;
+      var lines = shortlist.map(function (r, i) {
+        var bits = [];
+        if (r.rating) bits.push('★ ' + fmtScore(r.rating * 20));
+        if (r.price) bits.push(priceStr(r.price));
+        if (r.distance != null) bits.push(fmtTravel(r.distance));
+        return (i + 1) + '. ' + r.name + (bits.length ? ' — ' + bits.join(' · ') : '');
+      });
+      var text = 'Tonight’s shortlist:\n' + lines.join('\n');
+      try {
+        if (navigator.share) {
+          navigator.share({ title: 'Tonight’s shortlist', text: text })
+            .catch(function () { /* dismissed */ });
+          return;
+        }
+      } catch (e) { /* fall through */ }
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            announce('Copied your shortlist to the clipboard');
+            toast('Shortlist copied!');
+          }, function () { toast('Couldn’t copy'); });
+          return;
+        }
+      } catch (e) {}
+      toast('Sharing isn’t available here');
+    }
+
     function showEnd(emptyFromStart) {
       setMode('end');
       var title = $('deck-end-title');
@@ -1184,12 +1848,21 @@
       if (emptyFromStart) {
         if (title) title.textContent = 'Nothing matched those filters';
         if (sub) sub.textContent = 'Try widening your preferences or searching farther.';
+      } else if (shortlist.length) {
+        if (title) title.textContent = 'Down to your shortlist';
+        if (sub) sub.textContent = 'You’ve seen everything nearby — ' + shortlist.length +
+          ' place' + (shortlist.length === 1 ? ' is' : 's are') + ' waiting on your shortlist.';
       } else {
         if (title) title.textContent = 'That’s everywhere nearby that matched';
         if (sub) sub.textContent = 'You’ve seen every spot within your distance cap.';
       }
       var farther = $('end-farther');
       if (farther) farther.style.display = find.hasFarther() ? '' : 'none';
+      var slBtn = $('end-shortlist');
+      if (slBtn) {
+        slBtn.style.display = shortlist.length ? '' : 'none';
+        slBtn.textContent = 'Compare shortlist (' + shortlist.length + ')';
+      }
       announce(emptyFromStart ? 'No places matched your preferences.' : 'You have reached the end of the deck.');
       var t = $('deck-end-title');
       if (t) { t.setAttribute('tabindex', '-1'); t.focus(); }
@@ -1223,8 +1896,12 @@
     function infoTop() { if (topCard) cycleSegment(topCard); }
 
     function teardown() {
+      clearRoulette();
+      if (rouletteEl) rouletteEl.classList.remove('is-landed');
       clear(deckEl);
       queue = []; idx = 0; topCard = null; animating = false;
+      history = []; shortlist = [];
+      updateUndo(); updateBadge();
       setMode('deck');
     }
 
@@ -1232,6 +1909,15 @@
       if (btnNo) btnNo.addEventListener('click', passTop);
       if (btnYes) btnYes.addEventListener('click', likeTop);
       if (btnInfo) btnInfo.addEventListener('click', infoTop);
+      if (btnUndo) btnUndo.addEventListener('click', undoLast);
+      if (badgeEl) badgeEl.addEventListener('click', showShortlist);
+      var slBack = shortlistEl && shortlistEl.querySelector('.shortlist-back');
+      if (slBack) slBack.addEventListener('click', backFromShortlist);
+      var slShare = shortlistEl && shortlistEl.querySelector('.shortlist-share');
+      if (slShare) slShare.addEventListener('click', shareShortlist);
+      var endSl = $('end-shortlist');
+      if (endSl) endSl.addEventListener('click', showShortlist);
+      updateUndo(); updateBadge();
 
       var keep = $('decision-keep');
       if (keep) keep.addEventListener('click', keepLooking);
@@ -1252,16 +1938,20 @@
         var dw = $('deck-wrap');
         if (!dw || dw.hidden) return;
         if (decisionEl && !decisionEl.hidden) return;
-        if (endEl && !endEl.hidden) return;
         var t = e.target;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+        if (rouletteEl && !rouletteEl.hidden) return; // roulette is spinning — hands off
+        // undo works from the deck AND the end screen (bring the last card back)
+        if (e.key === 'Backspace' || e.key === 'z' || e.key === 'Z') { e.preventDefault(); undoLast(); return; }
+        if (endEl && !endEl.hidden) return;
+        if (shortlistEl && !shortlistEl.hidden) return;
         if (e.key === 'ArrowLeft') { e.preventDefault(); passTop(); }
         else if (e.key === 'ArrowRight') { e.preventDefault(); likeTop(); }
       };
       document.addEventListener('keydown', keyHandler);
     }
 
-    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown };
+    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown, surprise: surprise };
   })();
 
   /* paint a wc-range fill % (shared) */
@@ -1796,15 +2486,22 @@
         data.placeId = state.pendingPlace.placeId || null;
         data.coords = state.pendingPlace.loc || null;
       }
-      if (state.editingId) {
+      var wasEdit = !!state.editingId;
+      if (wasEdit) {
         visited.update(state.editingId, data);
         announce('Updated ' + name);
       } else {
         visited.add(data);
-        announce('Saved ' + name + ' to your log');
+        announce('Saved ' + name + ' — overall ' + fmtScore(overallOf(data)));
       }
+      // celebrate the save as the sheet closes: bloom from where it stood
+      var sheetEl = $('rating-sheet');
+      var rr = sheetEl ? sheetEl.getBoundingClientRect() : null;
       hide();
       visited.render();
+      haptic(14);
+      if (rr) dropletBurst(rr.left + rr.width / 2, rr.top + rr.height * 0.35, Math.min(rr.width, 300));
+      toast((wasEdit ? 'Updated ' : 'Saved ') + name + ' · overall ' + fmtScore(overallOf(data)));
     }
 
     function init() {
@@ -1830,6 +2527,9 @@
     var statsEl = $('visited-stats');
     var sortSel = $('visited-sort');
     var tabCount = $('visited-tab-count');
+    var filterWrap = $('visited-filter');
+    var filterInput = $('visited-filter-input');
+    var filterQ = ''; // live quick-filter text (only offered when the log > 5)
 
     function load() {
       var v = store.getVisited();
@@ -1946,21 +2646,58 @@
       return card;
     }
 
+    /* quick-filter match: case-insensitive substring on name / note / location */
+    function matchesFilter(e, q) {
+      return (e.name || '').toLowerCase().indexOf(q) !== -1 ||
+             (e.note || '').toLowerCase().indexOf(q) !== -1 ||
+             (e.loc || '').toLowerCase().indexOf(q) !== -1;
+    }
+
     function render() {
       if (!listEl) return;
       clear(listEl);
-      var arr = sorted();
 
       // tab count + stats
       var n = state.visited.length;
       if (tabCount) tabCount.textContent = n ? '(' + n + ')' : '';
 
+      // quick filter: only worth offering once the log outgrows a glance
+      var canFilter = n > 5;
+      if (filterWrap) filterWrap.hidden = !canFilter;
+      if (!canFilter && filterQ) {
+        filterQ = '';
+        if (filterInput) filterInput.value = '';
+      }
+
+      var arr = sorted();
+      var q = canFilter ? filterQ.trim().toLowerCase() : '';
+      if (q) arr = arr.filter(function (e) { return matchesFilter(e, q); });
+
+      if (n && !arr.length) {
+        // entries exist, the filter just matched none — say so plainly
+        // (stats stay up: they describe the whole log, not the filtered view)
+        var avgAll = state.visited.reduce(function (s, e) { return s + overallOf(e); }, 0) / n;
+        renderStats(n, avgAll);
+        listEl.appendChild(el('p', 'visited-nomatch', 'No matches for “' + filterQ.trim() + '”'));
+        return;
+      }
+
       if (!arr.length) {
         statsEl.textContent = '';
-        var empty = el('div', 'empty');
-        empty.appendChild(el('div', 'empty-glyph', '📓'));
-        empty.appendChild(el('p', 'empty-title', 'No visits yet'));
-        empty.appendChild(el('p', 'empty-sub', 'Rate a place to start your log.'));
+        // painterly empty state — a CSS-drawn place setting waiting for its
+        // first meal (steam wisps pause under prefers-reduced-motion)
+        var empty = el('div', 'empty empty--visited');
+        var art = el('div', 'empty-table');
+        art.setAttribute('aria-hidden', 'true');
+        art.appendChild(el('span', 'empty-steam s1'));
+        art.appendChild(el('span', 'empty-steam s2'));
+        art.appendChild(el('span', 'empty-steam s3'));
+        art.appendChild(el('span', 'empty-plate'));
+        art.appendChild(el('span', 'empty-fork'));
+        art.appendChild(el('span', 'empty-spoon'));
+        empty.appendChild(art);
+        empty.appendChild(el('p', 'empty-title', 'Your table is set'));
+        empty.appendChild(el('p', 'empty-sub', 'Rate the first place you eat and it will live here, watercolor bars and all.'));
         var addBtn = el('button', 'add-place-btn', '+ Add a place');
         addBtn.type = 'button';
         addBtn.addEventListener('click', function () { sheet.openBlank(); });
@@ -1969,19 +2706,30 @@
         return;
       }
 
-      var avg = arr.reduce(function (s, e) { return s + overallOf(e); }, 0) / arr.length;
+      var avg = state.visited.reduce(function (s, e) { return s + overallOf(e); }, 0) / n;
+      renderStats(n, avg);
+
+      arr.forEach(function (e) { listEl.appendChild(buildCard(e)); });
+    }
+
+    function renderStats(n, avg) {
+      if (!statsEl) return;
       statsEl.innerHTML = '';
       statsEl.appendChild(document.createTextNode('You’ve logged '));
       statsEl.appendChild(el('strong', null, String(n)));
       statsEl.appendChild(document.createTextNode(' place' + (n === 1 ? '' : 's') + ' · average overall '));
       statsEl.appendChild(el('strong', null, fmtScore(avg)));
-
-      arr.forEach(function (e) { listEl.appendChild(buildCard(e)); });
     }
 
     function init() {
       load();
       if (sortSel) sortSel.addEventListener('change', function () { state.sort = sortSel.value; render(); });
+      if (filterInput) {
+        filterInput.addEventListener('input', function () {
+          filterQ = filterInput.value || '';
+          render();
+        });
+      }
       var addBtn = $('add-place');
       if (addBtn) addBtn.addEventListener('click', function () { sheet.openBlank(); });
       // initialise tab count
@@ -2120,6 +2868,7 @@
     var sortSel = $('friends-sort');
     var chipsEl = $('friend-chips');
     var state2 = { sort: 'recent', filter: 'all', token: 0 };
+    var hearts = {}; // session-local demo likes, keyed by entry id
 
     function buildChips() {
       if (!chipsEl) return;
@@ -2174,6 +2923,29 @@
 
       var foot = el('div', 'friend-foot');
       foot.appendChild(el('span', 'v-date', relTime(e.date)));
+
+      // session-local demo hearts (no persistence — this tab only)
+      var liked = !!hearts[e.id];
+      var baseN = (hashStr(e.id) % 9) + 1;
+      var heart = el('button', 'friend-heart' + (liked ? ' is-liked' : ''));
+      heart.type = 'button';
+      heart.setAttribute('aria-pressed', liked ? 'true' : 'false');
+      heart.setAttribute('aria-label', (liked ? 'Unlike ' : 'Like ') + e.friend.name + "'s rating");
+      heart.innerHTML = '<span class="friend-heart-glyph" aria-hidden="true">' + (liked ? '♥' : '♡') + '</span> ' +
+        '<span class="friend-heart-count">' + (baseN + (liked ? 1 : 0)) + '</span>';
+      heart.addEventListener('click', function () {
+        hearts[e.id] = !hearts[e.id];
+        var on = hearts[e.id];
+        heart.classList.toggle('is-liked', on);
+        heart.setAttribute('aria-pressed', on ? 'true' : 'false');
+        heart.setAttribute('aria-label', (on ? 'Unlike ' : 'Like ') + e.friend.name + "'s rating");
+        heart.querySelector('.friend-heart-glyph').textContent = on ? '♥' : '♡';
+        heart.querySelector('.friend-heart-count').textContent = String(baseN + (on ? 1 : 0));
+        haptic(8);
+        announce((on ? 'Liked ' : 'Unliked ') + e.friend.name + "'s rating");
+      });
+      foot.appendChild(heart);
+
       foot.appendChild(el('span', 'v-demo-tag', 'Sample'));
       card.appendChild(foot);
       return card;
@@ -2218,7 +2990,11 @@
           listEl.appendChild(empty);
           return;
         }
-        list.forEach(function (e) { listEl.appendChild(buildEntry(e)); });
+        list.forEach(function (e, i) {
+          var entry = buildEntry(e);
+          enterStagger(entry, i);
+          listEl.appendChild(entry);
+        });
         announce(list.length + ' friend ratings shown');
       }).catch(function () {
         if (token === state2.token) showError();
@@ -2282,8 +3058,34 @@
       line.appendChild(tr);
       line.appendChild(document.createTextNode(item.reviews.toLocaleString() + ' reviews'));
       stat.appendChild(line);
+
+      // 7-point trend sparkline, synthesized deterministically from the
+      // row itself (name-seeded wobble shaped by the trend direction)
+      var sparkColor = item.rank === 1 ? 'var(--gold)'
+        : item.rank === 2 ? 'var(--wisteria)'
+        : item.rank === 3 ? 'var(--pond-deep)'
+        : 'var(--ink-soft)';
+      stat.appendChild(svgSparkline(trendSeries(item), sparkColor));
+
       li.appendChild(stat);
       return li;
+    }
+
+    /* Synthesize a plausible 7-point series ending at the row's score:
+       up-trends climb ~6 points, down-trends fall, flat wobbles. Seeded
+       by place name so every render draws the identical line. */
+    function trendSeries(item) {
+      var h = hashStr(item.place + item.rank);
+      var dir = item.trend === 'up' ? 1 : item.trend === 'down' ? -1 : 0;
+      var pts = [];
+      for (var i = 0; i < 7; i++) {
+        var ti = i / 6;
+        var base = item.score - dir * (1 - ti) * 6;
+        var wob = Math.sin(h % 7 + i * 1.7) * 1.4;
+        pts.push(base + wob);
+      }
+      pts[6] = item.score;
+      return pts;
     }
 
     function showLoading() {
@@ -2320,7 +3122,25 @@
       social.getPopular({ range: state3.range }).then(function (list) {
         if (token !== state3.token) return; // stale response
         clear(listEl);
-        list.forEach(function (item) { listEl.appendChild(buildRow(item)); });
+        list.forEach(function (item, i) {
+          var row = buildRow(item);
+          enterStagger(row, i);
+          // top-3 rank badges bloom softly just after their row lands
+          if (!prefersReducedMotion && item.rank <= 3) {
+            var badge = row.querySelector('.pop-rank');
+            if (badge) {
+              badge.classList.add('is-blooming');
+              badge.style.animationDelay = (i * 40 + 380) + 'ms';
+              badge.addEventListener('animationend', function onBloom(e2) {
+                if (e2.animationName !== 'rank-bloom') return;
+                badge.classList.remove('is-blooming');
+                badge.style.animationDelay = '';
+                badge.removeEventListener('animationend', onBloom);
+              });
+            }
+          }
+          listEl.appendChild(row);
+        });
         var label = state3.range === 'today' ? 'today' : (state3.range === 'month' ? 'this month' : 'this year');
         announce('Top ' + list.length + ' places ' + label);
       }).catch(function () {

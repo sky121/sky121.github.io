@@ -17,16 +17,23 @@
     ember: "#e08a5a", emberDeep: "#c25a3a"
   };
   var SAVE_KEY = "dragoose-save";
+  // lustrous-scale shimmer cycle (picked by time index — no string building)
+  var LUSTRE = [PAL.gold, PAL.rose, PAL.wisteria];
+  // harmony-sky geese: fixed sinusoidal drift paths across the crowned hub
+  // (y0 is a VH fraction; spd in px/s; everything else phase/shape)
+  var HARMONY_GEESE = [
+    { y0: 0.20, amp: 26, spd: 34, freq: 0.50, phase: 0.0, size: 9 },
+    { y0: 0.44, amp: 34, spd: 26, freq: 0.34, phase: 2.2, size: 7 },
+    { y0: 0.66, amp: 22, spd: 42, freq: 0.60, phase: 4.1, size: 8 },
+    { y0: 0.80, amp: 30, spd: 30, freq: 0.42, phase: 1.3, size: 6 }
+  ];
 
+  // characters/projectiles/clouds are fully procedural now — only the
+  // scale pickups still ship as PNG sprites
   var IMG_SRC = {
-    goose: "images/dragoose/goose.png",
-    dragonEmber: "images/dragoose/dragon-ember.png",
-    dragonStorm: "images/dragoose/dragon-storm.png",
-    fireball: "images/dragoose/fireball.png",
     scale: "images/dragoose/scale.png",
     scaleEmber: "images/dragoose/scale-ember.png",
-    scaleStorm: "images/dragoose/scale-storm.png",
-    cloud: "images/dragoose/cloud.png"
+    scaleStorm: "images/dragoose/scale-storm.png"
   };
   var images = {};
 
@@ -52,11 +59,18 @@
   var reduceMotion = false;
   try { reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
 
+  // haptic tap (phones only; silently a no-op elsewhere)
+  function buzz(pattern) {
+    if (reduceMotion) return;
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+  }
+
   // ---------------------------------------------------------
   // SAVE MODULE (localStorage hoard)
   // ---------------------------------------------------------
   var Save = {
-    data: { scales: 0, relics: [], wins: 0 },
+    data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "", regalia: [], crowned: false, seenHints: {}, gentle: false,
+      records: { fastestCrown: null, mostScalesRun: 0, totalDuelsWon: 0 } },
     load: function () {
       try {
         var raw = localStorage.getItem(SAVE_KEY);
@@ -66,6 +80,19 @@
             this.data.scales = p.scales | 0;
             this.data.relics = Array.isArray(p.relics) ? p.relics : [];
             this.data.wins = p.wins | 0;
+            this.data.duels = (p.duels && typeof p.duels === "object") ? p.duels : {};
+            this.data.plumes = Array.isArray(p.plumes) ? p.plumes : [];
+            this.data.plume = typeof p.plume === "string" ? p.plume : "";
+            this.data.regalia = Array.isArray(p.regalia) ? p.regalia : [];
+            this.data.crowned = !!p.crowned;
+            this.data.seenHints = (p.seenHints && typeof p.seenHints === "object") ? p.seenHints : {};
+            this.data.gentle = !!p.gentle;
+            var rec = (p.records && typeof p.records === "object") ? p.records : {};
+            this.data.records = {
+              fastestCrown: (typeof rec.fastestCrown === "number") ? rec.fastestCrown : null,
+              mostScalesRun: rec.mostScalesRun | 0,
+              totalDuelsWon: rec.totalDuelsWon | 0
+            };
           }
         }
       } catch (e) {}
@@ -78,14 +105,28 @@
       if (this.data.relics.indexOf(id) === -1) this.data.relics.push(id);
       this.data.wins++; this.save();
     },
-    hasRelic: function (id) { return this.data.relics.indexOf(id) !== -1; }
+    hasRelic: function (id) { return this.data.relics.indexOf(id) !== -1; },
+    duelCount: function (type) { return this.data.duels[type] | 0; },
+    addDuel: function (type) { this.data.duels[type] = this.duelCount(type) + 1; this.save(); },
+    addPlume: function (id) {
+      var isNew = this.data.plumes.indexOf(id) === -1;
+      if (isNew) { this.data.plumes.push(id); this.data.plume = id; }
+      this.save();
+      return isNew;
+    },
+    hasRegalia: function (id) { return this.data.regalia.indexOf(id) !== -1; },
+    addRegalia: function (id) {
+      var isNew = this.data.regalia.indexOf(id) === -1;
+      if (isNew) { this.data.regalia.push(id); this.save(); }
+      return isNew;
+    }
   };
 
   // ---------------------------------------------------------
   // AUDIO MODULE (Web Audio, synthesized)
   // ---------------------------------------------------------
   var Audio2 = {
-    ctx: null, master: null, muted: false, ready: false, chargeOsc: null, chargeGain: null,
+    ctx: null, master: null, duelBus: null, muted: false, ready: false, chargeOsc: null, chargeGain: null,
     init: function () {
       if (this.ready) return;
       try {
@@ -95,6 +136,12 @@
         this.master = this.ctx.createGain();
         this.master.gain.value = this.muted ? 0 : 0.5;
         this.master.connect(this.ctx.destination);
+        // duel bus: an intensity layer that swells in during duels and
+        // fades to silence in the open sky / title (routes through master,
+        // so it honors the mute toggle for free)
+        this.duelBus = this.ctx.createGain();
+        this.duelBus.gain.value = 0;
+        this.duelBus.connect(this.master);
         this.ready = true;
       } catch (e) {}
     },
@@ -130,7 +177,86 @@
       src.connect(f); f.connect(g); g.connect(this.master);
       src.start(t);
     },
-    dodge: function () { this.noise(0.22, 0.18, 2200); this.tone(520, 0.18, "sine", 0.08, 900); },
+    dodge: function () { this.noise(0.22, 0.18, 2200); this.tone(this.jit(520), 0.18, "sine", 0.08, this.jit(900)); },
+    thunder: function (big) {
+      this.noise(0.3 + big * 0.25, 0.16 + big * 0.12, 700);
+      this.tone(90, 0.4 + big * 0.2, "sawtooth", 0.12 + big * 0.06, 50);
+    },
+
+    /* ---- ambient music: slow airy chords drifting like the clouds ---- */
+    musicTimer: null,
+    musicStep: 0,
+    musicStart: function () {
+      if (!this.ready || this.musicTimer) return;
+      var self = this;
+      var CHORD_LEN = 7.5;
+      // gentle pentatonic-ish pads in the site's dreamy register
+      var CHORDS = [
+        [196.0, 246.9, 293.7, 392.0],   // G  B  D  G
+        [174.6, 220.0, 261.6, 349.2],   // F  A  C  F
+        [146.8, 196.0, 246.9, 293.7],   // D  G  B  D
+        [164.8, 207.7, 261.6, 329.6]    // E  Ab C  E  (soft color)
+      ];
+      var playChord = function () {
+        if (!self.ready || self.muted) return;
+        var t = self.ctx.currentTime;
+        var notes = CHORDS[self.musicStep % CHORDS.length];
+        self.musicStep++;
+        for (var i = 0; i < notes.length; i++) {
+          var o = self.ctx.createOscillator();
+          var g = self.ctx.createGain();
+          o.type = "sine";
+          o.frequency.value = notes[i] * (1 + (Math.random() - 0.5) * 0.002); // faint drift
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.linearRampToValueAtTime(0.028 - i * 0.004, t + CHORD_LEN * 0.4);
+          g.gain.linearRampToValueAtTime(0.0001, t + CHORD_LEN * 1.05);
+          o.connect(g); g.connect(self.master);
+          o.start(t); o.stop(t + CHORD_LEN * 1.1);
+        }
+        // ---- duel intensity layer (fed into the duel bus) ----
+        // the bus itself glides toward its target so entering/leaving a
+        // duel mid-chord fades smoothly (~1.5s) with no clicks
+        if (self.duelBus) {
+          var inDuel = Game.state === "PLAYING" && Game.mode === "duel";
+          var phase2 = inDuel && Game.dragon && Game.dragon.phase === 2;
+          self.duelBus.gain.setTargetAtTime(inDuel ? (phase2 ? 0.7 : 0.5) : 0, t, 0.5);
+          if (inDuel) {
+            // a deep sine root an octave under the chord
+            var lo = self.ctx.createOscillator();
+            var lg = self.ctx.createGain();
+            lo.type = "sine";
+            lo.frequency.value = notes[0] / 2;
+            lg.gain.setValueAtTime(0.0001, t);
+            lg.gain.linearRampToValueAtTime(0.055, t + CHORD_LEN * 0.35);
+            lg.gain.linearRampToValueAtTime(0.0001, t + CHORD_LEN * 1.05);
+            lo.connect(lg); lg.connect(self.duelBus);
+            lo.start(t); lo.stop(t + CHORD_LEN * 1.1);
+            // a very quiet triangle at the root, pulsing like a heartbeat
+            // (tremolo: a slow LFO wobbles the note's gain — faster in phase 2)
+            var pu = self.ctx.createOscillator();
+            var trem = self.ctx.createGain();
+            var pg = self.ctx.createGain();
+            pu.type = "triangle";
+            pu.frequency.value = notes[0];
+            trem.gain.value = 0.6;
+            pg.gain.setValueAtTime(0.0001, t);
+            pg.gain.linearRampToValueAtTime(0.02, t + CHORD_LEN * 0.4);
+            pg.gain.linearRampToValueAtTime(0.0001, t + CHORD_LEN * 1.05);
+            var lfo = self.ctx.createOscillator();
+            var lfoG = self.ctx.createGain();
+            lfo.type = "sine";
+            lfo.frequency.value = phase2 ? 3.2 : 2.2;
+            lfoG.gain.value = 0.4;
+            lfo.connect(lfoG); lfoG.connect(trem.gain);
+            pu.connect(trem); trem.connect(pg); pg.connect(self.duelBus);
+            pu.start(t); pu.stop(t + CHORD_LEN * 1.1);
+            lfo.start(t); lfo.stop(t + CHORD_LEN * 1.1);
+          }
+        }
+      };
+      playChord();
+      this.musicTimer = window.setInterval(playChord, CHORD_LEN * 1000);
+    },
     fireball: function (charge) {
       var base = 150 + charge * 120;
       this.tone(base, 0.28, "sawtooth", 0.18, base * 0.4);
@@ -158,9 +284,11 @@
         this.chargeOsc = null; this.chargeGain = null;
       }
     },
-    hitDragon: function () { this.tone(330, 0.1, "square", 0.1, 220); this.noise(0.08, 0.08, 2600); },
-    hurt: function () { this.tone(140, 0.3, "sawtooth", 0.22, 70); this.noise(0.2, 0.15, 700); },
-    scale: function () { this.tone(880, 0.16, "sine", 0.12, 1320); this.tone(1320, 0.18, "sine", 0.08); },
+    // slight pitch drift so rapid-fire SFX don't fatigue the ear
+    jit: function (f) { return f * (1 + (Math.random() - 0.5) * 0.08); },
+    hitDragon: function () { this.tone(this.jit(330), 0.1, "square", 0.1, this.jit(220)); this.noise(0.08, 0.08, 2600); },
+    hurt: function () { this.tone(this.jit(140), 0.3, "sawtooth", 0.22, 70); this.noise(0.2, 0.15, 700); },
+    scale: function () { this.tone(this.jit(880), 0.16, "sine", 0.12, this.jit(1320)); this.tone(this.jit(1320), 0.18, "sine", 0.08); },
     power: function () { this.tone(523, 0.2, "sine", 0.14); setTimeout(function(){Audio2.tone(784,0.3,"sine",0.14);}.bind(this), 110); },
     victory: function () {
       var notes = [523, 659, 784, 1047];
@@ -207,7 +335,7 @@
     },
     onDown: function (e) {
       if (Game.state !== "PLAYING") return;
-      Audio2.init(); Audio2.resume();
+      Audio2.init(); Audio2.resume(); Audio2.musicStart();
       this.pointerDown = true;
       this.moved = false;
       this.downTime = performance.now();
@@ -247,7 +375,7 @@
           this.keys.space = true;
           this.downTime = performance.now();
           this.holding = false;
-          Audio2.init(); Audio2.resume();
+          Audio2.init(); Audio2.resume(); Audio2.musicStart();
         } else if (!down && this.keys.space) { // release
           this.keys.space = false;
           var held = performance.now() - this.downTime;
@@ -515,6 +643,26 @@
       }
     },
 
+    // harmony-sky mini dragons: one tiny peaceful rig per variant,
+    // rendered ONCE into a cached canvas (~90px box from the 460-unit
+    // rig) and then only ever drawImage'd — never re-rigged per frame
+    miniDragons: {},
+    miniDragon: function (variant) {
+      var c = this.miniDragons[variant];
+      if (c) return c;
+      var k = 90 / 460;
+      c = document.createElement("canvas");
+      c.width = 90; c.height = Math.ceil(370 * k);
+      var x = c.getContext("2d");
+      x.save();
+      x.scale(k, k);
+      x.translate(230, 150);
+      Art.dragon(x, { t: 0, swayPhase: 0.6, flapPhase: 0.9, bow: 0, simple: true, variant: variant });
+      x.restore();
+      this.miniDragons[variant] = c;
+      return c;
+    },
+
     // per-frame scratch canvases (characters render here first so a
     // single drawImage alpha can fade the whole figure cleanly)
     scratch: function (key, w, h) {
@@ -679,6 +827,12 @@
       var CB = hurt ? this.mix("#fdfbf4", "#c25a3a", hurt * 0.6) : "#fdfbf4";   // body
       var CS = hurt ? this.mix("#e8dfc9", "#a84a34", hurt * 0.55) : "#e8dfc9";  // shade
       var CW = hurt ? this.mix("#f6f0dd", "#c05a40", hurt * 0.55) : "#f6f0dd";  // wing
+      // plume: a subtle ceremonial wash over the coat (cosmetic only)
+      if (o.tint && !hurt) {
+        CB = this.mix(CB, o.tint, 0.14);
+        CS = this.mix(CS, o.tint, 0.22);
+        CW = this.mix(CW, o.tint, 0.18);
+      }
       var fl = o.flap || 0;
       var bank = o.bank || 0;
 
@@ -730,6 +884,23 @@
       g.strokeStyle = ink; g.globalAlpha = 0.65; g.lineWidth = 2; g.stroke();
       g.globalAlpha = 1;
 
+      // REGALIA: Tempest's Spade — a storm-blue dragon spade past the tail fan
+      if (o.gear && o.gear.spade) {
+        g.strokeStyle = ink; g.globalAlpha = 0.7; g.lineWidth = 2.4;
+        g.beginPath(); g.moveTo(0, 44); g.lineTo(0, 52); g.stroke();
+        g.globalAlpha = 1;
+        g.beginPath();
+        g.moveTo(0, 50);
+        g.quadraticCurveTo(6.5, 55, 0, 64);
+        g.quadraticCurveTo(-6.5, 55, 0, 50);
+        g.closePath();
+        g.fillStyle = "#4f6d94"; g.fill();
+        g.strokeStyle = ink; g.globalAlpha = 0.7; g.lineWidth = 1.8; g.stroke();
+        g.globalAlpha = 0.5; g.strokeStyle = "#bfe3ff"; g.lineWidth = 1;
+        g.beginPath(); g.moveTo(0, 52); g.lineTo(0, 61); g.stroke();
+        g.globalAlpha = 1;
+      }
+
       // ---- body: teardrop with soft keel shading ----
       g.beginPath();
       g.moveTo(0, -26);
@@ -752,6 +923,29 @@
         g.globalAlpha = 1;
       }
 
+      // REGALIA: Sorrel's Mantle — a leaf-woven collar over the shoulders
+      if (o.gear && o.gear.mantle) {
+        for (var ls = -1; ls <= 1; ls += 2) {
+          for (var li = 0; li < 2; li++) {
+            g.save();
+            g.translate(ls * (7 + li * 6), -16 + li * 5);
+            g.rotate(ls * (0.5 + li * 0.35));
+            g.beginPath();
+            g.moveTo(0, -7);
+            g.quadraticCurveTo(5.5, -2, 0, 8);
+            g.quadraticCurveTo(-5.5, -2, 0, -7);
+            g.closePath();
+            g.fillStyle = li === 0 ? "#93b48b" : "#7a9a6f";
+            g.globalAlpha = 0.92; g.fill();
+            g.strokeStyle = ink; g.globalAlpha = 0.45; g.lineWidth = 1.2; g.stroke();
+            g.globalAlpha = 0.4; g.strokeStyle = "#42603d"; g.lineWidth = 0.9;
+            g.beginPath(); g.moveTo(0, -5); g.lineTo(0, 6); g.stroke();
+            g.globalAlpha = 1;
+            g.restore();
+          }
+        }
+      }
+
       // ---- neck (ink under-stroke = outline) + head ----
       g.strokeStyle = ink; g.lineWidth = 11.5; g.globalAlpha = 0.8;
       g.beginPath(); g.moveTo(0, -18); g.lineTo(0, -38); g.stroke();
@@ -761,12 +955,41 @@
 
       g.save();
       g.translate(0, -43);
+      // REGALIA: Ember's Horns — backswept cinder-bone horns behind the skull
+      if (o.gear && o.gear.horns) {
+        for (var hs = -1; hs <= 1; hs += 2) {
+          g.beginPath();
+          g.moveTo(hs * 5.5, -3);
+          g.quadraticCurveTo(hs * 14, 0, hs * 17, 9);
+          g.quadraticCurveTo(hs * 11.5, 6.5, hs * 7.5, 3.5);
+          g.closePath();
+          g.fillStyle = "#ead9a4"; g.fill();
+          g.strokeStyle = "#b6a06a"; g.globalAlpha = 0.9; g.lineWidth = 1.4; g.stroke();
+          g.globalAlpha = 1;
+        }
+      }
       g.scale(0.92, 1);
       g.beginPath(); g.arc(0, 0, 9.5, 0, TAU);
       g.fillStyle = CB; g.fill();
       g.strokeStyle = ink; g.globalAlpha = 0.8; g.lineWidth = 2; g.stroke();
       g.globalAlpha = 1;
       g.restore();
+      // REGALIA: Gilded Crest — a small gold circlet seen from above
+      if (o.gear && o.gear.crest) {
+        g.save();
+        g.translate(0, -43);
+        g.strokeStyle = "#cdb878"; g.lineWidth = 2.2; g.globalAlpha = 0.95;
+        g.beginPath(); g.arc(0, 0, 6.4, 0, TAU); g.stroke();
+        g.fillStyle = "#f6ecd0";
+        for (var cp = 0; cp < 5; cp++) {
+          var ca3 = -Math.PI / 2 + cp * (TAU / 5);
+          g.beginPath(); g.arc(Math.cos(ca3) * 6.4, Math.sin(ca3) * 6.4, 1.5, 0, TAU); g.fill();
+        }
+        g.strokeStyle = "#8a6c30"; g.globalAlpha = 0.55; g.lineWidth = 0.9;
+        g.beginPath(); g.arc(0, 0, 6.4, 0, TAU); g.stroke();
+        g.globalAlpha = 1;
+        g.restore();
+      }
       // beak: broad wedge with a nail line
       g.beginPath();
       g.moveTo(-5, -49.5);
@@ -786,6 +1009,30 @@
         g.beginPath(); g.arc(-5.4, -44.5, 1.7, 0, TAU); g.fill();
         g.beginPath(); g.arc(5.4, -44.5, 1.7, 0, TAU); g.fill();
       }
+      // CROWNED: a tiny three-point gold circlet resting just above the eyes
+      // (drawn last so it sits atop the head — the highest point from above)
+      if (o.gear && o.gear.crown) {
+        g.save();
+        g.translate(0, -46.5);
+        g.beginPath();
+        g.moveTo(-5, 1.6);
+        g.bezierCurveTo(-2.6, 0.4, 2.6, 0.4, 5, 1.6);  // rim curves with the skull
+        g.lineTo(4.5, -0.7);
+        g.lineTo(3.2, -3.3);   // right point
+        g.lineTo(1.9, -0.9);
+        g.lineTo(0, -4.4);     // center point
+        g.lineTo(-1.9, -0.9);
+        g.lineTo(-3.2, -3.3);  // left point
+        g.lineTo(-4.5, -0.7);
+        g.closePath();
+        g.fillStyle = "#cdb878"; g.globalAlpha = 0.95; g.fill();
+        g.strokeStyle = "#a8863c"; g.globalAlpha = 0.8; g.lineWidth = 1; g.stroke();
+        // a single soft gleam on the band
+        g.globalAlpha = 0.85; g.fillStyle = "#f6ecd0";
+        g.beginPath(); g.arc(0, 0.4, 0.8, 0, TAU); g.fill();
+        g.globalAlpha = 1;
+        g.restore();
+      }
       // dragonfire smolders in his beak while charging
       if (o.charge > 0.01) {
         Fx.drawDot(g, 0, -56, 9 + o.charge * 10, PAL.ember, 0.3 + o.charge * 0.45, true);
@@ -796,7 +1043,9 @@
     // ----- THE DRAGONS -----
     dragonPal: {
       ember: { hi: "#e89058", lo: "#b04830", belly: "#f2c68c", memHi: "#d96a45", memLo: "#8e2f24", bone: "#ead9a4", boneTip: "#b6a06a", eye: "#ffd97a", spade: "#a83a54", vein: "#d98ba0" },
-      storm: { hi: "#7fa8c9", lo: "#3d6288", belly: "#d3e2ef", memHi: "#5f86ab", memLo: "#2e4d6e", bone: "#dbe6f0", boneTip: "#8fa6bd", eye: "#bfe3ff", spade: "#4f6d94", vein: "#a292c4" }
+      storm: { hi: "#7fa8c9", lo: "#3d6288", belly: "#d3e2ef", memHi: "#5f86ab", memLo: "#2e4d6e", bone: "#dbe6f0", boneTip: "#8fa6bd", eye: "#bfe3ff", spade: "#4f6d94", vein: "#a292c4" },
+      verdant: { hi: "#93b48b", lo: "#597a52", belly: "#e9efdb", memHi: "#7a9a6f", memLo: "#42603d", bone: "#e3e8cf", boneTip: "#9aa87f", eye: "#e5f0a8", spade: "#6e8a4f", vein: "#cdb878" },
+      gilded: { hi: "#d9b96a", lo: "#a8863c", belly: "#f6ecd0", memHi: "#c2a052", memLo: "#7c6128", bone: "#f2e6c4", boneTip: "#b3903f", eye: "#fff3c4", spade: "#b3903f", vein: "#cdb878" }
     },
     // o: { t, swayPhase, flapPhase, phase2, flash, bow, variant, simple }
     dragon: function (g, o) {
@@ -1078,6 +1327,7 @@
             p.active = true; p.x = cfg.x; p.y = cfg.y; p.vx = cfg.vx; p.vy = cfg.vy;
             p.r = cfg.r; p.dmg = cfg.dmg; p.life = cfg.life; p.color = cfg.color;
             p.rot = cfg.rot || 0; p.spin = cfg.spin || 0; p.kind = cfg.kind || "fire";
+            p.grav = cfg.grav || 0;
             p.power = cfg.power || null;
             p.seed = Math.random() * TAU;
             if (p.trail) p.trail.length = 0; else p.trail = [];
@@ -1110,7 +1360,49 @@
   };
   var RELICS = {
     emberHeart: { name: "Heart of Ember", glyph: "❤️‍🔥", desc: "Begin each run with one extra feather of health." },
-    cinderGift: { name: "Cinder's Gift", glyph: "🔥", desc: "Begin each run already wielding Ember Wake." }
+    cinderGift: { name: "Cinder's Gift", glyph: "🔥", desc: "Begin each run already wielding Ember Wake." },
+    galeFeather: { name: "Gale Feather", glyph: "🪶", desc: "Your dodge recovers in half the time." },
+    stormGift: { name: "Tempest's Gift", glyph: "⚡", desc: "Begin each run already wielding Storm Dodge." },
+    thistleDown: { name: "Thistle Down", glyph: "🌾", desc: "Fallen scales drift to you from much farther away." },
+    verdantGift: { name: "Sorrel's Gift", glyph: "🌿", desc: "Begin each run already wielding Forked Flame." },
+    gildedHeart: { name: "Gilded Heart", glyph: "🥇", desc: "Begin each run with your charge igniting 25% faster." },
+    gildedGift: { name: "Aurelia's Gift", glyph: "🪙", desc: "Begin each run already wielding Tailwind Fury." }
+  };
+
+  // ceremonial-duel trophies: cosmetic washes for Gary's coat (no power)
+  var PLUMES = {
+    cinderPlume: { name: "Cinder Plume", glyph: "🌹", color: "#d98ba0", desc: "Gary wears a rose-washed coat, a gift of Ember's ceremony." },
+    tempestPlume: { name: "Tempest Plume", glyph: "🌀", color: "#7fa8c9", desc: "Gary wears a storm-blue coat, a gift of Tempest's ceremony." },
+    sorrelPlume: { name: "Sorrel Plume", glyph: "🍃", color: "#93b48b", desc: "Gary wears a moss-green coat, a gift of Sorrel's ceremony." },
+    gildedPlume: { name: "Gilded Plume", glyph: "✨", color: "#cdb878", desc: "Gary wears a gold-washed coat, a gift of Aurelia's ceremony." }
+  };
+  var DRAGON_PLUME = { ember: "cinderPlume", storm: "tempestPlume", verdant: "sorrelPlume", gilded: "gildedPlume" };
+
+  // regalia: hoard equipment that changes Gary's silhouette AND his fight
+  // (earned at the second ceremonial victory against each dragon)
+  var REGALIA = {
+    emberHorns: { name: "Ember's Horns", glyph: "🐏", dragon: "ember", desc: "Backswept horns of cinder-bone — your dodge dash now rams dragons for damage." },
+    tempestSpade: { name: "Tempest's Spade", glyph: "🌩️", dragon: "storm", desc: "A storm-forged tail spade — fully charged shots loose a rearward fan of lightning." },
+    sorrelMantle: { name: "Sorrel's Mantle", glyph: "🍂", dragon: "verdant", desc: "A leaf-woven mantle — it slowly grows a ward that blocks one hit." },
+    gildedCrest: { name: "Gilded Crest", glyph: "👑", dragon: "gilded", desc: "A gilded crest — scales are worth double while your health is full." }
+  };
+  var DRAGON_REGALIA = { ember: "emberHorns", storm: "tempestSpade", verdant: "sorrelMantle", gilded: "gildedCrest" };
+  // every attack in the game, for ceremonial cross-kit stealing
+  var ALL_ATTACKS = ["volley", "aimed", "breath", "fan", "lance", "nova", "spiral", "seeds", "lures", "ray", "coins"];
+  var BASE_KIT = {
+    ember: ["volley", "aimed", "breath"],
+    storm: ["fan", "lance", "nova"],
+    verdant: ["spiral", "seeds"],
+    gilded: ["lures", "ray", "coins"]
+  };
+
+  // the gauntlet: dragons faced in order within a single run
+  var RUN_BOSSES = ["ember", "storm", "verdant", "gilded"];
+  var DRAGONS = {
+    ember: { name: "Ember, the Cinder Wyrm", health: 100, roamSpeed: 105, enragedSpeed: 150 },
+    storm: { name: "Tempest, the Storm Wyrm", health: 115, roamSpeed: 120, enragedSpeed: 170 },
+    verdant: { name: "Sorrel, the Verdant Wyrm", health: 130, roamSpeed: 112, enragedSpeed: 160 },
+    gilded: { name: "Aurelia, the Gilded Wyrm", health: 145, roamSpeed: 110, enragedSpeed: 165 }
   };
 
   // ---------------------------------------------------------
@@ -1193,7 +1485,9 @@
       $("btn-resume").addEventListener("click", function () { Game.togglePause(); });
       $("btn-restart-pause").addEventListener("click", function () { Game.startRun(); });
       $("btn-retry").addEventListener("click", function () { Game.startRun(); });
-      $("btn-continue").addEventListener("click", function () { Game.toTitle(); });
+      $("btn-continue").addEventListener("click", function () { Game.continueFromWin(); });
+      $("plume-btn").addEventListener("click", function () { Game.cyclePlume(); });
+      $("gentle-btn").addEventListener("click", function () { Game.toggleGentle(); });
       $("btn-mute").addEventListener("click", function () { Game.toggleMute(); });
     },
 
@@ -1230,7 +1524,58 @@
       this.state = "TITLE";
       this.showScreen("title");
       hud.hidden = true;
+      // once crowned, the title screen wears it forever
+      var tk = screens.title.querySelector(".title-kicker");
+      if (tk) tk.textContent = Save.data.crowned
+        ? "Ruler of the skies · a watercolor flying roguelike"
+        : "A watercolor flying roguelike";
       this.renderHoard();
+      this.renderTitleGoose();
+      this.renderGentle();
+    },
+
+    // 'Gentle breeze' assist: slower dragon attack cycling + 1 extra feather
+    renderGentle: function () {
+      var b = $("gentle-btn");
+      if (b) b.setAttribute("aria-pressed", Save.data.gentle ? "true" : "false");
+    },
+
+    toggleGentle: function () {
+      Save.data.gentle = !Save.data.gentle;
+      Save.save();
+      this.renderGentle();
+      Audio2.init(); Audio2.resume();
+      Audio2.tone(Save.data.gentle ? 440 : 330, 0.12, "sine", 0.07, Save.data.gentle ? 620 : 250);
+    },
+
+    // Gary on the title card, wearing the equipped plume + owned regalia
+    // (plain Gary when the hoard is empty). Redrawn on plume cycling so
+    // the button gives instant feedback.
+    renderTitleGoose: function () {
+      var c = $("title-goose");
+      if (!c) return;
+      var g = c.getContext("2d");
+      g.clearRect(0, 0, c.width, c.height);
+      g.save();
+      // the rig fits a 140-unit box around the origin (~y -60..+64)
+      g.translate(90, 80);
+      g.scale(1.15, 1.15);
+      var plume = PLUMES[Save.data.plume];
+      Art.goose(g, {
+        flap: 2.1,
+        bank: 0.08,
+        hurt: 0,
+        charge: 0,
+        tint: plume ? plume.color : null,
+        gear: {
+          horns: Save.hasRegalia("emberHorns"),
+          spade: Save.hasRegalia("tempestSpade"),
+          mantle: Save.hasRegalia("sorrelMantle"),
+          crest: Save.hasRegalia("gildedCrest"),
+          crown: Save.data.crowned
+        }
+      });
+      g.restore();
     },
 
     renderHoard: function () {
@@ -1245,26 +1590,74 @@
           var rn = d.relics.map(function (id) { return RELICS[id] ? RELICS[id].glyph + " " + RELICS[id].name : id; });
           parts.push("Relics: " + rn.join(", "));
         }
+        if (d.regalia && d.regalia.length > 0) {
+          var gn = d.regalia.map(function (id) { return REGALIA[id] ? REGALIA[id].glyph + " " + REGALIA[id].name : id; });
+          parts.push("Regalia: " + gn.join(", "));
+        }
+        if (d.crowned) parts.push("👑 Crowned — Dragoose, Ruler of the Skies");
+        // quiet lifetime records line beneath the hoard
+        var recEl = $("hoard-records");
+        if (recEl) {
+          var rc = d.records || {};
+          var rp = [];
+          if (rc.fastestCrown != null) {
+            var rm2 = Math.floor(rc.fastestCrown / 60), rs2 = rc.fastestCrown % 60;
+            rp.push("fastest crowning " + (rm2 > 0 ? rm2 + "m " : "") + rs2 + "s");
+          }
+          if (rc.mostScalesRun > 0) rp.push("best run " + rc.mostScalesRun + " scales");
+          if (rc.totalDuelsWon > 0) rp.push(rc.totalDuelsWon + " duel" + (rc.totalDuelsWon === 1 ? "" : "s") + " won");
+          recEl.hidden = rp.length === 0;
+          recEl.textContent = rp.length ? "Records: " + rp.join(" · ") : "";
+        }
         $("hoard-stats").textContent = parts.join(" · ");
       } else {
         box.hidden = true;
       }
+      // plume selector: cycle through ceremonial coats you've earned
+      var pb = $("plume-btn");
+      if (d.plumes && d.plumes.length > 0) {
+        box.hidden = false;
+        pb.hidden = false;
+        var cur = PLUMES[d.plume];
+        pb.textContent = "Plume: " + (cur ? cur.glyph + " " + cur.name : "None") + " ▸";
+      } else {
+        pb.hidden = true;
+      }
+    },
+
+    cyclePlume: function () {
+      var owned = Save.data.plumes;
+      if (!owned.length) return;
+      var order = [""].concat(owned);
+      var i = order.indexOf(Save.data.plume);
+      Save.data.plume = order[(i + 1) % order.length];
+      Save.save();
+      this.renderHoard();
+      this.renderTitleGoose();
+      Audio2.init(); Audio2.resume();
+      Audio2.tone(520, 0.12, "sine", 0.07, 700);
     },
 
     // ----- START A RUN -----
     startRun: function () {
+      Audio2.init(); Audio2.resume(); Audio2.musicStart();
       this.showScreen(null);
       hud.hidden = false;
+      this.runStats = { time: 0, dmg: 0, dodges: 0 };
       Particles.clear();
       PlayerShots.clear(); DragonShots.clear(); Pickups.clear();
       this.floatLayer.innerHTML = "";
       this.scaleProgress = 0;
+      this.scalesBanked = 0;
+      this.winIsFinal = false;
+      this.introT = 0; this.introDur = 0;
       this.nextPowerAt = 3;
       this.powers = {};
       this.shake = 0; this.hitStop = 0; this.flashRed = 0; this.flashWhite = 0;
 
       var startHealth = 4;
       if (Save.hasRelic("emberHeart")) startHealth = 5;
+      if (Save.data.gentle) startHealth += 1; // gentle breeze assist
 
       this.player = {
         x: VW / 2, y: VH * 0.72, vx: 0, vy: 0,
@@ -1273,36 +1666,211 @@
         iframes: 0, dodgeCd: 0, dashTime: 0,
         charge: 0, charging: false, justDodged: 0,
         invulnFlash: 0, hurtFlash: 0, hitScale: 1,
+        ward: false, wardCd: 8, ramHit: false,
         ghosts: []
       };
 
-      // relic perk: start with a power
+      // relic perks: start with a power
       if (Save.hasRelic("cinderGift")) { this.powers.emberWake = true; }
+      if (Save.hasRelic("stormGift")) { this.powers.stormDodge = true; }
+      if (Save.hasRelic("verdantGift")) { this.powers.split = true; }
+      if (Save.hasRelic("gildedGift")) { this.powers.velocity = true; }
       this.renderPowers();
 
-      this.dragon = this.makeDragon("ember");
+      // the open sky: no dragon yet — fly into a realm to anger its ruler
+      this.dragon = null;
+      this.mode = "sky";
+      this.initSky();
+      this.player.y = VH * 0.82;
       this.updateHUD();
       this.state = "PLAYING";
+      this.floatText(VW / 2, VH * 0.73, "Fly into a realm to challenge its dragon", PAL.gold);
+
+      // first-flight tutorial hints (one-time, then remembered in the save)
+      if (!Save.data.seenHints.sky) {
+        Save.data.seenHints.sky = true;
+        Save.save();
+        var skyHint = function (delay, msg) {
+          setTimeout(function () {
+            if (Game.state === "PLAYING" && Game.mode === "sky") {
+              Game.floatText(VW / 2, VH * 0.78, msg, PAL.wisteria);
+            }
+          }, delay);
+        };
+        skyHint(1000, "drag to steer");
+        skyHint(3000, "tap to dodge");
+        skyHint(5000, "hold to charge dragonfire");
+      }
       this.wipe();
     },
 
-    makeDragon: function (type) {
+    // ----- THE OPEN SKY (realm hub) -----
+    initSky: function () {
+      var pals = {
+        ember: { a: PAL.ember, b: PAL.emberDeep },
+        storm: { a: "#7fa8c9", b: "#3d6288" },
+        verdant: { a: PAL.sage, b: "#597a52" },
+        gilded: { a: "#d9b96a", b: "#a8863c" }
+      };
+      // four realms in a diamond — the player flies in from the bottom
+      var spots = [
+        { x: VW * 0.5, y: VH * 0.16 },    // top
+        { x: VW * 0.22, y: VH * 0.375 },  // left
+        { x: VW * 0.78, y: VH * 0.375 },  // right
+        { x: VW * 0.5, y: VH * 0.585 }    // bottom (nearest the player)
+      ];
+      this.sky = { grace: 1.0, realms: [], tint: { color: "", k: 0, x: 0, y: 0 } };
+      for (var i = 0; i < RUN_BOSSES.length; i++) {
+        var t = RUN_BOSSES[i];
+        this.sky.realms.push({
+          type: t,
+          name: DRAGONS[t].name.split(",")[0],
+          x: spots[i].x, y: spots[i].y, r: 88,
+          pal: pals[t] || pals.ember,
+          defeated: false,
+          phase: Math.random() * TAU
+        });
+      }
+    },
+
+    updateSky: function (dt) {
+      var sky = this.sky;
+      if (!sky) return;
+      var p = this.player;
+      // realm-proximity tinting: the sky warms toward the nearest realm's
+      // pigment (full within r*1.2, faded out by r*3); paintSky reads this
+      var tint = sky.tint;
+      tint.k = 0;
+      for (var ti = 0; ti < sky.realms.length; ti++) {
+        var trm = sky.realms[ti];
+        var tdx = p.x - trm.x, tdy = p.y - trm.y;
+        var tk = 1 - (Math.sqrt(tdx * tdx + tdy * tdy) - trm.r * 1.2) / (trm.r * 1.8);
+        if (tk > 1) tk = 1;
+        if (tk > tint.k) {
+          tint.k = tk; tint.color = trm.pal.a;
+          tint.x = trm.x; tint.y = trm.y;
+        }
+      }
+      if (sky.grace > 0) { sky.grace -= dt; return; }
+      for (var i = 0; i < sky.realms.length; i++) {
+        var rm = sky.realms[i];
+        var dx = p.x - rm.x, dy = p.y - rm.y;
+        if (dx * dx + dy * dy < (rm.r * 0.72) * (rm.r * 0.72)) {
+          // a respected realm can be re-entered for a ceremonial duel
+          this.enterRealm(rm, rm.defeated);
+          return;
+        }
+      }
+    },
+
+    enterRealm: function (realm, ceremonial) {
+      var p = this.player;
+      this.mode = "duel";
+      PlayerShots.clear(); DragonShots.clear();
+      p.x = VW / 2; p.y = VH * 0.72; p.vx = 0; p.vy = 0;
+      p.iframes = 1.2;
+      p.charge = 0; p.charging = false;
+      Audio2.chargeStop();
+      this.dragon = this.makeDragon(realm.type, ceremonial);
+      // boss-intro flyby: a short non-interactive entrance — the dragon
+      // swoops in from off-screen and holds its fire under a name card
+      var d = this.dragon;
+      this.introDur = reduceMotion ? 0.5 : 1.4;
+      this.introT = this.introDur;
+      d.introToX = d.x; d.introToY = d.y;
+      if (!reduceMotion) d.y = -d.r; // starts above the sky, swoops down
+      this.updateHUD();
+      // first-duel tutorial hint (one-time)
+      if (!ceremonial && !Save.data.seenHints.duel) {
+        Save.data.seenHints.duel = true;
+        Save.save();
+        setTimeout(function () {
+          if (Game.state === "PLAYING" && Game.mode === "duel") {
+            Game.floatText(VW / 2, VH * 0.56, "watch for the glow — dodge the telegraphed attacks", PAL.wisteria);
+          }
+        }, 1500);
+      }
+      this.wipe();
+    },
+
+    returnToSky: function () {
+      var p = this.player;
+      this.mode = "sky";
+      this.dragon = null;
+      PlayerShots.clear(); DragonShots.clear(); Pickups.clear();
+      // a breather between duels: preen two feathers back
+      p.health = Math.min(p.maxHealth, p.health + 2);
+      p.x = VW / 2; p.y = VH * 0.82; p.vx = 0; p.vy = 0;
+      p.iframes = 1.0;
+      if (this.sky) this.sky.grace = 0.9;
+      this.updateHUD();
+      this.showScreen(null);
+      hud.hidden = false;
+      this.state = "PLAYING";
+      this.floatText(VW / 2, VH * 0.73, "Choose your next realm", PAL.wisteria);
+      this.wipe();
+    },
+
+    makeDragon: function (type, ceremonial) {
+      var spec = DRAGONS[type] || DRAGONS.ember;
+      var hp = spec.health;
+      var roam = spec.roamSpeed, enraged = spec.enragedSpeed;
+      var tier = 0, stolen = null, punishDodge = false;
+      if (ceremonial) {
+        // the dragon has been studying you since it bowed
+        tier = Save.duelCount(type);
+        hp = Math.round(hp * Math.min(2, 1.2 + tier * 0.12));
+        roam *= 1.12; enraged *= 1.12;
+        // it evolves: borrow one move from another dragon's kit
+        var own = BASE_KIT[type] || [];
+        var pool = ALL_ATTACKS.filter(function (a) { return own.indexOf(a) === -1; });
+        stolen = pool[tier % pool.length];
+        // and it counters a dodge-centric build
+        punishDodge = !!(this.powers.stormDodge || this.powers.emberWake);
+      }
       var d = {
         type: type,
-        name: type === "ember" ? "Ember, the Cinder Wyrm" : "Tempest, the Storm Wyrm",
+        ceremonial: !!ceremonial,
+        tier: tier,
+        stolen: stolen,
+        punishDodge: punishDodge,
+        name: (ceremonial ? "⟡ " : "") + spec.name,
         x: VW / 2, y: VH * 0.24,
         vx: 0, vy: 0, r: 110,
-        health: 100, maxHealth: 100,
+        health: hp, maxHealth: hp,
+        roamSpeed: roam, enragedSpeed: enraged,
         facing: Math.PI / 2,
         phase: 1,
         state: "roam", stateT: 0, attackCd: 2.2,
         telegraph: 0, telegraphType: null, telegraphMax: 0,
         targetX: VW / 2, targetY: VH * 0.24,
         hitFlash: 0, bowT: 0,
-        dropMilestones: [80, 60, 45, 30, 18, 8], // health thresholds that drop scales
+        // health thresholds that drop scales
+        dropMilestones: [0.8, 0.6, 0.45, 0.3, 0.18, 0.08].map(function (f) { return hp * f; }),
         dashVx: 0, dashVy: 0
       };
       return d;
+    },
+
+    continueFromWin: function () {
+      if (this.winIsFinal) this.toTitle();
+      else this.returnToSky();
+    },
+
+    // swap the win screen's kicker/title (crowning vs an ordinary bow)
+    setWinHeader: function (kicker, title) {
+      var k = screens.win.querySelector(".overlay-kicker");
+      var t = screens.win.querySelector(".overlay-title");
+      if (k) k.textContent = kicker;
+      if (t) t.textContent = title;
+    },
+
+    fmtRunStats: function () {
+      var st = this.runStats || { time: 0, dmg: 0, dodges: 0 };
+      var m = Math.floor(st.time / 60), s = Math.round(st.time % 60);
+      return (m > 0 ? m + "m " : "") + s + "s in the sky · " +
+        Math.round(st.dmg) + " damage dealt · " +
+        st.dodges + " dodge" + (st.dodges === 1 ? "" : "s");
     },
 
     // ----- PAUSE -----
@@ -1318,10 +1886,12 @@
     },
 
     // ----- WIPE TRANSITION -----
-    wipe: function () {
+    wipe: function (golden) {
       bloomWipe.classList.remove("is-wiping");
+      bloomWipe.classList.toggle("is-golden", !!golden);
       void bloomWipe.offsetWidth;
       bloomWipe.classList.add("is-wiping");
+      if (golden) setTimeout(function () { bloomWipe.classList.remove("is-golden"); }, 900);
     },
 
     // ----- FLOATING TEXT -----
@@ -1356,7 +1926,13 @@
       // hit-stop freezes gameplay briefly
       if (this.hitStop > 0) { this.hitStop -= dt; if (this.hitStop > 0) return; }
 
+      if (this.runStats) this.runStats.time += dt;
+
+      // boss-intro flyby countdown (dragon holds fire while it runs)
+      if (this.introT > 0) this.introT -= dt;
+
       this.updatePlayer(dt);
+      if (this.mode === "sky") this.updateSky(dt);
       this.updateDragon(dt);
       this.updateShots(dt);
       this.updatePickups(dt);
@@ -1418,7 +1994,8 @@
       // ----- build charge while holding -----
       if (Input.holding) {
         if (!p.charging) { p.charging = true; Audio2.chargeStart(); }
-        p.charge = Math.min(1, p.charge + dt * 1.05);
+        // RELIC: gilded heart — the charge ignites 25% faster
+        p.charge = Math.min(1, p.charge + dt * (Save.hasRelic("gildedHeart") ? 1.31 : 1.05));
         Audio2.chargeUpdate(p.charge);
       } else if (p.charging) {
         // holding ended without release event (safety)
@@ -1476,6 +2053,33 @@
       var targetBank = Math.max(-0.5, Math.min(0.5, p.vx / 700));
       p.bank += (targetBank - p.bank) * (1 - Math.pow(0.001, dt));
 
+      // REGALIA: Sorrel's Mantle slowly regrows a one-hit leaf ward
+      if (Save.hasRegalia("sorrelMantle") && !p.ward) {
+        p.wardCd = (p.wardCd == null ? 8 : p.wardCd) - dt;
+        if (p.wardCd <= 0) {
+          p.ward = true;
+          this.floatText(p.x, p.y - 40, "leaf ward", PAL.sage);
+          Particles.ring(p.x, p.y, PAL.sage, 16, 380, 0.35, 4);
+        }
+      }
+
+      // REGALIA: Ember's Horns — the dodge dash rams dragons
+      if (p.dashTime > 0 && !p.ramHit && Save.hasRegalia("emberHorns")) {
+        var rd = this.dragon;
+        if (rd && rd.state !== "bow") {
+          var rdx = p.x - rd.x, rdy = p.y - rd.y;
+          var rrr = rd.r * 0.55 + p.r * 0.8;
+          if (rdx * rdx + rdy * rdy < rrr * rrr) {
+            p.ramHit = true;
+            this.damageDragon(7, p.x, p.y);
+            this.addShake(6);
+            this.hitStop = 0.04;
+            Particles.sparkBurst(p.x, p.y, 10, PAL.ember, 460, 0.35);
+            this.floatText(p.x, p.y - 30, "ram!", PAL.ember);
+          }
+        }
+      }
+
       // dash trail: afterimages + cool mist + streaks
       if (p.dashTime > 0) {
         p.ghosts.push({ x: p.x, y: p.y, facing: p.facing, bank: p.bank, life: 0.3, maxLife: 0.3 });
@@ -1531,8 +2135,12 @@
       p.facing = ang;
       p.dashTime = 0.18;
       p.iframes = 0.42;
-      p.dodgeCd = 0.6;
+      // RELIC: gale feather — dodge recovers in half the time
+      p.dodgeCd = Save.hasRelic("galeFeather") ? 0.3 : 0.6;
       p.justDodged = 1.2;
+      p.ramHit = false; // Ember's Horns may connect once per dash
+      if (this.runStats) this.runStats.dodges++;
+      buzz(12);
       Audio2.dodge();
       Particles.burst(p.x, p.y, 8, "#cfe3f1", 3, 12, 0.3);
       Particles.ring(p.x, p.y, "#eaf4fc", 14, 460, 0.32, 4);
@@ -1540,6 +2148,22 @@
 
       // POWER: storm dodge -> lightning
       if (this.powers.stormDodge) this.stormDodgeBurst();
+
+      // CEREMONIAL COUNTER: a studied dragon punishes your dodge habit
+      var d = this.dragon;
+      if (d && d.ceremonial && d.punishDodge && d.state !== "bow") {
+        var dd = d;
+        setTimeout(function () {
+          if (Game.state !== "PLAYING" || Game.dragon !== dd || dd.state === "bow") return;
+          var pa = Math.atan2(Game.player.y - dd.y, Game.player.x - dd.x);
+          DragonShots.spawn({
+            x: dd.x + Math.cos(pa) * 70, y: dd.y + Math.sin(pa) * 70,
+            vx: Math.cos(pa) * 520, vy: Math.sin(pa) * 520,
+            r: 18, dmg: 1, life: 2.4, color: PAL.gold, rot: pa, kind: "fire"
+          });
+          Audio2.tone(300, 0.1, "square", 0.08, 160);
+        }, 320);
+      }
     },
 
     stormDodgeBurst: function () {
@@ -1588,6 +2212,19 @@
           rot: shots[i].ang, spin: 6, kind: "fire"
         });
       }
+
+      // REGALIA: Tempest's Spade — a full charge cracks lightning off the tail
+      if (charge >= 0.98 && Save.hasRegalia("tempestSpade")) {
+        for (var ti = -1; ti <= 1; ti++) {
+          var ta = ang + Math.PI + ti * 0.35;
+          PlayerShots.spawn({
+            x: p.x - Math.cos(ang) * 26, y: p.y - Math.sin(ang) * 26,
+            vx: Math.cos(ta) * 540, vy: Math.sin(ta) * 540,
+            r: 14, dmg: 2.4, life: 0.7, color: PAL.wisteria, rot: ta, kind: "bolt"
+          });
+        }
+        Audio2.thunder(0.3);
+      }
       Audio2.fireball(charge);
       // muzzle flash: glow bloom + sparks + (charged) shockwave ring
       Particles.glow(sx, sy, 0, 0, 20 * size, 1.6, 0.22, PAL.gold, 0.8, 0.9);
@@ -1618,17 +2255,41 @@
         }
         return;
       }
-      // enraged: shed rising embers + heat
+
+      // ----- boss-intro flyby: swoop to the arena spot, hold fire -----
+      if (this.introT > 0) {
+        d.state = "roam"; d.stateT = 0;
+        d.telegraph = 0; d.telegraphType = null;
+        var it = 1 - this.introT / (this.introDur || 1);
+        if (it < 0) it = 0; else if (it > 1) it = 1;
+        if (!reduceMotion) {
+          var ie = 1 - Math.pow(1 - it, 3); // smooth cubic ease-out
+          d.y = -d.r + (d.introToY + d.r) * ie;
+          d.x = d.introToX + Math.sin(it * Math.PI) * 26;
+        }
+        d.facing = this.angleLerp(d.facing,
+          Math.atan2(this.player.y - d.y, this.player.x - d.x), 1 - Math.pow(0.05, dt));
+        return; // no attack cooldown ticks during the entrance
+      }
+
+      // enraged: shed rising embers + heat (static crackle for the storm wyrm)
       if (d.phase === 2 && Math.random() < dt * 14) {
         var ea = Math.random() * TAU, er = d.r * (0.3 + Math.random() * 0.5);
+        var ec = d.type === "storm"
+          ? (Math.random() < 0.4 ? PAL.wisteria : "#8fd0ff")
+          : d.type === "verdant"
+          ? (Math.random() < 0.4 ? PAL.rose : PAL.sage)   // petals shaken loose
+          : d.type === "gilded"
+          ? (Math.random() < 0.4 ? "#fff3c4" : PAL.gold)  // treasure-light shed like dust
+          : (Math.random() < 0.4 ? PAL.rose : PAL.ember);
         Particles.glow(d.x + Math.cos(ea) * er, d.y + Math.sin(ea) * er,
           (Math.random() - 0.5) * 0.8, -1.1 - Math.random() * 1.4,
           4 + Math.random() * 7, 0.9, 0.7 + Math.random() * 0.5,
-          Math.random() < 0.4 ? PAL.rose : PAL.ember, 0.55, 0.98);
+          ec, 0.55, 0.98);
       }
 
-      // phase transition
-      if (d.phase === 1 && d.health <= d.maxHealth * 0.5) {
+      // phase transition (ceremonial dragons enrage earlier)
+      if (d.phase === 1 && d.health <= d.maxHealth * (d.ceremonial ? 0.6 : 0.5)) {
         d.phase = 2;
         d.telegraph = 0; d.telegraphType = null;
         d.attackCd = 1.0;
@@ -1649,12 +2310,14 @@
           d.targetY = VH * 0.14 + Math.random() * VH * 0.22;
           d.stateT = 0;
         }
-        var sp = d.phase === 2 ? 150 : 105;
+        var sp = d.phase === 2 ? d.enragedSpeed : d.roamSpeed;
         if (dist > 1) { d.vx = (dx / dist) * sp; d.vy = (dy / dist) * sp; }
         d.x += d.vx * dt; d.y += d.vy * dt;
         d.facing = this.angleLerp(d.facing, Math.atan2(this.player.y - d.y, this.player.x - d.x), 1 - Math.pow(0.02, dt));
 
-        d.attackCd -= dt;
+        // ceremonial dragons cycle their attacks noticeably faster;
+        // the gentle-breeze assist slows every dragon's cycle ~25%
+        d.attackCd -= dt * (d.ceremonial ? 1.3 : 1) * (Save.data.gentle ? 0.78 : 1);
         if (d.attackCd <= 0) this.dragonBeginAttack();
       }
       // ----- telegraph (wind-up) -----
@@ -1670,7 +2333,8 @@
       else if (d.state === "dash") {
         d.x += d.dashVx * dt; d.y += d.dashVy * dt;
         d.dashVx *= Math.pow(0.2, dt); d.dashVy *= Math.pow(0.2, dt);
-        Particles.spawn(d.x, d.y, 0, 0, 30, 1.3, 0.4, PAL.ember, 0.22, 0.92);
+        Particles.spawn(d.x, d.y, 0, 0, 30, 1.3, 0.4,
+          d.type === "storm" ? "#9fc2e0" : d.type === "verdant" ? PAL.sage : d.type === "gilded" ? PAL.gold : PAL.ember, 0.22, 0.92);
         d.stateT += dt;
         // keep in bounds
         if (d.x < 90) { d.x = 90; d.dashVx = Math.abs(d.dashVx); }
@@ -1679,24 +2343,60 @@
         if (d.y > VH * 0.7) { d.y = VH * 0.7; d.dashVy = -Math.abs(d.dashVy); }
         if (d.stateT > 0.55) this.dragonEndAttack();
       }
-      // ----- sweeping breath -----
+      // ----- sweeping breath (ember) / sweeping sun-beam ray (gilded) -----
       else if (d.state === "breath") {
         d.stateT += dt;
         d.vx *= 0.94; d.vy *= 0.94;
         d.x += d.vx * dt; d.y += d.vy * dt;
-        // emit breath cone
+        var isRay = d.telegraphType === "ray";
+        var rayDur = d.phase === 2 ? 1.45 : 1.1;
+        // emit breath cone (ray: a denser, faster, short-lived gold line)
         d.breathT = (d.breathT || 0) + dt;
-        if (d.breathT > 0.045) {
+        if (d.breathT > (isRay ? 0.026 : 0.045)) {
           d.breathT = 0;
-          var sweep = d.breathAng + Math.sin(d.stateT * 3.2) * 0.55;
-          var spd = 300;
-          DragonShots.spawn({
-            x: d.x + Math.cos(d.facing) * 70, y: d.y + Math.sin(d.facing) * 70,
-            vx: Math.cos(sweep) * spd, vy: Math.sin(sweep) * spd,
-            r: 22, dmg: 1, life: 2.4, color: PAL.ember, rot: sweep, kind: "breath"
-          });
+          var sweep, spd;
+          if (isRay) {
+            var rp = Math.min(1, d.stateT / rayDur);
+            sweep = d.breathAng + (rp - 0.5) * (d.phase === 2 ? 1.8 : 1.35) * (d.raySign || 1);
+            spd = 430;
+            DragonShots.spawn({
+              x: d.x + Math.cos(sweep) * 70, y: d.y + Math.sin(sweep) * 70,
+              vx: Math.cos(sweep) * spd, vy: Math.sin(sweep) * spd,
+              r: 17, dmg: 1, life: 0.95, color: PAL.gold, rot: sweep, kind: "breath"
+            });
+          } else {
+            sweep = d.breathAng + Math.sin(d.stateT * 3.2) * 0.55;
+            spd = 300;
+            DragonShots.spawn({
+              x: d.x + Math.cos(d.facing) * 70, y: d.y + Math.sin(d.facing) * 70,
+              vx: Math.cos(sweep) * spd, vy: Math.sin(sweep) * spd,
+              r: 22, dmg: 1, life: 2.4, color: PAL.ember, rot: sweep, kind: "breath"
+            });
+          }
         }
-        if (d.stateT > (d.phase === 2 ? 1.7 : 1.3)) this.dragonEndAttack();
+        if (d.stateT > (isRay ? rayDur : (d.phase === 2 ? 1.7 : 1.3))) this.dragonEndAttack();
+      }
+      // ----- blooming petal spiral (verdant) -----
+      else if (d.state === "spiral") {
+        d.stateT += dt;
+        d.vx *= 0.94; d.vy *= 0.94;
+        d.x += d.vx * dt; d.y += d.vy * dt;
+        d.spiralT = (d.spiralT || 0) + dt;
+        var emitEvery = d.phase === 2 ? 0.07 : 0.09;
+        while (d.spiralT > emitEvery) {
+          d.spiralT -= emitEvery;
+          d.spiralAng += 0.62;
+          var arms = d.phase === 2 ? 2 : 1;
+          for (var ai = 0; ai < arms; ai++) {
+            var pa = d.spiralAng + ai * Math.PI;
+            DragonShots.spawn({
+              x: d.x + Math.cos(pa) * d.r * 0.45, y: d.y + Math.sin(pa) * d.r * 0.45,
+              vx: Math.cos(pa) * 295, vy: Math.sin(pa) * 295,
+              r: 13, dmg: 1, life: 2.6, color: "#d98ba0", rot: pa, kind: "petal"
+            });
+          }
+        }
+        if (d.stateT > (d.phase === 2 ? 1.8 : 1.4)) this.dragonEndAttack();
       }
     },
 
@@ -1704,14 +2404,31 @@
       var d = this.dragon;
       d.state = "telegraph";
       d.stateT = 0;
-      // choose attack
-      var choices = ["volley", "aimed", "breath"];
-      if (d.phase === 2) choices = ["volley", "aimed", "breath", "dash", "dash"];
+      // choose attack — each dragon has its own kit
+      var choices;
+      if (d.type === "storm") {
+        choices = ["fan", "lance", "nova"];
+        if (d.phase === 2) choices = ["fan", "lance", "nova", "dash", "dash"];
+      } else if (d.type === "verdant") {
+        choices = ["spiral", "seeds", "spiral", "seeds"];
+        if (d.phase === 2) choices = ["spiral", "seeds", "spiral", "dash", "dash"];
+      } else if (d.type === "gilded") {
+        choices = ["lures", "ray", "coins"];
+        if (d.phase === 2) choices = ["lures", "ray", "coins", "dash", "dash"];
+      } else {
+        choices = ["volley", "aimed", "breath"];
+        if (d.phase === 2) choices = ["volley", "aimed", "breath", "dash", "dash"];
+      }
+      // ceremonial adaptation: it has evolved a move from another dragon's kit
+      if (d.ceremonial && d.stolen) { choices = choices.concat([d.stolen, d.stolen]); }
       d.telegraphType = choices[(Math.random() * choices.length) | 0];
-      d.telegraph = d.telegraphType === "dash" ? 0.6 : 0.5;
+      d.telegraph = d.telegraphType === "dash" ? 0.6
+        : (d.telegraphType === "nova" || d.telegraphType === "spiral") ? 0.7
+        : d.telegraphType === "ray" ? 0.65 : 0.5;
       d.telegraphMax = d.telegraph;
-      if (d.telegraphType === "breath") {
+      if (d.telegraphType === "breath" || d.telegraphType === "ray") {
         d.breathAng = Math.atan2(this.player.y - d.y, this.player.x - d.x);
+        d.raySign = Math.random() < 0.5 ? -1 : 1;
       }
     },
 
@@ -1760,10 +2477,172 @@
         d.state = "breath"; d.stateT = 0; d.breathT = 0;
         d.breathAng = Math.atan2(p.y - d.y, p.x - d.x);
       }
+      // ----- storm kit -----
+      else if (t === "fan") {
+        // a crackling fan of bolts — tighter and faster than Ember's volley
+        var fn = d.phase === 2 ? 11 : 7;
+        var fspread = Math.PI * (d.phase === 2 ? 0.7 : 0.48);
+        var fbase = Math.atan2(p.y - d.y, p.x - d.x) - fspread / 2;
+        for (var fi = 0; fi < fn; fi++) {
+          var fa = fbase + fspread * (fi / (fn - 1));
+          DragonShots.spawn({
+            x: d.x, y: d.y, vx: Math.cos(fa) * 350, vy: Math.sin(fa) * 350,
+            r: 15, dmg: 1, life: 2.6, color: "#8fd0ff", rot: fa, kind: "zap"
+          });
+        }
+        Audio2.thunder(0.5);
+        d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.2 : 1.9;
+      } else if (t === "lance") {
+        // three fast bolts down one locked line — sidestep, don't outrun
+        var la = Math.atan2(p.y - d.y, p.x - d.x);
+        var ln = d.phase === 2 ? 4 : 3;
+        for (var ls = 0; ls < ln; ls++) {
+          (function (delay) {
+            setTimeout(function () {
+              if (Game.state !== "PLAYING" || Game.dragon !== d) return;
+              DragonShots.spawn({
+                x: d.x + Math.cos(la) * 70, y: d.y + Math.sin(la) * 70,
+                vx: Math.cos(la) * 600, vy: Math.sin(la) * 600,
+                r: 17, dmg: 1, life: 2.2, color: "#bfe3ff", rot: la, kind: "zap"
+              });
+              Audio2.tone(340, 0.1, "square", 0.08, 180);
+            }, delay);
+          })(ls * 130);
+        }
+        d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.4 : 2.1;
+      } else if (t === "nova") {
+        // thunderclap: a radial shell of bolts from the body
+        this.stormNova(d, d.phase === 2 ? 16 : 12, 255, 0);
+        if (d.phase === 2) {
+          setTimeout(function () {
+            if (Game.state === "PLAYING" && Game.dragon === d) Game.stormNova(d, 16, 255, Math.PI / 16);
+          }, 380);
+        }
+        Audio2.thunder(1);
+        this.addShake(6);
+        d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.5 : 2.3;
+      }
+      // ----- verdant kit -----
+      else if (t === "spiral") {
+        // a blooming spiral of petals wheels out from the body over time
+        d.state = "spiral"; d.stateT = 0; d.spiralT = 0;
+        d.spiralAng = Math.atan2(p.y - d.y, p.x - d.x);
+        Audio2.tone(320, 0.3, "sine", 0.1, 180);
+      } else if (t === "seeds") {
+        // lob three slow seed pods that drift toward you, then burst
+        var sa = Math.atan2(p.y - d.y, p.x - d.x);
+        var offs = d.phase === 2 ? [-0.7, -0.23, 0.23, 0.7] : [-0.55, 0, 0.55];
+        for (var si = 0; si < offs.length; si++) {
+          var seedAng = sa + offs[si];
+          var seed = DragonShots.spawn({
+            x: d.x + Math.cos(seedAng) * 60, y: d.y + Math.sin(seedAng) * 60,
+            vx: Math.cos(seedAng) * 130, vy: Math.sin(seedAng) * 130,
+            r: 20, dmg: 1, life: 6, color: "#93b48b", rot: seedAng, kind: "seed"
+          });
+          if (seed) seed.fuse = 2.1 + si * 0.25;
+        }
+        Audio2.tone(240, 0.25, "sine", 0.1, 130);
+        d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.6 : 2.4;
+      }
+      // ----- gilded kit (GREED) -----
+      else if (t === "lures") {
+        // scatter hovering false scales — gold and glinting, but rimmed
+        // dark and pulsing slow. Get close (or wait) and they detonate.
+        var ln2 = d.phase === 2 ? 4 : 3;
+        for (var li2 = 0; li2 < ln2; li2++) {
+          var lt = ln2 === 1 ? 0.5 : li2 / (ln2 - 1);
+          var lx = VW * (0.18 + 0.64 * lt) + (Math.random() - 0.5) * 56;
+          var ly = VH * (0.34 + Math.random() * 0.2);
+          // launch velocity decays exponentially so each lure settles ~at
+          // its scatter point, then hovers (no steering, gentle drift)
+          var lu = DragonShots.spawn({
+            x: d.x, y: d.y,
+            vx: (lx - d.x) * 3.9, vy: (ly - d.y) * 3.9,
+            r: 16, dmg: 1, life: 6, color: PAL.gold, rot: 0, kind: "lure"
+          });
+          if (lu) lu.fuse = 1.6 + li2 * 0.12;
+        }
+        Audio2.tone(880, 0.2, "sine", 0.08, 1180);
+        d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.5 : 2.3;
+      } else if (t === "ray") {
+        // sweeping sun-beam: reuses the breath state with a gold branch
+        d.state = "breath"; d.stateT = 0; d.breathT = 0;
+        if (d.breathAng == null) d.breathAng = Math.atan2(p.y - d.y, p.x - d.x);
+        Audio2.tone(520, 0.5, "sawtooth", 0.1, 260);
+      } else if (t === "coins") {
+        // a lobbed volley of spinning coins that arc under gravity
+        var cn = d.phase === 2 ? 7 : 5;
+        var cAim = Math.atan2(p.y - d.y, p.x - d.x);
+        for (var ci2 = 0; ci2 < cn; ci2++) {
+          var lob = cAim + (cn === 1 ? 0 : (ci2 / (cn - 1) - 0.5)) * 1.15;
+          DragonShots.spawn({
+            x: d.x + Math.cos(lob) * 60, y: d.y + Math.sin(lob) * 60,
+            vx: Math.cos(lob) * (180 + Math.random() * 80),
+            vy: Math.sin(lob) * 150 - (130 + Math.random() * 90),
+            r: 15, dmg: 1, life: 3.2, color: PAL.gold, rot: lob, kind: "coin",
+            grav: 560
+          });
+        }
+        Audio2.tone(660, 0.22, "triangle", 0.1, 420);
+        Audio2.noise(0.12, 0.08, 2400);
+        d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.4 : 2.2;
+      }
+    },
+
+    // false-scale detonation: five radial gold shots
+    burstLure: function (s) {
+      s.active = false;
+      var off = Math.random() * TAU;
+      for (var i = 0; i < 5; i++) {
+        var a = off + (i / 5) * TAU;
+        DragonShots.spawn({
+          x: s.x, y: s.y, vx: Math.cos(a) * 270, vy: Math.sin(a) * 270,
+          r: 13, dmg: 1, life: 1.8, color: PAL.gold, rot: a, kind: "fire"
+        });
+      }
+      Particles.burst(s.x, s.y, 8, PAL.gold, 3, 14, 0.4);
+      Particles.ring(s.x, s.y, PAL.gold, 14, 430, 0.35, 4);
+      Particles.sparkBurst(s.x, s.y, 6, "#fff3c4", 340, 0.3);
+      Audio2.tone(700, 0.12, "square", 0.09, 300);
+    },
+
+    // seed pod detonation: a ring of petals
+    burstSeed: function (s) {
+      s.active = false;
+      var n = 6;
+      var off = Math.random() * TAU;
+      for (var i = 0; i < n; i++) {
+        var a = off + (i / n) * TAU;
+        DragonShots.spawn({
+          x: s.x, y: s.y, vx: Math.cos(a) * 265, vy: Math.sin(a) * 265,
+          r: 13, dmg: 1, life: 1.6, color: "#d98ba0", rot: a, kind: "petal"
+        });
+      }
+      Particles.burst(s.x, s.y, 8, PAL.sage, 3, 14, 0.4);
+      Particles.ring(s.x, s.y, PAL.sage, 14, 420, 0.35, 4);
+      Audio2.noise(0.16, 0.12, 1600);
+    },
+
+    stormNova: function (d, n, spd, offset) {
+      for (var i = 0; i < n; i++) {
+        var a = offset + (i / n) * TAU;
+        DragonShots.spawn({
+          x: d.x + Math.cos(a) * d.r * 0.5, y: d.y + Math.sin(a) * d.r * 0.5,
+          vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
+          r: 15, dmg: 1, life: 3, color: "#8fd0ff", rot: a, kind: "zap"
+        });
+      }
+      Particles.ring(d.x, d.y, PAL.wisteria, d.r * 0.6, 900, 0.5, 7);
+      Particles.sparkBurst(d.x, d.y, 10, "#bfe3ff", 480, 0.4);
     },
 
     dragonEndAttack: function () {
       var d = this.dragon;
+      // the storm wyrm discharges as it pulls out of a dash
+      if (d.type === "storm" && d.telegraphType === "dash") {
+        this.stormNova(d, 6, 210, Math.random() * TAU);
+        Audio2.thunder(0.4);
+      }
       d.state = "roam"; d.stateT = 0;
       d.attackCd = d.phase === 2 ? 1.0 : 1.8;
       d.telegraphType = null;
@@ -1795,6 +2674,28 @@
       });
 
       DragonShots.forEach(function (s) {
+        // seed pods drift toward the player, then burst into petals
+        if (s.kind === "seed") {
+          var sdx = p.x - s.x, sdy = p.y - s.y;
+          var sl = Math.hypot(sdx, sdy) || 1;
+          var steer = 220;
+          s.vx += (sdx / sl) * steer * dt; s.vy += (sdy / sl) * steer * dt;
+          var spd2 = Math.hypot(s.vx, s.vy);
+          var maxSpd = 185;
+          if (spd2 > maxSpd) { s.vx = s.vx / spd2 * maxSpd; s.vy = s.vy / spd2 * maxSpd; }
+          s.fuse -= dt;
+          if (s.fuse <= 0 || sl < 64) { self.burstSeed(s); return; }
+        }
+        // gilded lures settle, hover glinting, then detonate near the greedy
+        if (s.kind === "lure") {
+          s.vx *= Math.pow(0.005, dt); s.vy *= Math.pow(0.005, dt);
+          s.x += Math.sin(self.time * 1.7 + s.seed) * 9 * dt;
+          s.fuse -= dt;
+          var lpx = p.x - s.x, lpy = p.y - s.y;
+          if (s.fuse <= 0 || lpx * lpx + lpy * lpy < 70 * 70) { self.burstLure(s); return; }
+        }
+        // lobbed coins arc under gravity
+        if (s.grav) s.vy += s.grav * dt;
         s.x += s.vx * dt; s.y += s.vy * dt;
         s.rot += 3 * dt;
         s.life -= dt;
@@ -1825,6 +2726,7 @@
       if (!d || d.state === "bow") return;
       var before = d.health;
       d.health = Math.max(0, d.health - dmg);
+      if (this.runStats) this.runStats.dmg += Math.min(dmg, before);
       d.hitFlash = 0.16;
       Particles.burst(x, y, Math.min(12, 4 + dmg), PAL.ember, 3, 14, 0.36);
       Particles.glow(x, y, 0, 0, 16 + dmg * 1.4, 1.5, 0.24, PAL.gold, 0.7, 0.9);
@@ -1850,17 +2752,34 @@
 
     dropScale: function (x, y) {
       var ang = Math.random() * Math.PI * 2;
+      // 1 in 10 scales falls lustrous — bigger, iridescent, worth +3
+      var rare = Math.random() < 0.1;
       Pickups.list.push({
         x: x, y: y, vx: Math.cos(ang) * 90, vy: Math.sin(ang) * 90 - 60,
-        r: 22, t: 0, collected: false, magnet: false,
+        r: 22, t: 0, collected: false, magnet: false, rare: rare,
         type: this.dragon.type
       });
-      Particles.burst(x, y, 6, PAL.gold, 3, 12, 0.4);
+      Particles.burst(x, y, rare ? 12 : 6, rare ? PAL.wisteria : PAL.gold, 3, rare ? 16 : 12, 0.4);
+      if (rare) Particles.ring(x, y, PAL.rose, 14, 420, 0.36, 4);
     },
 
     hurtPlayer: function (dmg, x, y) {
       var p = this.player;
       if (p.iframes > 0) return;
+      // REGALIA: Sorrel's Mantle — the leaf ward drinks one blow
+      if (p.ward) {
+        p.ward = false;
+        p.wardCd = 12;
+        p.iframes = 0.8;
+        Particles.burst(p.x, p.y, 10, PAL.sage, 4, 16, 0.4);
+        Particles.ring(p.x, p.y, PAL.sage, 20, 540, 0.4, 5);
+        this.floatText(p.x, p.y - 34, "ward spent", PAL.sage);
+        Audio2.noise(0.14, 0.1, 1800);
+        var wdx = p.x - x, wdy = p.y - y;
+        var wl = Math.hypot(wdx, wdy) || 1;
+        p.vx += (wdx / wl) * 200; p.vy += (wdy / wl) * 200;
+        return;
+      }
       p.health -= dmg;
       p.iframes = 0.9;       // brief mercy invuln
       p.hurtFlash = 0.5;
@@ -1868,6 +2787,7 @@
       this.flashRed = 0.6;
       this.addShake(12);
       this.hitStop = 0.05;
+      buzz(35);
       Audio2.hurt();
       Particles.burst(p.x, p.y, 12, PAL.rose, 4, 16, 0.4);
       Particles.ring(p.x, p.y, PAL.rose, 20, 620, 0.42, 6);
@@ -1894,7 +2814,9 @@
         // gravity-ish settle then magnet toward player
         var dx = p.x - s.x, dy = p.y - s.y;
         var dist = Math.hypot(dx, dy);
-        if (dist < 150 || s.magnet) {
+        // RELIC: thistle down — scales drift in from much farther away
+        var magnetR = Save.hasRelic("thistleDown") ? 300 : 150;
+        if (dist < magnetR || s.magnet) {
           s.magnet = true;
           var pull = 520;
           s.vx += (dx / dist) * pull * dt;
@@ -1915,12 +2837,20 @@
     },
 
     collectScale: function (s) {
-      this.scaleProgress++;
+      // lustrous scales bank 3; the gilded crest doubles AFTER the rare bonus
+      var worth = s.rare ? 3 : 1;
+      if (Save.hasRegalia("gildedCrest") && this.player.health === this.player.maxHealth) worth *= 2;
+      this.scaleProgress += worth;
+      buzz(8);
       Audio2.scale();
       Particles.burst(this.player.x, this.player.y, 8, PAL.gold, 3, 12, 0.4);
       Particles.ring(this.player.x, this.player.y, PAL.gold, 12, 360, 0.32, 3);
       Particles.sparkBurst(this.player.x, this.player.y, 6, PAL.gold, 300, 0.3);
-      this.floatText(this.player.x, this.player.y - 30, "+1 scale", PAL.gold);
+      if (s.rare) {
+        this.floatText(this.player.x, this.player.y - 30, "+" + worth + " lustrous!", PAL.rose);
+      } else {
+        this.floatText(this.player.x, this.player.y - 30, "+" + worth + " scale" + (worth > 1 ? "s" : ""), PAL.gold);
+      }
       this.updateHUD();
       if (this.scaleProgress >= this.nextPowerAt) {
         this.nextPowerAt += 4;
@@ -1997,24 +2927,125 @@
       Particles.ring(d.x, d.y, "#fff6dd", 16, 460, 0.55, 4);
       Particles.sparkBurst(d.x, d.y, 16, PAL.gold, 520, 0.5);
       DragonShots.clear();
+      buzz([20, 60, 40]);
       Audio2.victory();
-      // bank scales
-      Save.addScales(this.scaleProgress);
-      // grant relic
-      var relicId = this.scaleProgress >= 12 ? "cinderGift" : "emberHeart";
+      // bank only the scales earned since the previous duel
+      Save.addScales(this.scaleProgress - this.scalesBanked);
+      this.scalesBanked = this.scaleProgress;
+      // lifetime records
+      var rec0 = Save.data.records;
+      rec0.totalDuelsWon++;
+      if (this.scaleProgress > rec0.mostScalesRun) rec0.mostScalesRun = this.scaleProgress;
+      Save.save();
+
+      // ----- ceremonial victory: bonus scales + trophies, no relic, no crown -----
+      if (d.ceremonial) {
+        var bonus = 3 + d.tier;
+        Save.addScales(bonus);
+        Save.addDuel(d.type);
+        // trophy ladder: 1st ceremony = plume, 2nd = regalia, then scales
+        var plumeId = DRAGON_PLUME[d.type];
+        var gotPlume = plumeId ? Save.addPlume(plumeId) : false;
+        var regId = DRAGON_REGALIA[d.type];
+        var gotRegalia = (!gotPlume && d.tier >= 1 && regId) ? Save.addRegalia(regId) : false;
+        this.winIsFinal = false;
+        var cName = d.name.replace("⟡ ", "").split(",")[0];
+        var self2 = this;
+        setTimeout(function () {
+          self2.state = "WIN";
+          self2.wipe();
+          self2.setWinHeader("respect earned", "You have earned its respect");
+          $("win-sub").textContent = cName + " bows once more, honored by the ceremony. " +
+            bonus + " bonus scales join your hoard.";
+          if (gotPlume && PLUMES[plumeId]) {
+            var PL = PLUMES[plumeId];
+            $("relic-grant").innerHTML =
+              '<span class="relic-glyph">' + PL.glyph + '</span>' +
+              '<span><span class="relic-text-name">Plume gained: ' + PL.name + '</span>' +
+              '<br><span class="relic-text-desc">' + PL.desc + '</span></span>';
+          } else if (gotRegalia && REGALIA[regId]) {
+            var RG = REGALIA[regId];
+            $("relic-grant").innerHTML =
+              '<span class="relic-glyph">' + RG.glyph + '</span>' +
+              '<span><span class="relic-text-name">Regalia gained: ' + RG.name + '</span>' +
+              '<br><span class="relic-text-desc">' + RG.desc + '</span></span>';
+          } else {
+            $("relic-grant").innerHTML =
+              '<span class="relic-glyph">✨</span>' +
+              '<span><span class="relic-text-name">The ceremony deepens</span>' +
+              '<br><span class="relic-text-desc">It will fight harder next time — and reward you better.</span></span>';
+          }
+          $("btn-continue").textContent = "Return to the sky";
+          $("win-stats").textContent = self2.fmtRunStats();
+          self2.showScreen("win");
+        }, reduceMotion ? 600 : 1400);
+        return;
+      }
+
+      // grant this dragon's relic
+      var relicId;
+      if (d.type === "gilded") relicId = this.scaleProgress >= 20 ? "gildedGift" : "gildedHeart";
+      else if (d.type === "verdant") relicId = this.scaleProgress >= 16 ? "verdantGift" : "thistleDown";
+      else if (d.type === "storm") relicId = this.scaleProgress >= 12 ? "stormGift" : "galeFeather";
+      else relicId = this.scaleProgress >= 8 ? "cinderGift" : "emberHeart";
       var hadBefore = Save.hasRelic(relicId);
       Save.addRelic(relicId);
 
+      // mark this realm at peace
+      var remaining = 0;
+      if (this.sky) {
+        for (var ri = 0; ri < this.sky.realms.length; ri++) {
+          var rm = this.sky.realms[ri];
+          if (rm.type === d.type) rm.defeated = true;
+          else if (!rm.defeated) remaining++;
+        }
+      }
+      var isFinal = remaining === 0;
+      this.winIsFinal = isFinal;
+      var firstName = d.name.split(",")[0];
       var self = this;
+
+      // THE CROWNING — every realm at peace; the sky turns to gold
+      if (isFinal) {
+        Save.data.crowned = true;
+        var fc = Save.data.records.fastestCrown;
+        if (this.runStats && (fc == null || this.runStats.time < fc)) {
+          Save.data.records.fastestCrown = Math.round(this.runStats.time);
+        }
+        Save.save();
+        if (!reduceMotion) {
+          Particles.ring(d.x, d.y, PAL.gold, 40, 900, 1.0, 10);
+          Particles.ring(d.x, d.y, "#fff3c4", 24, 620, 0.8, 6);
+          for (var ci3 = 0; ci3 < 10; ci3++) {
+            Particles.glow(
+              VW * (0.15 + Math.random() * 0.7), VH * (0.5 + Math.random() * 0.4),
+              (Math.random() - 0.5) * 0.6, -1.4 - Math.random() * 1.6,
+              8 + Math.random() * 12, 0.9, 1.3 + Math.random() * 0.6, PAL.gold, 0.6, 0.99);
+          }
+          this.flashWhite = 0.25;
+        }
+      }
+
       setTimeout(function () {
         self.state = "WIN";
-        self.wipe();
+        self.wipe(isFinal); // the crowning gets the golden wipe
         var R = RELICS[relicId];
-        $("win-sub").textContent = "Ember bows its great head. " + self.scaleProgress + " scales now rest in your hoard.";
+        self.setWinHeader(isFinal ? "the crowning" : "respect earned",
+          isFinal ? "Dragoose, Ruler of the Skies" : "You have earned its respect");
+        if (isFinal) {
+          $("win-sub").textContent = firstName + " bows amid the quieting sky. Every dragon's respect is yours — " +
+            "the skies name you Dragoose, and " +
+            self.scaleProgress + " scale" + (self.scaleProgress === 1 ? "" : "s") + " rest in your hoard.";
+        } else {
+          $("win-sub").textContent = firstName + " bows its great head. The sky opens again — " +
+            remaining + " realm" + (remaining === 1 ? " still waits" : "s still wait") + " for you.";
+        }
         $("relic-grant").innerHTML =
           '<span class="relic-glyph">' + R.glyph + '</span>' +
           '<span><span class="relic-text-name">' + (hadBefore ? "Relic strengthened: " : "Relic gained: ") + R.name + '</span>' +
           '<br><span class="relic-text-desc">' + R.desc + '</span></span>';
+        $("btn-continue").textContent = isFinal ? "Onward" : "Return to the sky";
+        $("win-stats").textContent = self.fmtRunStats();
         self.showScreen("win");
       }, reduceMotion ? 600 : 1400);
     },
@@ -2025,16 +3056,21 @@
       Audio2.death();
       this.flashWhite = 0.4;
       Save.addScales(Math.floor(this.scaleProgress / 2)); // partial salvage
+      if (this.scaleProgress > Save.data.records.mostScalesRun) {
+        Save.data.records.mostScalesRun = this.scaleProgress; Save.save();
+      }
       Particles.burst(this.player.x, this.player.y, 20, PAL.rose, 5, 24, 0.4);
       var self = this;
       setTimeout(function () {
         self.wipe();
+        var dn = self.dragon ? self.dragon.name.split(",")[0] : "The dragon";
         var lines = [
           "You earned " + Math.floor(self.scaleProgress / 2) + " salvaged scales for the hoard.",
           "The dragon's respect must be won another day.",
-          "Ember snorts. It expected more of a goose."
+          dn + " snorts. It expected more of a goose."
         ];
         $("dead-sub").textContent = lines[(Math.random() * lines.length) | 0];
+        $("dead-stats").textContent = self.fmtRunStats();
         self.showScreen("dead");
       }, reduceMotion ? 300 : 700);
     },
@@ -2042,6 +3078,9 @@
     // ----- HUD -----
     updateHUD: function () {
       var d = this.dragon, p = this.player;
+      // no duel, no boss bar (the open sky hides it)
+      var bossBar = this._bossBarEl || (this._bossBarEl = document.querySelector(".boss-bar"));
+      if (bossBar) bossBar.style.visibility = d ? "visible" : "hidden";
       if (d) {
         var pct = Math.max(0, d.health / d.maxHealth) * 100;
         var fill = $("boss-fill");
@@ -2089,6 +3128,7 @@
       this.drawClouds(g, 0.5);   // far/mid clouds behind action
 
       if (this.state === "PLAYING" || this.state === "PAUSED" || this.state === "POWER" || this.state === "DEAD" || this.state === "WIN") {
+        if (this.mode === "sky" && this.sky) this.drawRealms(g);
         if (this.dragon) this.drawDragon(g);
         Particles.draw(g);
         this.drawDragonShots(g);
@@ -2101,6 +3141,12 @@
       this.drawClouds(g, 0.85, true); // nearest clouds in front for depth
 
       g.restore();
+
+      // boss-intro name card (steady — drawn outside the shake transform)
+      if (this.introT > 0 && this.mode === "duel" && this.dragon &&
+          (this.state === "PLAYING" || this.state === "PAUSED")) {
+        this.drawIntroCard(g);
+      }
 
       // screen treatment: vignette + color grade in one pre-baked layer
       if (Fx.vignette) g.drawImage(Fx.vignette, 0, 0);
@@ -2155,6 +3201,17 @@
       grd.addColorStop(1, "#4f7ba0");
       g.fillStyle = grd;
       g.fillRect(0, 0, VW, VH);
+
+      // realm-proximity tint: nearing a realm warms the sky toward its pigment
+      var tint = (this.mode === "sky" && this.sky) ? this.sky.tint : null;
+      if (tint && tint.k > 0.02) {
+        var tg = g.createRadialGradient(tint.x, tint.y, 0, tint.x, tint.y, VH * 0.85);
+        tg.addColorStop(0, Fx.rgba(tint.color, 0.12 * tint.k));
+        tg.addColorStop(0.55, Fx.rgba(tint.color, 0.05 * tint.k));
+        tg.addColorStop(1, Fx.rgba(tint.color, 0));
+        g.fillStyle = tg;
+        g.fillRect(0, 0, VW, VH);
+      }
 
       var sx = VW * 0.78, sy = VH * 0.1;
 
@@ -2255,11 +3312,19 @@
       var sg = scr._ctx;
       sg.save();
       sg.translate(75, 72);
+      var plume = PLUMES[Save.data.plume];
       Art.goose(sg, {
         flap: p.flapPhase || 0,
         bank: p.bank,
         hurt: Math.min(1, p.hurtFlash * 1.6),
-        charge: p.charging ? p.charge : 0
+        charge: p.charging ? p.charge : 0,
+        tint: plume ? plume.color : null,
+        gear: {
+          horns: Save.hasRegalia("emberHorns"),
+          spade: Save.hasRegalia("tempestSpade"),
+          mantle: Save.hasRegalia("sorrelMantle"),
+          crown: Save.data.crowned
+        }
       });
       sg.restore();
 
@@ -2289,6 +3354,24 @@
       g.scale(k, k);
       g.drawImage(scr, -75, -72);
       g.restore();
+
+      // REGALIA: the leaf ward shimmers as a slow ring of green light
+      if (p.ward) {
+        g.save();
+        g.translate(p.x, p.y);
+        g.rotate(this.time * 1.1);
+        g.globalCompositeOperation = "lighter";
+        g.strokeStyle = Fx.rgba(PAL.sage, 0.4 + Math.sin(this.time * 4) * 0.12);
+        g.lineWidth = 2.5;
+        g.lineCap = "round";
+        for (var wi = 0; wi < 4; wi++) {
+          g.beginPath();
+          g.arc(0, 0, 42, wi * (TAU / 4), wi * (TAU / 4) + 1.0);
+          g.stroke();
+        }
+        Fx.drawDot(g, 0, 0, 50, PAL.sage, 0.08, true);
+        g.restore();
+      }
     },
 
     drawChargeUI: function (g) {
@@ -2350,16 +3433,17 @@
     },
 
     // jagged, flickering lightning bolt
-    drawBolt: function (g, s) {
+    drawBolt: function (g, s, col) {
+      col = col || PAL.wisteria;
       var ang = s.rot;
       var len = s.r * 3.4;
       var px = Math.cos(ang + Math.PI / 2), py = Math.sin(ang + Math.PI / 2);
-      Fx.drawDot(g, s.x, s.y, s.r * 1.9, PAL.wisteria, 0.5, true);
+      Fx.drawDot(g, s.x, s.y, s.r * 1.9, col, 0.5, true);
       g.save();
       g.globalCompositeOperation = "lighter";
       g.lineCap = "round"; g.lineJoin = "round";
       for (var pass = 0; pass < 2; pass++) {
-        g.strokeStyle = pass === 0 ? Fx.rgba(PAL.wisteria, 0.65) : "rgba(255,255,255,0.92)";
+        g.strokeStyle = pass === 0 ? Fx.rgba(col, 0.65) : "rgba(255,255,255,0.92)";
         g.lineWidth = pass === 0 ? 5.5 : 2.2;
         g.beginPath();
         var segs = 5;
@@ -2395,11 +3479,68 @@
       var self = this;
       DragonShots.forEach(function (s) {
         if (s.kind === "breath") {
-          // breath cone droplets: soft, smoky, painterly
-          var t2 = s.life / 2.4;
-          Fx.drawDot(g, s.x, s.y, s.r * 1.5, PAL.emberDeep, 0.4 * t2 + 0.15, false);
-          Fx.drawDot(g, s.x, s.y, s.r * 1.1, PAL.ember, 0.5, true);
-          Fx.drawDot(g, s.x, s.y, s.r * 0.5, PAL.gold, 0.55, true);
+          // breath droplets as pooled watercolor: each is a ragged pigment
+          // blot — offset soft pools (stable per-droplet via the seed), a
+          // darker edge settling behind the travel direction, and an alpha
+          // ease so blots bloom wet then dry away
+          var isRay2 = s.color === PAL.gold;                 // gilded sun-beam vs ember breath
+          var maxL2 = isRay2 ? 0.95 : 2.4;
+          var age2 = 1 - Math.max(0, s.life) / maxL2;        // 0 fresh -> 1 spent
+          var ease2 = age2 < 0.22 ? age2 / 0.22 : 1 - (age2 - 0.22) / 0.78;
+          if (ease2 < 0) ease2 = 0;
+          var spread2 = 1 + age2 * 0.55;                     // pigment soaks outward
+          var sd2 = s.seed;
+          var bx3 = -Math.cos(s.rot) * s.r * 0.55;           // opposite travel
+          var by3 = -Math.sin(s.rot) * s.r * 0.55;
+          var edgeC2 = isRay2 ? "#a8863c" : PAL.emberDeep;
+          var bodyC2 = isRay2 ? PAL.gold : PAL.ember;
+          var coreC2 = isRay2 ? "#fff3c4" : PAL.gold;
+          // wet base wash + darker edge pooling at the trailing rim
+          Fx.drawDot(g, s.x + bx3 * 0.4, s.y + by3 * 0.4, s.r * 1.55 * spread2, edgeC2, 0.08 + 0.26 * ease2, false);
+          Fx.drawDot(g, s.x + bx3, s.y + by3, s.r * 0.8 * spread2, edgeC2, 0.34 * ease2, false);
+          // ragged blot: offset pigment pools of varying radius
+          Fx.drawDot(g, s.x + Math.cos(sd2) * s.r * 0.42, s.y + Math.sin(sd2) * s.r * 0.42, s.r * 1.05 * spread2, bodyC2, 0.42 * ease2, true);
+          Fx.drawDot(g, s.x + Math.cos(sd2 * 2.3) * s.r * 0.55, s.y + Math.sin(sd2 * 2.3) * s.r * 0.55, s.r * 0.72 * spread2, bodyC2, 0.38 * ease2, true);
+          Fx.drawDot(g, s.x + Math.cos(sd2 * 3.7) * s.r * 0.3, s.y + Math.sin(sd2 * 3.7) * s.r * 0.3, s.r * 0.5 * spread2, coreC2, 0.5 * ease2, true);
+          Fx.drawDot(g, s.x, s.y, s.r * 0.34, coreC2, 0.55 * ease2, true);
+        } else if (s.kind === "zap") {
+          // hostile lightning: deep indigo rim keeps it readable on the sky
+          Fx.drawDot(g, s.x, s.y, s.r * 1.8, "#2f3f66", 0.34, false);
+          self.drawBolt(g, s, s.color || "#8fd0ff");
+        } else if (s.kind === "seed") {
+          // drifting seed pod: dark husk, pulsing green heart, gold fuse glint
+          var pu = 0.5 + Math.sin(self.time * (6 + s.seed) ) * 0.5;
+          Fx.drawDot(g, s.x, s.y, s.r * 1.7, "#3c4f36", 0.5, false);
+          Fx.drawDot(g, s.x, s.y, s.r * 1.15, PAL.sage, 0.75, true);
+          Fx.drawDot(g, s.x, s.y, s.r * (0.5 + pu * 0.2), "#e5f0a8", 0.6 + pu * 0.3, true);
+          for (var ti2 = 1; ti2 < s.trail.length; ti2++) {
+            var tt2 = 1 - ti2 / s.trail.length;
+            Fx.drawDot(g, s.trail[ti2].x, s.trail[ti2].y, s.r * 0.5 * tt2, PAL.sage, tt2 * 0.2, true);
+          }
+        } else if (s.kind === "petal") {
+          // whirling petal: rose bloom over a moss rim
+          Fx.drawDot(g, s.x, s.y, s.r * 1.6, "#5e4a4a", 0.3, false);
+          Fx.drawDot(g, s.x, s.y, s.r * 1.25, PAL.rose, 0.7, true);
+          Fx.drawDot(g, s.x, s.y, s.r * 0.55, "#f3d9de", 0.8, true);
+        } else if (s.kind === "lure") {
+          // false scale: gold glint with a dark rim + slow pulse (the tell)
+          var lp2 = 0.5 + Math.sin(self.time * 2.2 + s.seed) * 0.5;
+          Fx.drawDot(g, s.x, s.y, s.r * 2.0, "#59481f", 0.42, false);
+          Fx.drawDot(g, s.x, s.y, s.r * 1.25, PAL.gold, 0.5 + lp2 * 0.3, true);
+          Fx.drawDot(g, s.x, s.y, s.r * 0.55, "#fff3c4", 0.45 + lp2 * 0.4, true);
+        } else if (s.kind === "coin") {
+          // spinning gilded disc, flashing thin as it turns
+          g.save();
+          g.translate(s.x, s.y);
+          g.rotate(s.rot * 0.4);
+          var cw2 = Math.abs(Math.sin(self.time * 9 + s.seed)) * 0.75 + 0.25;
+          g.scale(cw2, 1);
+          g.beginPath(); g.arc(0, 0, s.r, 0, TAU);
+          g.fillStyle = "#d9b96a"; g.fill();
+          g.lineWidth = 2.4; g.strokeStyle = "#8a6f2e";
+          g.globalAlpha = 0.85; g.stroke(); g.globalAlpha = 1;
+          g.restore();
+          Fx.drawDot(g, s.x, s.y, s.r * 1.7, PAL.gold, 0.22, true);
         } else {
           // hostile crimson rim under the flame so enemy fire reads at a glance
           Fx.drawDot(g, s.x, s.y, s.r * 1.7, "#a03428", 0.32, false);
@@ -2420,10 +3561,17 @@
         var bob = Math.sin(s.t * 5) * 4;
         g.translate(0, bob);
 
-        // pulsing treasure glow
+        // pulsing treasure glow (lustrous: iridescent hue-shifting shimmer)
         var pulse = 0.5 + Math.sin(s.t * 6) * 0.2;
-        Fx.drawDot(g, 0, 0, 40, PAL.gold, pulse * 0.55, true);
-        Fx.drawDot(g, 0, 0, 20, "#fff3cf", pulse * 0.5, true);
+        if (s.rare) {
+          var li = (s.t * 2.4) | 0;
+          Fx.drawDot(g, 0, 0, 54, LUSTRE[li % 3], pulse * 0.6, true);
+          Fx.drawDot(g, 0, 0, 30, LUSTRE[(li + 1) % 3], pulse * 0.5, true);
+          Fx.drawDot(g, 0, 0, 20, "#fff3cf", pulse * 0.55, true);
+        } else {
+          Fx.drawDot(g, 0, 0, 40, PAL.gold, pulse * 0.55, true);
+          Fx.drawDot(g, 0, 0, 20, "#fff3cf", pulse * 0.5, true);
+        }
 
         // rotating four-point gleam
         g.save();
@@ -2443,8 +3591,143 @@
         g.restore();
 
         g.rotate(Math.sin(s.t * 2) * 0.3);
-        var sz = 56;
+        var sz = s.rare ? 72 : 56;
         g.drawImage(img, -sz / 2, -sz / 2, sz, sz);
+        g.restore();
+      }
+    },
+
+    // boss-intro name card: serif name over a thin gold rule, fading with introT
+    drawIntroCard: function (g) {
+      var d = this.dragon;
+      var t = 1 - this.introT / (this.introDur || 1);
+      if (t < 0) t = 0; else if (t > 1) t = 1;
+      // fade in over the first ~18%, out over the last ~28%
+      var a = Math.min(1, t / 0.18, (1 - t) / 0.28);
+      if (a <= 0.01) return;
+      var cy = VH * 0.45;
+      g.save();
+      // a soft paper wash so the serif reads on any sky
+      Fx.drawDot(g, VW / 2, cy + 6, 190, "#f6f1e7", 0.55 * a, false);
+      g.globalAlpha = a;
+      g.textAlign = "center";
+      g.font = 'italic 600 33px "Cormorant Garamond", Georgia, serif';
+      g.fillStyle = Fx.rgba(PAL.ink, 0.9);
+      var nm = d.ceremonial ? d.name.replace("⟡ ", "") : d.name;
+      g.fillText(nm, VW / 2, cy);
+      // thin gold rule, drawing itself wider as the card settles
+      var rw = 110 * (0.45 + 0.55 * Math.min(1, t / 0.4));
+      g.strokeStyle = Fx.rgba(PAL.gold, 0.95);
+      g.lineWidth = 1.4;
+      g.beginPath();
+      g.moveTo(VW / 2 - rw, cy + 16);
+      g.lineTo(VW / 2 + rw, cy + 16);
+      g.stroke();
+      if (d.ceremonial) {
+        g.font = 'italic 500 20px "Cormorant Garamond", Georgia, serif';
+        g.fillStyle = Fx.rgba("#8a7940", 0.95);
+        g.fillText("⟡ Ceremonial duel", VW / 2, cy + 42);
+      }
+      g.restore();
+    },
+
+    // the open sky's realm vortexes — swirling pools of each dragon's pigment
+    drawRealms: function (g) {
+      var t = this.time;
+      for (var i = 0; i < this.sky.realms.length; i++) {
+        var rm = this.sky.realms[i];
+        var bob = Math.sin(t * 0.9 + rm.phase) * 6;
+        var x = rm.x, y = rm.y + bob;
+        var breathe = 1 + Math.sin(t * 1.6 + rm.phase) * 0.05;
+
+        if (rm.defeated) {
+          // at peace: a calm golden bloom
+          Fx.drawDot(g, x, y, rm.r * 1.15, PAL.gold, 0.16, true);
+          Fx.drawDot(g, x, y, rm.r * 0.55, "#fff3d6", 0.22, true);
+          // HARMONY: once crowned, the befriended dragon circles its realm
+          if (Save.data.crowned) {
+            var mimg = Fx.miniDragon(rm.type);
+            var oa = this.time * 0.25 + rm.phase;
+            var ox = x + Math.cos(oa) * rm.r * 1.35;
+            var oy = y + Math.sin(oa) * rm.r * 1.35;
+            g.save();
+            g.translate(ox, oy);
+            g.rotate(oa + Math.PI); // rig faces up; face along the orbit
+            g.globalAlpha = 0.8;
+            g.scale(0.5, 0.5);
+            g.drawImage(mimg, -mimg.width / 2, -mimg.height / 2);
+            g.restore();
+          }
+          g.save();
+          g.globalAlpha = 0.5;
+          g.strokeStyle = PAL.gold;
+          g.lineWidth = 2;
+          g.beginPath(); g.arc(x, y, rm.r * 0.8, 0, TAU); g.stroke();
+          g.restore();
+        } else {
+          // pigment pool: layered washes + a slowly turning ragged ring
+          Fx.drawDot(g, x, y, rm.r * 1.6 * breathe, rm.pal.a, 0.18, true);
+          Fx.drawDot(g, x, y, rm.r * 1.05 * breathe, rm.pal.b, 0.3, false);
+          Fx.drawDot(g, x, y, rm.r * 0.55, rm.pal.b, 0.32, false);
+          Fx.drawDot(g, x, y, rm.r * 0.32, rm.pal.a, 0.3, true);
+
+          g.save();
+          g.translate(x, y);
+          g.rotate(t * 0.35 + rm.phase);
+          g.strokeStyle = Fx.rgba(rm.pal.b, 0.5);
+          g.lineWidth = 2.5;
+          g.lineCap = "round";
+          for (var s2 = 0; s2 < 5; s2++) {
+            g.beginPath();
+            g.arc(0, 0, rm.r * 0.82, s2 * (TAU / 5), s2 * (TAU / 5) + 0.8);
+            g.stroke();
+          }
+          // orbiting motes drawn into the swirl
+          g.globalCompositeOperation = "lighter";
+          for (var m2 = 0; m2 < 3; m2++) {
+            var ma = t * (0.7 + m2 * 0.23) + m2 * 2.1 + rm.phase;
+            Fx.drawDot(g, Math.cos(ma) * rm.r * 0.62, Math.sin(ma) * rm.r * 0.62,
+              7 + m2 * 2, "#fff7e0", 0.5, true);
+          }
+          g.restore();
+        }
+
+        // realm label
+        g.save();
+        g.textAlign = "center";
+        g.font = 'italic 500 21px "Cormorant Garamond", Georgia, serif';
+        g.fillStyle = Fx.rgba("#2e3a48", rm.defeated ? 0.5 : 0.8);
+        g.fillText(rm.name, x, y + rm.r + 26);
+        if (rm.defeated) {
+          g.font = '600 10px Karla, sans-serif';
+          g.fillStyle = Fx.rgba("#8a7940", 0.85);
+          g.fillText("R E S P E C T E D", x, y + rm.r + 43);
+          g.font = 'italic 14px "Cormorant Garamond", Georgia, serif';
+          g.fillStyle = Fx.rgba("#2e3a48", 0.55);
+          g.fillText("enter for a ceremonial duel", x, y + rm.r + 61);
+        }
+        g.restore();
+      }
+
+      // HARMONY: crowned skies belong to everyone — geese drift freely
+      if (Save.data.crowned) {
+        g.save();
+        g.strokeStyle = "rgba(253, 251, 244, 0.9)";
+        g.lineCap = "round";
+        g.lineJoin = "round";
+        for (var gz = 0; gz < HARMONY_GEESE.length; gz++) {
+          var gs = HARMONY_GEESE[gz];
+          var gx = ((this.time * gs.spd + gs.phase * 140) % (VW + 80)) - 40;
+          var gy = VH * gs.y0 + Math.sin(this.time * gs.freq + gs.phase) * gs.amp;
+          var fl2 = Math.sin(this.time * 5.2 + gs.phase * 3) * gs.size * 0.4;
+          g.lineWidth = 1.7;
+          g.globalAlpha = 0.65;
+          g.beginPath();
+          g.moveTo(gx - gs.size, gy - fl2);
+          g.lineTo(gx, gy + gs.size * 0.42);
+          g.lineTo(gx + gs.size, gy - fl2);
+          g.stroke();
+        }
         g.restore();
       }
     },
@@ -2463,11 +3746,13 @@
       g.save();
       g.translate(d.x, d.y);
 
-      // enraged: heat aura beneath the body
+      // enraged: heat aura beneath the body (storm: cold static halo)
       if (d.phase === 2 && d.state !== "bow") {
         var hp = 0.5 + Math.sin(this.time * 5) * 0.5;
-        Fx.drawDot(g, 0, 0, d.r * (1.35 + hp * 0.12), PAL.emberDeep, 0.1 + hp * 0.08, true);
-        Fx.drawDot(g, 0, 0, d.r * 0.9, PAL.rose, 0.07 + hp * 0.07, true);
+        var auraA = d.type === "storm" ? "#3d6288" : d.type === "verdant" ? "#597a52" : PAL.emberDeep;
+        var auraB = d.type === "storm" ? PAL.wisteria : d.type === "verdant" ? PAL.gold : PAL.rose;
+        Fx.drawDot(g, 0, 0, d.r * (1.35 + hp * 0.12), auraA, 0.1 + hp * 0.08, true);
+        Fx.drawDot(g, 0, 0, d.r * 0.9, auraB, 0.07 + hp * 0.07, true);
       }
       // bowing: warm golden halo of respect
       if (d.state === "bow") {
@@ -2478,7 +3763,10 @@
       if (d.state === "telegraph") {
         var prog = 1 - d.telegraph / d.telegraphMax;
         var pul = 0.5 + Math.sin(this.time * 18) * 0.5;
-        var tc = d.telegraphType === "dash" ? PAL.rose : PAL.gold;
+        var tc = d.telegraphType === "dash" ? PAL.rose
+               : d.type === "storm" ? "#bfe3ff"
+               : d.type === "verdant" ? "#d9ecc2"
+               : PAL.gold;
         var aim = d.telegraphType === "breath" ? d.breathAng : Math.atan2(this.player.y - d.y, this.player.x - d.x);
 
         // charging glow gathers on the dragon
@@ -2486,7 +3774,31 @@
 
         g.save();
         g.rotate(aim);
-        if (d.telegraphType === "breath") {
+        if (d.telegraphType === "nova" || d.telegraphType === "spiral") {
+          // radial wind-up: a swelling disc + jittering arcs (static or vines)
+          var rc1 = d.telegraphType === "spiral" ? PAL.sage : PAL.wisteria;
+          var rc2 = d.telegraphType === "spiral" ? "#d9ecc2" : "#8fd0ff";
+          var nr = d.r * (0.7 + prog * 0.9);
+          var ng = g.createRadialGradient(0, 0, d.r * 0.3, 0, 0, nr);
+          ng.addColorStop(0, Fx.rgba(rc1, 0.28 * (0.3 + prog * 0.7)));
+          ng.addColorStop(0.7, Fx.rgba(rc2, 0.16 * (0.3 + prog * 0.7)));
+          ng.addColorStop(1, Fx.rgba(rc2, 0));
+          g.fillStyle = ng;
+          g.beginPath(); g.arc(0, 0, nr, 0, TAU); g.fill();
+          g.globalCompositeOperation = "lighter";
+          g.strokeStyle = Fx.rgba(d.telegraphType === "spiral" ? "#eef5da" : "#dff0ff", 0.3 + prog * 0.5 * pul);
+          g.lineWidth = 2.5;
+          for (var zi = 0; zi < 5; zi++) {
+            var za = (zi / 5) * TAU + this.time * 3;
+            var zr1 = d.r * 0.5, zr2 = nr * (0.85 + Math.random() * 0.2);
+            g.beginPath();
+            g.moveTo(Math.cos(za) * zr1, Math.sin(za) * zr1);
+            var zmid = (zr1 + zr2) / 2, zj = (Math.random() - 0.5) * 24;
+            g.lineTo(Math.cos(za) * zmid - Math.sin(za) * zj, Math.sin(za) * zmid + Math.cos(za) * zj);
+            g.lineTo(Math.cos(za) * zr2, Math.sin(za) * zr2);
+            g.stroke();
+          }
+        } else if (d.telegraphType === "breath") {
           // soft cone showing the sweep to come
           var cr = 430, half = 0.62;
           var cg = g.createRadialGradient(0, 0, d.r * 0.4, 0, 0, cr);
