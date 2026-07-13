@@ -49,6 +49,9 @@
 - **Friends/Popular motion** — feed entries and leaderboard rows enter with a ~40ms staggered rise (`enterStagger`/`.social-enter`, class stripped on animationend); top-3 Popular rank badges bloom on first render. Reduced-motion: everything instant.
 - **Extras preference facet** — outdoor seating / good for groups / serves alcohol / kid-friendly chips on Preferences; every demo restaurant carries `extras` flags; filter requires ALL selected (like dietary). Live Google Places results don't carry these attributes, so the extras check is skipped when `r.extras` is undefined.
 
+### Wave 5 (2026-07-08, partial)
+- **Popular sparklines** — each leaderboard row draws a 7-point trend line (`svgSparkline` + `trendSeries`: deterministic, name-seeded, shaped by the row's trend direction) in the rank accent; aria-hidden, hidden <360px. Remaining wave-5 ideas (shortlist share, rating-save celebration, friend hearts) are queued for the next wave.
+
 ### Wave 4 (2026-07-08)
 - **Swipe haptics** — `haptic(ms)` helper (top of `eats.js`, next to `announce`): guarded `navigator.vibrate`, never throws where unsupported, skipped under prefers-reduced-motion. 10 ms on a committed swipe (`fling`, drag or ✗/♥/arrow keys), 18 ms on reaching the decision screen (`onLike`), 6 ms on undo (`undoLast`).
 - **Travel-time estimates** — `fmtTravel(mi)` (next to `fmtDist`): ≤1.3 mi → walking minutes at 3.1 mph ("12 min walk"), farther → urban driving minutes at ~16 mph ("9 min drive"); rounded up, min 1 min. Shown as its own dot-separated chip after distance on swipe cards (`.ov-travel`, glued to the distance in a non-wrapping `.ov-distgroup` so the meta line wraps cleanly at 390 px), on the decision screen, in the shortlist compare rows, and in the card a11y summary ("about 2 min walk"). The " away" suffix was dropped where the travel chip follows (kept in the a11y summary).
