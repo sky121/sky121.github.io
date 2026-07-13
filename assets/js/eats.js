@@ -50,6 +50,34 @@
     } catch (e) { /* purely decorative — never break the flow */ }
   }
 
+  /* Watercolor droplet burst at a fixed screen point (same spirit as the
+     landing orb pop). Decorative; skipped under reduced motion. */
+  function dropletBurst(cx, cy, base) {
+    if (prefersReducedMotion) return;
+    try {
+      var layer = el('div', 'orb-burst');
+      layer.style.left = cx + 'px';
+      layer.style.top = cy + 'px';
+      var palette = ['var(--rose)', 'var(--wisteria)', 'var(--sage)', 'var(--gold)', 'var(--pond)'];
+      var DROPS = 12;
+      for (var i = 0; i < DROPS; i++) {
+        var d = el('span', 'orb-drop');
+        var ang = (i / DROPS) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+        var dist = base * (0.34 + Math.random() * 0.32);
+        var size = base * (0.06 + Math.random() * 0.10);
+        d.style.setProperty('--dx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+        d.style.setProperty('--dy', (Math.sin(ang) * dist).toFixed(1) + 'px');
+        d.style.width = size.toFixed(1) + 'px';
+        d.style.height = size.toFixed(1) + 'px';
+        d.style.background = palette[i % palette.length];
+        d.style.animationDelay = (Math.random() * 60).toFixed(0) + 'ms';
+        layer.appendChild(d);
+      }
+      document.body.appendChild(layer);
+      window.setTimeout(function () { if (layer.parentNode) layer.parentNode.removeChild(layer); }, 600);
+    } catch (e) { /* decorative */ }
+  }
+
   /* Small transient toast (paper pill above the tab bar) — visual companion
      to announce(); screen readers get the live region, sighted users get this. */
   var toastTimer = null;
@@ -1752,6 +1780,8 @@
           bits.push(fmtDist(r.distance));
           bits.push(fmtTravel(r.distance));
         }
+        var mineSl = myRatingFor(r.name);
+        if (mineSl) bits.push('you rated it ' + fmtScore(overallOf(mineSl)));
         body.appendChild(el('p', 'sl-meta', bits.join('  ·  ')));
         row.appendChild(body);
         var acts = el('div', 'sl-acts');
@@ -1779,6 +1809,36 @@
       renderShortlist();
       var t = shortlistEl && shortlistEl.querySelector('.shortlist-title');
       if (t) { t.setAttribute('tabindex', '-1'); t.focus(); }
+    }
+
+    /* Share the whole shortlist as a numbered plain-text list. */
+    function shareShortlist() {
+      if (!shortlist.length) return;
+      var lines = shortlist.map(function (r, i) {
+        var bits = [];
+        if (r.rating) bits.push('★ ' + fmtScore(r.rating * 20));
+        if (r.price) bits.push(priceStr(r.price));
+        if (r.distance != null) bits.push(fmtTravel(r.distance));
+        return (i + 1) + '. ' + r.name + (bits.length ? ' — ' + bits.join(' · ') : '');
+      });
+      var text = 'Tonight’s shortlist:\n' + lines.join('\n');
+      try {
+        if (navigator.share) {
+          navigator.share({ title: 'Tonight’s shortlist', text: text })
+            .catch(function () { /* dismissed */ });
+          return;
+        }
+      } catch (e) { /* fall through */ }
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            announce('Copied your shortlist to the clipboard');
+            toast('Shortlist copied!');
+          }, function () { toast('Couldn’t copy'); });
+          return;
+        }
+      } catch (e) {}
+      toast('Sharing isn’t available here');
     }
 
     function showEnd(emptyFromStart) {
@@ -1853,6 +1913,8 @@
       if (badgeEl) badgeEl.addEventListener('click', showShortlist);
       var slBack = shortlistEl && shortlistEl.querySelector('.shortlist-back');
       if (slBack) slBack.addEventListener('click', backFromShortlist);
+      var slShare = shortlistEl && shortlistEl.querySelector('.shortlist-share');
+      if (slShare) slShare.addEventListener('click', shareShortlist);
       var endSl = $('end-shortlist');
       if (endSl) endSl.addEventListener('click', showShortlist);
       updateUndo(); updateBadge();
@@ -2424,15 +2486,22 @@
         data.placeId = state.pendingPlace.placeId || null;
         data.coords = state.pendingPlace.loc || null;
       }
-      if (state.editingId) {
+      var wasEdit = !!state.editingId;
+      if (wasEdit) {
         visited.update(state.editingId, data);
         announce('Updated ' + name);
       } else {
         visited.add(data);
-        announce('Saved ' + name + ' to your log');
+        announce('Saved ' + name + ' — overall ' + fmtScore(overallOf(data)));
       }
+      // celebrate the save as the sheet closes: bloom from where it stood
+      var sheetEl = $('rating-sheet');
+      var rr = sheetEl ? sheetEl.getBoundingClientRect() : null;
       hide();
       visited.render();
+      haptic(14);
+      if (rr) dropletBurst(rr.left + rr.width / 2, rr.top + rr.height * 0.35, Math.min(rr.width, 300));
+      toast((wasEdit ? 'Updated ' : 'Saved ') + name + ' · overall ' + fmtScore(overallOf(data)));
     }
 
     function init() {
@@ -2799,6 +2868,7 @@
     var sortSel = $('friends-sort');
     var chipsEl = $('friend-chips');
     var state2 = { sort: 'recent', filter: 'all', token: 0 };
+    var hearts = {}; // session-local demo likes, keyed by entry id
 
     function buildChips() {
       if (!chipsEl) return;
@@ -2853,6 +2923,29 @@
 
       var foot = el('div', 'friend-foot');
       foot.appendChild(el('span', 'v-date', relTime(e.date)));
+
+      // session-local demo hearts (no persistence — this tab only)
+      var liked = !!hearts[e.id];
+      var baseN = (hashStr(e.id) % 9) + 1;
+      var heart = el('button', 'friend-heart' + (liked ? ' is-liked' : ''));
+      heart.type = 'button';
+      heart.setAttribute('aria-pressed', liked ? 'true' : 'false');
+      heart.setAttribute('aria-label', (liked ? 'Unlike ' : 'Like ') + e.friend.name + "'s rating");
+      heart.innerHTML = '<span class="friend-heart-glyph" aria-hidden="true">' + (liked ? '♥' : '♡') + '</span> ' +
+        '<span class="friend-heart-count">' + (baseN + (liked ? 1 : 0)) + '</span>';
+      heart.addEventListener('click', function () {
+        hearts[e.id] = !hearts[e.id];
+        var on = hearts[e.id];
+        heart.classList.toggle('is-liked', on);
+        heart.setAttribute('aria-pressed', on ? 'true' : 'false');
+        heart.setAttribute('aria-label', (on ? 'Unlike ' : 'Like ') + e.friend.name + "'s rating");
+        heart.querySelector('.friend-heart-glyph').textContent = on ? '♥' : '♡';
+        heart.querySelector('.friend-heart-count').textContent = String(baseN + (on ? 1 : 0));
+        haptic(8);
+        announce((on ? 'Liked ' : 'Unliked ') + e.friend.name + "'s rating");
+      });
+      foot.appendChild(heart);
+
       foot.appendChild(el('span', 'v-demo-tag', 'Sample'));
       card.appendChild(foot);
       return card;

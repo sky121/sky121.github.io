@@ -49,8 +49,11 @@
 - **Friends/Popular motion** — feed entries and leaderboard rows enter with a ~40ms staggered rise (`enterStagger`/`.social-enter`, class stripped on animationend); top-3 Popular rank badges bloom on first render. Reduced-motion: everything instant.
 - **Extras preference facet** — outdoor seating / good for groups / serves alcohol / kid-friendly chips on Preferences; every demo restaurant carries `extras` flags; filter requires ALL selected (like dietary). Live Google Places results don't carry these attributes, so the extras check is skipped when `r.extras` is undefined.
 
-### Wave 5 (2026-07-08, partial)
-- **Popular sparklines** — each leaderboard row draws a 7-point trend line (`svgSparkline` + `trendSeries`: deterministic, name-seeded, shaped by the row's trend direction) in the rank accent; aria-hidden, hidden <360px. Remaining wave-5 ideas (shortlist share, rating-save celebration, friend hearts) are queued for the next wave.
+### Wave 5-6 (2026-07-08)
+- **Popular sparklines** — each leaderboard row draws a 7-point trend line (`svgSparkline` + `trendSeries`: deterministic, name-seeded, shaped by the row's trend direction) in the rank accent; aria-hidden, hidden <360px.
+- **Rating-save celebration** — saving a rating fires a watercolor droplet burst from the sheet (`dropletBurst(cx,cy,base)`, a reusable body-level helper), a 14 ms haptic, and a toast with the overall score.
+- **Friend hearts** — each Friends entry has a like button (♡ → ♥ rose, count seeded per entry id); session-local demo state only, aria-pressed, announced.
+- **Share shortlist** — a ghost button on the compare view shares a numbered plain-text list (name — ★ · $ · travel) via navigator.share or clipboard + toast; shortlist rows also show your Visited rating when you've eaten there.
 
 ### Wave 4 (2026-07-08)
 - **Swipe haptics** — `haptic(ms)` helper (top of `eats.js`, next to `announce`): guarded `navigator.vibrate`, never throws where unsupported, skipped under prefers-reduced-motion. 10 ms on a committed swipe (`fling`, drag or ✗/♥/arrow keys), 18 ms on reaching the decision screen (`onLike`), 6 ms on undo (`undoLast`).

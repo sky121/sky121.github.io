@@ -688,6 +688,10 @@ body { position: fixed; inset: 0; }
 .bloom-wipe.is-wiping {
   animation: bloom-wipe 0.7s ease-in-out both;
 }
+/* the crowning's one golden transition */
+.bloom-wipe.is-golden {
+  background: radial-gradient(circle at 50% 55%, rgba(255, 250, 232, 0.98) 0%, rgba(205, 184, 120, 0.92) 38%, rgba(216, 154, 61, 0.9) 70%, rgba(90, 66, 20, 0.95) 100%);
+}
 @keyframes bloom-wipe {
   0% { opacity: 0; transform: scale(0.2); }
   45% { opacity: 1; transform: scale(1.4); }

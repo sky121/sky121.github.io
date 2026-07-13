@@ -177,7 +177,7 @@
       src.connect(f); f.connect(g); g.connect(this.master);
       src.start(t);
     },
-    dodge: function () { this.noise(0.22, 0.18, 2200); this.tone(520, 0.18, "sine", 0.08, 900); },
+    dodge: function () { this.noise(0.22, 0.18, 2200); this.tone(this.jit(520), 0.18, "sine", 0.08, this.jit(900)); },
     thunder: function (big) {
       this.noise(0.3 + big * 0.25, 0.16 + big * 0.12, 700);
       this.tone(90, 0.4 + big * 0.2, "sawtooth", 0.12 + big * 0.06, 50);
@@ -284,9 +284,11 @@
         this.chargeOsc = null; this.chargeGain = null;
       }
     },
-    hitDragon: function () { this.tone(330, 0.1, "square", 0.1, 220); this.noise(0.08, 0.08, 2600); },
-    hurt: function () { this.tone(140, 0.3, "sawtooth", 0.22, 70); this.noise(0.2, 0.15, 700); },
-    scale: function () { this.tone(880, 0.16, "sine", 0.12, 1320); this.tone(1320, 0.18, "sine", 0.08); },
+    // slight pitch drift so rapid-fire SFX don't fatigue the ear
+    jit: function (f) { return f * (1 + (Math.random() - 0.5) * 0.08); },
+    hitDragon: function () { this.tone(this.jit(330), 0.1, "square", 0.1, this.jit(220)); this.noise(0.08, 0.08, 2600); },
+    hurt: function () { this.tone(this.jit(140), 0.3, "sawtooth", 0.22, 70); this.noise(0.2, 0.15, 700); },
+    scale: function () { this.tone(this.jit(880), 0.16, "sine", 0.12, this.jit(1320)); this.tone(this.jit(1320), 0.18, "sine", 0.08); },
     power: function () { this.tone(523, 0.2, "sine", 0.14); setTimeout(function(){Audio2.tone(784,0.3,"sine",0.14);}.bind(this), 110); },
     victory: function () {
       var notes = [523, 659, 784, 1047];
@@ -1884,10 +1886,12 @@
     },
 
     // ----- WIPE TRANSITION -----
-    wipe: function () {
+    wipe: function (golden) {
       bloomWipe.classList.remove("is-wiping");
+      bloomWipe.classList.toggle("is-golden", !!golden);
       void bloomWipe.offsetWidth;
       bloomWipe.classList.add("is-wiping");
+      if (golden) setTimeout(function () { bloomWipe.classList.remove("is-golden"); }, 900);
     },
 
     // ----- FLOATING TEXT -----
@@ -3024,7 +3028,7 @@
 
       setTimeout(function () {
         self.state = "WIN";
-        self.wipe();
+        self.wipe(isFinal); // the crowning gets the golden wipe
         var R = RELICS[relicId];
         self.setWinHeader(isFinal ? "the crowning" : "respect earned",
           isFinal ? "Dragoose, Ruler of the Skies" : "You have earned its respect");
