@@ -89,6 +89,52 @@
     });
   }
 
+  /* Tiny 7-point trend sparkline (Popular rows) — a stroke-only line over
+     a soft area wash at 12% opacity, ~64x20. Built from real SVG nodes (no
+     innerHTML). `color` is any CSS color, including var(...) tokens, so the
+     evening theme restyles it for free. Decorative: aria-hidden (the trend
+     arrow next to it already carries the semantics). */
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  function svgSparkline(points, color) {
+    var W = 64, H = 20, PAD = 2.5;
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('width', String(W));
+    svg.setAttribute('height', String(H));
+    svg.setAttribute('class', 'pop-spark');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    var pts = (points || []).map(Number).filter(function (n) { return isFinite(n); });
+    if (pts.length < 2) return svg; // nothing to draw — empty, invisible svg
+    var min = Math.min.apply(null, pts);
+    var max = Math.max.apply(null, pts);
+    var span = (max - min) || 1;
+    var step = (W - PAD * 2) / (pts.length - 1);
+    var coords = pts.map(function (v, i) {
+      var x = PAD + i * step;
+      var y = H - PAD - ((v - min) / span) * (H - PAD * 2);
+      return [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
+    });
+    var line = coords.map(function (c, i) { return (i ? 'L' : 'M') + c[0] + ' ' + c[1]; }).join(' ');
+    var area = document.createElementNS(SVG_NS, 'path');
+    area.setAttribute('d', line +
+      ' L' + coords[coords.length - 1][0] + ' ' + (H - 1) +
+      ' L' + coords[0][0] + ' ' + (H - 1) + ' Z');
+    area.setAttribute('stroke', 'none');
+    area.setAttribute('fill-opacity', '0.12');
+    area.style.fill = color;
+    svg.appendChild(area);
+    var path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', line);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    path.style.stroke = color;
+    svg.appendChild(path);
+    return svg;
+  }
+
   /* ------------------------------------------------------------------ *
    * store — localStorage CRUD (graceful when storage is blocked)
    * ------------------------------------------------------------------ */
@@ -2919,8 +2965,34 @@
       line.appendChild(tr);
       line.appendChild(document.createTextNode(item.reviews.toLocaleString() + ' reviews'));
       stat.appendChild(line);
+
+      // 7-point trend sparkline, synthesized deterministically from the
+      // row itself (name-seeded wobble shaped by the trend direction)
+      var sparkColor = item.rank === 1 ? 'var(--gold)'
+        : item.rank === 2 ? 'var(--wisteria)'
+        : item.rank === 3 ? 'var(--pond-deep)'
+        : 'var(--ink-soft)';
+      stat.appendChild(svgSparkline(trendSeries(item), sparkColor));
+
       li.appendChild(stat);
       return li;
+    }
+
+    /* Synthesize a plausible 7-point series ending at the row's score:
+       up-trends climb ~6 points, down-trends fall, flat wobbles. Seeded
+       by place name so every render draws the identical line. */
+    function trendSeries(item) {
+      var h = hashStr(item.place + item.rank);
+      var dir = item.trend === 'up' ? 1 : item.trend === 'down' ? -1 : 0;
+      var pts = [];
+      for (var i = 0; i < 7; i++) {
+        var ti = i / 6;
+        var base = item.score - dir * (1 - ti) * 6;
+        var wob = Math.sin(h % 7 + i * 1.7) * 1.4;
+        pts.push(base + wob);
+      }
+      pts[6] = item.score;
+      return pts;
     }
 
     function showLoading() {

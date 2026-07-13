@@ -2002,6 +2002,8 @@ html.evening .pop-card:hover { box-shadow: 0 16px 32px -18px rgba(0,0,0,0.7); }
 .pop-body .v-demo-tag { margin-top: 0.25rem; align-self: flex-start; }
 
 .pop-stat { text-align: right; flex: none; }
+.pop-spark { display: block; margin: 0.3rem 0 0 auto; opacity: 0.9; }
+@media (max-width: 360px) { .pop-spark { display: none; } }
 .pop-score { font-family: var(--font-display); line-height: 1; }
 .pop-score .big {
   display: block;
