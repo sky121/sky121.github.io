@@ -19,6 +19,14 @@
   var SAVE_KEY = "dragoose-save";
   // lustrous-scale shimmer cycle (picked by time index — no string building)
   var LUSTRE = [PAL.gold, PAL.rose, PAL.wisteria];
+  // harmony-sky geese: fixed sinusoidal drift paths across the crowned hub
+  // (y0 is a VH fraction; spd in px/s; everything else phase/shape)
+  var HARMONY_GEESE = [
+    { y0: 0.20, amp: 26, spd: 34, freq: 0.50, phase: 0.0, size: 9 },
+    { y0: 0.44, amp: 34, spd: 26, freq: 0.34, phase: 2.2, size: 7 },
+    { y0: 0.66, amp: 22, spd: 42, freq: 0.60, phase: 4.1, size: 8 },
+    { y0: 0.80, amp: 30, spd: 30, freq: 0.42, phase: 1.3, size: 6 }
+  ];
 
   // characters/projectiles/clouds are fully procedural now — only the
   // scale pickups still ship as PNG sprites
@@ -61,7 +69,8 @@
   // SAVE MODULE (localStorage hoard)
   // ---------------------------------------------------------
   var Save = {
-    data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "", regalia: [], crowned: false, seenHints: {}, gentle: false },
+    data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "", regalia: [], crowned: false, seenHints: {}, gentle: false,
+      records: { fastestCrown: null, mostScalesRun: 0, totalDuelsWon: 0 } },
     load: function () {
       try {
         var raw = localStorage.getItem(SAVE_KEY);
@@ -78,6 +87,12 @@
             this.data.crowned = !!p.crowned;
             this.data.seenHints = (p.seenHints && typeof p.seenHints === "object") ? p.seenHints : {};
             this.data.gentle = !!p.gentle;
+            var rec = (p.records && typeof p.records === "object") ? p.records : {};
+            this.data.records = {
+              fastestCrown: (typeof rec.fastestCrown === "number") ? rec.fastestCrown : null,
+              mostScalesRun: rec.mostScalesRun | 0,
+              totalDuelsWon: rec.totalDuelsWon | 0
+            };
           }
         }
       } catch (e) {}
@@ -624,6 +639,26 @@
         var k = keys[i];
         if (images[k]) this.baked[k] = this.bakeSprite(images[k]);
       }
+    },
+
+    // harmony-sky mini dragons: one tiny peaceful rig per variant,
+    // rendered ONCE into a cached canvas (~90px box from the 460-unit
+    // rig) and then only ever drawImage'd — never re-rigged per frame
+    miniDragons: {},
+    miniDragon: function (variant) {
+      var c = this.miniDragons[variant];
+      if (c) return c;
+      var k = 90 / 460;
+      c = document.createElement("canvas");
+      c.width = 90; c.height = Math.ceil(370 * k);
+      var x = c.getContext("2d");
+      x.save();
+      x.scale(k, k);
+      x.translate(230, 150);
+      Art.dragon(x, { t: 0, swayPhase: 0.6, flapPhase: 0.9, bow: 0, simple: true, variant: variant });
+      x.restore();
+      this.miniDragons[variant] = c;
+      return c;
     },
 
     // per-frame scratch canvases (characters render here first so a
@@ -1558,6 +1593,20 @@
           parts.push("Regalia: " + gn.join(", "));
         }
         if (d.crowned) parts.push("👑 Crowned — Dragoose, Ruler of the Skies");
+        // quiet lifetime records line beneath the hoard
+        var recEl = $("hoard-records");
+        if (recEl) {
+          var rc = d.records || {};
+          var rp = [];
+          if (rc.fastestCrown != null) {
+            var rm2 = Math.floor(rc.fastestCrown / 60), rs2 = rc.fastestCrown % 60;
+            rp.push("fastest crowning " + (rm2 > 0 ? rm2 + "m " : "") + rs2 + "s");
+          }
+          if (rc.mostScalesRun > 0) rp.push("best run " + rc.mostScalesRun + " scales");
+          if (rc.totalDuelsWon > 0) rp.push(rc.totalDuelsWon + " duel" + (rc.totalDuelsWon === 1 ? "" : "s") + " won");
+          recEl.hidden = rp.length === 0;
+          recEl.textContent = rp.length ? "Records: " + rp.join(" · ") : "";
+        }
         $("hoard-stats").textContent = parts.join(" · ");
       } else {
         box.hidden = true;
@@ -2879,6 +2928,11 @@
       // bank only the scales earned since the previous duel
       Save.addScales(this.scaleProgress - this.scalesBanked);
       this.scalesBanked = this.scaleProgress;
+      // lifetime records
+      var rec0 = Save.data.records;
+      rec0.totalDuelsWon++;
+      if (this.scaleProgress > rec0.mostScalesRun) rec0.mostScalesRun = this.scaleProgress;
+      Save.save();
 
       // ----- ceremonial victory: bonus scales + trophies, no relic, no crown -----
       if (d.ceremonial) {
@@ -2950,6 +3004,10 @@
       // THE CROWNING — every realm at peace; the sky turns to gold
       if (isFinal) {
         Save.data.crowned = true;
+        var fc = Save.data.records.fastestCrown;
+        if (this.runStats && (fc == null || this.runStats.time < fc)) {
+          Save.data.records.fastestCrown = Math.round(this.runStats.time);
+        }
         Save.save();
         if (!reduceMotion) {
           Particles.ring(d.x, d.y, PAL.gold, 40, 900, 1.0, 10);
@@ -2994,6 +3052,9 @@
       Audio2.death();
       this.flashWhite = 0.4;
       Save.addScales(Math.floor(this.scaleProgress / 2)); // partial salvage
+      if (this.scaleProgress > Save.data.records.mostScalesRun) {
+        Save.data.records.mostScalesRun = this.scaleProgress; Save.save();
+      }
       Particles.burst(this.player.x, this.player.y, 20, PAL.rose, 5, 24, 0.4);
       var self = this;
       setTimeout(function () {
@@ -3579,6 +3640,20 @@
           // at peace: a calm golden bloom
           Fx.drawDot(g, x, y, rm.r * 1.15, PAL.gold, 0.16, true);
           Fx.drawDot(g, x, y, rm.r * 0.55, "#fff3d6", 0.22, true);
+          // HARMONY: once crowned, the befriended dragon circles its realm
+          if (Save.data.crowned) {
+            var mimg = Fx.miniDragon(rm.type);
+            var oa = this.time * 0.25 + rm.phase;
+            var ox = x + Math.cos(oa) * rm.r * 1.35;
+            var oy = y + Math.sin(oa) * rm.r * 1.35;
+            g.save();
+            g.translate(ox, oy);
+            g.rotate(oa + Math.PI); // rig faces up; face along the orbit
+            g.globalAlpha = 0.8;
+            g.scale(0.5, 0.5);
+            g.drawImage(mimg, -mimg.width / 2, -mimg.height / 2);
+            g.restore();
+          }
           g.save();
           g.globalAlpha = 0.5;
           g.strokeStyle = PAL.gold;
@@ -3626,6 +3701,28 @@
           g.font = 'italic 14px "Cormorant Garamond", Georgia, serif';
           g.fillStyle = Fx.rgba("#2e3a48", 0.55);
           g.fillText("enter for a ceremonial duel", x, y + rm.r + 61);
+        }
+        g.restore();
+      }
+
+      // HARMONY: crowned skies belong to everyone — geese drift freely
+      if (Save.data.crowned) {
+        g.save();
+        g.strokeStyle = "rgba(253, 251, 244, 0.9)";
+        g.lineCap = "round";
+        g.lineJoin = "round";
+        for (var gz = 0; gz < HARMONY_GEESE.length; gz++) {
+          var gs = HARMONY_GEESE[gz];
+          var gx = ((this.time * gs.spd + gs.phase * 140) % (VW + 80)) - 40;
+          var gy = VH * gs.y0 + Math.sin(this.time * gs.freq + gs.phase) * gs.amp;
+          var fl2 = Math.sin(this.time * 5.2 + gs.phase * 3) * gs.size * 0.4;
+          g.lineWidth = 1.7;
+          g.globalAlpha = 0.65;
+          g.beginPath();
+          g.moveTo(gx - gs.size, gy - fl2);
+          g.lineTo(gx, gy + gs.size * 0.42);
+          g.lineTo(gx + gs.size, gy - fl2);
+          g.stroke();
         }
         g.restore();
       }

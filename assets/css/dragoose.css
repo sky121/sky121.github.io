@@ -302,6 +302,16 @@ body { position: fixed; inset: 0; }
   line-height: 1.35;
 }
 
+/* quiet lifetime records line beneath the hoard */
+.hoard-records {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #8a7940;
+  opacity: 0.9;
+}
+
 /* ceremonial plume selector (cycles Gary's cosmetic coat) */
 .plume-btn {
   margin-top: 6px;
