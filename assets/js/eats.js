@@ -387,9 +387,9 @@
     return h;
   }
 
-  function panelArt(r, segKey) {
+  function panelArt(r, segKey, variant) {
     var pal = CUISINE_ART[(r.cuisines || [])[0]] || ['#a292c4', '#7fa8c9', '#e8dfc9'];
-    var h = hashStr((r.name || r.id || '') + segKey);
+    var h = hashStr((r.name || r.id || '') + segKey + (variant ? '#' + variant : ''));
     var rnd = function (lo, hi, salt) {
       var x = ((h >> (salt % 24)) & 255) / 255;
       return Math.round(lo + x * (hi - lo));
@@ -1123,8 +1123,6 @@
     var history = [];   // swipes this deck: {i, id, dir} — fuels Undo
     var shortlist = []; // liked-and-saved places for this outing
 
-    var SEGMENTS = ['vibe', 'food', 'reviews'];
-    var SEG_LABEL = { vibe: 'Vibe', food: 'Food', reviews: 'Reviews' };
 
     function setMode(mode) {
       var onDeck = mode === 'deck';
@@ -1202,6 +1200,52 @@
       c.removeEventListener('animationend', onDealEnd);
     }
 
+    /* ---- trio playlist ----
+       The card face is THREE EQUAL floating blocks (vibe / food / review),
+       all clearly visible at once; a single tap advances all three to the
+       next set. Pools are interleaved round-robin, and when one category
+       runs dry the others backfill its slot so every set holds three real
+       things (e.g. one review + three vibe shots still fills every page). */
+    function mediaPlaylist(r) {
+      var segs = r.segments || {};
+      var pools = { vibe: [], food: [], review: [] };
+      ['vibe', 'food'].forEach(function (k) {
+        var seg = segs[k] || {};
+        if (seg.photoUrl) {
+          pools[k].push({ kind: k, photoUrl: seg.photoUrl, caption: seg.caption || '' });
+        } else {
+          // demo (or photo-less live place): two art variants per category
+          pools[k].push({ kind: k, art: 0, caption: seg.caption || '' });
+          pools[k].push({ kind: k, art: 1, caption: seg.caption || '' });
+        }
+      });
+      var quotes = (segs.reviews && segs.reviews.quotes) || [];
+      quotes.slice(0, 3).forEach(function (q) { pools.review.push({ kind: 'review', quote: q }); });
+      if (!pools.review.length) pools.review.push({ kind: 'review', quote: null });
+
+      // round-robin interleave until every pool is dry
+      var flat = [];
+      var order = ['vibe', 'food', 'review'];
+      var idx = { vibe: 0, food: 0, review: 0 };
+      var remaining = pools.vibe.length + pools.food.length + pools.review.length;
+      while (remaining > 0) {
+        for (var i = 0; i < order.length; i++) {
+          var k2 = order[i];
+          if (idx[k2] < pools[k2].length) { flat.push(pools[k2][idx[k2]++]); remaining--; }
+        }
+      }
+      // chunk into sets of three; a short last set backfills from the top
+      var pages = [];
+      for (var p = 0; p < flat.length; p += 3) pages.push(flat.slice(p, p + 3));
+      var last = pages[pages.length - 1];
+      var scan = 0;
+      while (last.length < 3 && scan < flat.length) {
+        if (last.indexOf(flat[scan]) === -1) last.push(flat[scan]);
+        scan++;
+      }
+      return pages;
+    }
+
     function buildCard(r, depth) {
       var card = el('article', 'swipe-card');
       card.dataset.depth = depth === 0 ? '0' : (depth === 1 ? '1' : '2');
@@ -1209,64 +1253,20 @@
       card.tabIndex = depth === 0 ? 0 : -1;
       card.setAttribute('role', 'group');
       card.setAttribute('aria-roledescription', 'restaurant card');
-      card._seg = 0;
+      card._page = 0;
+      card._pages = mediaPlaylist(r);
       card._data = r;
 
-      var media = el('div', 'card-media');
-      SEGMENTS.forEach(function (segKey, si) {
-        var panel = el('div', 'card-seg-panel seg-' + segKey + (si === 0 ? ' is-active' : ''));
-        if (segKey === 'reviews') {
-          var rv = el('div', 'card-reviews');
-          var quotes = (r.segments && r.segments.reviews && r.segments.reviews.quotes) || [];
-          if (quotes.length) {
-            quotes.forEach(function (q) {
-              var box = el('div', 'card-review');
-              box.appendChild(el('p', 'card-review-text', '“' + q.text + '”'));
-              var by = el('p', 'card-review-by');
-              by.appendChild(el('span', 'card-review-score', '★ ' + fmtScore(q.score)));
-              by.appendChild(document.createTextNode(' · ' + q.by));
-              box.appendChild(by);
-              rv.appendChild(box);
-            });
-          } else {
-            var note = el('div', 'card-review');
-            note.appendChild(el('p', 'card-review-text', 'No reviews to show yet.'));
-            rv.appendChild(note);
-          }
-          panel.appendChild(rv);
-        } else {
-          var seg = r.segments && r.segments[segKey];
-          if (seg && seg.photoUrl) {
-            // live mode: real Place photo for this segment
-            panel.style.backgroundImage = 'url("' + String(seg.photoUrl).replace(/"/g, '') + '")';
-            panel.style.backgroundSize = 'cover';
-            panel.style.backgroundPosition = 'center';
-          } else {
-            // no photo: procedural watercolor composition keyed to the cuisine
-            panel.style.background = panelArt(r, segKey);
-          }
-          panel.appendChild(el('span', 'card-seg-kind', SEG_LABEL[segKey]));
-        }
-        media.appendChild(panel);
-      });
-      card.appendChild(media);
-      card.appendChild(el('div', 'card-scrim'));
-
+      // set indicator bars — one per trio set
       var bars = el('div', 'seg-bars');
-      SEGMENTS.forEach(function (s, si) {
-        bars.appendChild(el('span', 'seg-bar' + (si === 0 ? ' is-on' : '')));
-      });
+      for (var bi = 0; bi < card._pages.length; bi++) {
+        bars.appendChild(el('span', 'seg-bar' + (bi === 0 ? ' is-on' : '')));
+      }
       card.appendChild(bars);
 
-      // three-at-once: mini previews of the two non-hero segments;
-      // a single tap rotates all three (hero -> peek, next peek -> hero)
-      var peeks = el('div', 'card-peeks');
-      peeks.setAttribute('aria-hidden', 'true');
-      peeks.appendChild(el('div', 'peek'));
-      peeks.appendChild(el('div', 'peek'));
-      card.appendChild(peeks);
-      card._peeks = peeks;
-      updatePeeks(card);
+      // the trio: three equal floating blocks + the info strip
+      var trio = el('div', 'trio');
+      for (var ti = 0; ti < 3; ti++) trio.appendChild(el('div', 'trio-block'));
 
       var yes = el('div', 'stamp stamp-yes', 'Yes');
       var no = el('div', 'stamp stamp-no', 'Nope');
@@ -1275,7 +1275,7 @@
       card.appendChild(yes);
       card.appendChild(no);
 
-      var ov = el('div', 'card-overlay');
+      var ov = el('div', 'trio-info');
       ov.appendChild(el('h3', 'ov-name', r.name));
       var meta = el('div', 'ov-meta');
       if (r.rating) {
@@ -1314,12 +1314,10 @@
         var you = el('span', 'ov-you', 'You rated this ' + fmtScore(overallOf(mine)));
         ov.appendChild(you);
       }
-      var tagLine = el('p', 'ov-tags');
-      tagLine.textContent = (r.segments && r.segments.vibe && r.segments.vibe.caption) || '';
-      ov.appendChild(tagLine);
-      card._tagLine = tagLine;
-      card.appendChild(ov);
+      trio.appendChild(ov);
+      card.appendChild(trio);
 
+      renderTrio(card, false);
       card.setAttribute('aria-label', a11ySummary(r));
 
       if (depth === 0) attachDrag(card);
@@ -1342,63 +1340,57 @@
       return bits.join(', ');
     }
 
+    /* paint the current set into the three blocks (+ the indicator bars) */
+    function renderTrio(card, animate) {
+      var r = card._data;
+      var page = card._pages[card._page] || [];
+      var blocks = card.querySelectorAll('.trio-block');
+      for (var i = 0; i < blocks.length; i++) {
+        var b = blocks[i];
+        var item = page[i];
+        clear(b);
+        b.style.background = '';
+        b.style.animationDelay = '';
+        if (!item) { b.className = 'trio-block trio-review'; continue; }
+        b.className = 'trio-block trio-' + item.kind;
+        if (item.kind === 'review') {
+          var q = item.quote;
+          b.appendChild(el('p', 'trio-quote', q ? '“' + q.text + '”' : 'No reviews yet — be the first to rate it.'));
+          if (q) {
+            var by = el('p', 'trio-by');
+            by.appendChild(el('span', 'trio-score', '★ ' + fmtScore(q.score)));
+            by.appendChild(document.createTextNode(' · ' + q.by));
+            b.appendChild(by);
+          }
+        } else {
+          if (item.photoUrl) {
+            b.style.background = 'url("' + String(item.photoUrl).replace(/"/g, '') + '") center / cover';
+          } else {
+            b.style.background = panelArt(r, item.kind, item.art || 0);
+          }
+          if (item.caption) b.appendChild(el('span', 'trio-cap', item.caption));
+        }
+        b.appendChild(el('span', 'trio-tag', item.kind === 'review' ? 'Review' : item.kind === 'vibe' ? 'Vibe' : 'Food'));
+        if (animate && !prefersReducedMotion) {
+          b.classList.remove('is-turn');
+          void b.offsetWidth;
+          b.style.animationDelay = (i * 70) + 'ms';
+          b.classList.add('is-turn');
+        }
+      }
+      var barsEls = card.querySelectorAll('.seg-bar');
+      for (var j = 0; j < barsEls.length; j++) {
+        barsEls[j].classList.toggle('is-on', j === card._page);
+        barsEls[j].classList.toggle('is-done', j < card._page);
+      }
+    }
+
+    /* one tap advances ALL THREE blocks to the next set */
     function cycleSegment(card) {
-      if (!card) return;
-      card._seg = (card._seg + 1) % SEGMENTS.length;
-      applySegment(card);
-    }
-
-    /* fill one mini preview tile with a compact rendering of a segment */
-    function peekContent(node, r, segKey) {
-      clear(node);
-      node.className = 'peek peek-' + segKey;
-      var seg = r.segments && r.segments[segKey];
-      if (segKey === 'reviews') {
-        node.style.background = '';
-        var q = seg && seg.quotes && seg.quotes[0];
-        node.appendChild(el('span', 'peek-quote', q ? '“' + q.text + '”' : 'What people say'));
-      } else if (seg && seg.photoUrl) {
-        node.style.background = 'url("' + String(seg.photoUrl).replace(/"/g, '') + '") center / cover';
-      } else {
-        node.style.background = panelArt(r, segKey);
-      }
-      node.appendChild(el('span', 'peek-label', SEG_LABEL[segKey]));
-    }
-
-    /* the two peeks always show whatever the hero is not */
-    function updatePeeks(card) {
-      if (!card._peeks) return;
-      var r = card._data;
-      var tiles = card._peeks.children;
-      for (var i = 0; i < 2; i++) {
-        var segKey = SEGMENTS[(card._seg + 1 + i) % SEGMENTS.length];
-        peekContent(tiles[i], r, segKey);
-        if (!prefersReducedMotion) {
-          tiles[i].classList.remove('is-in');
-          void tiles[i].offsetWidth;
-          tiles[i].classList.add('is-in');
-        }
-      }
-    }
-    function applySegment(card) {
-      var panels = card.querySelectorAll('.card-seg-panel');
-      var bars = card.querySelectorAll('.seg-bar');
-      SEGMENTS.forEach(function (s, i) {
-        if (panels[i]) panels[i].classList.toggle('is-active', i === card._seg);
-        if (bars[i]) {
-          bars[i].classList.toggle('is-on', i === card._seg);
-          bars[i].classList.toggle('is-done', i < card._seg); // earlier chapters stay filled
-        }
-      });
-      var r = card._data;
-      var segKey = SEGMENTS[card._seg];
-      var caption = '';
-      if (segKey === 'vibe') caption = (r.segments && r.segments.vibe && r.segments.vibe.caption) || '';
-      else if (segKey === 'food') caption = (r.segments && r.segments.food && r.segments.food.caption) || '';
-      else caption = 'What people are saying';
-      if (card._tagLine) card._tagLine.textContent = caption;
-      updatePeeks(card);
-      announce(SEG_LABEL[segKey] + ' featured: ' + (caption || r.name));
+      if (!card || !card._pages) return;
+      card._page = (card._page + 1) % card._pages.length;
+      renderTrio(card, true);
+      announce('Set ' + (card._page + 1) + ' of ' + card._pages.length + ' for ' + card._data.name);
     }
 
     function attachDrag(card) {
