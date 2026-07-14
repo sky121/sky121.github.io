@@ -1,0 +1,16 @@
+{
+  "name": "Peckish — find where to eat",
+  "short_name": "Peckish",
+  "description": "Swipe to decide where to eat, and keep a watercolor log of every place you've tasted.",
+  "start_url": "/eats.html",
+  "scope": "/eats",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f1e7",
+  "theme_color": "#f6f1e7",
+  "icons": [
+    { "src": "/images/peckish-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/images/peckish-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/images/peckish-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

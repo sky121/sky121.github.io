@@ -49,6 +49,9 @@
 - **Friends/Popular motion** — feed entries and leaderboard rows enter with a ~40ms staggered rise (`enterStagger`/`.social-enter`, class stripped on animationend); top-3 Popular rank badges bloom on first render. Reduced-motion: everything instant.
 - **Extras preference facet** — outdoor seating / good for groups / serves alcohol / kid-friendly chips on Preferences; every demo restaurant carries `extras` flags; filter requires ALL selected (like dietary). Live Google Places results don't carry these attributes, so the extras check is skipped when `r.extras` is undefined.
 
+### PWA (2026-07-08)
+Peckish is installable: `peckish.webmanifest` (standalone, portrait, watercolor icons in `images/peckish-icon-*.png`) + `peckish-sw.js` registered with **scope `/eats`** so it never controls the rest of the portfolio. Strategy: network-first with cache fallback — online visitors always get fresh files, and **demo mode works fully offline** after the first visit (verified: offline reload + full deck flow). Install tip added to the settings sheet. Icons regenerate from `scratchpad` pkicon.html if ever needed.
+
 ### Wave 5-6 (2026-07-08)
 - **Popular sparklines** — each leaderboard row draws a 7-point trend line (`svgSparkline` + `trendSeries`: deterministic, name-seeded, shaped by the row's trend direction) in the rank accent; aria-hidden, hidden <360px.
 - **Rating-save celebration** — saving a rating fires a watercolor droplet burst from the sheet (`dropletBurst(cx,cy,base)`, a reusable body-level helper), a 14 ms haptic, and a toast with the overall score.
