@@ -978,64 +978,136 @@ html.evening .swipe-card { box-shadow: 0 18px 42px -20px rgba(0,0,0,0.75), inset
   pointer-events: none;
 }
 
-/* ----- three-at-once: mini previews of the two non-hero segments ----- */
-.card-peeks {
-  position: absolute;
-  top: 4.7rem;
-  right: 0.75rem;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  width: 5.6rem;
-  pointer-events: none;
-}
-.peek {
-  position: relative;
-  height: 4rem;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid rgba(253, 251, 244, 0.55);
-  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.55);
-  background: #4d5a74;
-}
-.peek::after {
-  content: '';
+/* ===== TRIO CARD FACE =====
+   Three EQUAL floating blocks (vibe / food / review), all visible at once,
+   over a dusk backdrop; a single tap turns all three to the next set. */
+.trio {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(20,24,33,0) 42%, rgba(20,24,33,0.5) 100%);
-  pointer-events: none;
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1.5rem 0.65rem 0.65rem;
+  background: linear-gradient(170deg, #55617b 0%, #4d4f68 58%, #58506b 100%);
 }
-.peek.is-in { animation: peek-in 0.38s cubic-bezier(0.22, 1, 0.36, 1); }
-@keyframes peek-in {
-  from { transform: translateY(7px) scale(0.93); opacity: 0.15; }
-  to { transform: none; opacity: 1; }
+.trio-block {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(253, 251, 244, 0.32);
+  box-shadow: 0 10px 22px -10px rgba(10, 14, 22, 0.6);
+  background: #4d5a74;
 }
-.peek-label {
+.trio-block.is-turn { animation: trio-turn 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+@keyframes trio-turn {
+  from { opacity: 0.1; transform: translateY(12px) scale(0.955); }
+  to { opacity: 1; transform: none; }
+}
+/* category tag chip, top-left of every block */
+.trio-tag {
   position: absolute;
-  left: 0.42rem;
-  bottom: 0.32rem;
+  top: 0.45rem;
+  left: 0.5rem;
   z-index: 2;
-  font-size: 0.52rem;
+  padding: 0.14rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(20, 24, 33, 0.42);
+  font-size: 0.56rem;
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.92);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(2px);
 }
-.peek-reviews { background: linear-gradient(160deg, #4d5a74, #3a465c); }
-.peek-quote {
+/* caption ribbon along the bottom of photo/art blocks */
+.trio-cap {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 1;
+  padding: 1.1rem 0.6rem 0.4rem;
+  background: linear-gradient(180deg, rgba(20,24,33,0) 0%, rgba(20,24,33,0.55) 100%);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: rgba(253, 251, 244, 0.95);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* review block: a quote card */
+.trio-review {
+  background: linear-gradient(160deg, #4d5a74, #38445a);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1.3rem 0.9rem 0.6rem;
+}
+.trio-quote {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  margin: 0.32rem 0.42rem 0;
   font-family: var(--font-display);
   font-style: italic;
-  font-size: 0.62rem;
-  line-height: 1.25;
-  color: rgba(253, 251, 244, 0.95);
+  font-size: 0.98rem;
+  line-height: 1.3;
+  color: rgba(253, 251, 244, 0.97);
 }
+.trio-by {
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  color: rgba(253, 251, 244, 0.7);
+}
+.trio-score { color: var(--gold); font-weight: 500; }
+/* drifting paper-light sheen on the art/photo blocks */
+.trio-vibe::before, .trio-food::before {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  background:
+    radial-gradient(34% 30% at 30% 32%, rgba(255, 251, 240, 0.16) 0%, rgba(255, 251, 240, 0) 70%),
+    radial-gradient(30% 26% at 72% 64%, rgba(255, 251, 240, 0.1) 0%, rgba(255, 251, 240, 0) 70%);
+  animation: wash-drift 14s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+/* info strip — a fourth floating block carrying name + meta */
+.trio-info {
+  flex: 0 0 auto;
+  border-radius: 16px;
+  background: rgba(251, 247, 238, 0.96);
+  border: 1px solid rgba(253, 251, 244, 0.5);
+  box-shadow: 0 10px 22px -10px rgba(10, 14, 22, 0.55);
+  padding: 0.55rem 0.75rem 0.6rem;
+}
+.trio-info .ov-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(1.18rem, 4.6vw, 1.4rem);
+  line-height: 1.12;
+  color: var(--ink);
+  text-shadow: none;
+  margin: 0 0 0.18rem;
+}
+.trio-info .ov-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  text-shadow: none;
+}
+.trio-info .ov-star { color: #b8952e; }
+.trio-info .ov-price { color: #5e7d57; }
+.trio-info .ov-dot { opacity: 0.45; }
+.trio-info .ov-you { color: #8a7940; background: rgba(205, 184, 120, 0.18); border-color: rgba(205, 184, 120, 0.5); margin-top: 0.3rem; }
+html.evening .trio-info { background: rgba(43, 49, 64, 0.96); }
+html.evening .trio-info .ov-name { color: var(--ink); }
 
 /* ----- IG-style segment indicator bars ----- */
 .seg-bars {
@@ -2371,7 +2443,8 @@ html.evening .settings-msg.is-ok { color: #b6d3af; }
   .pref-chip, .seg-btn, .deck-btn,
   .decision-card, .deck-end-card, .decision-act, .seg-bar,
   .bloom-drop, .roulette-card, .roulette-spark, .roulette-name.is-tick,
-  .empty-steam, .peek, .peek.is-in, .pop-rank.is-blooming {
+  .empty-steam, .pop-rank.is-blooming,
+  .trio-block.is-turn, .trio-vibe::before, .trio-food::before {
     transition: none;
     animation: none;
   }
