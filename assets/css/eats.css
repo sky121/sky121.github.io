@@ -1925,6 +1925,18 @@ html.evening .range-btn.is-active {
 .pop-card:hover { transform: translateY(-2px); box-shadow: 0 16px 32px -18px rgba(46,58,72,0.45); }
 html.evening .pop-card:hover { box-shadow: 0 16px 32px -18px rgba(0,0,0,0.7); }
 
+/* home-screen install tip in the settings sheet */
+.settings-install {
+  margin: 0.7rem 0 0.9rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 12px;
+  background: rgba(127, 168, 201, 0.1);
+  border: 1px solid rgba(127, 168, 201, 0.3);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+html.evening .settings-install { background: rgba(127, 168, 201, 0.12); border-color: rgba(127, 168, 201, 0.28); }
+
 /* session-local demo hearts on friend ratings */
 .friend-heart {
   appearance: none;

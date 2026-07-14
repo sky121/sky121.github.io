@@ -3258,6 +3258,17 @@
     popular.init();
     settings.init();
     find.init();
+
+    // PWA: register the Peckish service worker, scoped to '/eats' so it
+    // never controls the rest of the portfolio. Network-first, so online
+    // visitors always get fresh files; offline reopens keep demo mode alive.
+    try {
+      if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+        navigator.serviceWorker.register('/peckish-sw.js', { scope: '/eats' }).catch(function () {
+          /* registration is a progressive enhancement — never surface errors */
+        });
+      }
+    } catch (e) {}
   }
 
   if (document.readyState === 'loading') {
