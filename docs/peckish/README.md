@@ -44,6 +44,32 @@
 - **Swipe deck:** cards nearest-first, expanding outward. Drag **left = pass / right = like** (rotation + green YES / red NOPE stamps, peeking next card); also ✗/♥ buttons + ArrowLeft/ArrowRight; reduced-motion uses fades. **Tap the card to cycle story segments: Vibe → Food → Reviews.** Card overlay: name, 0–100 rating + review count, price, cuisine, distance, open-now.
 - **Decision screen** (on like): "Tonight: <name>" → Open in Maps (Directions), Call (if phone), "I ate here → Rate" (opens the rating sheet), **Save to shortlist · keep swiping**, Keep looking. **End-of-deck** screen → Compare shortlist (if any) / Widen preferences / Search farther (live) / Start over.
 
+### Find orb redesign — "living pool" (2026-07-08)
+The landing orb is now continuously alive instead of a mostly-static circle.
+All ambient loops are transform/opacity only (no box-shadow or filter
+animation): **pigment churn** — three oversized palette washes
+(rose+wisteria on `.find-orb-pool::before`, sage+gold on
+`.find-orb-pool::after`, pond+rose on the new `.find-orb-churn` span's
+`::before`) rotate/drift on offset 27s/34s/21s alternate loops, clipped to
+the circle by `overflow:hidden`, so the colors visibly swirl and remix;
+**breathing** — the button scales 1→1.035 on a 5.2s loop (`orb-breathe`)
+while a `.find-orb::after` glow-shadow spreads and softens in sync via
+opacity+scale (`orb-shadow-breathe`); **sheen sweep** — the specular
+highlight drifts diagonally across the surface on a 13s loop
+(`orb-sheen-sweep`); **ripple** — a concentric ring expands and fades every
+4.2s (`orb-ripple` on `.find-orb::before`), quickening to 1.1s on press;
+**word-mark glow** — a halo behind "Find" pulses on the breath period
+(`orb-text-glow` on `.find-orb-inner::before`). Hover swells the orb via the
+independent `translate`/`scale` properties (so they compose with the breathe
+animation) and speeds the churn layers up subtly; active is a fast 0.96
+squish. Dark mode gets stronger wash opacities + a pond-glow shadow so the
+orb glows against the dark paper. The tap **pop-burst → Preferences**
+choreography is unchanged (`.is-popping` now also fades the churn span and
+stills the new pseudos); reduced motion stills every loop into a static
+painted orb and keeps the instant no-pop path. One HTML addition:
+`<span class="find-orb-churn">` between pool and sheen in `eats.html`; no JS
+changes.
+
 ### Wave 3 (2026-07-08)
 - **Share a pick** — the decision screen has a Share action: native `navigator.share` sheet where available (title/text/maps URL), clipboard fallback with a paper-pill "Copied!" toast + live-region announcement; fully guarded, never breaks the screen.
 - **Friends/Popular motion** — feed entries and leaderboard rows enter with a ~40ms staggered rise (`enterStagger`/`.social-enter`, class stripped on animationend); top-3 Popular rank badges bloom on first render. Reduced-motion: everything instant.

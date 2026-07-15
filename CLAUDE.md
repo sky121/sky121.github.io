@@ -10,6 +10,24 @@ the single source of truth for its state and roadmap:
 - **Peckish** (restaurant picker): `eats.html`, `assets/js/eats.js`,
   `assets/css/eats.css` → docs in `docs/peckish/README.md`
 
+## Orchestration model (how work gets done)
+
+**The main session is the ORCHESTRATOR — it never implements tasks itself.**
+For every task (planned or user-requested):
+
+1. **Plan** the task into a self-contained scope with explicit verification
+   requirements.
+2. **Deploy a subagent** to implement it — run multiple agents in parallel
+   when tasks touch disjoint files (Dragoose lane vs Peckish lane vs shared).
+   Agent prompts must include: exact file whitelist, the design-language
+   rules below, verification steps (node --check + Playwright + reading
+   screenshots), "no git commands", and a report-back format.
+3. The orchestrator stays available for new instructions while agents work;
+   on each agent's completion it **reviews the diff, re-verifies, commits,
+   opens the PR, merges, resets the branch**, and deploys the next wave.
+4. If an agent dies mid-task (usage limits), the orchestrator salvages:
+   audit the partial diff, finish only the small gaps, verify, ship.
+
 ## Git & PR workflow (standard practice for all future work)
 
 1. **Branch per unit of work.** Each self-contained change (a feature wave,

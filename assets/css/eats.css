@@ -216,7 +216,12 @@ html.evening :focus-visible {
   min-height: min(74vh, 40rem);
 }
 
-/* ----- The watercolor BUBBLE button (hero) ----- */
+/* ----- The watercolor BUBBLE button (hero): a living pool ----- */
+/* Layering (back → front): ::after breathing glow-shadow, ::before ripple
+   ring, .find-orb-pool (glass body + two churning washes on its pseudos),
+   .find-orb-churn (third wash), .find-orb-sheen (drifting light),
+   .find-orb-inner (word mark + glow halo).
+   All ambient loops are transform/opacity only. */
 .find-orb {
   position: relative;
   appearance: none;
@@ -230,28 +235,32 @@ html.evening :focus-visible {
   place-items: center;
   isolation: isolate;
   -webkit-tap-highlight-color: transparent;
-  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  /* hover/press ride the independent translate/scale properties so they
+     compose with the breathing transform animation instead of fighting it */
+  transition:
+    translate 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    scale 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: orb-breathe 5.2s ease-in-out infinite;
+}
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.035); }
 }
 
-/* the translucent soap-bubble body: drifting iridescence in the palette */
+/* the translucent glass body of the pool (washes churn on its pseudos) */
 .find-orb-pool {
   position: absolute;
   inset: 0;
   border-radius: 50%;
+  overflow: hidden; /* clips the oversized churning washes to the circle */
   background:
-    /* sheen highlight (top-left) */
-    radial-gradient(38% 30% at 30% 24%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 60%),
-    /* iridescent palette blooms, translucent */
-    radial-gradient(48% 48% at 24% 30%, rgba(217, 139, 160, 0.55) 0%, rgba(217, 139, 160, 0) 60%),
-    radial-gradient(50% 50% at 78% 26%, rgba(162, 146, 196, 0.5) 0%, rgba(162, 146, 196, 0) 62%),
-    radial-gradient(58% 58% at 70% 82%, rgba(147, 180, 139, 0.42) 0%, rgba(147, 180, 139, 0) 64%),
-    radial-gradient(56% 56% at 22% 80%, rgba(205, 184, 120, 0.4) 0%, rgba(205, 184, 120, 0) 62%),
+    /* soft top-light */
+    radial-gradient(52% 40% at 32% 22%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 62%),
     /* glassy pond tint, more transparent toward centre */
-    radial-gradient(120% 120% at 46% 44%, rgba(127, 168, 201, 0.18) 0%, rgba(74, 114, 153, 0.42) 96%);
+    radial-gradient(120% 120% at 46% 44%, rgba(127, 168, 201, 0.2) 0%, rgba(74, 114, 153, 0.44) 96%);
   box-shadow:
-    /* outer cast glow */
-    0 24px 54px -18px rgba(74, 114, 153, 0.55),
-    0 50px 90px -34px rgba(162, 146, 196, 0.5),
+    /* close cast shadow (the breathing glow lives on .find-orb::after) */
+    0 16px 34px -16px rgba(74, 114, 153, 0.5),
     /* rim of light */
     inset 0 0 0 1.5px rgba(255, 255, 255, 0.45),
     /* top sheen + bottom shading for volume */
@@ -260,50 +269,162 @@ html.evening :focus-visible {
   -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
   z-index: -1;
-  animation: orb-wobble 7s ease-in-out infinite;
+  animation: orb-wobble 9s ease-in-out infinite;
 }
 html.evening .find-orb-pool {
   background:
-    radial-gradient(38% 30% at 30% 24%, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 60%),
-    radial-gradient(48% 48% at 24% 30%, rgba(217, 139, 160, 0.5) 0%, rgba(217, 139, 160, 0) 60%),
-    radial-gradient(50% 50% at 78% 26%, rgba(176, 162, 210, 0.5) 0%, rgba(176, 162, 210, 0) 62%),
-    radial-gradient(58% 58% at 70% 82%, rgba(147, 180, 139, 0.4) 0%, rgba(147, 180, 139, 0) 64%),
-    radial-gradient(56% 56% at 22% 80%, rgba(205, 184, 120, 0.42) 0%, rgba(205, 184, 120, 0) 62%),
-    radial-gradient(120% 120% at 46% 44%, rgba(159, 194, 224, 0.16) 0%, rgba(74, 114, 153, 0.5) 96%);
+    radial-gradient(52% 40% at 32% 22%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 62%),
+    radial-gradient(120% 120% at 46% 44%, rgba(159, 194, 224, 0.2) 0%, rgba(74, 114, 153, 0.55) 96%);
   box-shadow:
-    0 24px 54px -18px rgba(0, 0, 0, 0.55),
-    0 50px 90px -34px rgba(127, 168, 201, 0.5),
+    0 16px 34px -16px rgba(0, 0, 0, 0.55),
     inset 0 0 0 1.5px rgba(255, 255, 255, 0.4),
     inset 0 6px 12px rgba(255, 255, 255, 0.4),
     inset 0 -22px 40px -14px rgba(0, 0, 0, 0.4);
 }
 
-/* crisp little soap-bubble specular highlight that drifts slowly */
+/* --- slow pigment churn: three oversized wash layers that independently
+       rotate/drift on long offset loops so the colors visibly remix --- */
+.find-orb-pool::before,
+.find-orb-pool::after,
+.find-orb-churn::before {
+  content: "";
+  position: absolute;
+  inset: -28%;
+  border-radius: 50%;
+  will-change: transform;
+}
+/* wash A — rose + wisteria */
+.find-orb-pool::before {
+  background:
+    radial-gradient(34% 34% at 26% 34%, rgba(217, 139, 160, 0.6) 0%, rgba(217, 139, 160, 0) 68%),
+    radial-gradient(36% 36% at 72% 26%, rgba(162, 146, 196, 0.55) 0%, rgba(162, 146, 196, 0) 70%);
+  animation: orb-churn-a 27s ease-in-out infinite alternate;
+}
+/* wash B — sage + gold */
+.find-orb-pool::after {
+  background:
+    radial-gradient(38% 38% at 68% 74%, rgba(147, 180, 139, 0.5) 0%, rgba(147, 180, 139, 0) 70%),
+    radial-gradient(34% 34% at 28% 72%, rgba(205, 184, 120, 0.46) 0%, rgba(205, 184, 120, 0) 68%);
+  animation: orb-churn-b 34s ease-in-out infinite alternate;
+}
+/* wash C — pond + a faint second rose, on its own clipped span */
+.find-orb-churn {
+  position: absolute;
+  inset: 3%;
+  border-radius: 50%;
+  overflow: hidden;
+  z-index: -1;
+  pointer-events: none;
+}
+.find-orb-churn::before {
+  background:
+    radial-gradient(40% 40% at 50% 20%, rgba(127, 168, 201, 0.42) 0%, rgba(127, 168, 201, 0) 70%),
+    radial-gradient(30% 30% at 76% 62%, rgba(217, 139, 160, 0.3) 0%, rgba(217, 139, 160, 0) 66%);
+  animation: orb-churn-c 21s ease-in-out infinite alternate-reverse;
+}
+@keyframes orb-churn-a {
+  0%   { transform: rotate(0deg) translate(0%, 0%) scale(1); }
+  50%  { transform: rotate(140deg) translate(5%, -4%) scale(1.14); }
+  100% { transform: rotate(300deg) translate(-4%, 5%) scale(1.02); }
+}
+@keyframes orb-churn-b {
+  0%   { transform: rotate(0deg) translate(0%, 0%) scale(1.05); }
+  50%  { transform: rotate(-160deg) translate(-5%, 3%) scale(1.16); }
+  100% { transform: rotate(-330deg) translate(4%, -4%) scale(1); }
+}
+@keyframes orb-churn-c {
+  0%   { transform: rotate(0deg) translate(0%, 0%) scale(1); }
+  50%  { transform: rotate(180deg) translate(6%, 4%) scale(1.18); }
+  100% { transform: rotate(350deg) translate(-5%, -3%) scale(1.04); }
+}
+/* dark paper: pigments glow a touch stronger so the pool doesn't wash out */
+html.evening .find-orb-pool::before {
+  background:
+    radial-gradient(34% 34% at 26% 34%, rgba(224, 156, 175, 0.66) 0%, rgba(224, 156, 175, 0) 68%),
+    radial-gradient(36% 36% at 72% 26%, rgba(176, 162, 210, 0.62) 0%, rgba(176, 162, 210, 0) 70%);
+}
+html.evening .find-orb-pool::after {
+  background:
+    radial-gradient(38% 38% at 68% 74%, rgba(157, 190, 149, 0.56) 0%, rgba(157, 190, 149, 0) 70%),
+    radial-gradient(34% 34% at 28% 72%, rgba(214, 194, 132, 0.52) 0%, rgba(214, 194, 132, 0) 68%);
+}
+html.evening .find-orb-churn::before {
+  background:
+    radial-gradient(40% 40% at 50% 20%, rgba(159, 194, 224, 0.48) 0%, rgba(159, 194, 224, 0) 70%),
+    radial-gradient(30% 30% at 76% 62%, rgba(224, 156, 175, 0.34) 0%, rgba(224, 156, 175, 0) 66%);
+}
+/* hover: the churn quickens subtly under the cursor */
+.find-orb:hover .find-orb-pool::before { animation-duration: 15s; }
+.find-orb:hover .find-orb-pool::after  { animation-duration: 19s; }
+.find-orb:hover .find-orb-churn::before { animation-duration: 12s; }
+
+/* crisp specular highlight that sweeps diagonally, like light on water */
 .find-orb-sheen {
   position: absolute;
-  top: 16%;
-  left: 20%;
+  top: 12%;
+  left: 14%;
   width: 30%;
   height: 22%;
   border-radius: 50%;
   background: radial-gradient(closest-side, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 72%);
-  filter: blur(1px);
+  filter: blur(1px); /* static blur — never animated */
   z-index: 1;
   pointer-events: none;
-  animation: orb-sheen 7s ease-in-out infinite;
+  animation: orb-sheen-sweep 13s ease-in-out infinite;
+}
+@keyframes orb-sheen-sweep {
+  0%, 100% { transform: translate(0%, 0%) scale(0.92) rotate(-8deg); opacity: 0.9; }
+  30%      { transform: translate(70%, 55%) scale(1.15) rotate(4deg); opacity: 0.55; }
+  55%      { transform: translate(135%, 105%) scale(0.95) rotate(10deg); opacity: 0.3; }
+  78%      { transform: translate(55%, 35%) scale(1.1) rotate(0deg); opacity: 0.6; }
 }
 
-/* soft outward ripple ring (faint rim of light) */
+/* soft concentric ripple — a droplet landing in the pool every ~4s */
 .find-orb::before {
   content: "";
   position: absolute;
-  inset: -5%;
+  inset: -4%;
   border-radius: 50%;
-  border: 1px solid rgba(127, 168, 201, 0.4);
+  border: 1.5px solid rgba(127, 168, 201, 0.55);
   z-index: -2;
-  animation: orb-ripple 7s ease-out infinite;
+  opacity: 0;
+  animation: orb-ripple 4.2s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
 }
-html.evening .find-orb::before { border-color: rgba(159, 194, 224, 0.4); }
+html.evening .find-orb::before { border-color: rgba(159, 194, 224, 0.55); }
+/* press: a quick ripple radiates from the squish */
+.find-orb:active::before { animation-duration: 1.1s; }
+@keyframes orb-ripple {
+  0%   { transform: scale(0.9); opacity: 0; }
+  12%  { opacity: 0.55; }
+  65%  { opacity: 0; }
+  100% { transform: scale(1.28); opacity: 0; }
+}
+
+/* breathing glow-shadow behind everything: its OPACITY breathes in sync
+   with the orb's scale (box-shadow itself is never animated) */
+.find-orb::after {
+  content: "";
+  position: absolute;
+  inset: -16%;
+  border-radius: 50%;
+  background:
+    radial-gradient(50% 50% at 50% 60%, rgba(74, 114, 153, 0.5) 0%, rgba(74, 114, 153, 0) 70%),
+    radial-gradient(60% 60% at 46% 40%, rgba(162, 146, 196, 0.34) 0%, rgba(162, 146, 196, 0) 72%);
+  z-index: -3;
+  pointer-events: none;
+  opacity: 0.7;
+  animation: orb-shadow-breathe 5.2s ease-in-out infinite;
+}
+html.evening .find-orb::after {
+  background:
+    radial-gradient(50% 50% at 50% 58%, rgba(127, 168, 201, 0.42) 0%, rgba(127, 168, 201, 0) 70%),
+    radial-gradient(60% 60% at 46% 40%, rgba(162, 146, 196, 0.3) 0%, rgba(162, 146, 196, 0) 72%);
+  opacity: 0.8;
+}
+@keyframes orb-shadow-breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(1.09); } /* spreads + softens as the orb swells */
+}
 
 .find-orb-inner {
   position: relative;
@@ -316,6 +437,22 @@ html.evening .find-orb::before { border-color: rgba(159, 194, 224, 0.4); }
   text-shadow:
     0 1px 1px rgba(46, 58, 72, 0.35),
     0 2px 10px rgba(46, 58, 72, 0.45);
+}
+/* halo behind the word mark: a gentle glow pulse loosely synced with the
+   breath (same 5.2s period, slight offset) */
+.find-orb-inner::before {
+  content: "";
+  position: absolute;
+  inset: -55% -38%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 251, 240, 0.42) 0%, rgba(255, 251, 240, 0) 72%);
+  z-index: -1;
+  opacity: 0.5;
+  animation: orb-text-glow 5.2s ease-in-out -0.8s infinite;
+}
+@keyframes orb-text-glow {
+  0%, 100% { opacity: 0.35; transform: scale(0.96); }
+  50%      { opacity: 0.8;  transform: scale(1.08); }
 }
 html.evening .find-orb-inner {
   color: #f3eee3;
@@ -331,22 +468,17 @@ html.evening .find-orb-inner {
   line-height: 1;
   letter-spacing: 0.01em;
 }
-.find-orb:hover { transform: translateY(-5px) scale(1.03); }
-.find-orb:active { transform: translateY(-1px) scale(0.97); }
+.find-orb:hover  { translate: 0 -5px; scale: 1.035; }
+.find-orb:active {
+  translate: 0 -1px;
+  scale: 0.96; /* quick squish */
+  transition-duration: 0.12s, 0.12s;
+}
 
 @keyframes orb-wobble {
   0%, 100% { transform: scale(1) translateY(0); border-radius: 50%; }
-  35%      { transform: scale(1.025) translateY(-3px); border-radius: 49% 51% 52% 48% / 51% 49% 51% 49%; }
-  65%      { transform: scale(0.99) translateY(2px); border-radius: 51% 49% 48% 52% / 49% 52% 48% 51%; }
-}
-@keyframes orb-sheen {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.95; }
-  50%      { transform: translate(8%, 6%) scale(1.08); opacity: 0.75; }
-}
-@keyframes orb-ripple {
-  0% { transform: scale(0.97); opacity: 0.55; }
-  70% { opacity: 0; }
-  100% { transform: scale(1.16); opacity: 0; }
+  35%      { transform: scale(1.02) translateY(-2px); border-radius: 49% 51% 52% 48% / 51% 49% 51% 49%; }
+  65%      { transform: scale(0.995) translateY(2px); border-radius: 51% 49% 48% 52% / 49% 52% 48% 51%; }
 }
 
 /* ----- POP: swell then burst + fade ----- */
@@ -357,7 +489,13 @@ html.evening .find-orb-inner {
 .find-orb.is-popping .find-orb-pool {
   animation: orb-pool-pop 0.46s cubic-bezier(0.3, 0.8, 0.4, 1) forwards;
 }
+.find-orb.is-popping .find-orb-churn {
+  animation: orb-pool-pop 0.46s cubic-bezier(0.3, 0.8, 0.4, 1) forwards;
+}
 .find-orb.is-popping .find-orb-sheen { animation: none; opacity: 0; }
+.find-orb.is-popping::before,
+.find-orb.is-popping::after,
+.find-orb.is-popping .find-orb-inner::before { animation: none; opacity: 0; }
 .find-orb.is-popping .find-orb-inner { animation: orb-inner-pop 0.28s ease forwards; }
 
 @keyframes orb-pop {
@@ -2499,7 +2637,9 @@ html.evening .settings-msg.is-ok { color: #b6d3af; }
 
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .find-orb, .find-orb-pool, .find-orb-sheen, .find-orb::before, .bottab-icon,
+  .find-orb, .find-orb-pool, .find-orb-sheen, .find-orb::before,
+  .find-orb::after, .find-orb-pool::before, .find-orb-pool::after,
+  .find-orb-churn, .find-orb-churn::before, .find-orb-inner::before, .bottab-icon,
   .card, .ctl-switch::after, .card-action, .sheet,
   .pop-card, .friend-chip, .range-btn,
   .find-orb.is-popping, .find-orb.is-popping .find-orb-pool,
