@@ -106,7 +106,7 @@
 
           <header class="prefs-head">
             <h2 class="prefs-title">What are you in the mood for?</h2>
-            <p class="prefs-sub">All optional &mdash; skip anything and we&rsquo;ll show everything nearby.</p>
+            <p class="prefs-sub">One quick question at a time &mdash; skip any of them, or start swiping whenever you&rsquo;re ready.</p>
           </header>
 
           <form class="prefs-form" id="prefs-form" autocomplete="off">
@@ -161,8 +161,15 @@
 
             <p class="prefs-count" id="prefs-count" role="status" aria-live="polite"></p>
 
+            <!-- one-at-a-time wizard nav: skip through steps, or bail out
+                 to the search at ANY point with the always-there buttons -->
+            <div class="prefs-stepnav">
+              <button type="button" class="btn-ghost step-back" id="step-back">&larr; Back</button>
+              <span class="step-where" id="step-where" aria-live="polite"></span>
+              <button type="button" class="btn-ghost step-next" id="step-next">Skip &rarr;</button>
+            </div>
+
             <div class="prefs-actions">
-              <button type="button" class="btn-ghost" id="prefs-skip">Skip</button>
               <button type="submit" class="btn-solid" id="prefs-start">Start swiping</button>
               <button type="button" class="btn-ghost btn-surprise" id="prefs-surprise">
                 <span class="surprise-spark" aria-hidden="true">&#10022;</span>
