@@ -974,6 +974,22 @@
       g.strokeStyle = ink; g.globalAlpha = 0.8; g.lineWidth = 2; g.stroke();
       g.globalAlpha = 1;
       g.restore();
+      // REGALIA: Dusk Cowl — a twilight hood draped over the back of the head
+      if (o.gear && o.gear.cowl) {
+        g.save();
+        g.translate(0, -43);
+        g.beginPath();
+        g.arc(0, 0, 11.2, -0.12 * Math.PI, 1.12 * Math.PI);       // outer drape
+        g.arc(0, -1.6, 7.6, 1.04 * Math.PI, -0.04 * Math.PI, true); // hood opening
+        g.closePath();
+        g.fillStyle = "#5d4f86"; g.globalAlpha = 0.92; g.fill();
+        g.strokeStyle = ink; g.globalAlpha = 0.55; g.lineWidth = 1.4; g.stroke();
+        // a soft violet sheen along the rim of the hood
+        g.globalAlpha = 0.5; g.strokeStyle = "#cbb8e8"; g.lineWidth = 1;
+        g.beginPath(); g.arc(0, 0, 9.4, 0.1 * Math.PI, 0.9 * Math.PI); g.stroke();
+        g.globalAlpha = 1;
+        g.restore();
+      }
       // REGALIA: Gilded Crest — a small gold circlet seen from above
       if (o.gear && o.gear.crest) {
         g.save();
@@ -1045,7 +1061,8 @@
       ember: { hi: "#e89058", lo: "#b04830", belly: "#f2c68c", memHi: "#d96a45", memLo: "#8e2f24", bone: "#ead9a4", boneTip: "#b6a06a", eye: "#ffd97a", spade: "#a83a54", vein: "#d98ba0" },
       storm: { hi: "#7fa8c9", lo: "#3d6288", belly: "#d3e2ef", memHi: "#5f86ab", memLo: "#2e4d6e", bone: "#dbe6f0", boneTip: "#8fa6bd", eye: "#bfe3ff", spade: "#4f6d94", vein: "#a292c4" },
       verdant: { hi: "#93b48b", lo: "#597a52", belly: "#e9efdb", memHi: "#7a9a6f", memLo: "#42603d", bone: "#e3e8cf", boneTip: "#9aa87f", eye: "#e5f0a8", spade: "#6e8a4f", vein: "#cdb878" },
-      gilded: { hi: "#d9b96a", lo: "#a8863c", belly: "#f6ecd0", memHi: "#c2a052", memLo: "#7c6128", bone: "#f2e6c4", boneTip: "#b3903f", eye: "#fff3c4", spade: "#b3903f", vein: "#cdb878" }
+      gilded: { hi: "#d9b96a", lo: "#a8863c", belly: "#f6ecd0", memHi: "#c2a052", memLo: "#7c6128", bone: "#f2e6c4", boneTip: "#b3903f", eye: "#fff3c4", spade: "#b3903f", vein: "#cdb878" },
+      umbra: { hi: "#8a7bb0", lo: "#4a3f6e", belly: "#d8d2e8", memHi: "#6d5f96", memLo: "#362d54", bone: "#d5cde6", boneTip: "#8d80ab", eye: "#e6d8ff", spade: "#5d4f86", vein: "#a292c4" }
     },
     // o: { t, swayPhase, flapPhase, phase2, flash, bow, variant, simple }
     dragon: function (g, o) {
@@ -1328,6 +1345,7 @@
             p.r = cfg.r; p.dmg = cfg.dmg; p.life = cfg.life; p.color = cfg.color;
             p.rot = cfg.rot || 0; p.spin = cfg.spin || 0; p.kind = cfg.kind || "fire";
             p.grav = cfg.grav || 0;
+            p.curve = cfg.curve || 0;
             p.power = cfg.power || null;
             p.seed = Math.random() * TAU;
             if (p.trail) p.trail.length = 0; else p.trail = [];
@@ -1366,7 +1384,9 @@
     thistleDown: { name: "Thistle Down", glyph: "🌾", desc: "Fallen scales drift to you from much farther away." },
     verdantGift: { name: "Sorrel's Gift", glyph: "🌿", desc: "Begin each run already wielding Forked Flame." },
     gildedHeart: { name: "Gilded Heart", glyph: "🥇", desc: "Begin each run with your charge igniting 25% faster." },
-    gildedGift: { name: "Aurelia's Gift", glyph: "🪙", desc: "Begin each run already wielding Tailwind Fury." }
+    gildedGift: { name: "Aurelia's Gift", glyph: "🪙", desc: "Begin each run already wielding Tailwind Fury." },
+    duskHeart: { name: "Dusk Heart", glyph: "🌙", desc: "Begin each run with your dodge granting 0.15s longer i-frames." },
+    umbraGift: { name: "Umbra's Gift", glyph: "🌌", desc: "Begin each run already wielding Mirror Plume." }
   };
 
   // ceremonial-duel trophies: cosmetic washes for Gary's coat (no power)
@@ -1374,9 +1394,10 @@
     cinderPlume: { name: "Cinder Plume", glyph: "🌹", color: "#d98ba0", desc: "Gary wears a rose-washed coat, a gift of Ember's ceremony." },
     tempestPlume: { name: "Tempest Plume", glyph: "🌀", color: "#7fa8c9", desc: "Gary wears a storm-blue coat, a gift of Tempest's ceremony." },
     sorrelPlume: { name: "Sorrel Plume", glyph: "🍃", color: "#93b48b", desc: "Gary wears a moss-green coat, a gift of Sorrel's ceremony." },
-    gildedPlume: { name: "Gilded Plume", glyph: "✨", color: "#cdb878", desc: "Gary wears a gold-washed coat, a gift of Aurelia's ceremony." }
+    gildedPlume: { name: "Gilded Plume", glyph: "✨", color: "#cdb878", desc: "Gary wears a gold-washed coat, a gift of Aurelia's ceremony." },
+    duskPlume: { name: "Dusk Plume", glyph: "🌆", color: "#8a7bb0", desc: "Gary wears a twilight-violet coat, a gift of Umbra's ceremony." }
   };
-  var DRAGON_PLUME = { ember: "cinderPlume", storm: "tempestPlume", verdant: "sorrelPlume", gilded: "gildedPlume" };
+  var DRAGON_PLUME = { ember: "cinderPlume", storm: "tempestPlume", verdant: "sorrelPlume", gilded: "gildedPlume", umbra: "duskPlume" };
 
   // regalia: hoard equipment that changes Gary's silhouette AND his fight
   // (earned at the second ceremonial victory against each dragon)
@@ -1384,25 +1405,28 @@
     emberHorns: { name: "Ember's Horns", glyph: "🐏", dragon: "ember", desc: "Backswept horns of cinder-bone — your dodge dash now rams dragons for damage." },
     tempestSpade: { name: "Tempest's Spade", glyph: "🌩️", dragon: "storm", desc: "A storm-forged tail spade — fully charged shots loose a rearward fan of lightning." },
     sorrelMantle: { name: "Sorrel's Mantle", glyph: "🍂", dragon: "verdant", desc: "A leaf-woven mantle — it slowly grows a ward that blocks one hit." },
-    gildedCrest: { name: "Gilded Crest", glyph: "👑", dragon: "gilded", desc: "A gilded crest — scales are worth double while your health is full." }
+    gildedCrest: { name: "Gilded Crest", glyph: "👑", dragon: "gilded", desc: "A gilded crest — scales are worth double while your health is full." },
+    duskCowl: { name: "Dusk Cowl", glyph: "🦇", dragon: "umbra", desc: "A cowl of dusk — dodging leaves a shadow decoy that draws the next aimed attack." }
   };
-  var DRAGON_REGALIA = { ember: "emberHorns", storm: "tempestSpade", verdant: "sorrelMantle", gilded: "gildedCrest" };
+  var DRAGON_REGALIA = { ember: "emberHorns", storm: "tempestSpade", verdant: "sorrelMantle", gilded: "gildedCrest", umbra: "duskCowl" };
   // every attack in the game, for ceremonial cross-kit stealing
-  var ALL_ATTACKS = ["volley", "aimed", "breath", "fan", "lance", "nova", "spiral", "seeds", "lures", "ray", "coins"];
+  var ALL_ATTACKS = ["volley", "aimed", "breath", "fan", "lance", "nova", "spiral", "seeds", "lures", "ray", "coins", "veil", "echoes", "crescent"];
   var BASE_KIT = {
     ember: ["volley", "aimed", "breath"],
     storm: ["fan", "lance", "nova"],
     verdant: ["spiral", "seeds"],
-    gilded: ["lures", "ray", "coins"]
+    gilded: ["lures", "ray", "coins"],
+    umbra: ["veil", "echoes", "crescent"]
   };
 
   // the gauntlet: dragons faced in order within a single run
-  var RUN_BOSSES = ["ember", "storm", "verdant", "gilded"];
+  var RUN_BOSSES = ["ember", "storm", "verdant", "gilded", "umbra"];
   var DRAGONS = {
     ember: { name: "Ember, the Cinder Wyrm", health: 100, roamSpeed: 105, enragedSpeed: 150 },
     storm: { name: "Tempest, the Storm Wyrm", health: 115, roamSpeed: 120, enragedSpeed: 170 },
     verdant: { name: "Sorrel, the Verdant Wyrm", health: 130, roamSpeed: 112, enragedSpeed: 160 },
-    gilded: { name: "Aurelia, the Gilded Wyrm", health: 145, roamSpeed: 110, enragedSpeed: 165 }
+    gilded: { name: "Aurelia, the Gilded Wyrm", health: 145, roamSpeed: 110, enragedSpeed: 165 },
+    umbra: { name: "Umbra, the Dusk Wyrm", health: 160, roamSpeed: 118, enragedSpeed: 172 }
   };
 
   // ---------------------------------------------------------
@@ -1572,6 +1596,7 @@
           spade: Save.hasRegalia("tempestSpade"),
           mantle: Save.hasRegalia("sorrelMantle"),
           crest: Save.hasRegalia("gildedCrest"),
+          cowl: Save.hasRegalia("duskCowl"),
           crown: Save.data.crowned
         }
       });
@@ -1675,7 +1700,9 @@
       if (Save.hasRelic("stormGift")) { this.powers.stormDodge = true; }
       if (Save.hasRelic("verdantGift")) { this.powers.split = true; }
       if (Save.hasRelic("gildedGift")) { this.powers.velocity = true; }
+      if (Save.hasRelic("umbraGift")) { this.powers.reflect = true; }
       this.renderPowers();
+      this.decoy = null; // Dusk Cowl shadow decoy (fresh run, no ghosts)
 
       // the open sky: no dragon yet — fly into a realm to anger its ruler
       this.dragon = null;
@@ -1710,14 +1737,17 @@
         ember: { a: PAL.ember, b: PAL.emberDeep },
         storm: { a: "#7fa8c9", b: "#3d6288" },
         verdant: { a: PAL.sage, b: "#597a52" },
-        gilded: { a: "#d9b96a", b: "#a8863c" }
+        gilded: { a: "#d9b96a", b: "#a8863c" },
+        umbra: { a: "#8a7bb0", b: "#4a3f6e" }
       };
-      // four realms in a diamond — the player flies in from the bottom
+      // five realms in a ring around the sky's heart — the player flies in
+      // from the bottom, so the lower pair sits widest to leave a clear lane
       var spots = [
-        { x: VW * 0.5, y: VH * 0.16 },    // top
-        { x: VW * 0.22, y: VH * 0.375 },  // left
-        { x: VW * 0.78, y: VH * 0.375 },  // right
-        { x: VW * 0.5, y: VH * 0.585 }    // bottom (nearest the player)
+        { x: VW * 0.5, y: VH * 0.13 },    // top center
+        { x: VW * 0.2, y: VH * 0.335 },   // upper left
+        { x: VW * 0.8, y: VH * 0.335 },   // upper right
+        { x: VW * 0.265, y: VH * 0.575 }, // lower left
+        { x: VW * 0.735, y: VH * 0.575 }  // lower right (the dusk gate)
       ];
       this.sky = { grace: 1.0, realms: [], tint: { color: "", k: 0, x: 0, y: 0 } };
       for (var i = 0; i < RUN_BOSSES.length; i++) {
@@ -1725,7 +1755,7 @@
         this.sky.realms.push({
           type: t,
           name: DRAGONS[t].name.split(",")[0],
-          x: spots[i].x, y: spots[i].y, r: 88,
+          x: spots[i].x, y: spots[i].y, r: 80,
           pal: pals[t] || pals.ember,
           defeated: false,
           phase: Math.random() * TAU
@@ -1767,6 +1797,7 @@
       var p = this.player;
       this.mode = "duel";
       PlayerShots.clear(); DragonShots.clear();
+      this.decoy = null;
       p.x = VW / 2; p.y = VH * 0.72; p.vx = 0; p.vy = 0;
       p.iframes = 1.2;
       p.charge = 0; p.charging = false;
@@ -1847,7 +1878,9 @@
         hitFlash: 0, bowT: 0,
         // health thresholds that drop scales
         dropMilestones: [0.8, 0.6, 0.45, 0.3, 0.18, 0.08].map(function (f) { return hp * f; }),
-        dashVx: 0, dashVy: 0
+        dashVx: 0, dashVy: 0,
+        // dusk veil (umbra kit; stealable): untargetable while veiled
+        veiled: false, veilMoved: false, veilX: 0, veilY: 0, echoFired: false
       };
       return d;
     },
@@ -1932,6 +1965,8 @@
       if (this.introT > 0) this.introT -= dt;
 
       this.updatePlayer(dt);
+      // Dusk Cowl shadow decoy fades on its own if nothing takes the bait
+      if (this.decoy) { this.decoy.t -= dt; if (this.decoy.t <= 0) this.decoy = null; }
       if (this.mode === "sky") this.updateSky(dt);
       this.updateDragon(dt);
       this.updateShots(dt);
@@ -2066,7 +2101,7 @@
       // REGALIA: Ember's Horns — the dodge dash rams dragons
       if (p.dashTime > 0 && !p.ramHit && Save.hasRegalia("emberHorns")) {
         var rd = this.dragon;
-        if (rd && rd.state !== "bow") {
+        if (rd && rd.state !== "bow" && !rd.veiled) {
           var rdx = p.x - rd.x, rdy = p.y - rd.y;
           var rrr = rd.r * 0.55 + p.r * 0.8;
           if (rdx * rdx + rdy * rdy < rrr * rrr) {
@@ -2129,12 +2164,17 @@
         var kv = Input.keyVec();
         if (kv.x || kv.y) ang = Math.atan2(kv.y, kv.x);
       }
+      // REGALIA: Dusk Cowl — the dodge sheds a shadow decoy where Gary was
+      if (Save.hasRegalia("duskCowl")) {
+        this.decoy = { x: p.x, y: p.y, facing: p.facing, t: 2, maxT: 2 };
+      }
       var dash = 760;
       p.vx = Math.cos(ang) * dash;
       p.vy = Math.sin(ang) * dash;
       p.facing = ang;
       p.dashTime = 0.18;
-      p.iframes = 0.42;
+      // RELIC: dusk heart — the dodge grants 0.15s longer i-frames
+      p.iframes = Save.hasRelic("duskHeart") ? 0.57 : 0.42;
       // RELIC: gale feather — dodge recovers in half the time
       p.dodgeCd = Save.hasRelic("galeFeather") ? 0.3 : 0.6;
       p.justDodged = 1.2;
@@ -2155,7 +2195,10 @@
         var dd = d;
         setTimeout(function () {
           if (Game.state !== "PLAYING" || Game.dragon !== dd || dd.state === "bow") return;
-          var pa = Math.atan2(Game.player.y - dd.y, Game.player.x - dd.x);
+          // the Dusk Cowl's shadow decoy draws the punishing snap shot
+          var tgt = (Game.decoy && Game.decoy.t > 0) ? Game.decoy : Game.player;
+          if (tgt !== Game.player) Game.decoy = null;
+          var pa = Math.atan2(tgt.y - dd.y, tgt.x - dd.x);
           DragonShots.spawn({
             x: dd.x + Math.cos(pa) * 70, y: dd.y + Math.sin(pa) * 70,
             vx: Math.cos(pa) * 520, vy: Math.sin(pa) * 520,
@@ -2281,6 +2324,8 @@
           ? (Math.random() < 0.4 ? PAL.rose : PAL.sage)   // petals shaken loose
           : d.type === "gilded"
           ? (Math.random() < 0.4 ? "#fff3c4" : PAL.gold)  // treasure-light shed like dust
+          : d.type === "umbra"
+          ? (Math.random() < 0.4 ? PAL.wisteria : "#8a7bb0") // dusk shed like falling night
           : (Math.random() < 0.4 ? PAL.rose : PAL.ember);
         Particles.glow(d.x + Math.cos(ea) * er, d.y + Math.sin(ea) * er,
           (Math.random() - 0.5) * 0.8, -1.1 - Math.random() * 1.4,
@@ -2334,7 +2379,7 @@
         d.x += d.dashVx * dt; d.y += d.dashVy * dt;
         d.dashVx *= Math.pow(0.2, dt); d.dashVy *= Math.pow(0.2, dt);
         Particles.spawn(d.x, d.y, 0, 0, 30, 1.3, 0.4,
-          d.type === "storm" ? "#9fc2e0" : d.type === "verdant" ? PAL.sage : d.type === "gilded" ? PAL.gold : PAL.ember, 0.22, 0.92);
+          d.type === "storm" ? "#9fc2e0" : d.type === "verdant" ? PAL.sage : d.type === "gilded" ? PAL.gold : d.type === "umbra" ? "#8a7bb0" : PAL.ember, 0.22, 0.92);
         d.stateT += dt;
         // keep in bounds
         if (d.x < 90) { d.x = 90; d.dashVx = Math.abs(d.dashVx); }
@@ -2398,6 +2443,58 @@
         }
         if (d.stateT > (d.phase === 2 ? 1.8 : 1.4)) this.dragonEndAttack();
       }
+      // ----- dusk veil (umbra): dissolve, slip elsewhere, shadowburst -----
+      else if (d.state === "veil") {
+        d.stateT += dt;
+        d.vx = 0; d.vy = 0;
+        // half-veiled: relocate to the rippling destination
+        if (!d.veilMoved && d.stateT >= 0.4) {
+          d.veilMoved = true;
+          d.x = d.veilX; d.y = d.veilY;
+          d.facing = Math.atan2(this.player.y - d.y, this.player.x - d.x);
+        }
+        // re-condense: burst back into being with a radial of dusk
+        if (d.veiled && d.stateT >= 1.0) {
+          d.veiled = false;
+          var voff = Math.random() * TAU;
+          for (var vi = 0; vi < 6; vi++) {
+            var va = voff + (vi / 6) * TAU;
+            DragonShots.spawn({
+              x: d.x + Math.cos(va) * d.r * 0.4, y: d.y + Math.sin(va) * d.r * 0.4,
+              vx: Math.cos(va) * 280, vy: Math.sin(va) * 280,
+              r: 15, dmg: 1, life: 2.4, color: "#8a7bb0", rot: va, kind: "dusk"
+            });
+          }
+          Particles.ring(d.x, d.y, PAL.wisteria, d.r * 0.5, 640, 0.42, 5);
+          Particles.burst(d.x, d.y, 10, "#4a3f6e", 4, 18, 0.4);
+          Audio2.noise(0.22, 0.12, 800);
+          Audio2.tone(170, 0.3, "sine", 0.12, 90);
+        }
+        if (d.stateT > 1.18) this.dragonEndAttack();
+      }
+      // ----- dusk echoes (umbra): flanking ghosts each loose one aimed shot -----
+      else if (d.state === "echoes") {
+        d.stateT += dt;
+        d.vx *= 0.94; d.vy *= 0.94;
+        d.x += d.vx * dt; d.y += d.vy * dt;
+        d.facing = this.angleLerp(d.facing, Math.atan2(this.player.y - d.y, this.player.x - d.x), 1 - Math.pow(0.05, dt));
+        if (!d.echoFired && d.stateT >= 0.6) {
+          d.echoFired = true;
+          var epx = Math.cos(d.facing + Math.PI / 2), epy = Math.sin(d.facing + Math.PI / 2);
+          for (var es = -1; es <= 1; es += 2) {
+            var ex2 = d.x + epx * es * d.r * 1.3, ey2 = d.y + epy * es * d.r * 1.3;
+            var ea2 = Math.atan2(this.player.y - ey2, this.player.x - ex2);
+            DragonShots.spawn({
+              x: ex2, y: ey2,
+              vx: Math.cos(ea2) * 380, vy: Math.sin(ea2) * 380,
+              r: 16, dmg: 1, life: 3, color: "#8a7bb0", rot: ea2, kind: "dusk"
+            });
+            Particles.glow(ex2, ey2, 0, 0, 20, 1.4, 0.3, PAL.wisteria, 0.5, 0.9);
+          }
+          Audio2.tone(240, 0.16, "sine", 0.09, 120);
+        }
+        if (d.stateT > 1.2) this.dragonEndAttack();
+      }
     },
 
     dragonBeginAttack: function () {
@@ -2415,6 +2512,9 @@
       } else if (d.type === "gilded") {
         choices = ["lures", "ray", "coins"];
         if (d.phase === 2) choices = ["lures", "ray", "coins", "dash", "dash"];
+      } else if (d.type === "umbra") {
+        choices = ["veil", "echoes", "crescent"];
+        if (d.phase === 2) choices = ["veil", "echoes", "crescent", "dash", "dash"];
       } else {
         choices = ["volley", "aimed", "breath"];
         if (d.phase === 2) choices = ["volley", "aimed", "breath", "dash", "dash"];
@@ -2424,10 +2524,14 @@
       d.telegraphType = choices[(Math.random() * choices.length) | 0];
       d.telegraph = d.telegraphType === "dash" ? 0.6
         : (d.telegraphType === "nova" || d.telegraphType === "spiral") ? 0.7
-        : d.telegraphType === "ray" ? 0.65 : 0.5;
+        : d.telegraphType === "ray" ? 0.65
+        : d.telegraphType === "crescent" ? 0.6
+        : d.telegraphType === "echoes" ? 0.55 : 0.5;
       d.telegraphMax = d.telegraph;
       if (d.telegraphType === "breath" || d.telegraphType === "ray") {
-        d.breathAng = Math.atan2(this.player.y - d.y, this.player.x - d.x);
+        // REGALIA: Dusk Cowl — a fresh shadow decoy draws the telegraphed aim
+        var at0 = (this.decoy && this.decoy.t > 0) ? this.decoy : this.player;
+        d.breathAng = Math.atan2(at0.y - d.y, at0.x - d.x);
         d.raySign = Math.random() < 0.5 ? -1 : 1;
       }
     },
@@ -2438,10 +2542,16 @@
       var t = d.telegraphType;
       Audio2.tone(200, 0.18, "sawtooth", 0.12, 120);
 
+      // REGALIA: Dusk Cowl — a fresh shadow decoy draws this attack's aim,
+      // then dissipates (one attack takes the bait)
+      var aimP = (this.decoy && this.decoy.t > 0) ? this.decoy : p;
+      var usedDecoy = aimP !== p;
+      if (usedDecoy) this.decoy = null;
+
       if (t === "volley") {
         var n = d.phase === 2 ? 9 : 6;
         var spread = Math.PI * (d.phase === 2 ? 0.9 : 0.6);
-        var base = Math.atan2(p.y - d.y, p.x - d.x) - spread / 2;
+        var base = Math.atan2(aimP.y - d.y, aimP.x - d.x) - spread / 2;
         for (var i = 0; i < n; i++) {
           var a = base + spread * (i / (n - 1));
           DragonShots.spawn({
@@ -2456,7 +2566,9 @@
           (function (delay) {
             setTimeout(function () {
               if (Game.state !== "PLAYING" || Game.dragon !== d) return;
-              var aa = Math.atan2(Game.player.y - d.y, Game.player.x - d.x);
+              var aa = usedDecoy
+                ? Math.atan2(aimP.y - d.y, aimP.x - d.x)
+                : Math.atan2(Game.player.y - d.y, Game.player.x - d.x);
               DragonShots.spawn({
                 x: d.x, y: d.y, vx: Math.cos(aa) * 420, vy: Math.sin(aa) * 420,
                 r: 22, dmg: 1, life: 3, color: PAL.ember, rot: aa, kind: "fire"
@@ -2467,7 +2579,7 @@
         }
         d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.4 : 2.2;
       } else if (t === "dash") {
-        var ang = Math.atan2(p.y - d.y, p.x - d.x);
+        var ang = Math.atan2(aimP.y - d.y, aimP.x - d.x);
         d.dashVx = Math.cos(ang) * 900;
         d.dashVy = Math.sin(ang) * 900;
         d.facing = ang;
@@ -2475,14 +2587,14 @@
         Audio2.tone(150, 0.3, "sawtooth", 0.16, 300);
       } else if (t === "breath") {
         d.state = "breath"; d.stateT = 0; d.breathT = 0;
-        d.breathAng = Math.atan2(p.y - d.y, p.x - d.x);
+        d.breathAng = Math.atan2(aimP.y - d.y, aimP.x - d.x);
       }
       // ----- storm kit -----
       else if (t === "fan") {
         // a crackling fan of bolts — tighter and faster than Ember's volley
         var fn = d.phase === 2 ? 11 : 7;
         var fspread = Math.PI * (d.phase === 2 ? 0.7 : 0.48);
-        var fbase = Math.atan2(p.y - d.y, p.x - d.x) - fspread / 2;
+        var fbase = Math.atan2(aimP.y - d.y, aimP.x - d.x) - fspread / 2;
         for (var fi = 0; fi < fn; fi++) {
           var fa = fbase + fspread * (fi / (fn - 1));
           DragonShots.spawn({
@@ -2494,7 +2606,7 @@
         d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.2 : 1.9;
       } else if (t === "lance") {
         // three fast bolts down one locked line — sidestep, don't outrun
-        var la = Math.atan2(p.y - d.y, p.x - d.x);
+        var la = Math.atan2(aimP.y - d.y, aimP.x - d.x);
         var ln = d.phase === 2 ? 4 : 3;
         for (var ls = 0; ls < ln; ls++) {
           (function (delay) {
@@ -2526,11 +2638,11 @@
       else if (t === "spiral") {
         // a blooming spiral of petals wheels out from the body over time
         d.state = "spiral"; d.stateT = 0; d.spiralT = 0;
-        d.spiralAng = Math.atan2(p.y - d.y, p.x - d.x);
+        d.spiralAng = Math.atan2(aimP.y - d.y, aimP.x - d.x);
         Audio2.tone(320, 0.3, "sine", 0.1, 180);
       } else if (t === "seeds") {
         // lob three slow seed pods that drift toward you, then burst
-        var sa = Math.atan2(p.y - d.y, p.x - d.x);
+        var sa = Math.atan2(aimP.y - d.y, aimP.x - d.x);
         var offs = d.phase === 2 ? [-0.7, -0.23, 0.23, 0.7] : [-0.55, 0, 0.55];
         for (var si = 0; si < offs.length; si++) {
           var seedAng = sa + offs[si];
@@ -2567,12 +2679,12 @@
       } else if (t === "ray") {
         // sweeping sun-beam: reuses the breath state with a gold branch
         d.state = "breath"; d.stateT = 0; d.breathT = 0;
-        if (d.breathAng == null) d.breathAng = Math.atan2(p.y - d.y, p.x - d.x);
+        if (d.breathAng == null) d.breathAng = Math.atan2(aimP.y - d.y, aimP.x - d.x);
         Audio2.tone(520, 0.5, "sawtooth", 0.1, 260);
       } else if (t === "coins") {
         // a lobbed volley of spinning coins that arc under gravity
         var cn = d.phase === 2 ? 7 : 5;
-        var cAim = Math.atan2(p.y - d.y, p.x - d.x);
+        var cAim = Math.atan2(aimP.y - d.y, aimP.x - d.x);
         for (var ci2 = 0; ci2 < cn; ci2++) {
           var lob = cAim + (cn === 1 ? 0 : (ci2 / (cn - 1) - 0.5)) * 1.15;
           DragonShots.spawn({
@@ -2586,6 +2698,40 @@
         Audio2.tone(660, 0.22, "triangle", 0.1, 420);
         Audio2.noise(0.12, 0.08, 2400);
         d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.4 : 2.2;
+      }
+      // ----- umbra kit (DUSK) -----
+      else if (t === "veil") {
+        // dissolve into dusk, slip to a rippling point, burst back in shadow
+        d.state = "veil"; d.stateT = 0;
+        d.veiled = true; d.veilMoved = false;
+        d.veilX = 90 + Math.random() * (VW - 180);
+        d.veilY = VH * 0.14 + Math.random() * VH * 0.34;
+        Particles.burst(d.x, d.y, 10, "#4a3f6e", 3, 18, 0.35);
+        Audio2.noise(0.3, 0.1, 600);
+        Audio2.tone(320, 0.35, "sine", 0.08, 110);
+      } else if (t === "echoes") {
+        // two ghost silhouettes condense at its flanks, then loose dusk
+        d.state = "echoes"; d.stateT = 0; d.echoFired = false;
+        Audio2.tone(300, 0.3, "sine", 0.08, 150);
+      } else if (t === "crescent") {
+        // a curved volley: the fan releases straight, then every blot bends
+        // the same way (perpendicular curve field on dusk shots)
+        var dn = d.phase === 2 ? 9 : 7;
+        var dspread = Math.PI * 0.56; // ~100 degrees
+        var dbase = Math.atan2(aimP.y - d.y, aimP.x - d.x) - dspread / 2;
+        var dsign = Math.random() < 0.5 ? -1 : 1;
+        for (var di = 0; di < dn; di++) {
+          var da = dbase + dspread * (di / (dn - 1));
+          DragonShots.spawn({
+            x: d.x + Math.cos(da) * 50, y: d.y + Math.sin(da) * 50,
+            vx: Math.cos(da) * 300, vy: Math.sin(da) * 300,
+            r: 14, dmg: 1, life: 3, color: "#8a7bb0", rot: da, kind: "dusk",
+            curve: 150 * dsign
+          });
+        }
+        Audio2.tone(210, 0.26, "sine", 0.1, 100);
+        Audio2.noise(0.14, 0.08, 900);
+        d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.3 : 2.1;
       }
     },
 
@@ -2646,6 +2792,7 @@
       d.state = "roam"; d.stateT = 0;
       d.attackCd = d.phase === 2 ? 1.0 : 1.8;
       d.telegraphType = null;
+      d.veiled = false; // safety: never leave a dragon untargetable
     },
 
     // ----- SHOTS / COLLISIONS -----
@@ -2662,8 +2809,8 @@
           Particles.spark(s.x, s.y, s.rot + Math.PI + (Math.random() - 0.5) * 0.9, 120 + Math.random() * 120, PAL.gold, 0.3, 1.8);
         }
         if (s.life <= 0 || s.x < -40 || s.x > VW + 40 || s.y < -40 || s.y > VH + 40) { s.active = false; return; }
-        // hit dragon
-        if (d && d.state !== "bow") {
+        // hit dragon (a veiled dragon is dusk itself — shots pass through)
+        if (d && d.state !== "bow" && !d.veiled) {
           var dx = s.x - d.x, dy = s.y - d.y;
           var rr = d.r * 0.62 + s.r;
           if (dx * dx + dy * dy < rr * rr) {
@@ -2696,6 +2843,13 @@
         }
         // lobbed coins arc under gravity
         if (s.grav) s.vy += s.grav * dt;
+        // dusk crescents bend: a small perpendicular acceleration curves
+        // the whole volley the same way (0 for every other shot kind)
+        if (s.curve) {
+          var cvl = Math.hypot(s.vx, s.vy) || 1;
+          var cnx = -s.vy / cvl, cny = s.vx / cvl;
+          s.vx += cnx * s.curve * dt; s.vy += cny * s.curve * dt;
+        }
         s.x += s.vx * dt; s.y += s.vy * dt;
         s.rot += 3 * dt;
         s.life -= dt;
@@ -2724,6 +2878,7 @@
     damageDragon: function (dmg, x, y) {
       var d = this.dragon;
       if (!d || d.state === "bow") return;
+      if (d.veiled) return; // dissolved into dusk — untargetable
       var before = d.health;
       d.health = Math.max(0, d.health - dmg);
       if (this.runStats) this.runStats.dmg += Math.min(dmg, before);
@@ -2984,7 +3139,8 @@
 
       // grant this dragon's relic
       var relicId;
-      if (d.type === "gilded") relicId = this.scaleProgress >= 20 ? "gildedGift" : "gildedHeart";
+      if (d.type === "umbra") relicId = this.scaleProgress >= 24 ? "umbraGift" : "duskHeart";
+      else if (d.type === "gilded") relicId = this.scaleProgress >= 20 ? "gildedGift" : "gildedHeart";
       else if (d.type === "verdant") relicId = this.scaleProgress >= 16 ? "verdantGift" : "thistleDown";
       else if (d.type === "storm") relicId = this.scaleProgress >= 12 ? "stormGift" : "galeFeather";
       else relicId = this.scaleProgress >= 8 ? "cinderGift" : "emberHeart";
@@ -3323,10 +3479,26 @@
           horns: Save.hasRegalia("emberHorns"),
           spade: Save.hasRegalia("tempestSpade"),
           mantle: Save.hasRegalia("sorrelMantle"),
+          cowl: Save.hasRegalia("duskCowl"),
           crown: Save.data.crowned
         }
       });
       sg.restore();
+
+      // REGALIA: Dusk Cowl — the shadow decoy left behind by a dodge, a
+      // dark goose-shaped stain fading out (same cached rig, low alpha)
+      var dc = this.decoy;
+      if (dc) {
+        var dct = Math.max(0, dc.t / (dc.maxT || 2));
+        g.save();
+        g.translate(dc.x, dc.y);
+        g.rotate(dc.facing + Math.PI / 2);
+        Fx.drawDot(g, 0, 0, 52, "#362d54", 0.3 * dct, false);
+        g.globalAlpha = 0.16 + 0.18 * dct;
+        g.scale(k, k);
+        g.drawImage(scr, -75, -72);
+        g.restore();
+      }
 
       // dash afterimages (cool spectral ghosts)
       for (var gi = 0; gi < p.ghosts.length; gi++) {
@@ -3528,6 +3700,16 @@
           Fx.drawDot(g, s.x, s.y, s.r * 2.0, "#59481f", 0.42, false);
           Fx.drawDot(g, s.x, s.y, s.r * 1.25, PAL.gold, 0.5 + lp2 * 0.3, true);
           Fx.drawDot(g, s.x, s.y, s.r * 0.55, "#fff3c4", 0.45 + lp2 * 0.4, true);
+        } else if (s.kind === "dusk") {
+          // dusk blot: violet bloom over a dark plum rim, trailing faint
+          // wisps of falling night (5 drawDot calls max)
+          Fx.drawDot(g, s.x, s.y, s.r * 1.8, "#362d54", 0.42, false);
+          Fx.drawDot(g, s.x, s.y, s.r * 1.2, "#8a7bb0", 0.7, true);
+          Fx.drawDot(g, s.x, s.y, s.r * 0.5, "#e6d8ff", 0.75, true);
+          for (var du = 1; du < s.trail.length; du += 2) {
+            var dut = 1 - du / s.trail.length;
+            Fx.drawDot(g, s.trail[du].x, s.trail[du].y, s.r * 0.65 * dut, "#6d5f96", dut * 0.24, true);
+          }
         } else if (s.kind === "coin") {
           // spinning gilded disc, flashing thin as it turns
           g.save();
@@ -3735,11 +3917,36 @@
     drawDragon: function (g) {
       var d = this.dragon;
 
+      // dusk veil: how solid the dragon is right now (1 = fully there)
+      var veilA = 1;
+      if (d.state === "veil") {
+        if (d.stateT < 0.4) veilA = 1 - (d.stateT / 0.4) * 0.94;      // dissolve
+        else if (d.stateT < 1.0) veilA = 0.06;                        // veiled
+        else veilA = 0.06 + Math.min(1, (d.stateT - 1.0) / 0.15) * 0.94; // return
+        // expanding dusk ripples telegraph the arrival point
+        if (d.stateT >= 0.28 && d.stateT < 1.02) {
+          var vp = Math.min(1, (d.stateT - 0.28) / 0.7);
+          g.save();
+          Fx.drawDot(g, d.veilX, d.veilY, d.r * (0.4 + vp * 0.55), "#4a3f6e", 0.14 + vp * 0.2, true);
+          g.globalCompositeOperation = "lighter";
+          g.lineCap = "round";
+          for (var vri = 0; vri < 3; vri++) {
+            var vq = vp - vri * 0.22;
+            if (vq < 0 || vq > 1) continue;
+            g.globalAlpha = (1 - vq) * 0.55;
+            g.strokeStyle = vri === 1 ? "#cbb8e8" : "#8a7bb0";
+            g.lineWidth = 3 - vri * 0.6;
+            g.beginPath(); g.arc(d.veilX, d.veilY, 18 + vq * d.r * 1.1, 0, TAU); g.stroke();
+          }
+          g.restore();
+        }
+      }
+
       // altitude shadow
       g.save();
       g.translate(d.x + 26, d.y + 64);
       g.scale(1.5, 0.6);
-      g.globalAlpha = 0.15;
+      g.globalAlpha = 0.15 * veilA;
       g.drawImage(Fx.dot("#22334c"), -80, -80, 160, 160);
       g.restore();
 
@@ -3749,8 +3956,8 @@
       // enraged: heat aura beneath the body (storm: cold static halo)
       if (d.phase === 2 && d.state !== "bow") {
         var hp = 0.5 + Math.sin(this.time * 5) * 0.5;
-        var auraA = d.type === "storm" ? "#3d6288" : d.type === "verdant" ? "#597a52" : PAL.emberDeep;
-        var auraB = d.type === "storm" ? PAL.wisteria : d.type === "verdant" ? PAL.gold : PAL.rose;
+        var auraA = d.type === "storm" ? "#3d6288" : d.type === "verdant" ? "#597a52" : d.type === "umbra" ? "#4a3f6e" : PAL.emberDeep;
+        var auraB = d.type === "storm" ? PAL.wisteria : d.type === "verdant" ? PAL.gold : d.type === "umbra" ? PAL.wisteria : PAL.rose;
         Fx.drawDot(g, 0, 0, d.r * (1.35 + hp * 0.12), auraA, 0.1 + hp * 0.08, true);
         Fx.drawDot(g, 0, 0, d.r * 0.9, auraB, 0.07 + hp * 0.07, true);
       }
@@ -3766,6 +3973,7 @@
         var tc = d.telegraphType === "dash" ? PAL.rose
                : d.type === "storm" ? "#bfe3ff"
                : d.type === "verdant" ? "#d9ecc2"
+               : d.type === "umbra" ? "#cbb8e8"
                : PAL.gold;
         var aim = d.telegraphType === "breath" ? d.breathAng : Math.atan2(this.player.y - d.y, this.player.x - d.x);
 
@@ -3826,6 +4034,11 @@
             g.lineTo(cd2 - 26, 26);
             g.stroke();
           }
+        } else if (d.telegraphType === "veil") {
+          // gathering dusk: the dragon darkens inward — no aim line,
+          // because it isn't aiming at you (yet)
+          Fx.drawDot(g, 0, 0, d.r * (0.65 + prog * 0.55), "#4a3f6e", 0.16 + prog * 0.22, false);
+          Fx.drawDot(g, 0, 0, d.r * 0.4, "#362d54", 0.1 + prog * 0.24, false);
         } else {
           // aimed / volley: tapered light beam toward the player
           var bl = Math.min(560, Math.hypot(this.player.x - d.x, this.player.y - d.y) + 60);
@@ -3887,7 +4100,19 @@
       });
       sg.restore();
       g.scale(k, k);
+      // dusk veil: one alpha fades the whole cached figure
+      if (d.state === "veil") g.globalAlpha = Math.max(0.04, Math.min(1, veilA));
       g.drawImage(scr, -230, -150);
+      // dusk echoes: two ghost silhouettes flank it — the SAME cached rig
+      // drawn twice more at low alpha (no extra rigging per frame)
+      if (d.state === "echoes") {
+        var ga2 = Math.min(1, d.stateT / 0.2, (1.2 - d.stateT) / 0.2);
+        if (ga2 > 0) {
+          g.globalAlpha = 0.35 * ga2;
+          g.drawImage(scr, -230 - 156, -150);
+          g.drawImage(scr, -230 + 156, -150);
+        }
+      }
       g.restore();
     },
 
