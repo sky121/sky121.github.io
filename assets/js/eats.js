@@ -1181,10 +1181,10 @@
         var i = idx + d;
         if (i >= queue.length) continue;
         var card = buildCard(queue[i], d);
-        if (deal) {
+        // only the visible top card deals in — the rest of the stack is
+        // hidden now that blocks float freely (no cards peeking behind)
+        if (deal && d === 0) {
           card.classList.add('is-dealing');
-          // bottom of the stack lands first, top card last
-          card.style.animationDelay = ((2 - d) * 95) + 'ms';
           card.addEventListener('animationend', onDealEnd);
         }
         deckEl.appendChild(card);
