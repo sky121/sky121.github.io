@@ -1050,6 +1050,43 @@
       countEl.textContent = n + ' sample place' + (n === 1 ? '' : 's') + ' match';
     }
 
+    /* ---- one-at-a-time wizard over the pref groups ----
+       Long scroll replaced by steps: one group visible at a time, Back /
+       Skip to move, and the Start swiping + Surprise me escape hatches
+       always in reach — quit the preferences early whenever you're done. */
+    var step = 0;
+    function stepGroups() {
+      return Array.prototype.slice.call(document.querySelectorAll('#prefs-form .pref-group'));
+    }
+    function showStep(i, focusLegend) {
+      var groups = stepGroups();
+      if (!groups.length) return;
+      step = Math.max(0, Math.min(groups.length - 1, i));
+      for (var g = 0; g < groups.length; g++) {
+        groups[g].classList.toggle('is-step', g === step);
+      }
+      var back = $('step-back');
+      var next = $('step-next');
+      var where = $('step-where');
+      if (back) back.style.visibility = step === 0 ? 'hidden' : 'visible';
+      if (next) next.textContent = step === groups.length - 1 ? 'Done →' : 'Skip →';
+      var legend = groups[step].querySelector('.pref-legend');
+      var title = legend ? legend.textContent.replace(/\(optional\)/, '').trim() : '';
+      if (where) where.textContent = (step + 1) + ' of ' + groups.length;
+      announce(title + ' — step ' + (step + 1) + ' of ' + groups.length);
+      if (focusLegend && legend) { legend.setAttribute('tabindex', '-1'); legend.focus(); }
+    }
+    function nextStep() {
+      var groups = stepGroups();
+      if (step >= groups.length - 1) {
+        // skipped past the last step — you're done: start the search
+        persist();
+        find.showDeck();
+        return;
+      }
+      showStep(step + 1, true);
+    }
+
     function render() {
       current();
       buildChips($('pref-cuisine'), CUISINES, 'cuisine');
@@ -1063,6 +1100,7 @@
       var openTgl = $('pref-open');
       if (openTgl) openTgl.checked = !!cur.openNow;
       updateCount();
+      showStep(0, false); // every visit starts the wizard from the top
     }
 
     function init() {
@@ -1074,10 +1112,10 @@
           find.showDeck();
         });
       }
-      var skip = $('prefs-skip');
-      if (skip) skip.addEventListener('click', function () {
-        cur = defaults(); persist(); render(); find.showDeck();
-      });
+      var back = $('step-back');
+      if (back) back.addEventListener('click', function () { showStep(step - 1, true); });
+      var next = $('step-next');
+      if (next) next.addEventListener('click', nextStep);
       var surprise = $('prefs-surprise');
       if (surprise) surprise.addEventListener('click', function () {
         current(); persist(); find.showSurprise();
