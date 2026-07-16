@@ -59,6 +59,11 @@
 
           <button id="btn-start" class="btn btn--primary" type="button">Take flight</button>
 
+          <button id="btn-daily" class="btn btn--daily" type="button" hidden>
+            <span id="daily-btn-label" class="daily-btn-label">Daily Flight</span>
+            <span id="daily-btn-date" class="daily-btn-date"></span>
+          </button>
+
           <div id="hoard-summary" class="hoard" hidden>
             <span class="hoard-label">Your hoard</span>
             <span id="hoard-stats" class="hoard-stats"></span>
@@ -86,6 +91,7 @@
           <div class="boss-bar">
             <div class="boss-name"><span id="boss-name">Ember, the Cinder Wyrm</span></div>
             <div class="boss-track"><div id="boss-fill" class="boss-fill"></div></div>
+            <div id="daily-mod" class="daily-mod" hidden></div>
           </div>
           <div class="hud-top-right">
             <div class="scale-count" title="Scales collected">
@@ -147,6 +153,10 @@
           <h2 class="overlay-title">You have earned its respect</h2>
           <p id="win-sub" class="overlay-sub"></p>
           <p id="win-stats" class="overlay-stats"></p>
+          <div id="daily-share" class="daily-share" hidden>
+            <span id="daily-share-text" class="daily-share-text"></span>
+            <button id="btn-copy-daily" class="daily-copy-btn" type="button">copy</button>
+          </div>
           <div id="relic-grant" class="relic-grant"></div>
           <button id="btn-continue" class="btn btn--primary" type="button">Onward</button>
           <a class="back-link" href="lab.html">&larr; Back to the Lab</a>
