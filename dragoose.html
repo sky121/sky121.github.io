@@ -68,8 +68,11 @@
             <span class="hoard-label">Your hoard</span>
             <span id="hoard-stats" class="hoard-stats"></span>
             <span id="hoard-records" class="hoard-records" hidden></span>
-            <button id="plume-btn" class="plume-btn" type="button" hidden></button>
           </div>
+
+          <button id="wardrobe-btn" class="wardrobe-btn" type="button">
+            <span aria-hidden="true">&#129718;</span> Wardrobe
+          </button>
 
           <ul class="howto" aria-label="How to play">
             <li><span class="howto-key">drag</span> steer</li>
@@ -160,6 +163,28 @@
           <div id="relic-grant" class="relic-grant"></div>
           <button id="btn-continue" class="btn btn--primary" type="button">Onward</button>
           <a class="back-link" href="lab.html">&larr; Back to the Lab</a>
+        </div>
+      </section>
+
+      <!-- ===================== WARDROBE ===================== -->
+      <section id="screen-wardrobe" class="screen screen--wardrobe" aria-label="Wardrobe" hidden>
+        <div class="overlay-card wardrobe-card">
+          <p class="overlay-kicker">the hoard's keeping</p>
+          <h2 class="overlay-title">Wardrobe</h2>
+          <div class="wardrobe-scroll" id="wardrobe-scroll">
+            <h3 class="wardrobe-heading">Plumes</h3>
+            <p class="wardrobe-note">ceremonial coats &mdash; tap one and Gary wears it</p>
+            <div id="wardrobe-plumes" class="wardrobe-swatches"></div>
+
+            <h3 class="wardrobe-heading">Regalia</h3>
+            <p class="wardrobe-note">hoard equipment &mdash; worn from the moment it is yours</p>
+            <div id="wardrobe-regalia" class="wardrobe-list"></div>
+
+            <h3 class="wardrobe-heading">Trinkets</h3>
+            <p class="wardrobe-note">quiet keepsakes shared by friendly hoards</p>
+            <div id="wardrobe-trinkets" class="wardrobe-list"></div>
+          </div>
+          <button id="btn-wardrobe-close" class="btn" type="button">Close</button>
         </div>
       </section>
 

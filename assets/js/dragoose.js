@@ -484,7 +484,10 @@
         }
         return;
       }
-      if (k === "escape" && down) { Game.togglePause(); return; }
+      if (k === "escape" && down) {
+        if (Game.wardrobeOpen) { Game.closeWardrobe(); return; }
+        Game.togglePause(); return;
+      }
       if (k === "m" && down) { Game.toggleMute(); return; }
       this.keys[k] = down;
     },
@@ -1733,7 +1736,12 @@
       $("btn-restart-pause").addEventListener("click", function () { Game.startRun(!!Game.daily); });
       $("btn-retry").addEventListener("click", function () { Game.startRun(!!Game.daily); });
       $("btn-continue").addEventListener("click", function () { Game.continueFromWin(); });
-      $("plume-btn").addEventListener("click", function () { Game.cyclePlume(); });
+      $("wardrobe-btn").addEventListener("click", function () { Game.openWardrobe(); });
+      $("btn-wardrobe-close").addEventListener("click", function () { Game.closeWardrobe(); });
+      // tapping the dim sky around the wardrobe card closes it
+      $("screen-wardrobe").addEventListener("click", function (e) {
+        if (e.target === e.currentTarget) Game.closeWardrobe();
+      });
       $("gentle-btn").addEventListener("click", function () { Game.toggleGentle(); });
       $("btn-mute").addEventListener("click", function () { Game.toggleMute(); });
     },
@@ -1882,33 +1890,187 @@
       } else {
         box.hidden = true;
       }
-      // plume selector: cycle through ceremonial coats you've earned
-      var pb = $("plume-btn");
-      if (d.plumes && d.plumes.length > 0) {
-        box.hidden = false;
-        pb.hidden = false;
-        var cur = PLUMES[d.plume];
-        pb.textContent = "Plume: " + (cur ? cur.glyph + " " + cur.name : "None") + " ▸";
-      } else {
-        pb.hidden = true;
-      }
     },
 
-    cyclePlume: function () {
-      var owned = Save.data.plumes;
-      if (!owned.length) return;
-      var order = [""].concat(owned);
-      var i = order.indexOf(Save.data.plume);
-      Save.data.plume = order[(i + 1) % order.length];
+    // ----- WARDROBE (browse plumes / regalia / trinkets) -----
+    // One quiet place for everything Gary has earned. Plumes equip from
+    // here (the old title-screen cycle button is gone); regalia and
+    // trinkets are browse-only — regalia is always worn once owned, and
+    // an unowned trinket stays a surprise, showing only its hoard.
+    wardrobeOpen: false,
+
+    dragonFirstName: function (type) {
+      var d = DRAGONS[type];
+      return d ? d.name.split(",")[0] : type;
+    },
+
+    openWardrobe: function () {
+      this.renderWardrobe();
+      $("screen-wardrobe").hidden = false;
+      $("wardrobe-scroll").scrollTop = 0;
+      // a focus()/scroll-into-view can nudge the letterboxed root (the spent
+      // bloom-wipe's end-state scale leaves phantom scroll room) — keep it seated
+      root.scrollTop = 0; root.scrollLeft = 0;
+      this.wardrobeOpen = true;
+      var cb = $("btn-wardrobe-close");
+      if (cb) { try { cb.focus({ preventScroll: true }); } catch (e) { cb.focus(); } }
+      Audio2.init(); Audio2.resume();
+      Audio2.tone(520, 0.1, "sine", 0.06, 660);
+    },
+
+    closeWardrobe: function (skipFocus) {
+      if (!this.wardrobeOpen) return;
+      $("screen-wardrobe").hidden = true;
+      this.wardrobeOpen = false;
+      if (!skipFocus) {
+        var wb = $("wardrobe-btn");
+        if (wb) { try { wb.focus({ preventScroll: true }); } catch (e) { wb.focus(); } }
+      }
+      root.scrollTop = 0; root.scrollLeft = 0;
+    },
+
+    equipPlume: function (id) {
+      Save.data.plume = id;
       Save.save();
-      this.renderHoard();
-      this.renderTitleGoose();
+      this.renderWardrobe();
+      this.renderTitleGoose(); // instant feedback on the title preview
       Audio2.init(); Audio2.resume();
       Audio2.tone(520, 0.12, "sine", 0.07, 700);
     },
 
+    // an owned plume swatch (or the bare-feathers one): tap to wear
+    plumeSwatch: function (id, name, color) {
+      var self = this;
+      var worn = Save.data.plume === id;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "plume-swatch" + (worn ? " is-worn" : "");
+      b.setAttribute("aria-pressed", worn ? "true" : "false");
+      var dot = document.createElement("span");
+      dot.className = "swatch-wash" + (color ? "" : " swatch-wash--bare");
+      if (color) dot.style.background = color;
+      dot.setAttribute("aria-hidden", "true");
+      var lb = document.createElement("span");
+      lb.className = "swatch-name";
+      lb.textContent = name;
+      var st = document.createElement("span");
+      st.className = "swatch-state";
+      st.textContent = worn ? "worn" : "tap to wear";
+      b.appendChild(dot); b.appendChild(lb); b.appendChild(st);
+      b.addEventListener("click", function () { self.equipPlume(id); });
+      return b;
+    },
+
+    // an unowned plume: a soft gray silhouette and a truthful hint
+    lockedSwatch: function (hint) {
+      var d = document.createElement("div");
+      d.className = "plume-swatch is-locked";
+      var dot = document.createElement("span");
+      dot.className = "swatch-wash swatch-wash--locked";
+      dot.setAttribute("aria-hidden", "true");
+      var lb = document.createElement("span");
+      lb.className = "swatch-hint";
+      lb.textContent = hint;
+      d.appendChild(dot); d.appendChild(lb);
+      return d;
+    },
+
+    // an owned regalia/trinket row: glyph + name + one-line note
+    wardrobeRow: function (glyph, name, desc, worn) {
+      var d = document.createElement("div");
+      d.className = "wardrobe-row";
+      var g = document.createElement("span");
+      g.className = "wardrobe-glyph";
+      g.setAttribute("aria-hidden", "true");
+      g.textContent = glyph;
+      var tx = document.createElement("span");
+      tx.className = "wardrobe-text";
+      var nm = document.createElement("span");
+      nm.className = "wardrobe-name";
+      nm.textContent = name;
+      if (worn) {
+        var w = document.createElement("span");
+        w.className = "wardrobe-worn";
+        w.textContent = "worn";
+        nm.appendChild(w);
+      }
+      var ds = document.createElement("span");
+      ds.className = "wardrobe-desc";
+      ds.textContent = desc;
+      tx.appendChild(nm); tx.appendChild(ds);
+      d.appendChild(g); d.appendChild(tx);
+      return d;
+    },
+
+    // an unowned regalia/trinket row: dimmed silhouette + truthful hint
+    lockedRow: function (glyph, hint) {
+      var d = document.createElement("div");
+      d.className = "wardrobe-row is-locked";
+      var g = document.createElement("span");
+      g.className = "wardrobe-glyph wardrobe-glyph--locked";
+      g.setAttribute("aria-hidden", "true");
+      g.textContent = glyph;
+      var tx = document.createElement("span");
+      tx.className = "wardrobe-text";
+      var hn = document.createElement("span");
+      hn.className = "wardrobe-hint";
+      hn.textContent = hint;
+      tx.appendChild(hn);
+      d.appendChild(g); d.appendChild(tx);
+      return d;
+    },
+
+    renderWardrobe: function () {
+      var i, j, type, id, name;
+      // --- plumes: a swatch grid, dragon order, bare feathers first ---
+      var pw = $("wardrobe-plumes");
+      pw.innerHTML = "";
+      pw.appendChild(this.plumeSwatch("", "Bare feathers", null));
+      for (i = 0; i < RUN_BOSSES.length; i++) {
+        type = RUN_BOSSES[i];
+        id = DRAGON_PLUME[type];
+        name = this.dragonFirstName(type);
+        if (Save.data.plumes.indexOf(id) !== -1) {
+          pw.appendChild(this.plumeSwatch(id, PLUMES[id].name, PLUMES[id].color));
+        } else {
+          pw.appendChild(this.lockedSwatch("win " + name + "'s ceremony"));
+        }
+      }
+      // --- regalia: all-apply once owned (no equipping to build) ---
+      var rw = $("wardrobe-regalia");
+      rw.innerHTML = "";
+      for (i = 0; i < RUN_BOSSES.length; i++) {
+        type = RUN_BOSSES[i];
+        id = DRAGON_REGALIA[type];
+        name = this.dragonFirstName(type);
+        if (Save.hasRegalia(id)) {
+          rw.appendChild(this.wardrobeRow(REGALIA[id].glyph, REGALIA[id].name, REGALIA[id].desc, true));
+        } else {
+          rw.appendChild(this.lockedRow("✦", "win " + name + "'s ceremony a second time"));
+        }
+      }
+      // --- trinkets: owned ones show themselves; the rest stay a surprise,
+      // whispering only which hoard still holds them ---
+      var tw = $("wardrobe-trinkets");
+      tw.innerHTML = "";
+      for (i = 0; i < RUN_BOSSES.length; i++) {
+        type = RUN_BOSSES[i];
+        name = this.dragonFirstName(type);
+        var ladder = DRAGON_TRINKETS[type];
+        for (j = 0; j < ladder.length; j++) {
+          id = ladder[j];
+          if (Save.hasTrinket(id)) {
+            tw.appendChild(this.wardrobeRow(TRINKETS[id].glyph, TRINKETS[id].name, TRINKETS[id].desc, false));
+          } else {
+            tw.appendChild(this.lockedRow("…", "a keepsake from " + name + "'s hoard"));
+          }
+        }
+      }
+    },
+
     // ----- START A RUN -----
     startRun: function (isDaily) {
+      this.closeWardrobe(true); // never carry the sheet into the sky
       Audio2.init(); Audio2.resume(); Audio2.musicStart();
       // Daily Flight: the date alone decides the realm route + one modifier
       this.daily = null;
