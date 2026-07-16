@@ -261,6 +261,32 @@ body { position: fixed; inset: 0; }
   outline-offset: 3px;
 }
 
+/* Daily Flight: a quieter pond-washed button beneath "Take flight" */
+.btn--daily {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 9px 26px 8px;
+  min-height: 54px;
+  color: var(--pond-deep);
+  background: rgba(127, 168, 201, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(74, 114, 153, 0.4), 0 4px 12px rgba(30, 45, 70, 0.1);
+}
+.btn--daily[hidden] { display: none; }
+.daily-btn-label {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+}
+.daily-btn-date {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  color: var(--pond-deep);
+}
+
 .back-link {
   display: inline-block;
   margin-top: 18px;
@@ -458,6 +484,29 @@ body { position: fixed; inset: 0; }
   .boss-fill { animation: none; }
 }
 
+/* Daily Flight modifier chip under the boss bar — explicitly visible so it
+   stays readable in the open sky, where the boss bar itself hides */
+.daily-mod {
+  visibility: visible;
+  display: inline-block;
+  margin-top: 6px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #fbf7ee;
+  text-shadow: 0 1px 5px rgba(20, 30, 50, 0.55);
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: rgba(46, 58, 72, 0.38);
+  box-shadow: inset 0 0 0 1px rgba(251, 247, 238, 0.3);
+}
+.daily-mod[hidden] { display: none; }
+
 .hud-top-right {
   display: flex;
   align-items: center;
@@ -645,6 +694,48 @@ body { position: fixed; inset: 0; }
 .screen--pause .btn,
 .screen--dead .btn,
 .screen--win .btn { display: flex; }
+
+/* Daily Flight shareable result line on the crowning screen */
+.daily-share {
+  margin: -4px auto 14px;
+  padding: 10px 12px 10px 16px;
+  border-radius: 14px;
+  background: rgba(127, 168, 201, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(74, 114, 153, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.daily-share[hidden] { display: none; }
+.daily-share-text {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--ink);
+  -webkit-user-select: text;
+  user-select: text;
+}
+.daily-copy-btn {
+  flex: none;
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--pond-deep);
+  background: rgba(253, 251, 244, 0.7);
+  border: 1px solid rgba(74, 114, 153, 0.45);
+  border-radius: 999px;
+  padding: 5px 14px;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.daily-copy-btn:hover { transform: translateY(-1px); background: rgba(253, 251, 244, 0.95); }
+.daily-copy-btn:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
 
 .relic-grant {
   margin: 4px auto 16px;

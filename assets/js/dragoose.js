@@ -19,6 +19,8 @@
   var SAVE_KEY = "dragoose-save";
   // lustrous-scale shimmer cycle (picked by time index — no string building)
   var LUSTRE = [PAL.gold, PAL.rose, PAL.wisteria];
+  // daily-route dashed path pattern (one shared array — no per-frame allocation)
+  var DAILY_DASH = [5, 11];
   // harmony-sky geese: fixed sinusoidal drift paths across the crowned hub
   // (y0 is a VH fraction; spd in px/s; everything else phase/shape)
   var HARMONY_GEESE = [
@@ -70,7 +72,8 @@
   // ---------------------------------------------------------
   var Save = {
     data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "", regalia: [], crowned: false, seenHints: {}, gentle: false,
-      records: { fastestCrown: null, mostScalesRun: 0, totalDuelsWon: 0 } },
+      records: { fastestCrown: null, mostScalesRun: 0, totalDuelsWon: 0 },
+      daily: null },
     load: function () {
       try {
         var raw = localStorage.getItem(SAVE_KEY);
@@ -93,6 +96,16 @@
               mostScalesRun: rec.mostScalesRun | 0,
               totalDuelsWon: rec.totalDuelsWon | 0
             };
+            // daily flight result: one entry, today only (older saves lack it)
+            this.data.daily = null;
+            if (p.daily && typeof p.daily === "object" && typeof p.daily.date === "string") {
+              this.data.daily = {
+                date: p.daily.date,
+                done: !!p.daily.done,
+                time: (typeof p.daily.time === "number") ? p.daily.time : null,
+                realmsCleared: p.daily.realmsCleared | 0
+              };
+            }
           }
         }
       } catch (e) {}
@@ -119,6 +132,63 @@
       var isNew = this.data.regalia.indexOf(id) === -1;
       if (isNew) { this.data.regalia.push(id); this.save(); }
       return isNew;
+    }
+  };
+
+  // ---------------------------------------------------------
+  // DAILY FLIGHT (date-seeded deterministic challenge)
+  // ---------------------------------------------------------
+  // small, fair modifiers — one per day, drawn from the seed
+  var DAILY_MODS = [
+    { id: "thinAir", name: "Thin Air", hud: "dodge rests +0.15s", desc: "The air is thin up here — your dodge takes 0.15s longer to recover." },
+    { id: "tailwind", name: "Tailwind", hud: "flight speed +12%", desc: "A tailwind at your back — Gary flies 12% faster." },
+    { id: "brittle", name: "Brittle Scales", hud: "frailer dragons, scales x2", desc: "Dragons are 10% frailer today, and every scale is worth double." },
+    { id: "longNight", name: "Long Night", hud: "shorter telegraphs", desc: "The light fades fast — every telegraph winds up 15% shorter." }
+  ];
+  var MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+  var Daily = {
+    // UTC date key, e.g. "2026-07-15" — everyone flies the same sky
+    utcKey: function () {
+      var d = new Date();
+      var mo = d.getUTCMonth() + 1, dy = d.getUTCDate();
+      return d.getUTCFullYear() + "-" + (mo < 10 ? "0" + mo : mo) + "-" + (dy < 10 ? "0" + dy : dy);
+    },
+    // "2026-07-15" -> "15 July"
+    prettyDate: function (key) {
+      var parts = key.split("-");
+      return (parts[2] | 0) + " " + (MONTH_NAMES[(parts[1] | 0) - 1] || "");
+    },
+    // FNV-1a string hash -> 32-bit seed
+    hash: function (str) {
+      var h = 2166136261;
+      for (var i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return h >>> 0;
+    },
+    // mulberry32 seeded PRNG (returns a 0..1 generator)
+    rng: function (seed) {
+      var a = seed >>> 0;
+      return function () {
+        a = (a + 0x6D2B79F5) >>> 0;
+        var t = a;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    },
+    // the whole day's flight, derived from the date alone:
+    // a shuffled realm route + one modifier
+    plan: function (key) {
+      var rnd = this.rng(this.hash(key));
+      var route = RUN_BOSSES.slice();
+      for (var i = route.length - 1; i > 0; i--) {
+        var j = (rnd() * (i + 1)) | 0;
+        var tmp = route[i]; route[i] = route[j]; route[j] = tmp;
+      }
+      return { date: key, route: route, mod: DAILY_MODS[(rnd() * DAILY_MODS.length) | 0] };
     }
   };
 
@@ -1441,6 +1511,7 @@
     bg: { clouds: [], washPhase: 0 },
     player: null,
     dragon: null,
+    daily: null,              // Daily Flight state {date, route, idx, mod} or null
     scaleProgress: 0,         // scales collected this run
     nextPowerAt: 3,           // scales needed for next power
     powers: {},               // active power flags
@@ -1504,11 +1575,14 @@
     },
 
     bindUI: function () {
-      $("btn-start").addEventListener("click", function () { Game.startRun(); });
+      $("btn-start").addEventListener("click", function () { Game.startRun(false); });
+      $("btn-daily").addEventListener("click", function () { Game.startRun(true); });
+      $("btn-copy-daily").addEventListener("click", function () { Game.copyDailyShare(); });
       $("btn-pause").addEventListener("click", function () { Game.togglePause(); });
       $("btn-resume").addEventListener("click", function () { Game.togglePause(); });
-      $("btn-restart-pause").addEventListener("click", function () { Game.startRun(); });
-      $("btn-retry").addEventListener("click", function () { Game.startRun(); });
+      // retries keep the mode you were flying (a daily retry is still the daily)
+      $("btn-restart-pause").addEventListener("click", function () { Game.startRun(!!Game.daily); });
+      $("btn-retry").addEventListener("click", function () { Game.startRun(!!Game.daily); });
       $("btn-continue").addEventListener("click", function () { Game.continueFromWin(); });
       $("plume-btn").addEventListener("click", function () { Game.cyclePlume(); });
       $("gentle-btn").addEventListener("click", function () { Game.toggleGentle(); });
@@ -1556,6 +1630,24 @@
       this.renderHoard();
       this.renderTitleGoose();
       this.renderGentle();
+      this.renderDailyButton();
+    },
+
+    // Daily Flight button: only once the player has won at least once, so
+    // newcomers aren't confused. Shows today's date + a check when flown.
+    renderDailyButton: function () {
+      var b = $("btn-daily");
+      if (!b) return;
+      if ((Save.data.wins | 0) < 1) { b.hidden = true; return; }
+      var key = Daily.utcKey();
+      var plan = Daily.plan(key);
+      var rec = Save.data.daily;
+      var doneToday = !!(rec && rec.date === key && rec.done);
+      b.hidden = false;
+      $("daily-btn-label").textContent = doneToday ? "✓ Daily Flight (again)" : "Daily Flight";
+      $("daily-btn-date").textContent = "the sky of " + Daily.prettyDate(key);
+      b.title = "Today's wind: " + plan.mod.name + " — " + plan.mod.desc +
+        (doneToday ? " Already flown today — a rerun won't overwrite a better result." : "");
     },
 
     // 'Gentle breeze' assist: slower dragon attack cycling + 1 extra feather
@@ -1664,8 +1756,22 @@
     },
 
     // ----- START A RUN -----
-    startRun: function () {
+    startRun: function (isDaily) {
       Audio2.init(); Audio2.resume(); Audio2.musicStart();
+      // Daily Flight: the date alone decides the realm route + one modifier
+      this.daily = null;
+      if (isDaily) {
+        var dplan = Daily.plan(Daily.utcKey());
+        this.daily = { date: dplan.date, route: dplan.route, idx: 0, mod: dplan.mod };
+      }
+      var dm = $("daily-mod");
+      if (dm) {
+        dm.hidden = !this.daily;
+        if (this.daily) {
+          dm.textContent = "Daily Flight · " + this.daily.mod.name + " — " + this.daily.mod.hud;
+          dm.title = this.daily.mod.desc;
+        }
+      }
       this.showScreen(null);
       hud.hidden = false;
       this.runStats = { time: 0, dmg: 0, dodges: 0 };
@@ -1711,7 +1817,16 @@
       this.player.y = VH * 0.82;
       this.updateHUD();
       this.state = "PLAYING";
-      this.floatText(VW / 2, VH * 0.73, "Fly into a realm to challenge its dragon", PAL.gold);
+      if (this.daily) {
+        this.floatText(VW / 2, VH * 0.73, "Daily Flight — follow the numbered route", PAL.gold);
+        setTimeout(function () {
+          if (Game.state === "PLAYING" && Game.mode === "sky" && Game.daily) {
+            Game.floatText(VW / 2, VH * 0.78, "today's wind: " + Game.daily.mod.name, PAL.wisteria);
+          }
+        }, 1400);
+      } else {
+        this.floatText(VW / 2, VH * 0.73, "Fly into a realm to challenge its dragon", PAL.gold);
+      }
 
       // first-flight tutorial hints (one-time, then remembered in the save)
       if (!Save.data.seenHints.sky) {
@@ -1758,8 +1873,25 @@
           x: spots[i].x, y: spots[i].y, r: 80,
           pal: pals[t] || pals.ember,
           defeated: false,
+          routeIdx: -1, routeLabel: "",
           phase: Math.random() * TAU
         });
+      }
+      // daily route: stamp each realm with its place in today's route and
+      // keep a route-ordered list for the dashed path (labels pre-built —
+      // drawRealms runs every frame and must not build strings)
+      if (this.daily) {
+        this.sky.routeOrder = [];
+        for (var ri = 0; ri < this.sky.realms.length; ri++) {
+          var rrm = this.sky.realms[ri];
+          rrm.routeIdx = this.daily.route.indexOf(rrm.type);
+          rrm.routeLabel = "" + (rrm.routeIdx + 1);
+        }
+        for (var oi = 0; oi < this.daily.route.length; oi++) {
+          for (var oj = 0; oj < this.sky.realms.length; oj++) {
+            if (this.sky.realms[oj].routeIdx === oi) this.sky.routeOrder.push(this.sky.realms[oj]);
+          }
+        }
       }
     },
 
@@ -1795,6 +1927,29 @@
 
     enterRealm: function (realm, ceremonial) {
       var p = this.player;
+      // Daily Flight: only the next realm on the route opens its gates —
+      // the others gently refuse (a nudge back out + a hint, throttled by
+      // the sky's grace timer so it can't spam)
+      if (this.daily) {
+        if (realm.routeIdx !== this.daily.idx) {
+          if (p) {
+            var rdx = p.x - realm.x, rdy = p.y - realm.y;
+            var rdl = Math.hypot(rdx, rdy);
+            if (rdl < 2) { rdx = 0; rdy = 1; rdl = 1; }
+            p.vx = (rdx / rdl) * 420;
+            p.vy = (rdy / rdl) * 420;
+          }
+          if (this.sky) this.sky.grace = 0.9;
+          var nxt = this.daily.route[this.daily.idx];
+          var msg = realm.defeated
+            ? "this realm is already at peace"
+            : "the route flies to " + DRAGONS[nxt].name.split(",")[0] + " first";
+          this.floatText(realm.x, Math.min(VH - 80, realm.y + realm.r * 0.5), msg, PAL.wisteria);
+          Audio2.tone(300, 0.14, "sine", 0.06, 220);
+          return;
+        }
+        ceremonial = false; // the daily gauntlet is always the true fight
+      }
       this.mode = "duel";
       PlayerShots.clear(); DragonShots.clear();
       this.decoy = null;
@@ -1838,7 +1993,8 @@
       this.showScreen(null);
       hud.hidden = false;
       this.state = "PLAYING";
-      this.floatText(VW / 2, VH * 0.73, "Choose your next realm", PAL.wisteria);
+      this.floatText(VW / 2, VH * 0.73,
+        this.daily ? "the route carries on — follow the numbers" : "Choose your next realm", PAL.wisteria);
       this.wipe();
     },
 
@@ -1859,6 +2015,8 @@
         // and it counters a dodge-centric build
         punishDodge = !!(this.powers.stormDodge || this.powers.emberWake);
       }
+      // DAILY: Brittle Scales — dragons are 10% frailer today
+      if (this.dailyMod("brittle")) hp = Math.round(hp * 0.9);
       var d = {
         type: type,
         ceremonial: !!ceremonial,
@@ -1904,6 +2062,80 @@
       return (m > 0 ? m + "m " : "") + s + "s in the sky · " +
         Math.round(st.dmg) + " damage dealt · " +
         st.dodges + " dodge" + (st.dodges === 1 ? "" : "s");
+    },
+
+    // ----- DAILY FLIGHT helpers -----
+    // is today's modifier <id> active this run? (cheap boolean — safe in hot loops)
+    dailyMod: function (id) {
+      return !!(this.daily && this.daily.mod.id === id);
+    },
+    // player steering speed (the Tailwind daily lifts it 12%)
+    flySpeed: function () {
+      return this.dailyMod("tailwind") ? 515.2 : 460;
+    },
+    // record today's result in the save — one entry, today only.
+    // Never downgrade: a completed daily is only replaced by a faster
+    // completion, and a failed attempt only by a deeper one.
+    recordDaily: function (done) {
+      if (!this.daily) return;
+      var t = this.runStats ? Math.round(this.runStats.time) : 0;
+      var entry = {
+        date: this.daily.date,
+        done: !!done,
+        time: done ? t : null,
+        realmsCleared: this.daily.idx
+      };
+      var cur = Save.data.daily;
+      if (cur && cur.date === entry.date) {
+        if (cur.done) {
+          if (!done) return;
+          if (typeof cur.time === "number" && cur.time <= t) return;
+        } else if (!done && (cur.realmsCleared | 0) >= entry.realmsCleared) {
+          return;
+        }
+      }
+      Save.data.daily = entry;
+      Save.save();
+    },
+    // "Daily Flight — 15 July — crowned in 4:32 — Tailwind"
+    dailyShareLine: function () {
+      var t = this.runStats ? Math.round(this.runStats.time) : 0;
+      var mm = Math.floor(t / 60), ss = t % 60;
+      return "Daily Flight — " + Daily.prettyDate(this.daily.date) +
+        " — crowned in " + mm + ":" + (ss < 10 ? "0" + ss : ss) +
+        " — " + this.daily.mod.name;
+    },
+    copyDailyShare: function () {
+      var el = $("daily-share-text");
+      var txt = el ? el.textContent : "";
+      if (!txt) return;
+      var fellBack = false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(txt).then(function () {
+            var b = $("btn-copy-daily");
+            if (b) {
+              b.textContent = "copied!";
+              setTimeout(function () { b.textContent = "copy"; }, 1400);
+            }
+          }, function () { Game.selectDailyShare(); });
+        } else {
+          fellBack = true;
+        }
+      } catch (e) { fellBack = true; }
+      // fallback: select the line so it can be copied by hand
+      if (fellBack) this.selectDailyShare();
+    },
+    selectDailyShare: function () {
+      var el = $("daily-share-text");
+      if (!el) return;
+      try {
+        var range = document.createRange();
+        range.selectNodeContents(el);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch (e) {}
     },
 
     // ----- PAUSE -----
@@ -2039,22 +2271,23 @@
 
       // ----- steering -----
       var accel = 1500;
+      var flyV = this.flySpeed(); // DAILY: Tailwind lifts this 12%
       var targetVX = 0, targetVY = 0, steering = false;
       if (Input.pointerDown) {
         var dx = Input.px - p.x, dy = Input.py - p.y;
         var dist = Math.hypot(dx, dy);
         if (dist > 6) {
           var pull = Math.min(1, dist / 160);
-          targetVX = (dx / dist) * 460 * pull;
-          targetVY = (dy / dist) * 460 * pull;
+          targetVX = (dx / dist) * flyV * pull;
+          targetVY = (dy / dist) * flyV * pull;
           steering = true;
         }
       }
       var kv = Input.keyVec();
       if (kv.x || kv.y) {
         var kl = Math.hypot(kv.x, kv.y) || 1;
-        targetVX = (kv.x / kl) * 460;
-        targetVY = (kv.y / kl) * 460;
+        targetVX = (kv.x / kl) * flyV;
+        targetVY = (kv.y / kl) * flyV;
         steering = true;
       }
 
@@ -2177,6 +2410,8 @@
       p.iframes = Save.hasRelic("duskHeart") ? 0.57 : 0.42;
       // RELIC: gale feather — dodge recovers in half the time
       p.dodgeCd = Save.hasRelic("galeFeather") ? 0.3 : 0.6;
+      // DAILY: Thin Air — the dodge rests a touch longer
+      if (this.dailyMod("thinAir")) p.dodgeCd += 0.15;
       p.justDodged = 1.2;
       p.ramHit = false; // Ember's Horns may connect once per dash
       if (this.runStats) this.runStats.dodges++;
@@ -2527,6 +2762,8 @@
         : d.telegraphType === "ray" ? 0.65
         : d.telegraphType === "crescent" ? 0.6
         : d.telegraphType === "echoes" ? 0.55 : 0.5;
+      // DAILY: Long Night — every wind-up is 15% shorter
+      if (this.dailyMod("longNight")) d.telegraph *= 0.85;
       d.telegraphMax = d.telegraph;
       if (d.telegraphType === "breath" || d.telegraphType === "ray") {
         // REGALIA: Dusk Cowl — a fresh shadow decoy draws the telegraphed aim
@@ -2995,6 +3232,8 @@
       // lustrous scales bank 3; the gilded crest doubles AFTER the rare bonus
       var worth = s.rare ? 3 : 1;
       if (Save.hasRegalia("gildedCrest") && this.player.health === this.player.maxHealth) worth *= 2;
+      // DAILY: Brittle Scales — every scale banks double
+      if (this.dailyMod("brittle")) worth *= 2;
       this.scaleProgress += worth;
       buzz(8);
       Audio2.scale();
@@ -3132,6 +3371,8 @@
           }
           $("btn-continue").textContent = "Return to the sky";
           $("win-stats").textContent = self2.fmtRunStats();
+          var ds2 = $("daily-share");
+          if (ds2) ds2.hidden = true;
           self2.showScreen("win");
         }, reduceMotion ? 600 : 1400);
         return;
@@ -3160,6 +3401,12 @@
       this.winIsFinal = isFinal;
       var firstName = d.name.split(",")[0];
       var self = this;
+
+      // DAILY: another step of the route flown
+      if (this.daily) {
+        this.daily.idx++;
+        if (isFinal) this.recordDaily(true);
+      }
 
       // THE CROWNING — every realm at peace; the sky turns to gold
       if (isFinal) {
@@ -3192,9 +3439,25 @@
           $("win-sub").textContent = firstName + " bows amid the quieting sky. Every dragon's respect is yours — " +
             "the skies name you Dragoose, and " +
             self.scaleProgress + " scale" + (self.scaleProgress === 1 ? "" : "s") + " rest in your hoard.";
+        } else if (self.daily) {
+          var nxt2 = self.daily.route[self.daily.idx];
+          $("win-sub").textContent = firstName + " bows its great head. The route carries on — " +
+            DRAGONS[nxt2].name.split(",")[0] + " waits next.";
         } else {
           $("win-sub").textContent = firstName + " bows its great head. The sky opens again — " +
             remaining + " realm" + (remaining === 1 ? " still waits" : "s still wait") + " for you.";
+        }
+        // DAILY: the shareable result line (final crowning only)
+        var ds = $("daily-share");
+        if (ds) {
+          if (isFinal && self.daily) {
+            $("daily-share-text").textContent = self.dailyShareLine();
+            var cb = $("btn-copy-daily");
+            if (cb) cb.textContent = "copy";
+            ds.hidden = false;
+          } else {
+            ds.hidden = true;
+          }
         }
         $("relic-grant").innerHTML =
           '<span class="relic-glyph">' + R.glyph + '</span>' +
@@ -3211,6 +3474,8 @@
       Audio2.chargeStop();
       Audio2.death();
       this.flashWhite = 0.4;
+      // DAILY: a fall still records the attempt (never over a better one)
+      if (this.daily) this.recordDaily(false);
       Save.addScales(Math.floor(this.scaleProgress / 2)); // partial salvage
       if (this.scaleProgress > Save.data.records.mostScalesRun) {
         Save.data.records.mostScalesRun = this.scaleProgress; Save.save();
@@ -3816,6 +4081,26 @@
     // the open sky's realm vortexes — swirling pools of each dragon's pigment
     drawRealms: function (g) {
       var t = this.time;
+
+      // DAILY: a faint dashed path threading the realms in route order,
+      // drifting slowly like a current in the sky (under the rings)
+      if (this.daily && this.sky.routeOrder) {
+        var ro = this.sky.routeOrder;
+        g.save();
+        g.strokeStyle = Fx.rgba(PAL.pondDeep, 0.26);
+        g.lineWidth = 2;
+        g.lineCap = "round";
+        g.setLineDash(DAILY_DASH);
+        if (!reduceMotion) g.lineDashOffset = -t * 12;
+        g.beginPath();
+        for (var pi = 0; pi < ro.length; pi++) {
+          if (pi === 0) g.moveTo(ro[pi].x, ro[pi].y);
+          else g.lineTo(ro[pi].x, ro[pi].y);
+        }
+        g.stroke();
+        g.restore();
+      }
+
       for (var i = 0; i < this.sky.realms.length; i++) {
         var rm = this.sky.realms[i];
         var bob = Math.sin(t * 0.9 + rm.phase) * 6;
@@ -3884,11 +4169,33 @@
           g.font = '600 10px Karla, sans-serif';
           g.fillStyle = Fx.rgba("#8a7940", 0.85);
           g.fillText("R E S P E C T E D", x, y + rm.r + 43);
-          g.font = 'italic 14px "Cormorant Garamond", Georgia, serif';
-          g.fillStyle = Fx.rgba("#2e3a48", 0.55);
-          g.fillText("enter for a ceremonial duel", x, y + rm.r + 61);
+          if (!this.daily) {
+            g.font = 'italic 14px "Cormorant Garamond", Georgia, serif';
+            g.fillStyle = Fx.rgba("#2e3a48", 0.55);
+            g.fillText("enter for a ceremonial duel", x, y + rm.r + 61);
+          }
         }
         g.restore();
+
+        // DAILY: route-order badge above each ring — the next stop on the
+        // route glows gold; later stops sit faint; flown stops fade out
+        if (this.daily && rm.routeIdx >= 0) {
+          var isNext = !rm.defeated && rm.routeIdx === this.daily.idx;
+          var bx = x, by = y - rm.r - 18;
+          g.save();
+          if (rm.defeated) g.globalAlpha = 0.35;
+          Fx.drawDot(g, bx, by, 15, isNext ? PAL.gold : "#fdfbf4", isNext ? 0.55 : 0.4, true);
+          g.strokeStyle = Fx.rgba(isNext ? "#8a7940" : PAL.ink, isNext ? 0.85 : 0.4);
+          g.lineWidth = isNext ? 2 : 1.4;
+          g.beginPath();
+          g.arc(bx, by, isNext ? 12 + (reduceMotion ? 0 : Math.sin(t * 2.4 + rm.phase) * 1.2) : 11, 0, TAU);
+          g.stroke();
+          g.textAlign = "center";
+          g.font = isNext ? '700 15px Karla, sans-serif' : '600 13px Karla, sans-serif';
+          g.fillStyle = Fx.rgba(PAL.ink, isNext ? 0.92 : 0.55);
+          g.fillText(rm.routeLabel, bx, by + 5);
+          g.restore();
+        }
       }
 
       // HARMONY: crowned skies belong to everyone — geese drift freely
@@ -4188,7 +4495,7 @@
 
   // expose minimal hooks for automated testing (no globals leaked otherwise)
   window.__dragoose = {
-    game: Game, input: Input, art: Art,
+    game: Game, input: Input, art: Art, daily: Daily,
     forceWin: function () { if (Game.dragon) Game.damageDragon(9999, Game.dragon.x, Game.dragon.y); },
     forceHurt: function () { if (Game.player) { Game.player.iframes = 0; Game.hurtPlayer(99, Game.player.x, Game.player.y + 50); } },
     state: function () { return Game.state; }
