@@ -44,6 +44,24 @@
 - **Swipe deck:** cards nearest-first, expanding outward. Drag **left = pass / right = like** (rotation + green YES / red NOPE stamps, peeking next card); also ✗/♥ buttons + ArrowLeft/ArrowRight; reduced-motion uses fades. **Tap the card to cycle story segments: Vibe → Food → Reviews.** Card overlay: name, 0–100 rating + review count, price, cuisine, distance, open-now.
 - **Decision screen** (on like): "Tonight: <name>" → Open in Maps (Directions), Call (if phone), "I ate here → Rate" (opens the rating sheet), **Save to shortlist · keep swiping**, Keep looking. **End-of-deck** screen → Compare shortlist (if any) / Widen preferences / Search farther (live) / Start over.
 
+### "Coming up" peek strip + softer deal-in (2026-07-16)
+A display-only preview beneath the swipe deck (`ensurePeek`/`renderPeek` in
+the deck closure, called from `renderStack`): tiny circular watercolor
+thumbs of the **next up-to-3 places** in the queue (food photo when one
+exists, else `panelArt` pigment) with the distance in tiny type under each,
+labeled "coming up" in small caps. Updates as cards are swiped; hides when
+nothing's ahead and whenever the deck view isn't active. Strictly
+decorative: `aria-hidden` (announce() already reports counts),
+`pointer-events: none`, zero handlers. On a fresh deal the thumbs **ripple
+in staggered** (~620ms + 90ms·i, `.is-rippling`) after the top card lands —
+skipped entirely under reduced motion. The main deal-in overshoot was
+tuned down (cubic-bezier 1.26 → 1.16, 0.62s → 0.66s) for a gentler landing.
+Layout: the deck trimmed to `min(60vh, 28.5rem)` (the trio centers itself,
+so the scatter just re-centers) so the strip clears the fixed tab bar at
+390×844 — verified by bounding-box assertion (row bottom ≤ tab-bar top);
+the short-screen media query (≤780px tall) hides the strip so controls
+always win.
+
 ### Visited insights — "Your month in meals" (2026-07-16)
 Display-only recap that sits between the Visited head row and the log
 (`.v-insights` section, JS-built in the visited closure, rendered on every

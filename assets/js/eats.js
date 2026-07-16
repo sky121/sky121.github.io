@@ -1204,6 +1204,7 @@
     var keyHandler = null;
     var history = [];   // swipes this deck: {i, id, dir} — fuels Undo
     var shortlist = []; // liked-and-saved places for this outing
+    var peekEl = null;  // "coming up" strip — built lazily below the deck
 
 
     function setMode(mode) {
@@ -1211,6 +1212,7 @@
       if (deckEl) deckEl.style.display = onDeck ? '' : 'none';
       if (hintEl) hintEl.style.display = onDeck ? '' : 'none';
       if (controlsEl) controlsEl.style.display = onDeck ? '' : 'none';
+      if (!onDeck && peekEl) peekEl.hidden = true; // renderPeek re-shows on deck
       if (decisionEl) decisionEl.hidden = mode !== 'decision';
       if (endEl) endEl.hidden = mode !== 'end';
       if (shortlistEl) shortlistEl.hidden = mode !== 'shortlist';
@@ -1221,6 +1223,7 @@
       clearRoulette();
       setMode('deck');
       clear(deckEl);
+      if (peekEl) peekEl.hidden = true;
       var l = el('div', 'deck-loading');
       l.appendChild(el('span', 'social-spinner', ''));
       l.appendChild(el('span', null, 'Finding places near you…'));
@@ -1273,6 +1276,7 @@
       }
       topCard = deckEl.querySelector('.swipe-card[data-depth="0"]');
       if (topCard) prefetchUpcoming();
+      renderPeek(deal);
     }
 
     function onDealEnd(e) {
@@ -1280,6 +1284,56 @@
       c.classList.remove('is-dealing');
       c.style.animationDelay = '';
       c.removeEventListener('animationend', onDealEnd);
+    }
+
+    /* ---- "coming up" peek strip ----
+       A quiet, display-only preview of the next places in the queue: tiny
+       circular watercolor thumbs with the distance beneath each. Strictly
+       decorative — aria-hidden (announce() already gives card counts),
+       pointer-events: none in CSS, no handlers. On a fresh deal the thumbs
+       ripple in with a slight stagger after the top card lands (skipped
+       under prefers-reduced-motion: they simply appear). */
+    function ensurePeek() {
+      if (peekEl || !deckEl || !deckEl.parentNode) return;
+      peekEl = el('div', 'peek-strip');
+      peekEl.setAttribute('aria-hidden', 'true');
+      peekEl.hidden = true;
+      peekEl.appendChild(el('p', 'peek-label', 'coming up'));
+      peekEl.appendChild(el('div', 'peek-row'));
+      // sits directly beneath the card stage, above the a11y note + controls
+      deckEl.parentNode.insertBefore(peekEl, deckEl.nextSibling);
+    }
+
+    function renderPeek(deal) {
+      ensurePeek();
+      if (!peekEl) return;
+      var row = peekEl.querySelector('.peek-row');
+      clear(row);
+      var upcoming = queue.slice(idx + 1, idx + 4); // the next (up to) 3
+      if (!upcoming.length) { peekEl.hidden = true; return; }
+      peekEl.hidden = false;
+      for (var i = 0; i < upcoming.length; i++) {
+        var r = upcoming[i];
+        var item = el('span', 'peek-item');
+        item.setAttribute('data-id', r.id);
+        item.setAttribute('data-name', r.name);
+        var thumb = el('span', 'peek-thumb');
+        var seg = (r.segments && r.segments.food) || {};
+        var photo = seg.photoUrl || r.photoUrl;
+        if (photo) {
+          thumb.style.background = 'url("' + String(photo).replace(/"/g, '') + '") center / cover';
+        } else {
+          thumb.style.background = panelArt(r, 'vibe', 0);
+        }
+        item.appendChild(thumb);
+        item.appendChild(el('span', 'peek-dist', fmtDist(r.distance)));
+        if (deal && !prefersReducedMotion) {
+          // ripple in once the main card has settled on the table
+          item.classList.add('is-rippling');
+          item.style.animationDelay = (620 + i * 90) + 'ms';
+        }
+        row.appendChild(item);
+      }
     }
 
     /* ---- trio playlist ----
@@ -2174,6 +2228,7 @@
       slPicking = false;
       if (shortlistEl) shortlistEl.classList.remove('is-picking');
       clear(deckEl);
+      if (peekEl) { peekEl.hidden = true; clear(peekEl.querySelector('.peek-row')); }
       queue = []; idx = 0; topCard = null; animating = false;
       history = []; shortlist = [];
       updateUndo(); updateBadge();
