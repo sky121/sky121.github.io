@@ -6,7 +6,7 @@
 > **Friends** + **Popular** tabs.
 >
 > Single source of truth so we can pick up exactly where we left off.
-> Last updated: **2026-07-08**.
+> Last updated: **2026-07-15**.
 
 ---
 
@@ -43,6 +43,33 @@
 - **Preferences — one-at-a-time wizard** (2026-07-08): one pref group on stage at a time (no long scroll): Back / "Skip →" step nav with a "N of 9" position marker, live match count, and **Start swiping + Surprise me always visible** so you can quit the questions early at any point; "Done →" past the last step starts the search; the wizard resets to step 1 on each visit (`prefs.showStep/nextStep`; `.pref-group.is-step` CSS). All groups optional, default "Any", persisted: Cuisine (16 chips), Price ($–$$$$), Min rating (Any/70+/80+/90+), Min reviews (Any/100+/500+/1000+), Open now, Max distance (Walking ~1mi / Short drive ~5mi / Anywhere — caps outward expansion), Dietary (Veg/Vegan/GF), Dining mode (Dine-in/Takeout/Delivery).
 - **Swipe deck:** cards nearest-first, expanding outward. Drag **left = pass / right = like** (rotation + green YES / red NOPE stamps, peeking next card); also ✗/♥ buttons + ArrowLeft/ArrowRight; reduced-motion uses fades. **Tap the card to cycle story segments: Vibe → Food → Reviews.** Card overlay: name, 0–100 rating + review count, price, cuisine, distance, open-now.
 - **Decision screen** (on like): "Tonight: <name>" → Open in Maps (Directions), Call (if phone), "I ate here → Rate" (opens the rating sheet), **Save to shortlist · keep swiping**, Keep looking. **End-of-deck** screen → Compare shortlist (if any) / Widen preferences / Search farther (live) / Start over.
+
+### End-of-deck "adjust one thing" chips (2026-07-15)
+The end-of-deck screen now recovers without a full restart. Above the
+existing actions (Compare shortlist / Widen preferences / Search farther /
+Start over) a JS-built chip row (`renderEndTweaks` in the deck closure,
+rebuilt on every `showEnd`) offers **Change cuisine / Change price / Change
+rating / Widen distance** plus a gold-washed **✦ Surprise me**:
+- **One-question tweaks** — a chip calls `find.showPrefs(false)` then
+  `prefs.jumpTo(controlId)`, which opens the wizard in a new **single-step
+  mode**: only that fieldset is on stage (found by control id via
+  `stepIndexFor`, so reordering steps in the HTML can't break it), the step
+  marker reads "just this one", Back is hidden, and the next button reads
+  **Done →** — pressing it (or Start swiping) persists and re-runs the
+  search for a fresh deal. `prefs.render()` resets the flag, so every
+  ordinary visit is the full 9-step wizard again.
+- **✦ Surprise me** (`surpriseFromEnd`) — roulettes a place you haven't
+  seen this outing (current matches minus `eats-seen` minus the shortlist,
+  reusing the existing `deck.surprise` roulette → decision flow). If
+  everything's been seen it calls the new `store.clearSeen()`, announces
+  it, toasts "Fresh deck!", and re-deals via `find.startSearch()`. Zero
+  current matches nudges you to loosen a preference instead of looping.
+- A11y/design: every transition announced through `announce()` (single-step
+  entry announces "change what you like, then Done to re-deal the deck");
+  chips are ≥44px pill buttons in the pref-chip watercolor style
+  (`.end-tweaks`/`.end-chip` CSS + evening overrides for the gold chip,
+  `.end-chip` added to the reduced-motion freeze list and the ≤400px
+  compaction).
 
 ### Find orb redesign — "living pool" (2026-07-08)
 The landing orb is now continuously alive instead of a mostly-static circle.

@@ -1632,6 +1632,52 @@ html.evening .decision-act--primary:hover { color: #3a1620; }
 }
 .deck-end-actions .btn-ghost, .deck-end-actions .btn-solid { flex: 1 1 8rem; }
 
+/* ----- end-of-deck "adjust one thing" chips (built in JS by showEnd) ----- */
+.end-tweaks { margin: -0.4rem auto 1.3rem; max-width: 22rem; }
+.end-tweaks-label {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.02rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.55rem;
+}
+.end-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+.end-chip {
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.84rem;
+  letter-spacing: 0.01em;
+  color: var(--ink-soft);
+  background: var(--card-bg);
+  border: 1px solid var(--card-line);
+  border-radius: 999px;
+  padding: 0.5rem 0.95rem;
+  min-height: 44px;
+  transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease, transform 0.12s ease;
+}
+.end-chip:hover { color: var(--ink); border-color: var(--pond-ink); }
+.end-chip:active { transform: scale(0.96); }
+.end-chip:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
+/* the low-friction "Surprise me" chip carries the warm gold wash */
+.end-chip--gold {
+  color: #4a3c14;
+  background: radial-gradient(120% 150% at 30% 18%, rgba(205, 184, 120, 0.5) 0%, rgba(205, 184, 120, 0.24) 85%);
+  border-color: rgba(205, 184, 120, 0.85);
+}
+.end-chip--gold:hover { color: #2a2410; border-color: var(--gold); }
+html.evening .end-chip--gold {
+  color: #ecdfb4;
+  background: radial-gradient(120% 150% at 30% 18%, rgba(205, 184, 120, 0.26) 0%, rgba(205, 184, 120, 0.1) 85%);
+  border-color: rgba(205, 184, 120, 0.55);
+}
+html.evening .end-chip--gold:hover { color: #f6edcd; border-color: var(--gold); }
+
 /* ----- Surprise-me roulette (rapid name shuffle) ----- */
 .roulette[hidden] { display: none; }
 .roulette {
@@ -2644,7 +2690,7 @@ html.evening .settings-msg.is-ok { color: #b6d3af; }
   .pop-card, .friend-chip, .range-btn,
   .find-orb.is-popping, .find-orb.is-popping .find-orb-pool,
   .find-orb.is-popping .find-orb-inner, .orb-drop,
-  .pref-chip, .seg-btn, .deck-btn,
+  .pref-chip, .seg-btn, .deck-btn, .end-chip,
   .decision-card, .deck-end-card, .decision-act, .seg-bar,
   .bloom-drop, .roulette-card, .roulette-spark, .roulette-name.is-tick,
   .empty-steam, .pop-rank.is-blooming,
@@ -2678,6 +2724,7 @@ html.evening .settings-msg.is-ok { color: #b6d3af; }
   .deck-controls { gap: 1.1rem; }
   .seg-btn { padding: 0.5rem 0.7rem; font-size: 0.8rem; }
   .pref-chip { padding: 0.5rem 0.8rem; font-size: 0.82rem; }
+  .end-chip { padding: 0.5rem 0.8rem; font-size: 0.8rem; }
   .card-actions { gap: 0.4rem; }
   .card-action { flex: 1 1 auto; }
   .pop-card { grid-template-columns: 2.4rem 1fr auto; gap: 0.6rem; padding: 0.8rem 0.85rem; }
