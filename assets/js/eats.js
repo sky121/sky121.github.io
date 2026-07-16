@@ -234,6 +234,9 @@
         delete map[id];
         localStorage.setItem(KEY_SEEN, JSON.stringify(map));
       } catch (e) {}
+    },
+    clearSeen: function () {
+      try { localStorage.removeItem(KEY_SEEN); } catch (e) {}
     }
   };
 
@@ -1055,6 +1058,10 @@
        Skip to move, and the Start swiping + Surprise me escape hatches
        always in reach — quit the preferences early whenever you're done. */
     var step = 0;
+    /* single-step mode: the end-of-deck "adjust one thing" chips open the
+       wizard at exactly one question — Done → goes straight back to a
+       fresh search instead of walking the remaining steps. */
+    var single = false;
     function stepGroups() {
       return Array.prototype.slice.call(document.querySelectorAll('#prefs-form .pref-group'));
     }
@@ -1068,23 +1075,42 @@
       var back = $('step-back');
       var next = $('step-next');
       var where = $('step-where');
-      if (back) back.style.visibility = step === 0 ? 'hidden' : 'visible';
-      if (next) next.textContent = step === groups.length - 1 ? 'Done →' : 'Skip →';
+      if (back) back.style.visibility = (step === 0 || single) ? 'hidden' : 'visible';
+      if (next) next.textContent = (single || step === groups.length - 1) ? 'Done →' : 'Skip →';
       var legend = groups[step].querySelector('.pref-legend');
       var title = legend ? legend.textContent.replace(/\(optional\)/, '').trim() : '';
-      if (where) where.textContent = (step + 1) + ' of ' + groups.length;
-      announce(title + ' — step ' + (step + 1) + ' of ' + groups.length);
+      if (where) where.textContent = single ? 'just this one' : ((step + 1) + ' of ' + groups.length);
+      announce(single
+        ? (title + ' — change what you like, then Done to re-deal the deck.')
+        : (title + ' — step ' + (step + 1) + ' of ' + groups.length));
       if (focusLegend && legend) { legend.setAttribute('tabindex', '-1'); legend.focus(); }
     }
     function nextStep() {
       var groups = stepGroups();
-      if (step >= groups.length - 1) {
-        // skipped past the last step — you're done: start the search
+      if (single || step >= groups.length - 1) {
+        // single-step tweak finished, or skipped past the last step —
+        // you're done: start the search
+        single = false;
         persist();
         find.showDeck();
         return;
       }
       showStep(step + 1, true);
+    }
+    /* find the wizard step whose fieldset contains the control `id` —
+       robust against steps being reordered in the HTML */
+    function stepIndexFor(id) {
+      var groups = stepGroups();
+      for (var i = 0; i < groups.length; i++) {
+        if (groups[i].querySelector('#' + id)) return i;
+      }
+      return 0;
+    }
+    /* open the wizard at just the step holding control `id` (single-step
+       mode). Call AFTER find.showPrefs() — render() resets the mode. */
+    function jumpTo(id) {
+      single = true;
+      showStep(stepIndexFor(id), true);
     }
 
     function render() {
@@ -1100,6 +1126,7 @@
       var openTgl = $('pref-open');
       if (openTgl) openTgl.checked = !!cur.openNow;
       updateCount();
+      single = false;        // full wizard unless jumpTo() re-enters single-step
       showStep(0, false); // every visit starts the wizard from the top
     }
 
@@ -1126,7 +1153,7 @@
       });
     }
 
-    return { init: init, render: render, current: current, defaults: defaults };
+    return { init: init, render: render, current: current, defaults: defaults, jumpTo: jumpTo };
   })();
 
   /* ================================================================== *
@@ -1871,8 +1898,70 @@
       toast('Sharing isn’t available here');
     }
 
+    /* ---- end-of-deck "adjust one thing" chips ----
+       One tap opens the preferences wizard at exactly that question
+       (prefs.jumpTo single-step mode); Done → re-runs the search and deals
+       a fresh deck. Rebuilt on every showEnd so labels stay current. */
+    function renderEndTweaks(emptyFromStart) {
+      var card = endEl && endEl.querySelector('.deck-end-card');
+      if (!card) return;
+      var old = card.querySelector('.end-tweaks');
+      if (old && old.parentNode) old.parentNode.removeChild(old);
+      var wrap = el('div', 'end-tweaks');
+      wrap.appendChild(el('p', 'end-tweaks-label',
+        emptyFromStart ? 'Loosen one thing' : 'Adjust one thing'));
+      var row = el('div', 'end-chips');
+      row.setAttribute('role', 'group');
+      row.setAttribute('aria-label', 'Adjust one preference');
+      // [label, control id inside the wizard step to jump to]
+      var TWEAKS = [
+        ['Change cuisine', 'pref-cuisine'],
+        ['Change price', 'pref-price'],
+        ['Change rating', 'pref-rating'],
+        ['Widen distance', 'pref-distance']
+      ];
+      TWEAKS.forEach(function (t) {
+        var b = el('button', 'end-chip', t[0]);
+        b.type = 'button';
+        b.addEventListener('click', function () {
+          find.showPrefs(false);   // renders the full wizard…
+          prefs.jumpTo(t[1]);      // …then narrows it to this one step
+        });
+        row.appendChild(b);
+      });
+      var sur = el('button', 'end-chip end-chip--gold', '✦ Surprise me');
+      sur.type = 'button';
+      sur.addEventListener('click', surpriseFromEnd);
+      row.appendChild(sur);
+      wrap.appendChild(row);
+      card.insertBefore(wrap, card.querySelector('.deck-end-actions'));
+    }
+
+    /* "Surprise me" from the end screen: roulette a place you haven't
+       seen this outing (seen memory + shortlist excluded); if you've truly
+       seen everything, clear the seen memory and deal the deck again. */
+    function surpriseFromEnd() {
+      var matched = find.filterByPrefs(state.results || []);
+      if (!matched.length) {
+        announce('Nothing matches your current preferences yet. Try adjusting one first.');
+        toast('Loosen a preference first');
+        return;
+      }
+      var seen = store.getSeen();
+      var fresh = matched.filter(function (r) {
+        if (seen[r.id]) return false;
+        return !shortlist.some(function (s) { return s.id === r.id; });
+      });
+      if (fresh.length) { surprise(fresh); return; }
+      store.clearSeen();
+      announce('You had seen everything — memory cleared, dealing a fresh deck.');
+      toast('Fresh deck!');
+      find.startSearch();
+    }
+
     function showEnd(emptyFromStart) {
       setMode('end');
+      renderEndTweaks(emptyFromStart);
       var title = $('deck-end-title');
       var sub = $('deck-end-sub');
       if (emptyFromStart) {
