@@ -6,7 +6,7 @@
 > **Friends** + **Popular** tabs.
 >
 > Single source of truth so we can pick up exactly where we left off.
-> Last updated: **2026-07-15**.
+> Last updated: **2026-07-16**.
 
 ---
 
@@ -43,6 +43,48 @@
 - **Preferences — one-at-a-time wizard** (2026-07-08): one pref group on stage at a time (no long scroll): Back / "Skip →" step nav with a "N of 9" position marker, live match count, and **Start swiping + Surprise me always visible** so you can quit the questions early at any point; "Done →" past the last step starts the search; the wizard resets to step 1 on each visit (`prefs.showStep/nextStep`; `.pref-group.is-step` CSS). All groups optional, default "Any", persisted: Cuisine (16 chips), Price ($–$$$$), Min rating (Any/70+/80+/90+), Min reviews (Any/100+/500+/1000+), Open now, Max distance (Walking ~1mi / Short drive ~5mi / Anywhere — caps outward expansion), Dietary (Veg/Vegan/GF), Dining mode (Dine-in/Takeout/Delivery).
 - **Swipe deck:** cards nearest-first, expanding outward. Drag **left = pass / right = like** (rotation + green YES / red NOPE stamps, peeking next card); also ✗/♥ buttons + ArrowLeft/ArrowRight; reduced-motion uses fades. **Tap the card to cycle story segments: Vibe → Food → Reviews.** Card overlay: name, 0–100 rating + review count, price, cuisine, distance, open-now.
 - **Decision screen** (on like): "Tonight: <name>" → Open in Maps (Directions), Call (if phone), "I ate here → Rate" (opens the rating sheet), **Save to shortlist · keep swiping**, Keep looking. **End-of-deck** screen → Compare shortlist (if any) / Widen preferences / Search farther (live) / Start over.
+
+### Richer shortlist compare view (2026-07-16)
+The compare screen (shortlist badge / end-of-deck "Compare shortlist") is now
+a real decision tool instead of a name+meta list:
+- **Compare cards** (`buildCompareCard` in the deck closure, `.slc*` CSS) —
+  each shortlisted place is a compact card with the food panelArt/photo
+  thumbnail (live photo when present, `panelArt(r,'food',0)` otherwise),
+  name + open-now/closed pill, and **fixed fact slots in the same order on
+  every card** (★ score + review count with a trend sparkline / price ·
+  cuisine / distance · travel time / "You rated it NN") so eyes can hop
+  straight down the column when weighing A against B at 390 px. The
+  sparkline is `svgSparkline` fed by `slTrendSeries` — the same name-seeded
+  deterministic recipe as Popular's `trendSeries`, rebuilt in the deck
+  closure since that helper is scoped to `popular` (hidden ≤360 px via the
+  existing `.pop-spark` rule).
+- **✦ Pick for me** (`pickForMe`) — a roulette spotlight hops card-to-card
+  with widening gaps (timers ride the existing `rouletteTimers` so deck
+  teardown clears them), lands on a random pick, the winner card **lifts
+  and glows gold** (`.slc.is-winner`) for a beat, then the standard
+  decision screen takes over ("Tonight: <name>" + Open in Maps / Call /
+  Share / Rate — the existing `onLike` machinery). While shuffling the
+  view's controls go quiet (`.shortlist.is-picking` + JS guards for the
+  keyboard path). **Reduced motion (or a one-place list) commits
+  instantly — no shuffle.** Button is a static hook in `eats.html`
+  (`.shortlist-pickme`, btn-solid).
+- **Per-card actions** — "Choose this one" (same `onLike` decision flow as
+  the winner path) and "Remove" with a **5-second Undo toast** that splices
+  the place back where it was (`removeWithUndo`; removing the last card
+  falls back to the deck/end screen, and Undo from the end screen re-runs
+  `showEnd` so the count/copy refresh). Both are ≥44 px pill buttons with
+  focus-visible outlines.
+- **toast() upgrade + styling** — `toast(msg, {label, onAction, duration})`
+  optionally renders one action button (e.g. "Undo") and holds the pill
+  longer; plain calls unchanged. Also added the previously **missing
+  `.eats-toast` CSS** (the pill had no styles at all): fixed paper pill
+  above the tab bar, is-show fade/rise, evening + reduced-motion variants;
+  interactive toasts drop `aria-hidden` so the Undo button is reachable.
+- A11y/design: `showShortlist` announces "Comparing N shortlisted places",
+  the shuffle announces "Choosing from your shortlist…", removals/undos are
+  announced; open/star/you-rated colors have evening overrides; Share
+  shortlist + Back keep working beneath the new Pick for me button. The old
+  `.sl-item` row styles were removed with the code that built them.
 
 ### End-of-deck "adjust one thing" chips (2026-07-15)
 The end-of-deck screen now recovers without a full restart. Above the
@@ -130,7 +172,7 @@ The card face is a **free-floating scatter**: three EQUAL **4:3 blocks** — two
 ### Swipe QoL (added 2026-07-08)
 - **Undo** — the ↩ button left of Pass (or **Z** / **Backspace**) brings the last card back, from the deck *or* the end screen; undoing a pass also erases its seen-memory record. History resets per deck load.
 - **Seen memory** — passed places are remembered in `eats-seen` (`{id: timestamp}`, ~6 h TTL, pruned on read). On a new search they **sink to the back of the deck** (nearest-first within unseen, then seen) instead of being hidden — no dead ends, no repeats up front.
-- **Liked shortlist** — "Save to shortlist" on the decision screen banks the place and keeps you swiping. A green ♥ badge in the deck bar counts saves and opens a **compare view** (name + meta + "Tonight" pick + remove). End-of-deck becomes "Down to your shortlist" with a compare button. Session-only (resets when you leave Find) — a shortlist is per outing.
+- **Liked shortlist** — "Save to shortlist" on the decision screen banks the place and keeps you swiping. A green ♥ badge in the deck bar counts saves and opens the **compare view** (see "Richer shortlist compare view", 2026-07-16). End-of-deck becomes "Down to your shortlist" with a compare button. Session-only (resets when you leave Find) — a shortlist is per outing.
 - **Procedural watercolor card art** — when a card has no real photo (all of demo mode, plus live places without photos), `panelArt()` paints a cuisine-keyed composition: Vibe = three pigment washes over dusk paper; Food = a plate with dish-color pooling on a table wash. Palettes per cuisine in `CUISINE_ART`; seeded by place name so every card differs. Replaces the old flat gradient + emoji glyph.
 
 ### Visited (private rating log) — fully works offline

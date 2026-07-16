@@ -79,18 +79,35 @@
   }
 
   /* Small transient toast (paper pill above the tab bar) — visual companion
-     to announce(); screen readers get the live region, sighted users get this. */
+     to announce(); screen readers get the live region, sighted users get this.
+     Optional second arg { label, onAction, duration } adds one action button
+     (e.g. "Undo") and keeps the pill up a little longer. */
   var toastTimer = null;
-  function toast(msg) {
+  function toast(msg, opts) {
     try {
       var t = $('eats-toast');
       if (!t) {
         t = el('div', 'eats-toast');
         t.id = 'eats-toast';
-        t.setAttribute('aria-hidden', 'true'); // announce() covers a11y
         document.body.appendChild(t);
       }
-      t.textContent = msg;
+      clear(t);
+      t.appendChild(el('span', 'eats-toast-msg', msg));
+      if (opts && opts.label && opts.onAction) {
+        // an interactive toast must be reachable by AT — plain ones stay
+        // hidden because announce() already covers them
+        t.removeAttribute('aria-hidden');
+        var act = el('button', 'eats-toast-act', opts.label);
+        act.type = 'button';
+        act.addEventListener('click', function () {
+          if (toastTimer) { window.clearTimeout(toastTimer); toastTimer = null; }
+          t.classList.remove('is-show');
+          opts.onAction();
+        });
+        t.appendChild(act);
+      } else {
+        t.setAttribute('aria-hidden', 'true'); // announce() covers a11y
+      }
       t.classList.remove('is-show');
       void t.offsetWidth; // restart the fade if a toast is already up
       t.classList.add('is-show');
@@ -98,7 +115,7 @@
       toastTimer = window.setTimeout(function () {
         toastTimer = null;
         t.classList.remove('is-show');
-      }, 1900);
+      }, (opts && opts.duration) || 1900);
     } catch (e) { /* purely decorative — never break the flow */ }
   }
 
@@ -1816,8 +1833,96 @@
     }
 
     function backFromShortlist() {
+      if (slPicking) return; // the roulette is mid-shuffle — sit tight
       if (idx < queue.length) { setMode('deck'); setControlsEnabled(true); if (topCard) topCard.focus(); }
       else showEnd(false);
+    }
+
+    /* Deterministic 7-point buzz series for the compare sparkline — the same
+       recipe as Popular's trendSeries (name-seeded wobble, direction from the
+       hash, ending exactly at the place's 0-100 score); rebuilt here because
+       that helper lives inside the popular closure. */
+    function slTrendSeries(r) {
+      if (!r.rating) return [];
+      var score = r.rating * 20;
+      var h = hashStr(r.name || r.id || '');
+      var dir = (h % 3) - 1; // falling / steady / rising — stable per place
+      var pts = [];
+      for (var i = 0; i < 7; i++) {
+        var ti = i / 6;
+        pts.push(score - dir * (1 - ti) * 6 + Math.sin(h % 7 + i * 1.7) * 1.4);
+      }
+      pts[6] = score;
+      return pts;
+    }
+
+    /* One compact compare card. Fact slots keep a fixed order on every card
+       (score+spark / price+cuisine / distance+travel / your rating) so eyes
+       can hop straight down the column when weighing A against B. */
+    function buildCompareCard(r) {
+      var card = el('article', 'slc');
+      card.dataset.id = r.id;
+      card.setAttribute('aria-label', a11ySummary(r));
+
+      var main = el('div', 'slc-main');
+      var thumb = el('div', 'slc-thumb');
+      thumb.setAttribute('aria-hidden', 'true');
+      var foodSeg = (r.segments && r.segments.food) || {};
+      var photo = foodSeg.photoUrl || r.photoUrl;
+      if (photo) thumb.style.background = 'url("' + String(photo).replace(/"/g, '') + '") center / cover';
+      else thumb.style.background = panelArt(r, 'food', 0);
+      main.appendChild(thumb);
+
+      var body = el('div', 'slc-body');
+      var head = el('div', 'slc-head');
+      head.appendChild(el('h3', 'slc-name', r.name));
+      if (r.open != null) head.appendChild(el('span', 'slc-open' + (r.open ? '' : ' is-closed'), r.open ? 'Open now' : 'Closed'));
+      body.appendChild(head);
+
+      var scoreRow = el('div', 'slc-row');
+      var score = el('span', 'slc-score');
+      if (r.rating) {
+        score.appendChild(el('span', 'slc-star', '★ ' + fmtScore(r.rating * 20)));
+        if (r.reviews) score.appendChild(document.createTextNode(' (' + r.reviews.toLocaleString() + ')'));
+      } else {
+        score.appendChild(document.createTextNode('No rating yet'));
+      }
+      scoreRow.appendChild(score);
+      var sparkPts = slTrendSeries(r);
+      if (sparkPts.length) scoreRow.appendChild(svgSparkline(sparkPts, 'var(--pond-deep)'));
+      body.appendChild(scoreRow);
+
+      var mid = [];
+      if (r.price) mid.push(priceStr(r.price));
+      if (r.type) mid.push(r.type);
+      body.appendChild(el('p', 'slc-fact', mid.length ? mid.join(' · ') : '—'));
+
+      var dist = [];
+      if (r.distance != null) { dist.push(fmtDist(r.distance)); dist.push(fmtTravel(r.distance)); }
+      body.appendChild(el('p', 'slc-fact slc-fact--dist', dist.length ? dist.join(' · ') : '—'));
+
+      var mine = myRatingFor(r.name);
+      if (mine) body.appendChild(el('p', 'slc-you', 'You rated it ' + fmtScore(overallOf(mine))));
+      main.appendChild(body);
+      card.appendChild(main);
+
+      var acts = el('div', 'slc-acts');
+      var choose = el('button', 'slc-choose', 'Choose this one');
+      choose.type = 'button';
+      choose.setAttribute('aria-label', 'Choose ' + r.name + ' for tonight');
+      choose.addEventListener('click', function () {
+        if (slPicking) return;
+        haptic(10);
+        onLike(r);
+      });
+      acts.appendChild(choose);
+      var rm = el('button', 'slc-remove', 'Remove');
+      rm.type = 'button';
+      rm.setAttribute('aria-label', 'Remove ' + r.name + ' from shortlist');
+      rm.addEventListener('click', function () { removeWithUndo(r); });
+      acts.appendChild(rm);
+      card.appendChild(acts);
+      return card;
     }
 
     function renderShortlist() {
@@ -1825,45 +1930,94 @@
       if (!listEl) return;
       clear(listEl);
       if (!shortlist.length) { backFromShortlist(); return; }
-      shortlist.forEach(function (r) {
-        var row = el('div', 'sl-item');
-        var body = el('div', 'sl-body');
-        body.appendChild(el('h3', 'sl-name', r.name));
-        var bits = [];
-        if (r.rating) bits.push('★ ' + fmtScore(r.rating * 20));
-        if (r.price) bits.push(priceStr(r.price));
-        if (r.type) bits.push(r.type);
-        if (r.distance != null) {
-          bits.push(fmtDist(r.distance));
-          bits.push(fmtTravel(r.distance));
+      shortlist.forEach(function (r) { listEl.appendChild(buildCompareCard(r)); });
+    }
+
+    /* Remove a place but keep it one tap from coming back: the toast carries
+       an Undo action that splices it back where it was. */
+    function removeWithUndo(r) {
+      if (slPicking) return;
+      var at = -1;
+      for (var i = 0; i < shortlist.length; i++) { if (shortlist[i].id === r.id) { at = i; break; } }
+      if (at < 0) return;
+      removeFromShortlist(r.id);
+      renderShortlist(); // an emptied list falls back to the deck / end screen
+      announce(r.name + ' removed from shortlist. Undo is available.');
+      toast('Removed ' + r.name, {
+        label: 'Undo',
+        duration: 5200,
+        onAction: function () {
+          if (shortlist.some(function (s) { return s.id === r.id; })) return;
+          shortlist.splice(Math.min(at, shortlist.length), 0, r);
+          updateBadge();
+          if (shortlistEl && !shortlistEl.hidden) renderShortlist();
+          else if (endEl && !endEl.hidden) showEnd(false); // refresh count + copy
+          announce(r.name + ' is back on your shortlist.');
         }
-        var mineSl = myRatingFor(r.name);
-        if (mineSl) bits.push('you rated it ' + fmtScore(overallOf(mineSl)));
-        body.appendChild(el('p', 'sl-meta', bits.join('  ·  ')));
-        row.appendChild(body);
-        var acts = el('div', 'sl-acts');
-        var pick = el('button', 'sl-pick', 'Tonight');
-        pick.type = 'button';
-        pick.addEventListener('click', function () { onLike(r); });
-        acts.appendChild(pick);
-        var rm = el('button', 'sl-remove', '×');
-        rm.type = 'button';
-        rm.setAttribute('aria-label', 'Remove ' + r.name + ' from shortlist');
-        rm.addEventListener('click', function () {
-          removeFromShortlist(r.id);
-          announce(r.name + ' removed from shortlist.');
-          renderShortlist();
-        });
-        acts.appendChild(rm);
-        row.appendChild(acts);
-        listEl.appendChild(row);
       });
+    }
+
+    /* ---- "Pick for me": roulette-shuffle across the compare cards ----
+       The spotlight hops card to card with widening gaps, lands on a random
+       pick, the winner lifts and glows for a beat, then the standard
+       decision screen ("Tonight: …" + Maps/Call/Share/Rate) takes over.
+       Reduced motion (or a one-place list) commits instantly — no shuffle. */
+    var slPicking = false;
+    function pickForMe() {
+      if (slPicking || !shortlist.length) return;
+      clearRoulette();
+      var pi = Math.floor(Math.random() * shortlist.length);
+      var pick = shortlist[pi];
+      if (prefersReducedMotion || shortlist.length === 1) {
+        announce('Tonight: ' + pick.name);
+        onLike(pick);
+        return;
+      }
+      var cards = shortlistEl ? Array.prototype.slice.call(shortlistEl.querySelectorAll('.slc')) : [];
+      if (cards.length !== shortlist.length) { onLike(pick); return; } // stale DOM — just commit
+      slPicking = true;
+      shortlistEl.classList.add('is-picking');
+      announce('Choosing from your shortlist…');
+      haptic(8);
+      var n = cards.length;
+      var ticks = Math.min(15, 6 + n * 2);
+      var offset = ((pi - (ticks - 1)) % n + n) % n; // last tick lands on the pick
+      var lastLit = null;
+      var t = 0;
+      for (var i = 0; i < ticks; i++) {
+        t += 65 + i * 15; // gaps widen — the spotlight slows to a stop
+        (function (i, at) {
+          rouletteTimers.push(window.setTimeout(function () {
+            if (!shortlistEl || shortlistEl.hidden) return; // navigated away
+            var c = cards[(offset + i) % n];
+            if (lastLit) lastLit.classList.remove('is-spot');
+            lastLit = c;
+            c.classList.add('is-spot');
+            if (i === ticks - 1) {
+              c.classList.remove('is-spot');
+              c.classList.add('is-winner'); // the lift + gold glow
+              haptic(18);
+              try { c.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e2) {}
+            }
+          }, at));
+        })(i, t);
+      }
+      rouletteTimers.push(window.setTimeout(function () {
+        slPicking = false;
+        if (shortlistEl) shortlistEl.classList.remove('is-picking');
+        if (!shortlistEl || shortlistEl.hidden) return;
+        onLike(pick); // "Tonight: <name>" + the standard decision actions
+      }, t + 950));
     }
 
     function showShortlist() {
       if (!shortlist.length) return;
+      clearRoulette();
+      slPicking = false;
+      if (shortlistEl) shortlistEl.classList.remove('is-picking');
       setMode('shortlist');
       renderShortlist();
+      announce('Comparing ' + shortlist.length + ' shortlisted place' + (shortlist.length === 1 ? '' : 's') + '.');
       var t = shortlistEl && shortlistEl.querySelector('.shortlist-title');
       if (t) { t.setAttribute('tabindex', '-1'); t.focus(); }
     }
@@ -2017,6 +2171,8 @@
     function teardown() {
       clearRoulette();
       if (rouletteEl) rouletteEl.classList.remove('is-landed');
+      slPicking = false;
+      if (shortlistEl) shortlistEl.classList.remove('is-picking');
       clear(deckEl);
       queue = []; idx = 0; topCard = null; animating = false;
       history = []; shortlist = [];
@@ -2034,6 +2190,8 @@
       if (slBack) slBack.addEventListener('click', backFromShortlist);
       var slShare = shortlistEl && shortlistEl.querySelector('.shortlist-share');
       if (slShare) slShare.addEventListener('click', shareShortlist);
+      var slPickBtn = shortlistEl && shortlistEl.querySelector('.shortlist-pickme');
+      if (slPickBtn) slPickBtn.addEventListener('click', pickForMe);
       var endSl = $('end-shortlist');
       if (endSl) endSl.addEventListener('click', showShortlist);
       updateUndo(); updateBadge();
