@@ -38,6 +38,17 @@
     { text: "tap to dodge through its drift-ring", w: 0 },
     { text: "hold to charge dragonfire — warm the spirit", w: 0 }
   ];
+  // sky weather moods: purely atmospheric hub ambience (zero gameplay
+  // effect). Whisper lines are pre-built; "clear" whispers nothing.
+  var WEATHER_MOODS = ["clear", "mist", "rain", "golden"];
+  var WEATHER_WHISPERS = {
+    mist: "a quiet mist drifts among the realms",
+    rain: "a soft rain crosses the sky",
+    golden: "golden light washes over the sky"
+  };
+  // reduced-motion rain: one faint uniform wash instead of falling streaks
+  var RAIN_WASH = "rgba(74,114,153,0.06)";
+  var RIPPLE_STROKE = "rgba(74,114,153,0.55)";
 
   // characters/projectiles/clouds are fully procedural now — only the
   // scale pickups still ship as PNG sprites
@@ -648,6 +659,81 @@
       this.cloudSprites.length = 0;
       for (var i = 0; i < 4; i++) this.cloudSprites.push(this.makeCloudSprite(360, 200));
       this.rays = this.makeRaysSprite();
+    },
+
+    // ----- SKY WEATHER ART (baked once, drawImage-only per frame) -----
+    mistBanks: [],
+    rainStreak: null,
+    goldenWash: null,
+    ensureWeatherArt: function () {
+      if (this.rainStreak) return;
+      for (var i = 0; i < 3; i++) this.mistBanks.push(this.makeMistBank());
+      this.rainStreak = this.makeRainStreak();
+      this.goldenWash = this.makeGoldenWash();
+    },
+
+    // one wide soft mist bank: overlapping squashed radial washes,
+    // fully feathered so no sprite edge ever shows
+    makeMistBank: function () {
+      var w = 360, h = 120;
+      var c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      var x = c.getContext("2d");
+      var puffs = 6;
+      for (var i = 0; i < puffs; i++) {
+        var t = i / (puffs - 1);
+        var px = w * (0.14 + 0.72 * t) + (Math.random() - 0.5) * w * 0.06;
+        var py = h * 0.5 + (Math.random() - 0.5) * h * 0.3;
+        var pr = h * (0.2 + Math.random() * 0.16);
+        x.save();
+        x.translate(px, py);
+        x.scale(2.4, 1);
+        var grad = x.createRadialGradient(0, 0, pr * 0.08, 0, 0, pr);
+        grad.addColorStop(0, "rgba(240,246,251,0.85)");
+        grad.addColorStop(0.55, "rgba(228,238,247,0.45)");
+        grad.addColorStop(1, "rgba(228,238,247,0)");
+        x.fillStyle = grad;
+        x.beginPath(); x.arc(0, 0, pr, 0, TAU); x.fill();
+        x.restore();
+      }
+      return c;
+    },
+
+    // one thin watercolor rain streak, slant baked in (drop drift matches:
+    // dx/dy = -0.1) so runtime draws never rotate
+    makeRainStreak: function () {
+      var c = document.createElement("canvas");
+      c.width = 10; c.height = 44;
+      var x = c.getContext("2d");
+      var grad = x.createLinearGradient(7, 2, 3, 42);
+      grad.addColorStop(0, "rgba(127,168,201,0)");
+      grad.addColorStop(0.35, "rgba(127,168,201,0.9)");
+      grad.addColorStop(1, "rgba(74,114,153,0.55)");
+      x.strokeStyle = grad;
+      x.lineWidth = 1.6;
+      x.lineCap = "round";
+      x.beginPath(); x.moveTo(7, 2); x.lineTo(3, 42); x.stroke();
+      return c;
+    },
+
+    // golden-hour wash: warm gold at the crown, rose toward the horizon,
+    // plus a bloom around the sun — half-res, blitted scaled up
+    makeGoldenWash: function () {
+      var c = document.createElement("canvas");
+      c.width = VW / 2; c.height = VH / 2;
+      var x = c.getContext("2d");
+      var w = c.width, h = c.height;
+      var grad = x.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, "rgba(246,214,150,0.18)");
+      grad.addColorStop(0.5, "rgba(232,178,150,0.11)");
+      grad.addColorStop(1, "rgba(217,139,160,0.14)");
+      x.fillStyle = grad; x.fillRect(0, 0, w, h);
+      var sx = w * 0.78, sy = h * 0.1;
+      var rg = x.createRadialGradient(sx, sy, 0, sx, sy, h * 0.7);
+      rg.addColorStop(0, "rgba(255,230,170,0.2)");
+      rg.addColorStop(1, "rgba(255,230,170,0)");
+      x.fillStyle = rg; x.fillRect(0, 0, w, h);
+      return c;
     },
 
     // full-screen layers rendered once
@@ -1573,6 +1659,7 @@
     player: null,
     dragon: null,
     daily: null,              // Daily Flight state {date, route, idx, mod} or null
+    weather: null,            // sky weather mood state (initWeather) or null
     tk: null,                 // cached owned-trinket flags (refreshTrinkets)
     scaleProgress: 0,         // scales collected this run
     nextPowerAt: 3,           // scales needed for next power
@@ -1882,6 +1969,7 @@
       this.dragon = null;
       this.mode = "sky";
       this.initSky();
+      this.initWeather();
       this.player.y = VH * 0.82;
       // the Fledgling Gale: a gentle training gust for the very first
       // flight only — never in a Daily, never once fledged or victorious
@@ -1916,6 +2004,19 @@
         skyHint(1000, "drag to steer");
         skyHint(3000, "tap to dodge");
         skyHint(5000, "hold to charge dragonfire");
+      }
+
+      // sky weather whisper: once per run (never on return-to-sky), hushed
+      // while the Fledgling Gale is teaching; clear skies say nothing
+      if (this.weather && WEATHER_WHISPERS[this.weather.mood]) {
+        var wthr = this.weather;
+        setTimeout(function () {
+          if (Game.weather === wthr && !wthr.whispered &&
+              Game.state === "PLAYING" && Game.mode === "sky" && !Game.training) {
+            wthr.whispered = true;
+            Game.floatText(VW / 2, VH * 0.68, WEATHER_WHISPERS[wthr.mood], PAL.wisteria);
+          }
+        }, 2600);
       }
       this.wipe();
     },
@@ -1970,10 +2071,211 @@
       }
     },
 
+    // ----- SKY WEATHER (ambient mood, zero gameplay effect) -----
+    // deterministic per run: the local hour + date seed the pick, so the
+    // hub sky feels tied to the player's real time of day. A Daily Flight
+    // derives its mood from the daily seed instead — everyone's sky matches.
+    weatherMoodFor: function (hour, rnd) {
+      // weights: clear stays common everywhere; golden hour only near
+      // dawn/dusk; mist favored through the morning; rain a light sprinkle
+      var wClear = 0.46, wMist = 0.16, wRain = 0.16, wGolden = 0;
+      if ((hour >= 5 && hour < 9) || (hour >= 16 && hour < 20)) wGolden = 0.24;
+      if (hour >= 5 && hour < 11) { wMist = 0.34; wRain = 0.1; }
+      var r = rnd() * (wClear + wMist + wRain + wGolden);
+      if ((r -= wGolden) < 0) return "golden";
+      if ((r -= wMist) < 0) return "mist";
+      if ((r -= wRain) < 0) return "rain";
+      return "clear";
+    },
+
+    pickWeatherMood: function () {
+      if (this.daily) {
+        // seeded off the same date key as the route, salted so the mood
+        // doesn't correlate with the modifier draw
+        var dr = Daily.rng(Daily.hash(this.daily.date + "|weather"));
+        return WEATHER_MOODS[(dr() * WEATHER_MOODS.length) | 0];
+      }
+      var now = new Date();
+      var hour = now.getHours();
+      var key = now.getFullYear() + "-" + (now.getMonth() + 1) + "-" + now.getDate() + "@" + hour;
+      return this.weatherMoodFor(hour, Daily.rng(Daily.hash(key)));
+    },
+
+    initWeather: function () {
+      this.weather = { mood: this.pickWeatherMood(), whispered: false,
+        banks: [], drops: [], ripples: [], motes: [], rippleT: 0 };
+      this.seedWeatherPools();
+    },
+
+    // test hook target: forcing a mood re-seeds its pools so it draws at once
+    forceWeather: function (mood) {
+      if (!this.weather) return;
+      if (WEATHER_MOODS.indexOf(mood) === -1) return;
+      this.weather.mood = mood;
+      this.weather.whispered = true; // forcing never re-whispers
+      this.seedWeatherPools();
+    },
+
+    // fixed-size pools built here ONCE per (re)init — the update/draw loops
+    // only mutate these entries in place, never allocate
+    seedWeatherPools: function () {
+      var w = this.weather;
+      Fx.ensureWeatherArt();
+      w.banks.length = 0; w.drops.length = 0; w.ripples.length = 0; w.motes.length = 0;
+      w.rippleT = 0.5;
+      var i;
+      // 3 mist banks: higher = slower + fainter (parallax-ish drift)
+      var bankRows = [
+        { y: VH * 0.24, s: 0.85, spd: 7, a: 0.1 },
+        { y: VH * 0.5, s: 1.1, spd: -10, a: 0.12 },
+        { y: VH * 0.78, s: 1.35, spd: 13, a: 0.14 }
+      ];
+      for (i = 0; i < bankRows.length; i++) {
+        var br = bankRows[i];
+        w.banks.push({
+          x: Math.random() * VW,
+          y: br.y + (Math.random() - 0.5) * 30,
+          w: 460 * br.s, h: 150 * br.s,
+          spd: br.spd, alpha: br.a, v: i % Fx.mistBanks.length
+        });
+      }
+      // sparse rain: 22 thin streaks + up to 5 droplet ripple rings
+      for (i = 0; i < 22; i++) {
+        w.drops.push({
+          x: Math.random() * VW,
+          y: Math.random() * VH,
+          spd: 260 + Math.random() * 120,
+          len: 26 + Math.random() * 14,
+          a: 0.18 + Math.random() * 0.17
+        });
+      }
+      for (i = 0; i < 5; i++) w.ripples.push({ x: 0, y: 0, t: 0, active: false });
+      // golden-hour motes: a few warm drifting glints
+      for (i = 0; i < 8; i++) {
+        w.motes.push({
+          x: Math.random() * VW,
+          y: Math.random() * VH,
+          r: 2 + Math.random() * 2.4,
+          spd: 4 + Math.random() * 6,
+          phase: Math.random() * TAU
+        });
+      }
+    },
+
+    updateWeather: function (dt) {
+      var w = this.weather;
+      if (!w || w.mood === "clear" || reduceMotion) return;
+      var i;
+      if (w.mood === "mist") {
+        for (i = 0; i < w.banks.length; i++) {
+          var b = w.banks[i];
+          b.x += b.spd * dt;
+          if (b.spd > 0 && b.x - b.w / 2 > VW) b.x = -b.w / 2;
+          else if (b.spd < 0 && b.x + b.w / 2 < 0) b.x = VW + b.w / 2;
+        }
+      } else if (w.mood === "rain") {
+        for (i = 0; i < w.drops.length; i++) {
+          var d = w.drops[i];
+          d.y += d.spd * dt;
+          d.x -= d.spd * 0.1 * dt; // matches the streak sprite's baked slant
+          if (d.y > VH + 20) {
+            d.y = -30 - Math.random() * 60;
+            d.x = Math.random() * VW;
+          }
+        }
+        // occasional droplet ripples low in the frame
+        w.rippleT -= dt;
+        if (w.rippleT <= 0) {
+          w.rippleT = 0.55 + Math.random() * 0.9;
+          for (i = 0; i < w.ripples.length; i++) {
+            if (!w.ripples[i].active) {
+              w.ripples[i].active = true;
+              w.ripples[i].t = 0;
+              w.ripples[i].x = 30 + Math.random() * (VW - 60);
+              w.ripples[i].y = VH * (0.76 + Math.random() * 0.18);
+              break;
+            }
+          }
+        }
+        for (i = 0; i < w.ripples.length; i++) {
+          var rp = w.ripples[i];
+          if (!rp.active) continue;
+          rp.t += dt / 0.9;
+          if (rp.t >= 1) rp.active = false;
+        }
+      } else if (w.mood === "golden") {
+        for (i = 0; i < w.motes.length; i++) {
+          var m = w.motes[i];
+          m.y -= m.spd * dt;
+          m.x += Math.sin(this.time * 0.5 + m.phase) * dt * 7;
+          if (m.y < -12) { m.y = VH + 12; m.x = Math.random() * VW; }
+        }
+      }
+    },
+
+    // drawn BETWEEN the sky backdrop/far clouds and the realm rings, sky
+    // mode only — duels keep their realm tints. drawImage + math only.
+    drawWeather: function (g) {
+      var w = this.weather;
+      if (!w || w.mood === "clear") return;
+      var i;
+      if (w.mood === "mist") {
+        g.save();
+        for (i = 0; i < w.banks.length; i++) {
+          var b = w.banks[i];
+          g.globalAlpha = b.alpha; // ≤ 0.14 — never veils a label
+          g.drawImage(Fx.mistBanks[b.v], b.x - b.w / 2, b.y - b.h / 2, b.w, b.h);
+        }
+        g.restore();
+      } else if (w.mood === "rain") {
+        if (reduceMotion) {
+          // no falling motion: one faint uniform wash reads as rain-light
+          g.save();
+          g.fillStyle = RAIN_WASH;
+          g.fillRect(0, 0, VW, VH);
+          g.restore();
+          return;
+        }
+        g.save();
+        for (i = 0; i < w.drops.length; i++) {
+          var d = w.drops[i];
+          g.globalAlpha = d.a; // ≤ 0.35
+          g.drawImage(Fx.rainStreak, d.x, d.y, 10, d.len);
+        }
+        g.strokeStyle = RIPPLE_STROKE;
+        g.lineWidth = 1.5;
+        for (i = 0; i < w.ripples.length; i++) {
+          var rp = w.ripples[i];
+          if (!rp.active) continue;
+          g.globalAlpha = (1 - rp.t) * 0.3;
+          g.save();
+          g.translate(rp.x, rp.y);
+          g.scale(1, 0.45); // flattened ellipse: a droplet meeting the haze
+          g.beginPath();
+          g.arc(0, 0, 4 + rp.t * 24, 0, TAU);
+          g.restore();
+          g.stroke();
+        }
+        g.restore();
+      } else if (w.mood === "golden") {
+        g.drawImage(Fx.goldenWash, 0, 0, VW, VH);
+        g.save();
+        g.globalCompositeOperation = "lighter";
+        for (i = 0; i < w.motes.length; i++) {
+          var m = w.motes[i];
+          var tw = 0.5 + 0.5 * Math.sin(this.time * 1.3 + m.phase);
+          g.globalAlpha = 0.1 + tw * 0.18;
+          g.drawImage(Fx.dot("#ffe9c2"), m.x - m.r * 2, m.y - m.r * 2, m.r * 4, m.r * 4);
+        }
+        g.restore();
+      }
+    },
+
     updateSky: function (dt) {
       var sky = this.sky;
       if (!sky) return;
       var p = this.player;
+      this.updateWeather(dt);
       // realm-proximity tinting: the sky warms toward the nearest realm's
       // pigment (full within r*1.2, faded out by r*3); paintSky reads this
       var tint = sky.tint;
@@ -3870,6 +4172,8 @@
       this.drawClouds(g, 0.5);   // far/mid clouds behind action
 
       if (this.state === "PLAYING" || this.state === "PAUSED" || this.state === "POWER" || this.state === "DEAD" || this.state === "WIN") {
+        // ambient weather sits between the sky backdrop and the realm rings
+        if (this.mode === "sky" && this.weather) this.drawWeather(g);
         if (this.mode === "sky" && this.sky) this.drawRealms(g);
         if (this.mode === "sky" && this.galeActive) this.drawGale(g);
         if (this.dragon) this.drawDragon(g);
@@ -4936,6 +5240,7 @@
     game: Game, input: Input, art: Art, daily: Daily, save: Save, particles: Particles,
     forceWin: function () { if (Game.dragon) Game.damageDragon(9999, Game.dragon.x, Game.dragon.y); },
     forceHurt: function () { if (Game.player) { Game.player.iframes = 0; Game.hurtPlayer(99, Game.player.x, Game.player.y + 50); } },
+    forceWeather: function (mood) { Game.forceWeather(mood); },
     state: function () { return Game.state; }
   };
 })();
