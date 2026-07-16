@@ -338,25 +338,30 @@ body { position: fixed; inset: 0; }
   opacity: 0.9;
 }
 
-/* ceremonial plume selector (cycles Gary's cosmetic coat) */
-.plume-btn {
-  margin-top: 6px;
-  align-self: center;
+/* Wardrobe: the one door to plumes, regalia, and trinkets */
+.wardrobe-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 10px auto 0;
+  min-height: 44px;
+  min-width: 150px;
   appearance: none;
   cursor: pointer;
   font-family: var(--sans);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   letter-spacing: 0.06em;
-  color: #8a7940;
-  background: rgba(253, 251, 244, 0.55);
-  border: 1px solid rgba(205, 184, 120, 0.55);
+  color: #7a5f12;
+  background: rgba(253, 251, 244, 0.6);
+  border: 1px solid rgba(205, 184, 120, 0.6);
   border-radius: 999px;
-  padding: 5px 14px;
+  padding: 9px 22px;
   transition: transform 0.15s ease, background 0.15s ease;
 }
-.plume-btn:hover { transform: translateY(-1px); background: rgba(253, 251, 244, 0.85); }
-.plume-btn:focus-visible { outline: 2px solid #a8924f; outline-offset: 2px; }
+.wardrobe-btn:hover { transform: translateY(-1px); background: rgba(253, 251, 244, 0.9); }
+.wardrobe-btn:focus-visible { outline: 3px solid var(--pond-deep); outline-offset: 3px; }
 
 /* Gentle breeze assist toggle: a quiet ghost pill under the how-to list */
 .gentle-btn {
@@ -763,6 +768,202 @@ body { position: fixed; inset: 0; }
   color: var(--ink);
   opacity: 0.82;
   line-height: 1.35;
+}
+
+/* ----------------------------------------------------------- */
+/* WARDROBE (plumes / regalia / trinkets sheet)                */
+/* ----------------------------------------------------------- */
+.screen--wardrobe { background: rgba(20, 32, 52, 0.55); backdrop-filter: blur(4px); }
+
+.wardrobe-card {
+  display: flex;
+  flex-direction: column;
+  max-height: min(86vh, 760px);
+  text-align: center;
+  padding: clamp(20px, 5vw, 32px) clamp(16px, 5vw, 28px);
+}
+.wardrobe-card .overlay-title { margin-bottom: 2px; }
+.wardrobe-card .btn { flex: none; }
+
+.wardrobe-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  text-align: left;
+  margin: 8px -4px 14px;
+  padding: 0 4px 4px;
+}
+
+.wardrobe-heading {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 21px;
+  color: var(--ink);
+  margin: 16px 0 1px;
+}
+.wardrobe-heading:first-child { margin-top: 4px; }
+.wardrobe-note {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 13.5px;
+  color: #5b6674;
+  margin: 0 0 8px;
+}
+
+/* --- plume swatch grid --- */
+.wardrobe-swatches {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.plume-swatch {
+  appearance: none;
+  border: 1px solid rgba(46, 58, 72, 0.14);
+  border-radius: 14px 15px 13px 16px / 15px 13px 16px 14px;
+  background: rgba(255, 253, 247, 0.9);
+  font-family: var(--sans);
+  color: var(--ink);
+  min-height: 84px;
+  padding: 10px 6px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(20, 30, 50, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.plume-swatch:hover { transform: translateY(-1px); box-shadow: 0 5px 12px rgba(20, 30, 50, 0.14); }
+.plume-swatch:focus-visible { outline: 3px solid var(--pond-deep); outline-offset: 2px; }
+.plume-swatch.is-worn {
+  border-color: rgba(168, 146, 79, 0.9);
+  box-shadow: inset 0 0 0 2px rgba(205, 184, 120, 0.55), 0 4px 10px rgba(168, 146, 79, 0.2);
+  background: rgba(253, 248, 235, 0.96);
+}
+.plume-swatch.is-locked {
+  cursor: default;
+  background: rgba(246, 244, 240, 0.72);
+  border-style: dashed;
+  border-color: rgba(46, 58, 72, 0.18);
+  box-shadow: none;
+}
+.swatch-wash {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50% 60% 50% 60%;
+  box-shadow: inset 0 0 0 1px rgba(46, 58, 72, 0.18), 0 2px 5px rgba(20, 30, 50, 0.16);
+}
+.swatch-wash--bare {
+  background:
+    radial-gradient(circle at 38% 32%, #fffdf6, #ece4d2 78%);
+}
+.swatch-wash--locked {
+  background: radial-gradient(circle at 38% 32%, #c9cdd3, #a4abb4 80%);
+  box-shadow: inset 0 0 0 1px rgba(46, 58, 72, 0.14);
+}
+.swatch-name {
+  font-weight: 700;
+  font-size: 11.5px;
+  line-height: 1.2;
+  text-align: center;
+}
+.swatch-state {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #5b6674;
+}
+.plume-swatch.is-worn .swatch-state {
+  color: #7a5f12;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.swatch-hint {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: center;
+  color: #5b6674;
+}
+
+/* --- regalia / trinket rows --- */
+.wardrobe-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wardrobe-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 48px;
+  padding: 8px 12px;
+  border-radius: 13px;
+  background: rgba(255, 253, 247, 0.9);
+  border: 1px solid rgba(46, 58, 72, 0.12);
+}
+.wardrobe-row.is-locked {
+  background: rgba(246, 244, 240, 0.72);
+  border-style: dashed;
+  border-color: rgba(46, 58, 72, 0.18);
+}
+.wardrobe-glyph {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border-radius: 11px;
+  background: radial-gradient(circle at 38% 32%, rgba(205, 184, 120, 0.35), rgba(217, 139, 160, 0.24));
+}
+.wardrobe-glyph--locked {
+  background: rgba(46, 58, 72, 0.08);
+  color: #6d7681;
+  filter: grayscale(1);
+  font-size: 17px;
+}
+.wardrobe-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.wardrobe-name {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.wardrobe-worn {
+  display: inline-block;
+  margin-left: 8px;
+  vertical-align: 1px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7a5f12;
+  background: rgba(205, 184, 120, 0.28);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.wardrobe-desc {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ink);
+  opacity: 0.78;
+}
+.wardrobe-hint {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 13px;
+  color: #5b6674;
 }
 
 /* ----------------------------------------------------------- */
