@@ -44,6 +44,31 @@
 - **Swipe deck:** cards nearest-first, expanding outward. Drag **left = pass / right = like** (rotation + green YES / red NOPE stamps, peeking next card); also ✗/♥ buttons + ArrowLeft/ArrowRight; reduced-motion uses fades. **Tap the card to cycle story segments: Vibe → Food → Reviews.** Card overlay: name, 0–100 rating + review count, price, cuisine, distance, open-now.
 - **Decision screen** (on like): "Tonight: <name>" → Open in Maps (Directions), Call (if phone), "I ate here → Rate" (opens the rating sheet), **Save to shortlist · keep swiping**, Keep looking. **End-of-deck** screen → Compare shortlist (if any) / Widen preferences / Search farther (live) / Start over.
 
+### Visited insights — "Your month in meals" (2026-07-16)
+Display-only recap that sits between the Visited head row and the log
+(`.v-insights` section, JS-built in the visited closure, rendered on every
+`render()`):
+- **Recap card** for the current calendar month: distinct **places tried**,
+  **average overall**, and a **weeks streak** (consecutive weeks with ≥1
+  visit, Monday-start local weeks via `weekIndex`; a quiet
+  week-in-progress doesn't break it — last week anchors). **Top cuisine**
+  with a hash-tinted pigment dot, then a compact **cuisine bar row** (top
+  4 by count, watercolor-tinted CSS bars + counts). If this month is
+  empty, last month's recap shows with a "— last month" label; with
+  nothing dated this or last month (incl. the fresh demo seeds) the whole
+  section stays hidden — the tab's existing empty state handles it.
+- **All-time line** beneath: total places · total visits · most-returned-to
+  place.
+- **Dating**: `computeInsights` reads `entryDate(e)` — the rating sheet's
+  `date` field (YYYY-MM-DD) first, else a new `ts` stamp that
+  `visited.add()` now writes on every new entry (`data.ts = Date.now()`).
+  Legacy entries with neither are treated as "earlier": counted all-time,
+  absent from the month and streak. New entries also remember
+  `cuisines` from the picked place so the breakdown can group them.
+- Semantic headings/labels for screen readers, no new interactions, full
+  `html.evening` overrides; verified against hand-computed seed data
+  (recap numbers exact, last-month fallback, fresh-demo hidden case).
+
 ### Richer shortlist compare view (2026-07-16)
 The compare screen (shortlist badge / end-of-deck "Compare shortlist") is now
 a real decision tool instead of a name+meta list:
