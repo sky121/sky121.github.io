@@ -29,6 +29,15 @@
     { y0: 0.66, amp: 22, spd: 42, freq: 0.60, phase: 4.1, size: 8 },
     { y0: 0.80, amp: 30, spd: 30, freq: 0.42, phase: 1.3, size: 6 }
   ];
+  // the Fledgling Gale: a first-flight-only training gust near the spawn.
+  // Prompt strings live here pre-built (the panel draws every frame and
+  // must never build strings); `w` caches each measured text width.
+  var GALE_X = VW * 0.26, GALE_Y = VH * 0.825, GALE_R = 34;
+  var TRAINING_STEPS = [
+    { text: "drag to steer — follow the spirit", w: 0 },
+    { text: "tap to dodge through its drift-ring", w: 0 },
+    { text: "hold to charge dragonfire — warm the spirit", w: 0 }
+  ];
 
   // characters/projectiles/clouds are fully procedural now — only the
   // scale pickups still ship as PNG sprites
@@ -71,7 +80,7 @@
   // SAVE MODULE (localStorage hoard)
   // ---------------------------------------------------------
   var Save = {
-    data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "", regalia: [], trinkets: [], crowned: false, seenHints: {}, gentle: false,
+    data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "", regalia: [], trinkets: [], crowned: false, seenHints: {}, gentle: false, fledged: false,
       records: { fastestCrown: null, mostScalesRun: 0, totalDuelsWon: 0 },
       daily: null },
     load: function () {
@@ -91,6 +100,7 @@
             this.data.crowned = !!p.crowned;
             this.data.seenHints = (p.seenHints && typeof p.seenHints === "object") ? p.seenHints : {};
             this.data.gentle = !!p.gentle;
+            this.data.fledged = !!p.fledged; // older saves lack it -> false
             var rec = (p.records && typeof p.records === "object") ? p.records : {};
             this.data.records = {
               fastestCrown: (typeof rec.fastestCrown === "number") ? rec.fastestCrown : null,
