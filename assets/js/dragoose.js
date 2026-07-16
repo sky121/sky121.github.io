@@ -71,7 +71,7 @@
   // SAVE MODULE (localStorage hoard)
   // ---------------------------------------------------------
   var Save = {
-    data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "", regalia: [], crowned: false, seenHints: {}, gentle: false,
+    data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "", regalia: [], trinkets: [], crowned: false, seenHints: {}, gentle: false,
       records: { fastestCrown: null, mostScalesRun: 0, totalDuelsWon: 0 },
       daily: null },
     load: function () {
@@ -87,6 +87,7 @@
             this.data.plumes = Array.isArray(p.plumes) ? p.plumes : [];
             this.data.plume = typeof p.plume === "string" ? p.plume : "";
             this.data.regalia = Array.isArray(p.regalia) ? p.regalia : [];
+            this.data.trinkets = Array.isArray(p.trinkets) ? p.trinkets : [];
             this.data.crowned = !!p.crowned;
             this.data.seenHints = (p.seenHints && typeof p.seenHints === "object") ? p.seenHints : {};
             this.data.gentle = !!p.gentle;
@@ -131,6 +132,12 @@
     addRegalia: function (id) {
       var isNew = this.data.regalia.indexOf(id) === -1;
       if (isNew) { this.data.regalia.push(id); this.save(); }
+      return isNew;
+    },
+    hasTrinket: function (id) { return this.data.trinkets.indexOf(id) !== -1; },
+    addTrinket: function (id) {
+      var isNew = this.data.trinkets.indexOf(id) === -1;
+      if (isNew) { this.data.trinkets.push(id); this.save(); }
       return isNew;
     }
   };
@@ -1458,6 +1465,41 @@
     duskHeart: { name: "Dusk Heart", glyph: "🌙", desc: "Begin each run with your dodge granting 0.15s longer i-frames." },
     umbraGift: { name: "Umbra's Gift", glyph: "🌌", desc: "Begin each run already wielding Mirror Plume." }
   };
+  // each dragon's two relics: the common heart + the ≥N-scales gift —
+  // once BOTH are yours, repeat victories reach deeper into the hoard
+  var DRAGON_RELICS = {
+    ember: ["emberHeart", "cinderGift"],
+    storm: ["galeFeather", "stormGift"],
+    verdant: ["thistleDown", "verdantGift"],
+    gilded: ["gildedHeart", "gildedGift"],
+    umbra: ["duskHeart", "umbraGift"]
+  };
+
+  // gifts from the hoard: rarer trinkets offered on repeat victories once a
+  // dragon's relics are already yours — tiny keepsakes (cosmetic or a
+  // whisper of a perk), never a new system; granted in order, then the
+  // dragon shares scales instead
+  var TRINKETS = {
+    cinderBell: { name: "Cinder Bell", glyph: "🔔", dragon: "ember", desc: "A tiny bell of cinder-glass — realms at peace chime softly as you pass their calm rings." },
+    warmDownfeather: { name: "Warm Downfeather", glyph: "🕊️", dragon: "ember", desc: "A downfeather still warm from Ember's hearth — begin each run with one extra feather." },
+    chargedQuill: { name: "Charged Quill", glyph: "✒️", dragon: "storm", desc: "A quill that never quite stopped storming — your dragonfire leaves a faint trail of sparks." },
+    weathervane: { name: "Weathervane", glyph: "🧭", dragon: "storm", desc: "A weathervane no bigger than a thumbnail — an unbowed realm's ring glints when you face it." },
+    pressedMeadowsweet: { name: "Pressed Meadowsweet", glyph: "🌸", dragon: "verdant", desc: "A sprig of meadowsweet pressed flat under one wing — petals drift loose in the open sky." },
+    dewdropPhial: { name: "Dewdrop Phial", glyph: "💧", dragon: "verdant", desc: "A dewdrop kept cool in glass — preening between duels restores one extra feather." },
+    luckyCoin: { name: "Aurelia's Lucky Coin", glyph: "🌟", dragon: "gilded", desc: "A small coin tucked beneath one wing — now and then it catches the sun in the open sky." },
+    burnishedPinfeather: { name: "Burnished Pinfeather", glyph: "🏵️", dragon: "gilded", desc: "A pinfeather burnished to a mirror shine — lustrous scales gleam one scale brighter." },
+    duskMoth: { name: "Dusk Moth", glyph: "🦋", dragon: "umbra", desc: "A pale moth that mistook you for the moon — it keeps you company in the open sky." },
+    hushBead: { name: "Hush Bead", glyph: "📿", dragon: "umbra", desc: "A bead of bottled dusk — your dodge holds its hush a breath longer." }
+  };
+  // grant order per dragon: first repeat victory → first trinket, second →
+  // second, later wins bank +2 bonus scales instead
+  var DRAGON_TRINKETS = {
+    ember: ["cinderBell", "warmDownfeather"],
+    storm: ["chargedQuill", "weathervane"],
+    verdant: ["pressedMeadowsweet", "dewdropPhial"],
+    gilded: ["luckyCoin", "burnishedPinfeather"],
+    umbra: ["duskMoth", "hushBead"]
+  };
 
   // ceremonial-duel trophies: cosmetic washes for Gary's coat (no power)
   var PLUMES = {
@@ -1512,6 +1554,7 @@
     player: null,
     dragon: null,
     daily: null,              // Daily Flight state {date, route, idx, mod} or null
+    tk: null,                 // cached owned-trinket flags (refreshTrinkets)
     scaleProgress: 0,         // scales collected this run
     nextPowerAt: 3,           // scales needed for next power
     powers: {},               // active power flags
@@ -1711,6 +1754,9 @@
           var gn = d.regalia.map(function (id) { return REGALIA[id] ? REGALIA[id].glyph + " " + REGALIA[id].name : id; });
           parts.push("Regalia: " + gn.join(", "));
         }
+        if (d.trinkets && d.trinkets.length > 0) {
+          parts.push(d.trinkets.length + " trinket" + (d.trinkets.length === 1 ? "" : "s") + " treasured");
+        }
         if (d.crowned) parts.push("👑 Crowned — Dragoose, Ruler of the Skies");
         // quiet lifetime records line beneath the hoard
         var recEl = $("hoard-records");
@@ -1788,6 +1834,8 @@
 
       var startHealth = 4;
       if (Save.hasRelic("emberHeart")) startHealth = 5;
+      // TRINKET: warm downfeather — one extra feather, kept warm since Ember's hearth
+      if (Save.hasTrinket("warmDownfeather")) startHealth += 1;
       if (Save.data.gentle) startHealth += 1; // gentle breeze assist
 
       this.player = {
@@ -1807,6 +1855,7 @@
       if (Save.hasRelic("verdantGift")) { this.powers.split = true; }
       if (Save.hasRelic("gildedGift")) { this.powers.velocity = true; }
       if (Save.hasRelic("umbraGift")) { this.powers.reflect = true; }
+      this.refreshTrinkets(); // cache trinket flags for the hot loops
       this.renderPowers();
       this.decoy = null; // Dusk Cowl shadow decoy (fresh run, no ghosts)
 
@@ -1873,6 +1922,7 @@
           x: spots[i].x, y: spots[i].y, r: 80,
           pal: pals[t] || pals.ember,
           defeated: false,
+          bellRung: false, // Cinder Bell: has this calm ring chimed this pass?
           routeIdx: -1, routeLabel: "",
           phase: Math.random() * TAU
         });
@@ -1911,6 +1961,42 @@
         if (tk > tint.k) {
           tint.k = tk; tint.color = trm.pal.a;
           tint.x = trm.x; tint.y = trm.y;
+        }
+      }
+      // TRINKET: cinder bell — realms at peace chime softly as you pass
+      // their calm rings (re-armed once you drift away again)
+      if (this.tk && this.tk.bell) {
+        for (var bi = 0; bi < sky.realms.length; bi++) {
+          var brm = sky.realms[bi];
+          if (!brm.defeated) continue;
+          var bdx = p.x - brm.x, bdy = p.y - brm.y;
+          var bd2 = bdx * bdx + bdy * bdy;
+          if (bd2 < (brm.r * 1.3) * (brm.r * 1.3)) {
+            if (!brm.bellRung) {
+              brm.bellRung = true;
+              Audio2.tone(1046.5, 0.7, "sine", 0.055, 980);
+              Audio2.tone(1568, 0.4, "sine", 0.022, 1500);
+              Particles.ring(brm.x, brm.y, PAL.gold, brm.r * 0.8, 90, 0.7, 2);
+            }
+          } else if (bd2 > (brm.r * 1.7) * (brm.r * 1.7)) {
+            brm.bellRung = false;
+          }
+        }
+      }
+      // TRINKETS: quiet keepsakes that show only in the open sky
+      if (this.tk && !reduceMotion) {
+        if (this.tk.petal && Math.random() < dt * 2.2) {
+          Particles.spawn(p.x + (Math.random() - 0.5) * 46, p.y + (Math.random() - 0.5) * 30,
+            (Math.random() - 0.5) * 30, 26 + Math.random() * 20, 3.5, 0.75, 1.4, PAL.sage, 0.42, 0.985);
+        }
+        if (this.tk.coin && Math.random() < dt * 0.8) {
+          Particles.glow(p.x + (Math.random() - 0.5) * 30, p.y + (Math.random() - 0.5) * 24,
+            0, -8, 7, 1.4, 0.5, PAL.gold, 0.75, 0.94);
+        }
+        if (this.tk.moth && Math.random() < dt * 8) {
+          var ma2 = this.time * 2.6;
+          Particles.glow(p.x + Math.cos(ma2) * 44, p.y - 20 + Math.sin(ma2 * 1.7) * 18,
+            0, 0, 4, 0.9, 0.3, PAL.wisteria, 0.6, 0.9);
         }
       }
       if (sky.grace > 0) { sky.grace -= dt; return; }
@@ -1985,7 +2071,8 @@
       this.dragon = null;
       PlayerShots.clear(); DragonShots.clear(); Pickups.clear();
       // a breather between duels: preen two feathers back
-      p.health = Math.min(p.maxHealth, p.health + 2);
+      // (TRINKET: dewdrop phial — one extra feather with the preen)
+      p.health = Math.min(p.maxHealth, p.health + (Save.hasTrinket("dewdropPhial") ? 3 : 2));
       p.x = VW / 2; p.y = VH * 0.82; p.vx = 0; p.vy = 0;
       p.iframes = 1.0;
       if (this.sky) this.sky.grace = 0.9;
@@ -2046,6 +2133,20 @@
     continueFromWin: function () {
       if (this.winIsFinal) this.toTitle();
       else this.returnToSky();
+    },
+
+    // cache owned-trinket flags so the per-frame paths (shots, sky ambience,
+    // realm draw) never call indexOf — refreshed at run start and when a
+    // hoard gift is granted mid-run
+    refreshTrinkets: function () {
+      this.tk = {
+        bell: Save.hasTrinket("cinderBell"),
+        quill: Save.hasTrinket("chargedQuill"),
+        vane: Save.hasTrinket("weathervane"),
+        petal: Save.hasTrinket("pressedMeadowsweet"),
+        coin: Save.hasTrinket("luckyCoin"),
+        moth: Save.hasTrinket("duskMoth")
+      };
     },
 
     // swap the win screen's kicker/title (crowning vs an ordinary bow)
@@ -2408,6 +2509,8 @@
       p.dashTime = 0.18;
       // RELIC: dusk heart — the dodge grants 0.15s longer i-frames
       p.iframes = Save.hasRelic("duskHeart") ? 0.57 : 0.42;
+      // TRINKET: hush bead — the hush lasts a breath longer
+      if (Save.hasTrinket("hushBead")) p.iframes += 0.05;
       // RELIC: gale feather — dodge recovers in half the time
       p.dodgeCd = Save.hasRelic("galeFeather") ? 0.3 : 0.6;
       // DAILY: Thin Air — the dodge rests a touch longer
@@ -3045,6 +3148,10 @@
         if (s.kind === "fire" && Math.random() < dt * 10) {
           Particles.spark(s.x, s.y, s.rot + Math.PI + (Math.random() - 0.5) * 0.9, 120 + Math.random() * 120, PAL.gold, 0.3, 1.8);
         }
+        // TRINKET: charged quill — a faint storm-blue spark trail (cosmetic)
+        if (self.tk && self.tk.quill && Math.random() < dt * 9) {
+          Particles.spark(s.x, s.y, s.rot + Math.PI + (Math.random() - 0.5) * 1.2, 80 + Math.random() * 100, "#bfe3ff", 0.26, 1.5);
+        }
         if (s.life <= 0 || s.x < -40 || s.x > VW + 40 || s.y < -40 || s.y > VH + 40) { s.active = false; return; }
         // hit dragon (a veiled dragon is dusk itself — shots pass through)
         if (d && d.state !== "bow" && !d.veiled) {
@@ -3231,6 +3338,8 @@
     collectScale: function (s) {
       // lustrous scales bank 3; the gilded crest doubles AFTER the rare bonus
       var worth = s.rare ? 3 : 1;
+      // TRINKET: burnished pinfeather — lustrous scales gleam one brighter
+      if (s.rare && Save.hasTrinket("burnishedPinfeather")) worth += 1;
       if (Save.hasRegalia("gildedCrest") && this.player.health === this.player.maxHealth) worth *= 2;
       // DAILY: Brittle Scales — every scale banks double
       if (this.dailyMod("brittle")) worth *= 2;
@@ -3385,8 +3494,28 @@
       else if (d.type === "verdant") relicId = this.scaleProgress >= 16 ? "verdantGift" : "thistleDown";
       else if (d.type === "storm") relicId = this.scaleProgress >= 12 ? "stormGift" : "galeFeather";
       else relicId = this.scaleProgress >= 8 ? "cinderGift" : "emberHeart";
+
+      // GIFTS FROM THE HOARD: when BOTH of this dragon's relics are already
+      // yours, it reaches deeper on a repeat victory — first its two
+      // trinkets in order, then +2 bonus scales once the hoard runs dry.
+      // Normal runs only: the Daily Flight keeps its own reward path.
+      var giftTrinketId = null, giftScales = 0;
+      var pair = DRAGON_RELICS[d.type];
+      if (!this.daily && pair && Save.hasRelic(pair[0]) && Save.hasRelic(pair[1])) {
+        var ladder = DRAGON_TRINKETS[d.type];
+        if (!Save.hasTrinket(ladder[0])) giftTrinketId = ladder[0];
+        else if (!Save.hasTrinket(ladder[1])) giftTrinketId = ladder[1];
+        else giftScales = 2;
+        if (giftTrinketId) {
+          Save.addTrinket(giftTrinketId);
+          this.refreshTrinkets(); // a keepsake starts working the moment it's yours
+        } else {
+          Save.addScales(giftScales);
+        }
+      }
+
       var hadBefore = Save.hasRelic(relicId);
-      Save.addRelic(relicId);
+      Save.addRelic(relicId); // dedupes an owned relic; still counts the win
 
       // mark this realm at peace
       var remaining = 0;
@@ -3459,10 +3588,23 @@
             ds.hidden = true;
           }
         }
-        $("relic-grant").innerHTML =
-          '<span class="relic-glyph">' + R.glyph + '</span>' +
-          '<span><span class="relic-text-name">' + (hadBefore ? "Relic strengthened: " : "Relic gained: ") + R.name + '</span>' +
-          '<br><span class="relic-text-desc">' + R.desc + '</span></span>';
+        if (giftTrinketId && TRINKETS[giftTrinketId]) {
+          var T = TRINKETS[giftTrinketId];
+          $("relic-grant").innerHTML =
+            '<span class="relic-glyph">' + T.glyph + '</span>' +
+            '<span><span class="relic-text-name">Gift from the hoard: ' + T.name + '</span>' +
+            '<br><span class="relic-text-desc">' + T.desc + '</span></span>';
+        } else if (giftScales > 0) {
+          $("relic-grant").innerHTML =
+            '<span class="relic-glyph">🪙</span>' +
+            '<span><span class="relic-text-name">Gift from the hoard: +' + giftScales + ' scales</span>' +
+            '<br><span class="relic-text-desc">Its hoard has nothing new — it shares scales instead.</span></span>';
+        } else {
+          $("relic-grant").innerHTML =
+            '<span class="relic-glyph">' + R.glyph + '</span>' +
+            '<span><span class="relic-text-name">' + (hadBefore ? "Relic strengthened: " : "Relic gained: ") + R.name + '</span>' +
+            '<br><span class="relic-text-desc">' + R.desc + '</span></span>';
+        }
         $("btn-continue").textContent = isFinal ? "Onward" : "Return to the sky";
         $("win-stats").textContent = self.fmtRunStats();
         self.showScreen("win");
@@ -4157,6 +4299,19 @@
               7 + m2 * 2, "#fff7e0", 0.5, true);
           }
           g.restore();
+
+          // TRINKET: weathervane — an unbowed realm's ring glints when Gary
+          // is facing it (in a daily, only the route's next stop answers)
+          if (this.tk && this.tk.vane && this.player &&
+              (!this.daily || rm.routeIdx === this.daily.idx)) {
+            var va = Math.atan2(y - this.player.y, x - this.player.x);
+            var vd = ((va - this.player.facing + Math.PI) % TAU + TAU) % TAU - Math.PI;
+            if (vd < 0.3 && vd > -0.3) {
+              var vp = reduceMotion ? 1 : 0.7 + Math.sin(t * 6 + rm.phase) * 0.3;
+              Fx.drawDot(g, x, y - rm.r * 0.82, 9 * vp + 4, "#fff7e0", 0.85, true);
+              Fx.drawDot(g, x, y - rm.r * 0.82, 3.5, "#ffffff", 0.9, true);
+            }
+          }
         }
 
         // realm label
@@ -4495,7 +4650,7 @@
 
   // expose minimal hooks for automated testing (no globals leaked otherwise)
   window.__dragoose = {
-    game: Game, input: Input, art: Art, daily: Daily,
+    game: Game, input: Input, art: Art, daily: Daily, save: Save, particles: Particles,
     forceWin: function () { if (Game.dragon) Game.damageDragon(9999, Game.dragon.x, Game.dragon.y); },
     forceHurt: function () { if (Game.player) { Game.player.iframes = 0; Game.hurtPlayer(99, Game.player.x, Game.player.y + 50); } },
     state: function () { return Game.state; }
