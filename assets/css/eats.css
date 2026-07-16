@@ -2358,6 +2358,117 @@ html.evening .friend-chip.is-active { color: #1c212c; background: var(--pond); b
 }
 .friend-foot .v-demo-tag { margin-top: 0; }
 
+/* ---------- Friends: taste match + detail header + share nudge ---------- */
+
+/* match pill on feed cards ("48% taste match · 2 shared spots") */
+.friend-match {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+  background: var(--chip-bg);
+  border: 1px solid rgba(74, 114, 153, 0.3);
+  border-radius: 999px;
+  padding: 0.16rem 0.6rem;
+  white-space: nowrap;
+}
+html.evening .friend-match { border-color: rgba(159, 194, 224, 0.32); }
+.friend-match-pct { font-weight: 500; color: var(--pond-ink); }
+/* no overlap yet — a quiet aside, not a number */
+.friend-match--none {
+  background: transparent;
+  border: 0;
+  padding: 0.16rem 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.86rem;
+  white-space: normal;
+}
+
+/* detail header card (shown when the list is filtered to one friend) */
+.friend-detail { grid-column: 1 / -1; padding: 1.1rem 1.2rem; }
+.friend-detail-head { display: flex; align-items: center; gap: 0.8rem; }
+.friend-detail .friend-avatar { width: 3.2rem; height: 3.2rem; font-size: 1.55rem; }
+.friend-detail-name {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.35rem;
+  line-height: 1.15;
+  color: var(--ink);
+}
+.friend-detail .friend-match { margin-top: 0.3rem; }
+
+/* watercolor match ring — soft track + pigment arc swept to the % */
+.match-ring { flex: none; width: 54px; height: 54px; margin-left: auto; }
+.match-ring-track { fill: none; stroke: var(--card-line); stroke-width: 5; }
+.match-ring-arc {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-opacity: 0.85;
+  filter: saturate(1.05);
+}
+.match-ring--rose .match-ring-arc { stroke: var(--rose); }
+.match-ring--pond .match-ring-arc { stroke: var(--pond-deep); }
+.match-ring--wisteria .match-ring-arc { stroke: var(--wisteria); }
+.match-ring--sage .match-ring-arc { stroke: var(--sage); }
+.match-ring--gold .match-ring-arc { stroke: var(--gold); }
+html.evening .match-ring--pond .match-ring-arc { stroke: var(--pond); }
+.match-ring-num {
+  fill: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+/* "You both loved" strip — places you both scored 80+ */
+.both-loved { margin-top: 1rem; padding-top: 0.85rem; border-top: 1px dashed var(--card-line); }
+.both-loved-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.02rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.55rem;
+}
+.both-loved-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.loved-chip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  padding: 0.42rem 0.75rem;
+  border-radius: 12px;
+  background:
+    radial-gradient(120% 160% at 20% 0%, rgba(217, 139, 160, 0.14) 0%, rgba(217, 139, 160, 0) 65%),
+    radial-gradient(140% 180% at 100% 100%, rgba(205, 184, 120, 0.12) 0%, rgba(205, 184, 120, 0) 60%),
+    var(--card-bg);
+  border: 1px solid rgba(217, 139, 160, 0.38);
+}
+html.evening .loved-chip { border-color: rgba(217, 139, 160, 0.34); }
+.loved-place {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 0.98rem;
+  color: var(--ink);
+}
+.loved-scores { font-size: 0.72rem; letter-spacing: 0.06em; color: var(--ink-soft); }
+
+/* quiet nudge beneath the friends list */
+.friends-cta { margin: 1.8rem auto 0.4rem; text-align: center; }
+.friends-cta-line {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.08rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.6rem;
+}
+.friends-cta-btn { min-height: 44px; }
+
 /* ---------- Popular tab ---------- */
 
 .popular-head { margin-bottom: 1.4rem; }
