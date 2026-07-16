@@ -990,8 +990,10 @@ html.evening .pref-chip.is-any.is-on, html.evening .seg-btn.is-any.is-on { color
 .deck {
   position: relative;
   width: 100%;
-  /* tall enough for the scatter, fits above the thumb-zone controls */
-  height: min(64vh, 31.5rem);
+  /* tall enough for the scatter, fits above the thumb-zone controls
+     (trimmed when the peek strip landed so it clears the tab bar; the
+     trio centers itself, so the scatter just re-centers in the box) */
+  height: min(60vh, 28.5rem);
   margin: 0 auto;
 }
 
@@ -1032,12 +1034,13 @@ html.evening .swipe-card { box-shadow: 0 18px 42px -20px rgba(0,0,0,0.75), inset
 
 /* ----- deal-in: fresh deck cards rise from the table and settle -----
    Staggered per depth via inline animation-delay (bottom card first);
-   the springy bezier gives a soft overshoot before the card rests. */
+   the springy bezier gives a soft overshoot before the card rests
+   (overshoot tuned down from 1.26 → 1.16 for a gentler landing). */
 .swipe-card.is-dealing {
-  animation: card-deal-in 0.62s cubic-bezier(0.3, 1.26, 0.42, 1) both;
+  animation: card-deal-in 0.66s cubic-bezier(0.3, 1.16, 0.4, 1) both;
 }
 @keyframes card-deal-in {
-  from { opacity: 0; transform: translateY(46px) rotate(2.8deg) scale(0.965); }
+  from { opacity: 0; transform: translateY(42px) rotate(2.4deg) scale(0.968); }
   to   { opacity: 1; transform: var(--settle, none); }
 }
 @keyframes card-fade-in {
@@ -1186,12 +1189,14 @@ html.evening .trio-block { border-color: rgba(233, 227, 211, 0.25); }
   from { opacity: 0.05; transform: translateY(14px) scale(0.94) rotate(var(--tilt, 0deg)); }
   to { opacity: 1; transform: rotate(var(--tilt, 0deg)); }
 }
-/* shorter phones: tighten the scatter so it never crowds the controls */
+/* shorter phones: tighten the scatter so it never crowds the controls;
+   the "coming up" peek strip bows out entirely — the controls always win */
 @media (max-height: 780px) {
   .trio { gap: 0.6rem 0.6rem; padding-top: 1.35rem; }
   .trio-block { flex-basis: 43%; }
   .trio-block:nth-child(2) { margin-top: 0.8rem; }
   .trio-block:nth-child(3) { flex-basis: 54%; margin-right: 10%; }
+  .peek-strip { display: none; }
 }
 /* category tag chip, top-left of every block */
 .trio-tag {
@@ -1456,6 +1461,63 @@ html.evening .card-review { background: rgba(43,49,64,0.92); }
   font-style: italic;
   font-size: 1.1rem;
   color: var(--ink-soft);
+}
+
+/* ----- "coming up" peek strip — display-only preview of the next cards -----
+   Tiny circular watercolor thumbs (JS paints panelArt pigment, or the food
+   photo when one exists) with the distance in tiny type below each. Strictly
+   decorative: aria-hidden in JS, no handlers, pointer-events none here. */
+.peek-strip {
+  margin: 0.1rem auto 0;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.peek-strip[hidden] { display: none; }
+.peek-label {
+  font-size: 0.58rem;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 0.25rem;
+}
+.peek-row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 1.15rem;
+}
+.peek-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+.peek-thumb {
+  width: 2.05rem;
+  height: 2.05rem;
+  border-radius: 50%;
+  border: 2px solid rgba(251, 247, 238, 0.95);
+  box-shadow: 0 8px 16px -9px rgba(46, 58, 72, 0.55);
+  background: #4d5a74; /* JS paints panelArt pigment / photo over this */
+}
+html.evening .peek-thumb { border-color: rgba(233, 227, 211, 0.25); }
+.peek-dist {
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+/* fresh-deal ripple: thumbs pop in one after another once the top card
+   lands (JS sets the stagger via inline animation-delay and skips the
+   class entirely under prefers-reduced-motion) */
+.peek-item.is-rippling {
+  animation: peek-ripple 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+@keyframes peek-ripple {
+  from { opacity: 0; transform: translateY(8px) scale(0.75); }
+  to   { opacity: 1; transform: none; }
 }
 
 /* ----- decision buttons (✗ ♥) in the thumb zone ----- */
@@ -3065,6 +3127,8 @@ html.evening .eats-toast-act:hover { color: var(--pond-ink); background: rgba(12
   .swipe-card.is-gone { transition: opacity 0.2s ease; transform: none !important; }
   /* deal-in becomes a simple staggered fade */
   .swipe-card.is-dealing { animation: card-fade-in 0.22s ease both; }
+  /* peek thumbs appear instantly, no ripple (JS also skips the stagger) */
+  .peek-item.is-rippling { animation: none; }
   /* segment swap: plain quick crossfade, no zoom */
   .card-seg-panel { transition: opacity 0.15s ease; transform: none; }
   .card-seg-panel.is-active { transform: none; }
