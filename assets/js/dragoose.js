@@ -77,6 +77,16 @@
   };
   var hud = $("hud");
   var bloomWipe = $("bloom-wipe");
+  // a spent wipe must not keep its animation end-state: fill-mode "both"
+  // leaves transform scale(2.2) behind, handing the overflow-hidden game
+  // root ~234px of phantom scroll room that any programmatic focus or
+  // scroll-into-view can grab (shifting the whole letterboxed layout).
+  // The moment the animation finishes, return the element to its dormant
+  // no-transform state.
+  bloomWipe.addEventListener("animationend", function () {
+    bloomWipe.classList.remove("is-wiping");
+    bloomWipe.classList.remove("is-golden");
+  });
 
   var reduceMotion = false;
   try { reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
@@ -1734,6 +1744,7 @@
       $("btn-resume").addEventListener("click", function () { Game.togglePause(); });
       // retries keep the mode you were flying (a daily retry is still the daily)
       $("btn-restart-pause").addEventListener("click", function () { Game.startRun(!!Game.daily); });
+      $("btn-quit-title").addEventListener("click", function () { Game.quitToTitlePressed(); });
       $("btn-retry").addEventListener("click", function () { Game.startRun(!!Game.daily); });
       $("btn-continue").addEventListener("click", function () { Game.continueFromWin(); });
       $("wardrobe-btn").addEventListener("click", function () { Game.openWardrobe(); });
@@ -2865,12 +2876,74 @@
     togglePause: function (force) {
       if (this.state === "PLAYING") {
         this.state = "PAUSED";
+        this.renderPauseSummary();
+        this.disarmQuit();
         this.showScreen("pause");
         Audio2.chargeStop();
       } else if (this.state === "PAUSED" && !force) {
         this.state = "PLAYING";
+        this.disarmQuit();
         this.showScreen(null);
       }
+    },
+
+    // the pause card's quiet scoreboard: realms bowed + scales gathered
+    // this run, plus the day's wind when this is a Daily Flight
+    renderPauseSummary: function () {
+      var el = $("pause-summary");
+      if (el) {
+        var bowed = 0, total = 5;
+        if (this.sky && this.sky.realms.length) {
+          total = this.sky.realms.length;
+          for (var i = 0; i < total; i++) {
+            if (this.sky.realms[i].defeated) bowed++;
+          }
+        }
+        el.textContent = bowed + " of " + total + " realms bowed · " +
+          this.scaleProgress + " scale" + (this.scaleProgress === 1 ? "" : "s") + " gathered";
+      }
+      var dl = $("pause-daily");
+      if (dl) {
+        dl.hidden = !this.daily;
+        if (this.daily) dl.textContent = "Daily Flight · " + this.daily.mod.name;
+      }
+    },
+
+    // ----- RETURN TO TITLE (two-tap confirm on the pause card) -----
+    quitArmed: false,
+    quitTimer: null,
+    quitToTitlePressed: function () {
+      if (!this.quitArmed) {
+        // first tap arms the confirm; it disarms itself after a breath
+        this.quitArmed = true;
+        var b = $("btn-quit-title");
+        if (b) { b.textContent = "sure? the run will fade"; b.classList.add("is-armed"); }
+        var self = this;
+        this.quitTimer = setTimeout(function () { self.disarmQuit(); }, 3000);
+        Audio2.tone(330, 0.1, "sine", 0.05, 260);
+        return;
+      }
+      this.quitToTitle();
+    },
+    disarmQuit: function () {
+      if (this.quitTimer) { clearTimeout(this.quitTimer); this.quitTimer = null; }
+      this.quitArmed = false;
+      var b = $("btn-quit-title");
+      if (b) { b.textContent = "Return to title"; b.classList.remove("is-armed"); }
+    },
+    quitToTitle: function () {
+      this.disarmQuit();
+      // scales already banked per-duel (dragonDefeated) — nothing to save
+      // here except a Daily's attempt depth, recorded exactly like a fall
+      // (recordDaily never overwrites a better result)
+      if (this.daily) this.recordDaily(false);
+      this.daily = null;
+      this.dragon = null;
+      this.mode = "sky";
+      PlayerShots.clear(); DragonShots.clear(); Pickups.clear();
+      Audio2.chargeStop();
+      this.toTitle();
+      this.wipe();
     },
 
     // ----- WIPE TRANSITION -----

@@ -700,6 +700,22 @@ body { position: fixed; inset: 0; }
 .screen--dead .btn,
 .screen--win .btn { display: flex; }
 
+/* pause card: the Daily Flight's wind, a quiet gold whisper
+   (full opacity — #7a5f12 on the paper card keeps AA contrast) */
+.pause-daily { color: #7a5f12; opacity: 1; }
+
+/* return-to-title: the armed "are you sure" breath (gentle, rose-washed) */
+.btn--quit.is-armed {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 17px;
+  letter-spacing: 0.01em;
+  color: #8c3a52;
+  background: rgba(217, 139, 160, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(217, 139, 160, 0.55), 0 4px 12px rgba(30, 45, 70, 0.1);
+}
+
 /* Daily Flight shareable result line on the crowning screen */
 .daily-share {
   margin: -4px auto 14px;
