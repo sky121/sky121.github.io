@@ -1815,57 +1815,130 @@ html.evening .shortlist-badge { color: #7ed49a; background: rgba(69, 168, 102, 0
   color: var(--ink-soft);
   margin: 0.3rem 0 1.1rem;
 }
-.shortlist-list { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.1rem; }
-.sl-item {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
+.shortlist-list { display: flex; flex-direction: column; gap: 0.7rem; margin-bottom: 1rem; }
+
+/* --- compare cards (JS-built in buildCompareCard) --- */
+.slc {
   text-align: left;
   border: 1px solid var(--card-line);
-  border-radius: 14px;
-  padding: 0.7rem 0.8rem;
+  border-radius: 16px;
+  padding: 0.75rem 0.8rem 0.8rem;
   background: rgba(251, 247, 238, 0.5);
+  transition: transform 0.3s cubic-bezier(0.22,1,0.36,1), box-shadow 0.3s ease,
+              border-color 0.2s ease, background-color 0.2s ease;
 }
-html.evening .sl-item { background: rgba(233, 227, 211, 0.05); }
-.sl-body { flex: 1 1 auto; min-width: 0; }
-.sl-name {
+html.evening .slc { background: rgba(233, 227, 211, 0.05); }
+.slc-main { display: flex; gap: 0.75rem; align-items: flex-start; }
+.slc-thumb {
+  flex: 0 0 auto;
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 12px;
+  border: 1px solid var(--card-line);
+}
+.slc-body { flex: 1 1 auto; min-width: 0; }
+.slc-head { display: flex; align-items: baseline; gap: 0.5rem; }
+.slc-name {
+  flex: 1 1 auto;
+  min-width: 0;
   font-family: var(--font-display);
   font-weight: 500;
-  font-size: 1.1rem;
+  font-size: 1.12rem;
   color: var(--ink);
   line-height: 1.2;
 }
-.sl-meta { font-size: 0.8rem; color: var(--ink-soft); margin-top: 0.15rem; }
-.sl-acts { display: flex; align-items: center; gap: 0.4rem; flex: 0 0 auto; }
-.sl-pick {
+.slc-open {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: #2e6f45;
+  background: rgba(69, 168, 102, 0.12);
+  border: 1px solid rgba(69, 168, 102, 0.4);
+  border-radius: 999px;
+  padding: 0.14rem 0.5rem;
+}
+.slc-open.is-closed { color: #a83c55; background: rgba(216, 96, 122, 0.1); border-color: rgba(216, 96, 122, 0.4); }
+html.evening .slc-open { color: #7ed49a; background: rgba(69, 168, 102, 0.16); border-color: rgba(126, 212, 154, 0.4); }
+html.evening .slc-open.is-closed { color: #f0a9ba; background: rgba(216, 96, 122, 0.16); border-color: rgba(216, 96, 122, 0.45); }
+/* fixed fact slots — score+spark / price+cuisine / distance+travel */
+.slc-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-top: 0.25rem; }
+.slc-row .pop-spark { margin: 0; flex: 0 0 auto; }
+.slc-score { font-size: 0.86rem; color: var(--ink); min-width: 0; }
+.slc-star { color: #8a6d24; font-weight: 500; }
+html.evening .slc-star { color: #d9c17a; }
+.slc-fact {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin-top: 0.18rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slc-you {
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: #8a7940;
+  margin-top: 0.22rem;
+}
+html.evening .slc-you { color: #d9c98f; }
+.slc-acts { display: flex; gap: 0.5rem; margin-top: 0.65rem; }
+.slc-choose {
+  flex: 1 1 auto;
   appearance: none;
   cursor: pointer;
+  min-height: 44px;
   font-family: var(--font-body);
-  font-size: 0.8rem;
   font-weight: 500;
+  font-size: 0.82rem;
   letter-spacing: 0.04em;
   color: var(--paper);
   background: linear-gradient(135deg, #45a866, #367f4f);
   border: 0;
   border-radius: 999px;
-  padding: 0.45rem 0.9rem;
+  padding: 0.55rem 1rem;
   transition: transform 0.15s ease, filter 0.15s ease;
 }
-.sl-pick:hover { transform: translateY(-1px); filter: brightness(1.06); }
-.sl-pick:focus-visible, .sl-remove:focus-visible, .shortlist-back:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
-.sl-remove {
+.slc-choose:hover { transform: translateY(-1px); filter: brightness(1.06); }
+.slc-remove {
+  flex: 0 0 auto;
   appearance: none;
   cursor: pointer;
-  width: 1.9rem;
-  height: 1.9rem;
-  border-radius: 50%;
-  border: 1px solid var(--card-line);
-  background: transparent;
+  min-height: 44px;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
   color: var(--ink-soft);
-  font-size: 1.05rem;
-  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--card-line);
+  border-radius: 999px;
+  padding: 0.55rem 0.95rem;
 }
-.sl-remove:hover { color: #d8607a; border-color: #d8607a; }
+.slc-remove:hover { color: #d8607a; border-color: #d8607a; }
+.slc-choose:focus-visible, .slc-remove:focus-visible, .shortlist-back:focus-visible,
+.shortlist-pickme:focus-visible, .shortlist-share:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
+
+/* "Pick for me" — the roulette spotlight hop + winner lift/glow */
+.shortlist-pickme { display: block; width: 100%; max-width: 20rem; margin: 0 auto 0.6rem; }
+.slc.is-spot {
+  border-color: var(--pond-deep);
+  background: rgba(127, 168, 201, 0.16);
+  box-shadow: 0 0 0 2px rgba(74, 114, 153, 0.35);
+}
+html.evening .slc.is-spot { background: rgba(127, 168, 201, 0.12); }
+.slc.is-winner {
+  border-color: var(--gold);
+  background: rgba(205, 184, 120, 0.16);
+  transform: translateY(-3px) scale(1.015);
+  box-shadow: 0 0 0 2px rgba(205, 184, 120, 0.55), 0 16px 32px -14px rgba(205, 184, 120, 0.8);
+}
+html.evening .slc.is-winner { background: rgba(205, 184, 120, 0.12); }
+/* mid-shuffle the controls go quiet (JS guards the keyboard path) */
+.shortlist.is-picking .slc-acts,
+.shortlist.is-picking .shortlist-pickme,
+.shortlist.is-picking .shortlist-share,
+.shortlist.is-picking .shortlist-back { pointer-events: none; opacity: 0.55; }
 
 /* ---------- Visited tab ---------- */
 
@@ -2681,6 +2754,59 @@ html.evening .btn-solid { color: #1c212c; }
 .settings-msg.is-ok { color: var(--sage); }
 html.evening .settings-msg.is-ok { color: #b6d3af; }
 
+/* ---------- Transient toast (paper pill above the tab bar) ---------- */
+.eats-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(6.2rem + env(safe-area-inset-bottom, 0));
+  z-index: 260;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: min(92vw, 24rem);
+  padding: 0.55rem 1rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-line);
+  border-radius: 999px;
+  box-shadow: 0 12px 30px -14px rgba(46, 58, 72, 0.55);
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  color: var(--ink);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(8px);
+  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s;
+}
+.eats-toast.is-show {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+html.evening .eats-toast { box-shadow: 0 12px 30px -14px rgba(0, 0, 0, 0.7); }
+.eats-toast-msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.eats-toast-act {
+  flex: 0 0 auto;
+  appearance: none;
+  cursor: pointer;
+  min-height: 44px;
+  padding: 0.3rem 0.9rem;
+  margin: -0.35rem -0.5rem -0.35rem 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pond-ink);
+}
+.eats-toast-act:hover { color: var(--pond-deep); background: rgba(127, 168, 201, 0.16); }
+html.evening .eats-toast-act:hover { color: var(--pond-ink); background: rgba(127, 168, 201, 0.14); }
+.eats-toast-act:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
+
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   .find-orb, .find-orb-pool, .find-orb-sheen, .find-orb::before,
@@ -2695,10 +2821,13 @@ html.evening .settings-msg.is-ok { color: #b6d3af; }
   .bloom-drop, .roulette-card, .roulette-spark, .roulette-name.is-tick,
   .empty-steam, .pop-rank.is-blooming,
   .trio-block.is-turn, .trio-vibe::before, .trio-food::before,
-  .pref-group.is-step {
+  .pref-group.is-step,
+  .slc, .slc-choose, .eats-toast {
     transition: none;
     animation: none;
   }
+  /* the winner still reads chosen, just without the lift */
+  .slc.is-winner { transform: none; }
   .social-enter { animation: none; opacity: 1; }
   /* swap fling/rotation for quick fades; JS also detects this flag */
   .swipe-card.is-settling { transition: opacity 0.18s ease; }
