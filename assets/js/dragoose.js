@@ -750,6 +750,15 @@
       return c;
     },
 
+    // the Fledgling Gale's cloud spirit: the mini-dragon rig whitened into
+    // a wispy cloud silhouette — built ONCE, then only ever drawImage'd
+    cloudSpiritC: null,
+    cloudSpirit: function () {
+      if (this.cloudSpiritC) return this.cloudSpiritC;
+      this.cloudSpiritC = this.tintSprite(this.miniDragon("storm"), "#f6fafd", 0.93);
+      return this.cloudSpiritC;
+    },
+
     // per-frame scratch canvases (characters render here first so a
     // single drawImage alpha can fade the whole figure cleanly)
     scratch: function (key, w, h) {
@@ -1874,6 +1883,10 @@
       this.mode = "sky";
       this.initSky();
       this.player.y = VH * 0.82;
+      // the Fledgling Gale: a gentle training gust for the very first
+      // flight only — never in a Daily, never once fledged or victorious
+      this.training = null;
+      this.galeActive = !this.daily && Save.data.wins === 0 && !Save.data.fledged;
       this.updateHUD();
       this.state = "PLAYING";
       if (this.daily) {
@@ -1893,7 +1906,9 @@
         Save.save();
         var skyHint = function (delay, msg) {
           setTimeout(function () {
-            if (Game.state === "PLAYING" && Game.mode === "sky") {
+            // hush while the Fledgling Gale is teaching — its prompts
+            // cover the same verbs and must not overlap these
+            if (Game.state === "PLAYING" && Game.mode === "sky" && !Game.training) {
               Game.floatText(VW / 2, VH * 0.78, msg, PAL.wisteria);
             }
           }, delay);
@@ -2009,6 +2024,17 @@
             0, 0, 4, 0.9, 0.3, PAL.wisteria, 0.6, 0.9);
         }
       }
+      // the Fledgling Gale: runs even during grace (it isn't a realm) so
+      // the training keeps breathing while the sky settles
+      if (this.galeActive) {
+        if (this.training) {
+          this.updateTraining(dt);
+        } else {
+          var gdx = p.x - GALE_X, gdy = p.y - GALE_Y;
+          var gr = GALE_R + p.r * 0.5;
+          if (gdx * gdx + gdy * gdy < gr * gr) this.startTraining();
+        }
+      }
       if (sky.grace > 0) { sky.grace -= dt; return; }
       for (var i = 0; i < sky.realms.length; i++) {
         var rm = sky.realms[i];
@@ -2019,6 +2045,124 @@
           return;
         }
       }
+    },
+
+    // ----- THE FLEDGLING GALE (first-flight training) -----
+    startTraining: function () {
+      this.training = {
+        step: 0, stepT: 0,
+        waitT: 1.1,      // a soft beat before each prompt appears
+        followT: 0,      // step 0: time spent flying beside the spirit
+        hintT: 0,        // throttle for the too-soft-a-shot nudge
+        outro: 0,        // >0: the spirit is taking its leave
+        ring: { active: false, x: 0, y: 0, r: 0, rest: 1.4 },
+        spirit: {
+          x: GALE_X, y: GALE_Y - 50,
+          ax: VW * 0.5, ay: VH * 0.76,   // drift anchor, clear of the realms
+          phase: Math.random() * TAU,
+          puff: 0                        // happy little swell on each success
+        }
+      };
+      Audio2.tone(660, 0.5, "sine", 0.05, 740);
+      Particles.ring(GALE_X, GALE_Y, "#eef4fa", GALE_R * 0.6, 240, 0.6, 3);
+      Particles.burst(GALE_X, GALE_Y, 10, "#ffffff", 3, 12, 0.4);
+      this.floatText(VW / 2, VH * 0.68, "a cloud spirit stirs from the gust", PAL.wisteria);
+    },
+
+    updateTraining: function (dt) {
+      var tr = this.training, p = this.player, sp = tr.spirit;
+      var t = this.time;
+      tr.stepT += dt;
+      if (sp.puff > 0) sp.puff -= dt;
+
+      // the spirit drifts a slow, watchable figure through the lower sky
+      var wx = sp.ax + Math.cos(t * 0.5 + sp.phase) * 96;
+      var wy = sp.ay + Math.sin(t * 0.8 + sp.phase * 1.7) * 46;
+      var ease = 1 - Math.pow(0.25, dt);
+      sp.x += (wx - sp.x) * ease;
+      sp.y += (wy - sp.y) * ease;
+
+      // taking its leave: dissolve into rising motes, then the gust is gone
+      if (tr.outro > 0) {
+        tr.outro -= dt;
+        if (!reduceMotion && Math.random() < dt * 14) {
+          Particles.glow(sp.x + (Math.random() - 0.5) * 40, sp.y + (Math.random() - 0.5) * 30,
+            0, -30, 5, 1.1, 0.6, "#ffffff", 0.6, 0.94);
+        }
+        if (tr.outro <= 0) { this.training = null; this.galeActive = false; }
+        return;
+      }
+      if (tr.waitT > 0) { tr.waitT -= dt; return; }
+
+      if (tr.step === 0) {
+        // (a) steer close — stay beside the spirit for a breath
+        var dx = p.x - sp.x, dy = p.y - sp.y;
+        if (dx * dx + dy * dy < 96 * 96) {
+          tr.followT += dt;
+          if (!reduceMotion && Math.random() < dt * 6) {
+            Particles.glow(sp.x + (Math.random() - 0.5) * 36, sp.y + (Math.random() - 0.5) * 26,
+              0, -12, 4, 0.9, 0.4, "#ffffff", 0.55, 0.92);
+          }
+        } else if (tr.followT > 0) {
+          tr.followT = Math.max(0, tr.followT - dt * 0.6);
+        }
+        if (tr.followT >= 1.1) this.trainingStepDone();
+      } else if (tr.step === 1) {
+        // (b) it breathes out a slow, harmless drift-ring — dodge through it
+        var ring = tr.ring;
+        if (!ring.active) {
+          ring.rest -= dt;
+          if (ring.rest <= 0) {
+            ring.active = true; ring.x = sp.x; ring.y = sp.y; ring.r = 18;
+            Audio2.tone(520, 0.25, "sine", 0.035, 440);
+          }
+        } else {
+          ring.r += 55 * dt;
+          if (ring.r > 200) {
+            ring.active = false; ring.rest = 1.1;
+          } else {
+            var rdx = p.x - ring.x, rdy = p.y - ring.y;
+            var rd = Math.sqrt(rdx * rdx + rdy * rdy);
+            if (p.dashTime > 0 && rd > ring.r - 30 && rd < ring.r + 30) {
+              ring.active = false;
+              this.trainingStepDone();
+            }
+          }
+        }
+      }
+      // step 2 (a charged breath) resolves in updateShots, where shots land
+    },
+
+    trainingStepDone: function () {
+      var tr = this.training, sp = tr.spirit;
+      sp.puff = 0.5;
+      Particles.burst(sp.x, sp.y, 8, "#f4f8fc", 3, 12, 0.4);
+      Particles.ring(sp.x, sp.y, PAL.pond, 16, 340, 0.4, 3);
+      Audio2.tone(784, 0.3, "sine", 0.045, 880);
+      tr.step += 1;
+      tr.stepT = 0;
+      tr.waitT = 0.9;
+      if (tr.step >= 3) this.trainingComplete();
+    },
+
+    trainingComplete: function () {
+      var tr = this.training, sp = tr.spirit;
+      tr.outro = 1.8;
+      // it sheds one golden scale, banked straight into the hoard
+      Save.data.fledged = true;
+      Save.addScales(1); // addScales saves — fledged rides along
+      this.floatText(sp.x, Math.max(60, sp.y - 46), "+1 scale", PAL.gold);
+      setTimeout(function () {
+        if (Game.state === "PLAYING" && Game.mode === "sky") {
+          Game.floatText(VW / 2, VH * 0.64, "the sky will remember you", PAL.gold);
+        }
+      }, 1000);
+      Particles.burst(sp.x, sp.y, 14, PAL.gold, 3.5, 14, 0.5);
+      Particles.ring(sp.x, sp.y, PAL.gold, 20, 420, 0.5, 4);
+      Particles.sparkBurst(sp.x, sp.y, 8, PAL.gold, 320, 0.34);
+      Audio2.tone(1046.5, 0.7, "sine", 0.05, 980);
+      buzz(8);
+      this.updateHUD();
     },
 
     enterRealm: function (realm, ceremonial) {
@@ -2046,6 +2190,10 @@
         }
         ceremonial = false; // the daily gauntlet is always the true fight
       }
+      // the Fledgling Gale never blocks the way: flying into a realm simply
+      // ends the lesson (a win means wins >= 1, so it won't wait around)
+      this.training = null;
+      this.galeActive = false;
       this.mode = "duel";
       PlayerShots.clear(); DragonShots.clear();
       this.decoy = null;
@@ -3163,6 +3311,27 @@
           Particles.spark(s.x, s.y, s.rot + Math.PI + (Math.random() - 0.5) * 1.2, 80 + Math.random() * 100, "#bfe3ff", 0.26, 1.5);
         }
         if (s.life <= 0 || s.x < -40 || s.x > VW + 40 || s.y < -40 || s.y > VH + 40) { s.active = false; return; }
+        // the cloud spirit (training step 3): dragonfire only ever warms it.
+        // A truly charged breath (big shot) completes the lesson; a soft
+        // tap just makes it puff and earns a gentle nudge.
+        var tr = self.training;
+        if (tr && tr.step === 2 && tr.outro <= 0 && tr.waitT <= 0) {
+          var tsp = tr.spirit;
+          var tdx = s.x - tsp.x, tdy = s.y - tsp.y;
+          var trr = 40 + s.r;
+          if (tdx * tdx + tdy * tdy < trr * trr) {
+            s.active = false;
+            tsp.puff = 0.5;
+            Particles.burst(s.x, s.y, 6, "#f4f8fc", 2.5, 10, 0.35);
+            if (s.r >= 40) {
+              self.trainingStepDone(); // it puffs happily — never hurt
+            } else if (self.time - tr.hintT > 2.5) {
+              tr.hintT = self.time;
+              self.floatText(tsp.x, Math.max(60, tsp.y - 40), "hold longer — let the fire bloom", PAL.wisteria);
+            }
+            return;
+          }
+        }
         // hit dragon (a veiled dragon is dusk itself — shots pass through)
         if (d && d.state !== "bow" && !d.veiled) {
           var dx = s.x - d.x, dy = s.y - d.y;
@@ -3702,6 +3871,7 @@
 
       if (this.state === "PLAYING" || this.state === "PAUSED" || this.state === "POWER" || this.state === "DEAD" || this.state === "WIN") {
         if (this.mode === "sky" && this.sky) this.drawRealms(g);
+        if (this.mode === "sky" && this.galeActive) this.drawGale(g);
         if (this.dragon) this.drawDragon(g);
         Particles.draw(g);
         this.drawDragonShots(g);
@@ -4381,6 +4551,109 @@
           g.lineTo(gx, gy + gs.size * 0.42);
           g.lineTo(gx + gs.size, gy - fl2);
           g.stroke();
+        }
+        g.restore();
+      }
+    },
+
+    // ----- THE FLEDGLING GALE (draw) -----
+    drawGale: function (g) {
+      var t = this.time;
+      var tr = this.training;
+
+      if (!tr) {
+        // the resting gust: a small silver-white swirl, clearly quieter
+        // and friendlier than a realm vortex (static soft disc when the
+        // player prefers reduced motion)
+        var gb = reduceMotion ? 0 : Math.sin(t * 1.1) * 4;
+        var gx = GALE_X, gy = GALE_Y + gb;
+        var gbr = reduceMotion ? 1 : 1 + Math.sin(t * 1.8) * 0.06;
+        Fx.drawDot(g, gx, gy, GALE_R * 1.5 * gbr, "#eef4fa", 0.32, true);
+        Fx.drawDot(g, gx, gy, GALE_R * 0.9 * gbr, "#ffffff", 0.38, true);
+        Fx.drawDot(g, gx, gy, GALE_R * 0.5, "#dce9f4", 0.4, false);
+        g.save();
+        g.lineCap = "round";
+        if (!reduceMotion) {
+          g.translate(gx, gy);
+          g.rotate(-t * 0.6);
+          g.strokeStyle = "rgba(255,255,255,0.78)";
+          g.lineWidth = 2;
+          for (var i = 0; i < 3; i++) {
+            g.beginPath();
+            g.arc(0, 0, GALE_R * (0.5 + i * 0.16), i * (TAU / 3), i * (TAU / 3) + 1.5);
+            g.stroke();
+          }
+        } else {
+          g.strokeStyle = "rgba(255,255,255,0.65)";
+          g.lineWidth = 2;
+          g.beginPath(); g.arc(gx, gy, GALE_R * 0.7, 0, TAU); g.stroke();
+        }
+        g.restore();
+        g.save();
+        g.textAlign = "center";
+        g.font = 'italic 500 18px "Cormorant Garamond", Georgia, serif';
+        g.fillStyle = Fx.rgba(PAL.ink, 0.75);
+        g.fillText("first flight?", gx, gy + GALE_R + 24);
+        g.restore();
+        return;
+      }
+
+      // training: the spirit, its drift-ring, and the current prompt
+      var fade = tr.outro > 0 ? Math.max(0, tr.outro / 1.8) : 1;
+      var sp = tr.spirit;
+
+      var ring = tr.ring;
+      if (ring.active) {
+        var ra = Math.max(0, 1 - ring.r / 200);
+        g.save();
+        g.lineCap = "round";
+        g.strokeStyle = Fx.rgba("#ffffff", (0.25 + ra * 0.5) * fade);
+        g.lineWidth = 5;
+        g.beginPath(); g.arc(ring.x, ring.y, ring.r, 0, TAU); g.stroke();
+        g.strokeStyle = Fx.rgba(PAL.pond, (0.2 + ra * 0.3) * fade);
+        g.lineWidth = 1.5;
+        g.beginPath(); g.arc(ring.x, ring.y, ring.r + 4, 0, TAU); g.stroke();
+        g.restore();
+      }
+
+      var simg = Fx.cloudSpirit();
+      var bob = reduceMotion ? 0 : Math.sin(t * 2.1 + sp.phase) * 5;
+      Fx.drawDot(g, sp.x, sp.y + bob, 46, "#ffffff", 0.28 * fade, true);
+      g.save();
+      g.translate(sp.x, sp.y + bob);
+      if (!reduceMotion) g.rotate(Math.sin(t * 0.9 + sp.phase) * 0.12);
+      g.globalAlpha = 0.85 * fade;
+      var sc = 0.62 * (1 + Math.max(0, sp.puff) * 0.3);
+      g.scale(sc, sc);
+      g.drawImage(simg, -simg.width / 2, -simg.height / 2);
+      g.restore();
+
+      // prompt panel: pre-built strings from TRAINING_STEPS only — the
+      // measured width is cached on first draw (never rebuilt per frame)
+      if (tr.outro <= 0 && tr.waitT <= 0 && tr.step < 3) {
+        var st = TRAINING_STEPS[tr.step];
+        var px = VW / 2, py = VH * 0.38;
+        g.save();
+        g.font = 'italic 500 20px "Cormorant Garamond", Georgia, serif';
+        if (!st.w) st.w = g.measureText(st.text).width;
+        g.strokeStyle = Fx.rgba(PAL.paper, 0.88);
+        g.lineWidth = 42;
+        g.lineCap = "round";
+        g.beginPath(); g.moveTo(px - st.w / 2, py); g.lineTo(px + st.w / 2, py); g.stroke();
+        g.textAlign = "center";
+        g.fillStyle = Fx.rgba(PAL.ink, 0.92);
+        g.fillText(st.text, px, py + 7);
+        // three little progress motes beneath the prompt
+        for (var d2 = 0; d2 < 3; d2++) {
+          var dx2 = px + (d2 - 1) * 18, dy2 = py + 34;
+          g.beginPath();
+          g.arc(dx2, dy2, 4, 0, TAU);
+          if (d2 < tr.step) { g.fillStyle = Fx.rgba(PAL.gold, 0.9); g.fill(); }
+          else {
+            g.strokeStyle = Fx.rgba(PAL.ink, 0.4);
+            g.lineWidth = 1.4;
+            g.stroke();
+          }
         }
         g.restore();
       }
