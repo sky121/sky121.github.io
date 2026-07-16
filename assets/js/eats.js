@@ -2228,7 +2228,10 @@
       document.addEventListener('keydown', keyHandler);
     }
 
-    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown, surprise: surprise };
+    /* Friends-tab CTA needs read access to the shortlist + the share flow. */
+    function shortlistCount() { return shortlist.length; }
+
+    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown, surprise: surprise, shortlistCount: shortlistCount, shareShortlist: shareShortlist };
   })();
 
   /* paint a wc-range fill % (shared) */
@@ -3365,8 +3368,148 @@
     var statsEl = $('friends-stats');
     var sortSel = $('friends-sort');
     var chipsEl = $('friend-chips');
+    var ctaEl = null; // "share your shortlist" nudge, JS-built below the list
     var state2 = { sort: 'recent', filter: 'all', token: 0 };
     var hearts = {}; // session-local demo likes, keyed by entry id
+
+    /* ---- taste match: your Visited log vs one friend's rated places ----
+       For every place you have BOTH rated (matched by name via myRatingFor),
+       closeness = 100 - |your overall - theirs|, floored at 0. The average
+       closeness is then damped by n/(n+2) so one lucky overlap can't read
+       as a near-perfect match (1 shared spot caps at 33%, 2 at 50%, ...).
+       Works identically on the demo feed and any future backend feed with
+       the same entry shape. Returns null when there is no overlap. */
+    function tasteMatch(entries) {
+      var seen = {};
+      var shared = [];
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        var key = String(e.place || '').toLowerCase();
+        if (!key || seen[key]) continue; // one vote per place per friend
+        seen[key] = true;
+        var mine = myRatingFor(e.place);
+        if (!mine) continue;
+        shared.push({ place: e.place, mine: overallOf(mine), theirs: overallOf(e) });
+      }
+      if (!shared.length) return null;
+      var sum = 0;
+      for (var j = 0; j < shared.length; j++) {
+        sum += Math.max(0, 100 - Math.abs(shared[j].mine - shared[j].theirs));
+      }
+      var pct = Math.round((sum / shared.length) * (shared.length / (shared.length + 2)));
+      return { pct: pct, shared: shared };
+    }
+
+    /* Group the (unfiltered) feed by friend name -> tasteMatch per friend. */
+    function matchByFriend(list) {
+      var groups = {};
+      list.forEach(function (e) {
+        var n = e.friend && e.friend.name;
+        if (!n) return;
+        (groups[n] = groups[n] || []).push(e);
+      });
+      var out = {};
+      for (var name in groups) out[name] = tasteMatch(groups[name]);
+      return out;
+    }
+
+    /* One-line match caption: "72% taste match · 3 shared spots", or a
+       quiet "no shared spots yet" when your logs don't overlap. */
+    function matchBadge(m) {
+      if (!m) return el('span', 'friend-match friend-match--none', 'no shared spots yet');
+      var b = el('span', 'friend-match');
+      b.appendChild(el('strong', 'friend-match-pct', m.pct + '% taste match'));
+      b.appendChild(document.createTextNode(' · ' + m.shared.length + ' shared spot' + (m.shared.length === 1 ? '' : 's')));
+      return b;
+    }
+
+    /* Small watercolor ring for the friend detail header — a soft track
+       with a pigment arc swept to the match percentage. Decorative
+       (aria-hidden): the matchBadge text alongside carries the meaning. */
+    function matchRing(pct, color) {
+      var R = 21, C = 2 * Math.PI * R;
+      var svg = document.createElementNS(SVG_NS, 'svg');
+      svg.setAttribute('viewBox', '0 0 52 52');
+      svg.setAttribute('class', 'match-ring match-ring--' + (color || 'pond'));
+      svg.setAttribute('aria-hidden', 'true');
+      svg.setAttribute('focusable', 'false');
+      var track = document.createElementNS(SVG_NS, 'circle');
+      track.setAttribute('cx', '26'); track.setAttribute('cy', '26'); track.setAttribute('r', String(R));
+      track.setAttribute('class', 'match-ring-track');
+      svg.appendChild(track);
+      var arc = document.createElementNS(SVG_NS, 'circle');
+      arc.setAttribute('cx', '26'); arc.setAttribute('cy', '26'); arc.setAttribute('r', String(R));
+      arc.setAttribute('class', 'match-ring-arc');
+      arc.setAttribute('stroke-dasharray', (C * Math.max(0, Math.min(100, pct)) / 100).toFixed(2) + ' ' + C.toFixed(2));
+      arc.setAttribute('transform', 'rotate(-90 26 26)');
+      svg.appendChild(arc);
+      var num = document.createElementNS(SVG_NS, 'text');
+      num.setAttribute('x', '26'); num.setAttribute('y', '31');
+      num.setAttribute('text-anchor', 'middle');
+      num.setAttribute('class', 'match-ring-num');
+      num.textContent = pct + '%';
+      svg.appendChild(num);
+      return svg;
+    }
+
+    /* Detail header card, shown when the list is filtered to one friend:
+       big avatar + name + match caption + watercolor ring, and — when you
+       both scored places >= 80 — a "You both loved" strip of chips. */
+    function buildDetailHead(f, m) {
+      var card = el('article', 'card friend-detail');
+      var head = el('div', 'friend-detail-head');
+      head.appendChild(avatar(f));
+      var who = el('div', 'friend-who');
+      who.appendChild(el('span', 'friend-detail-name', f.name));
+      who.appendChild(matchBadge(m));
+      head.appendChild(who);
+      if (m) head.appendChild(matchRing(m.pct, f.color));
+      card.appendChild(head);
+
+      if (m) {
+        var loved = m.shared.filter(function (s) { return s.mine >= 80 && s.theirs >= 80; });
+        if (loved.length) {
+          var strip = el('div', 'both-loved');
+          strip.appendChild(el('p', 'both-loved-title', 'You both loved'));
+          var row = el('div', 'both-loved-row');
+          loved.forEach(function (s) {
+            var chip = el('span', 'loved-chip');
+            chip.appendChild(el('span', 'loved-place', s.place));
+            chip.appendChild(el('span', 'loved-scores', 'you ' + fmtScore(s.mine) + ' · them ' + fmtScore(s.theirs)));
+            row.appendChild(chip);
+          });
+          strip.appendChild(row);
+          card.appendChild(strip);
+        }
+      }
+      return card;
+    }
+
+    /* Quiet nudge beneath the list: share the shortlist if one exists,
+       otherwise hop to Find to start one. Hidden entirely when there's
+       nothing to share AND nothing logged — never nag an empty app. */
+    function renderCta() {
+      if (!ctaEl) return;
+      clear(ctaEl);
+      var slN = deck.shortlistCount();
+      var hasVisited = (state.visited || []).length > 0;
+      if (!slN && !hasVisited) { ctaEl.hidden = true; return; }
+      ctaEl.hidden = false;
+      ctaEl.appendChild(el('p', 'friends-cta-line', 'Eaten somewhere great?'));
+      var b = el('button', 'btn-ghost friends-cta-btn',
+        slN ? 'Share your shortlist (' + slN + ')' : 'Share your shortlist');
+      b.type = 'button';
+      b.addEventListener('click', function () {
+        if (deck.shortlistCount()) {
+          deck.shareShortlist();
+        } else {
+          tabs.activate('find');
+          toast('Swipe a few places to build tonight’s shortlist');
+          announce('Opened Find — swipe a few places to build a shortlist to share.');
+        }
+      });
+      ctaEl.appendChild(b);
+    }
 
     function buildChips() {
       if (!chipsEl) return;
@@ -3391,7 +3534,7 @@
       return a;
     }
 
-    function buildEntry(e) {
+    function buildEntry(e, match) {
       var card = el('article', 'card friend-card');
 
       var head = el('div', 'friend-head');
@@ -3403,6 +3546,7 @@
       sub.appendChild(el('strong', 'friend-place', e.place));
       who.appendChild(sub);
       if (e.loc) who.appendChild(el('span', 'friend-loc', e.loc));
+      who.appendChild(matchBadge(match));
       head.appendChild(who);
 
       var ov = el('div', 'v-overall');
@@ -3468,10 +3612,12 @@
 
     function render() {
       if (!listEl) return;
+      renderCta();
       var token = ++state2.token;
       showLoading();
       social.getFriendsFeed({ sort: state2.sort }).then(function (list) {
         if (token !== state2.token) return; // stale response
+        var matches = matchByFriend(list); // from the FULL feed, pre-filter
         if (state2.filter !== 'all') {
           list = list.filter(function (e) { return e.friend.name === state2.filter; });
         }
@@ -3479,6 +3625,12 @@
         if (statsEl) {
           var nFriends = social.listFriends().length;
           statsEl.textContent = list.length + ' rating' + (list.length === 1 ? '' : 's') + ' from ' + nFriends + ' friends';
+        }
+        // Filtered to one friend -> a detail header (match ring + shared loves)
+        if (state2.filter !== 'all') {
+          var fObj = null;
+          social.listFriends().forEach(function (f) { if (f.name === state2.filter) fObj = f; });
+          if (fObj) listEl.appendChild(buildDetailHead(fObj, matches[fObj.name] || null));
         }
         if (!list.length) {
           var empty = el('div', 'empty');
@@ -3489,7 +3641,7 @@
           return;
         }
         list.forEach(function (e, i) {
-          var entry = buildEntry(e);
+          var entry = buildEntry(e, matches[e.friend.name] || null);
           enterStagger(entry, i);
           listEl.appendChild(entry);
         });
@@ -3502,6 +3654,12 @@
     function init() {
       if (sortSel) sortSel.addEventListener('change', function () { state2.sort = sortSel.value; render(); });
       buildChips();
+      // the nudge lives after the list, inside the Friends panel
+      if (listEl && listEl.parentNode) {
+        ctaEl = el('div', 'friends-cta');
+        ctaEl.hidden = true;
+        listEl.parentNode.insertBefore(ctaEl, listEl.nextSibling);
+      }
     }
 
     return { init: init, render: render };

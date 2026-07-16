@@ -69,6 +69,40 @@ Display-only recap that sits between the Visited head row and the log
   `html.evening` overrides; verified against hand-computed seed data
   (recap numbers exact, last-month fallback, fresh-demo hidden case).
 
+### Friends: taste match + "you both loved" + share nudge (2026-07-16)
+The Friends tab now reads your Visited log against each friend's demo feed
+(all in the `friends` closure; works unchanged on any future backend feed
+with the same shapes, no new storage keys):
+- **Taste match per friend** (`tasteMatch`) — for every place you've BOTH
+  rated (feed entry matched to your Visited log by name via `myRatingFor`,
+  deduped to one vote per place per friend), per-place closeness is
+  `100 - |your overall - theirs|` (floored at 0). The average closeness is
+  damped by `n/(n+2)` so a single lucky overlap can't read near-perfect
+  (1 shared spot caps at 33%, 2 at 50%…). Shown as a chip-bg pill under the
+  friend's name on every feed card ("48% taste match · 2 shared spots",
+  `.friend-match`); no overlap renders a quiet italic "no shared spots yet"
+  instead of a number. Matches are computed from the FULL feed before the
+  per-friend filter, so pills stay right in any view.
+- **Friend detail header** (`buildDetailHead`) — filtering to one friend
+  (the chips row) now prepends a full-width detail card: bigger avatar,
+  name, match caption, and a **watercolor match ring** (`matchRing` —
+  SVG track + pigment arc in the friend's palette color swept to the %,
+  aria-hidden since the caption carries the meaning). When you both scored
+  shared places **≥ 80 overall**, a **"You both loved"** strip lists them
+  as rose/gold-washed chips ("Tonkotsu Lane — you 90 · them 87",
+  `.loved-chip`); nothing qualifying → the strip is omitted entirely, no
+  overlap → no ring either.
+- **Share nudge** (`renderCta`) — one quiet line + button under the list
+  ("Eaten somewhere great?" / "Share your shortlist"). With a shortlist it
+  calls the deck's existing `shareShortlist()` (the deck closure now
+  exposes `shortlistCount()` + `shareShortlist` in its return for this);
+  without one it hops to Find (`tabs.activate('find')`) with a toast
+  nudging you to swipe a few places. Hidden entirely when the shortlist is
+  empty AND the Visited log is empty — never nags a fresh app.
+- Verified with hand-computed seeds asserted against the rendered text
+  exactly (48% / 26% cases, chips, CTA visibility matrix), light +
+  `html.evening` at 390px, zero page errors.
+
 ### Richer shortlist compare view (2026-07-16)
 The compare screen (shortlist badge / end-of-deck "Compare shortlist") is now
 a real decision tool instead of a name+meta list:
@@ -204,7 +238,7 @@ The card face is a **free-floating scatter**: three EQUAL **4:3 blocks** — two
 Rate any place with **Food / Vibe / Service sliders (0–100)** → live Overall, note, date. Cards show the three sub-bars + Overall, with sort, edit, re-rate, delete; running count + average. Persisted in `eats-visited`.
 
 ### Friends + Popular — DEMO UIs (backend-ready)
-- **Friends:** sample feed of friends' ratings (sort + per-friend filter), clearly demo-badged.
+- **Friends:** sample feed of friends' ratings (sort + per-friend filter), clearly demo-badged; per-friend **taste match** pills, a filtered **detail header** (watercolor ring + "You both loved" strip), and a **share-your-shortlist nudge** (see the 2026-07-16 section above).
 - **Popular:** trending leaderboard with Today / This Month / This Year toggle, top-3 accents.
 - Both read through a **promise-based mock `social` API** (loading/error states) — see the "MOCK SOCIAL API" comment in `eats.js`. Swapping in a real backend is a contained change to those resolvers, not a rewrite.
 
