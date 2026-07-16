@@ -1714,7 +1714,7 @@
         var rate = el('button', 'decision-act', 'I ate here → Rate');
         rate.type = 'button';
         rate.addEventListener('click', function () {
-          sheet.openForPlace({ name: r.name, placeId: r.placeId || null, loc: r.location || null, address: r.type || '' });
+          sheet.openForPlace({ name: r.name, placeId: r.placeId || null, loc: r.location || null, address: r.type || '', cuisines: r.cuisines || [] });
         });
         actionsEl.appendChild(rate);
 
@@ -2762,6 +2762,8 @@
       if (state.pendingPlace) {
         data.placeId = state.pendingPlace.placeId || null;
         data.coords = state.pendingPlace.loc || null;
+        // remember the cuisine keys so Visited insights can group this entry
+        data.cuisines = state.pendingPlace.cuisines || [];
       }
       var wasEdit = !!state.editingId;
       if (wasEdit) {
@@ -2807,6 +2809,7 @@
     var filterWrap = $('visited-filter');
     var filterInput = $('visited-filter-input');
     var filterQ = ''; // live quick-filter text (only offered when the log > 5)
+    var insightsEl = null; // "Your month in meals" recap (JS-built, above the log)
 
     function load() {
       var v = store.getVisited();
@@ -2835,6 +2838,9 @@
       }
       data.id = uid();
       data.demo = false;
+      // log-time timestamp (new entries only; older entries without one are
+      // treated as "earlier" by the insights recap)
+      if (!data.ts) data.ts = Date.now();
       state.visited.unshift(data);
       persist();
     }
@@ -2844,6 +2850,10 @@
         if (state.visited[i].id === id) {
           data.id = id;
           data.demo = false; // editing a demo entry makes it real
+          // an edit rebuilds the entry from the sheet, which doesn't carry
+          // these — keep the original log timestamp + cuisine keys
+          if (state.visited[i].ts && !data.ts) data.ts = state.visited[i].ts;
+          if (state.visited[i].cuisines && !data.cuisines) data.cuisines = state.visited[i].cuisines;
           state.visited[i] = data;
           break;
         }
@@ -2923,6 +2933,207 @@
       return card;
     }
 
+    /* -------------------------------------------------------------- *
+     * Insights — "Your month in meals" (display-only recap above the log)
+     * Timestamps: `date` ('YYYY-MM-DD', every sheet save has one) is the
+     * source of truth; `ts` (added to new entries) is the fallback; entries
+     * with neither are "earlier" — counted all-time, absent from the month.
+     * -------------------------------------------------------------- */
+    var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    var CUISINE_LABELS = {
+      italian: 'Italian', japanese: 'Japanese', mexican: 'Mexican', thai: 'Thai',
+      indian: 'Indian', chinese: 'Chinese', american: 'American',
+      mediterranean: 'Mediterranean', korean: 'Korean', vietnamese: 'Vietnamese',
+      pizza: 'Pizza', burgers: 'Burgers', seafood: 'Seafood', cafe: 'Café & bakery',
+      bbq: 'BBQ', vegetarian: 'Vegetarian'
+    };
+    function cuisineLabel(k) { return CUISINE_LABELS[k] || (k.charAt(0).toUpperCase() + k.slice(1)); }
+    function cuisinePal(k) { return CUISINE_ART[k] || ['#a292c4', '#7fa8c9', '#e8dfc9']; }
+
+    /* When did this entry happen? Local Date at noon (immune to DST edges),
+       or null for undated legacy entries. */
+    function entryDate(e) {
+      if (e && e.date) {
+        var p = String(e.date).split('-');
+        if (p.length === 3) {
+          var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10), 12);
+          if (!isNaN(d.getTime())) return d;
+        }
+      }
+      if (e && e.ts) {
+        var t = new Date(e.ts);
+        if (!isNaN(t.getTime())) return t;
+      }
+      return null;
+    }
+
+    /* Cuisine key for an entry: stored keys first (saved with ratings from a
+       Find card), else best-effort name match against the sample list. */
+    var demoCuisineByName = null;
+    function cuisineKeyOf(e) {
+      if (e.cuisines && e.cuisines.length) return e.cuisines[0];
+      if (!demoCuisineByName) {
+        demoCuisineByName = {};
+        DEMO_RESTAURANTS.forEach(function (r) {
+          if (r.cuisines && r.cuisines.length) demoCuisineByName[r.name.toLowerCase()] = r.cuisines[0];
+        });
+      }
+      return demoCuisineByName[String(e.name || '').toLowerCase()] || null;
+    }
+
+    /* Week bucket (weeks start Monday, local time) for the streak count. */
+    function weekIndex(d) {
+      var days = Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 86400000);
+      return Math.floor((days + 3) / 7);
+    }
+
+    /* All the recap numbers, or null when there's nothing to recap (no
+       entries dated this month or last month — incl. the fresh-demo case). */
+    function computeInsights() {
+      var all = state.visited || [];
+      if (!all.length) return null;
+      var dated = [];
+      all.forEach(function (e) {
+        var d = entryDate(e);
+        if (d) dated.push({ e: e, d: d });
+      });
+      var now = new Date();
+      var curKey = now.getFullYear() * 12 + now.getMonth();
+      function inMonth(key) {
+        return dated.filter(function (x) { return x.d.getFullYear() * 12 + x.d.getMonth() === key; });
+      }
+      var scopeKey = curKey, isLast = false;
+      var scope = inMonth(scopeKey);
+      if (!scope.length) { scopeKey = curKey - 1; isLast = true; scope = inMonth(scopeKey); }
+      if (!scope.length) return null;
+
+      // distinct places + average overall, this month
+      var seenNames = {}, placesTried = 0;
+      scope.forEach(function (x) {
+        var k = String(x.e.name || '').toLowerCase();
+        if (!seenNames[k]) { seenNames[k] = true; placesTried++; }
+      });
+      var avg = scope.reduce(function (s, x) { return s + overallOf(x.e); }, 0) / scope.length;
+
+      // cuisine counts, this month (entries with no cuisine info sit out)
+      var counts = {};
+      scope.forEach(function (x) {
+        var c = cuisineKeyOf(x.e);
+        if (c) counts[c] = (counts[c] || 0) + 1;
+      });
+      var bars = [];
+      for (var k in counts) bars.push({ key: k, label: cuisineLabel(k), count: counts[k] });
+      bars.sort(function (a, b) { return (b.count - a.count) || a.label.localeCompare(b.label); });
+      var top = bars.length ? bars[0] : null;
+      bars = bars.slice(0, 4);
+
+      // streak: consecutive weeks with >=1 visit, counting back from this
+      // week (a quiet week-in-progress doesn't break it — last week anchors)
+      var weeks = {};
+      dated.forEach(function (x) { weeks[weekIndex(x.d)] = true; });
+      var w = weekIndex(now);
+      if (!weeks[w]) w--;
+      var streak = 0;
+      while (weeks[w]) { streak++; w--; }
+
+      // all time: distinct places, total visits, most-revisited place
+      var byName = {}, totalPlaces = 0, fav = null;
+      all.forEach(function (e) {
+        var k = String(e.name || '').toLowerCase();
+        if (!byName[k]) { byName[k] = { name: e.name, count: 0 }; totalPlaces++; }
+        byName[k].count++;
+      });
+      for (var nk in byName) {
+        if (byName[nk].count > 1 && (!fav || byName[nk].count > fav.count)) fav = byName[nk];
+      }
+
+      return {
+        monthLabel: MONTH_NAMES[((scopeKey % 12) + 12) % 12],
+        isLast: isLast,
+        placesTried: placesTried,
+        avg: avg,
+        top: top,
+        streak: streak,
+        bars: bars,
+        allTime: { places: totalPlaces, visits: all.length, fav: fav }
+      };
+    }
+
+    function viStat(num, label) {
+      var s = el('div', 'vi-stat');
+      s.appendChild(el('span', 'vi-num', num));
+      s.appendChild(el('span', 'vi-lbl', label));
+      return s;
+    }
+
+    function renderInsights() {
+      if (!insightsEl) return;
+      clear(insightsEl);
+      var ins = computeInsights();
+      insightsEl.hidden = !ins;
+      if (!ins) return;
+
+      var card = el('div', 'card vi-card');
+
+      var head = el('div', 'vi-head');
+      head.appendChild(el('h2', 'vi-title', 'Your month in meals'));
+      head.appendChild(el('span', 'vi-when', ins.isLast ? ins.monthLabel + ' — last month' : ins.monthLabel));
+      card.appendChild(head);
+
+      var stats = el('div', 'vi-stats');
+      stats.appendChild(viStat(String(ins.placesTried), ins.placesTried === 1 ? 'place tried' : 'places tried'));
+      stats.appendChild(viStat(fmtScore(ins.avg), 'avg overall'));
+      stats.appendChild(viStat(String(ins.streak), ins.streak === 1 ? 'week streak' : 'weeks streak'));
+      card.appendChild(stats);
+
+      if (ins.top) {
+        var pal = cuisinePal(ins.top.key);
+        var tc = el('p', 'vi-top');
+        var dot = el('span', 'vi-dot');
+        dot.setAttribute('aria-hidden', 'true');
+        dot.style.background = 'radial-gradient(circle at 32% 30%, ' + pal[1] + ' 0%, ' + pal[0] + ' 72%)';
+        tc.appendChild(dot);
+        tc.appendChild(el('span', 'vi-top-lbl', 'Top cuisine'));
+        tc.appendChild(el('strong', null, ins.top.label));
+        card.appendChild(tc);
+      }
+
+      if (ins.bars.length) {
+        card.appendChild(el('h3', 'vi-sub', 'What you ate'));
+        var bwrap = el('div', 'vi-bars');
+        var max = ins.bars[0].count;
+        ins.bars.forEach(function (b) {
+          var row = el('div', 'vi-bar');
+          row.appendChild(el('span', 'lbl', b.label));
+          var track = el('div', 'track');
+          track.setAttribute('aria-hidden', 'true');
+          var fill = el('div', 'fill');
+          fill.style.width = Math.round((b.count / max) * 100) + '%';
+          fill.style.background = 'linear-gradient(90deg, ' + cuisinePal(b.key)[0] + 'b3, ' + cuisinePal(b.key)[0] + ')';
+          track.appendChild(fill);
+          row.appendChild(track);
+          row.appendChild(el('span', 'val', String(b.count)));
+          bwrap.appendChild(row);
+        });
+        card.appendChild(bwrap);
+      }
+
+      var at = el('p', 'vi-alltime');
+      at.appendChild(document.createTextNode('All time: '));
+      at.appendChild(el('strong', null, String(ins.allTime.places)));
+      at.appendChild(document.createTextNode(' place' + (ins.allTime.places === 1 ? '' : 's') + ' · '));
+      at.appendChild(el('strong', null, String(ins.allTime.visits)));
+      at.appendChild(document.createTextNode(' visit' + (ins.allTime.visits === 1 ? '' : 's')));
+      if (ins.allTime.fav) {
+        at.appendChild(document.createTextNode(' · most returned to '));
+        at.appendChild(el('strong', null, ins.allTime.fav.name));
+      }
+      card.appendChild(at);
+
+      insightsEl.appendChild(card);
+    }
+
     /* quick-filter match: case-insensitive substring on name / note / location */
     function matchesFilter(e, q) {
       return (e.name || '').toLowerCase().indexOf(q) !== -1 ||
@@ -2937,6 +3148,9 @@
       // tab count + stats
       var n = state.visited.length;
       if (tabCount) tabCount.textContent = n ? '(' + n + ')' : '';
+
+      // passive recap above the log (describes the whole log, never filtered)
+      renderInsights();
 
       // quick filter: only worth offering once the log outgrows a glance
       var canFilter = n > 5;
@@ -3000,6 +3214,13 @@
 
     function init() {
       load();
+      // insights host sits between the head row and the quick filter/log
+      if (listEl && listEl.parentNode) {
+        insightsEl = el('section', 'v-insights');
+        insightsEl.setAttribute('aria-label', 'Your meal insights');
+        insightsEl.hidden = true;
+        listEl.parentNode.insertBefore(insightsEl, filterWrap || listEl);
+      }
       if (sortSel) sortSel.addEventListener('change', function () { state.sort = sortSel.value; render(); });
       if (filterInput) {
         filterInput.addEventListener('input', function () {
