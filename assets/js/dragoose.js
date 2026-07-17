@@ -404,7 +404,14 @@
         (function (f, d) { setTimeout(function () { Audio2.tone(f, 0.4, "triangle", 0.16); }, d); })(notes[i], i * 130);
       }
     },
-    death: function () { this.tone(220, 0.8, "sine", 0.2, 90); this.tone(165, 0.9, "sine", 0.14, 70); }
+    death: function () { this.tone(220, 0.8, "sine", 0.2, 90); this.tone(165, 0.9, "sine", 0.14, 70); },
+    // the Bowing: a soft resolving chord — the duel's tension settling to rest
+    bowChord: function () {
+      this.tone(196.0, 2.1, "sine", 0.09);   // G3 root, held
+      this.tone(293.7, 2.0, "sine", 0.06);   // D4
+      this.tone(392.0, 1.8, "sine", 0.05);   // G4
+      this.tone(493.9, 1.6, "sine", 0.04);   // B4 — the warm third on top
+    }
   };
 
   // ---------------------------------------------------------
@@ -1659,6 +1666,19 @@
     umbra: { name: "Umbra, the Dusk Wyrm", health: 160, roamSpeed: 118, enragedSpeed: 172 }
   };
 
+  // THE BOWING — the painterly beat between the killing blow and the win
+  // screen. Per-realm petal colors are pre-derived here once (no per-frame
+  // lookups or string work); each defeated dragon sheds motes of its own sky.
+  var BOW_MOTES = {
+    ember:   [PAL.rose, PAL.ember],          // cinder petals
+    storm:   ["#8fd0ff", PAL.wisteria],      // rain-light and static
+    verdant: [PAL.sage, "#d9ecc2"],          // leaf and blossom
+    gilded:  ["#fff3c4", PAL.gold],          // treasure-light
+    umbra:   [PAL.wisteria, "#8a7bb0"]       // falling dusk
+  };
+  var BOW_SLOWMO = 0.35;   // dt scale for dragon/shots/particles while it bows
+  var BOW_DUR = 2.2;       // seconds of flourish, measured in real time
+
   // ---------------------------------------------------------
   // GAME OBJECT
   // ---------------------------------------------------------
@@ -1667,6 +1687,7 @@
     time: 0,
     shake: 0,
     hitStop: 0,
+    bowing: null,             // the Bowing flourish {t, dur, armed, show} or null
     muted: false,
     bg: { clouds: [], washPhase: 0 },
     player: null,
@@ -1788,6 +1809,7 @@
 
     toTitle: function () {
       this.state = "TITLE";
+      this.bowing = null; // never let a stale flourish resolve over the title
       this.showScreen("title");
       hud.hidden = true;
       // once crowned, the title screen wears it forever
@@ -2110,6 +2132,7 @@
       this.nextPowerAt = 3;
       this.powers = {};
       this.shake = 0; this.hitStop = 0; this.flashRed = 0; this.flashWhite = 0;
+      this.bowing = null;
 
       var startHealth = 4;
       if (Save.hasRelic("emberHeart")) startHealth = 5;
@@ -2987,7 +3010,40 @@
       // hit-stop freezes gameplay briefly
       if (this.hitStop > 0) { this.hitStop -= dt; if (this.hitStop > 0) return; }
 
-      if (this.runStats) this.runStats.time += dt;
+      // THE BOWING — the world slows while the defeated dragon dips its
+      // head. The flourish clock runs on real time (only the dragon, shots
+      // and particles breathe in slow motion — never the UI or input), and
+      // any fresh tap or press jumps straight to the win screen. Rewards
+      // were already banked at the killing blow, so skipping never
+      // double-fires them.
+      var ts = 1;
+      if (this.bowing) {
+        var bw = this.bowing;
+        bw.t += dt;
+        ts = BOW_SLOWMO;
+        var held = Input.pointerDown || !!Input.keys.space;
+        if (!bw.armed) {
+          // wait for the killing-blow press to clear before arming the skip
+          if (!held && !Input.tapQueued && !Input.releaseQueued) bw.armed = true;
+        } else if (held || Input.tapQueued || Input.releaseQueued) {
+          bw.t = bw.dur; // skip
+        }
+        // the goose rests during the bow — taps skip, they don't dodge/fire,
+        // and no new charge can begin (its drone would outlive the duel)
+        Input.tapQueued = false; Input.releaseQueued = false;
+        Input.holding = false;
+        if (this.player && this.player.charging) {
+          this.player.charging = false; this.player.charge = 0;
+          Audio2.chargeStop();
+        }
+        if (bw.t >= bw.dur) {
+          this.bowing = null;
+          bw.show();
+          return;
+        }
+      }
+
+      if (this.runStats && !this.bowing) this.runStats.time += dt;
 
       // boss-intro flyby countdown (dragon holds fire while it runs)
       if (this.introT > 0) this.introT -= dt;
@@ -2996,10 +3052,10 @@
       // Dusk Cowl shadow decoy fades on its own if nothing takes the bait
       if (this.decoy) { this.decoy.t -= dt; if (this.decoy.t <= 0) this.decoy = null; }
       if (this.mode === "sky") this.updateSky(dt);
-      this.updateDragon(dt);
-      this.updateShots(dt);
+      this.updateDragon(dt * ts);
+      this.updateShots(dt * ts);
       this.updatePickups(dt);
-      Particles.update(dt);
+      Particles.update(dt * ts);
 
       if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 40);
       if (this.flashRed > 0) this.flashRed = Math.max(0, this.flashRed - dt * 3);
@@ -3321,8 +3377,12 @@
       d.flapPhase = (d.flapPhase || 0) + dt * TAU * 0.42 * animSpd * (d.state === "bow" ? 0.4 : 1);
       d.swayPhase = (d.swayPhase || 0) + dt * 2.1 * animSpd * (d.state === "bow" ? 0.4 : 1);
 
-      // defeated: dissolve into rising golden motes while it bows
+      // defeated: glide to a gentle stop, dissolving into rising golden
+      // motes while it bows (whatever motion carried it fades softly away)
       if (d.state === "bow") {
+        d.x += (d.vx || 0) * dt; d.y += (d.vy || 0) * dt;
+        d.vx = (d.vx || 0) * Math.pow(0.02, dt);
+        d.vy = (d.vy || 0) * Math.pow(0.02, dt);
         if (Math.random() < dt * 26) {
           var ba = Math.random() * TAU, br = Math.random() * d.r * 0.7;
           Particles.glow(d.x + Math.cos(ba) * br, d.y + Math.sin(ba) * br,
@@ -4170,7 +4230,7 @@
         this.winIsFinal = false;
         var cName = d.name.replace("⟡ ", "").split(",")[0];
         var self2 = this;
-        setTimeout(function () {
+        this.beginBowing(function () {
           self2.state = "WIN";
           self2.wipe();
           self2.setWinHeader("respect earned", "You have earned its respect");
@@ -4199,7 +4259,7 @@
           var ds2 = $("daily-share");
           if (ds2) ds2.hidden = true;
           self2.showScreen("win");
-        }, reduceMotion ? 600 : 1400);
+        });
         return;
       }
 
@@ -4274,7 +4334,7 @@
         }
       }
 
-      setTimeout(function () {
+      var showWin = function () {
         self.state = "WIN";
         self.wipe(isFinal); // the crowning gets the golden wipe
         var R = RELICS[relicId];
@@ -4324,7 +4384,39 @@
         $("btn-continue").textContent = isFinal ? "Onward" : "Return to the sky";
         $("win-stats").textContent = self.fmtRunStats();
         self.showScreen("win");
-      }, reduceMotion ? 600 : 1400);
+      };
+      // The crowning keeps its own golden celebration on its own clock —
+      // the flourish is skipped entirely so the finale is never delayed.
+      if (isFinal) setTimeout(showWin, reduceMotion ? 600 : 1400);
+      else this.beginBowing(showWin);
+    },
+
+    // ----- THE BOWING -----
+    // A short painterly beat between the killing blow and the win screen:
+    // time slows, the dragon dips its head, and 20–30 motes of its realm's
+    // color drift down like petals while a soft chord resolves. Any fresh
+    // tap or press skips ahead (the skip lives in update()). Rewards are
+    // banked before this runs, so it never touches them. Reduced motion
+    // keeps the old quick transition — no slow-mo, no petals.
+    beginBowing: function (showWin) {
+      if (reduceMotion) { setTimeout(showWin, 600); return; }
+      var d = this.dragon;
+      var colors = (d && BOW_MOTES[d.type]) || BOW_MOTES.ember;
+      var n = 22 + ((Math.random() * 7) | 0); // 22–28 petals, pooled
+      for (var i = 0; i < n; i++) {
+        Particles.spawn(
+          d.x + (Math.random() - 0.5) * d.r * 3.2,
+          d.y - d.r * (0.4 + Math.random() * 1.6),
+          (Math.random() - 0.5) * 0.6, 0.6 + Math.random() * 0.8,
+          3.5 + Math.random() * 4.5, 1, 1.4 + Math.random() * 1.2,
+          colors[i & 1], 0.5, 0.997, true);
+      }
+      // the goose rests: let any half-built charge go quietly
+      var p = this.player;
+      if (p) { p.charge = 0; p.charging = false; }
+      Audio2.chargeStop();
+      Audio2.bowChord();
+      this.bowing = { t: 0, dur: BOW_DUR, armed: false, show: showWin };
     },
 
     playerDefeated: function () {
@@ -5476,6 +5568,7 @@
     forceWin: function () { if (Game.dragon) Game.damageDragon(9999, Game.dragon.x, Game.dragon.y); },
     forceHurt: function () { if (Game.player) { Game.player.iframes = 0; Game.hurtPlayer(99, Game.player.x, Game.player.y + 50); } },
     forceWeather: function (mood) { Game.forceWeather(mood); },
-    state: function () { return Game.state; }
+    state: function () { return Game.state; },
+    bowing: function () { return Game.bowing; }
   };
 })();
