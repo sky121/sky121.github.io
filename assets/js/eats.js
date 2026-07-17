@@ -2757,22 +2757,66 @@
     var sFood = $('s-food'), sVibe = $('s-vibe'), sService = $('s-service');
     var nFood = $('s-food-num'), nVibe = $('s-vibe-num'), nService = $('s-service-num');
     var overallOut = $('overall-value');
+    var overallWrap = overallOut ? overallOut.parentNode : null;   // .overall-num-wrap
+    var overallBlot = overallWrap ? overallWrap.querySelector('.overall-blot') : null;
     var titleEl = $('sheet-title');
     var lastFocused = null;
+
+    /* Watercolor score tint: low ~rose -> mid ~gold -> high ~sage.
+       Pure linear pigment mix; the CSS side anchors text colors to ink
+       (day) / cream (evening) via color-mix so numbers stay AA-readable —
+       the raw tint only ever paints decorative surfaces (track, thumb,
+       overall blot). */
+    var TINT_LOW = [217, 139, 160];   /* rose  #d98ba0 */
+    var TINT_MID = [205, 184, 120];   /* gold  #cdb878 */
+    var TINT_HIGH = [147, 180, 139];  /* sage  #93b48b */
+    function scoreTint(v) {
+      var a = TINT_LOW, b = TINT_MID, t;
+      if (v <= 50) { t = v / 50; } else { a = TINT_MID; b = TINT_HIGH; t = (v - 50) / 50; }
+      return 'rgb(' +
+        Math.round(a[0] + (b[0] - a[0]) * t) + ',' +
+        Math.round(a[1] + (b[1] - a[1]) * t) + ',' +
+        Math.round(a[2] + (b[2] - a[2]) * t) + ')';
+    }
 
     function syncSlider(input, out) {
       var v = parseFloat(input.value);
       out.textContent = fmtScore(v);
       input.setAttribute('aria-valuetext', fmtScore(v) + ' out of 100');
       paintRange(input);
+      // tint lives on the block so track, thumb AND number can read it
+      if (input.parentNode) input.parentNode.style.setProperty('--score-tint', scoreTint(v));
     }
-    function syncOverall() {
+    var blotSwelling = false;
+    function syncOverall(animate) {
       var avg = (parseFloat(sFood.value) + parseFloat(sVibe.value) + parseFloat(sService.value)) / 3;
       overallOut.textContent = fmtScore(avg);
+      if (overallWrap) overallWrap.style.setProperty('--score-tint', scoreTint(avg));
+      // gentle swell while sliding — transform/opacity keyframes only; one
+      // pulse at a time (animationend clears the flag), none under
+      // reduced motion (number + tint still update instantly above)
+      if (animate && !prefersReducedMotion && overallBlot && !blotSwelling) {
+        blotSwelling = true;
+        overallBlot.classList.add('is-swell');
+      }
     }
-    function syncAll() {
+    function syncAll(animate) {
       syncSlider(sFood, nFood); syncSlider(sVibe, nVibe); syncSlider(sService, nService);
-      syncOverall();
+      syncOverall(animate);
+    }
+
+    /* input events can fire far faster than frames paint (fine-grained
+       pointer drags) — coalesce them into one syncAll per frame */
+    var rafPending = false;
+    function scheduleSync() {
+      if (rafPending) return;
+      rafPending = true;
+      if (window.requestAnimationFrame) {
+        window.requestAnimationFrame(function () { rafPending = false; syncAll(true); });
+      } else {
+        rafPending = false;
+        syncAll(true);
+      }
     }
 
     function setValues(v) {
@@ -2888,21 +2932,29 @@
         visited.add(data);
         announce('Saved ' + name + ' — overall ' + fmtScore(overallOf(data)));
       }
-      // celebrate the save as the sheet closes: bloom from where it stood
-      var sheetEl = $('rating-sheet');
-      var rr = sheetEl ? sheetEl.getBoundingClientRect() : null;
+      // celebrate the save: a tiny droplet burst from the Save button
+      // (rect captured BEFORE hide() — a hidden sheet measures 0x0).
+      // dropletBurst itself no-ops under prefers-reduced-motion.
+      var saveBtn = $('rate-save');
+      var rr = saveBtn ? saveBtn.getBoundingClientRect() : null;
       hide();
       visited.render();
       haptic(14);
-      if (rr) dropletBurst(rr.left + rr.width / 2, rr.top + rr.height * 0.35, Math.min(rr.width, 300));
+      if (rr && rr.width) dropletBurst(rr.left + rr.width / 2, rr.top + rr.height / 2, Math.min(rr.width, 150));
       toast((wasEdit ? 'Updated ' : 'Saved ') + name + ' · overall ' + fmtScore(overallOf(data)));
     }
 
     function init() {
       if (!backdrop) return;
-      [ [sFood, nFood], [sVibe, nVibe], [sService, nService] ].forEach(function (pair) {
-        pair[0].addEventListener('input', function () { syncSlider(pair[0], pair[1]); syncOverall(); });
+      [sFood, sVibe, sService].forEach(function (input) {
+        input.addEventListener('input', scheduleSync);
       });
+      if (overallBlot) {
+        overallBlot.addEventListener('animationend', function () {
+          overallBlot.classList.remove('is-swell');
+          blotSwelling = false;
+        });
+      }
       form.addEventListener('submit', save);
       $('rate-cancel').addEventListener('click', hide);
       $('sheet-close').addEventListener('click', hide);
