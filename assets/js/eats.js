@@ -605,6 +605,55 @@
   }
 
   /* ================================================================== *
+   * OFFLINE — connectivity signal for the Find tab.
+   * A small paper note appears when the network drops (searches quietly
+   * run on the demo data) and slips away when the connection returns.
+   * Driven by navigator.onLine + the online/offline events; the search
+   * pipeline also asks isOffline() so live mode is never attempted
+   * without a network.
+   * ================================================================== */
+  var offline = (function () {
+    var note = null;
+
+    function isOffline() { return navigator.onLine === false; }
+
+    function ensureNote() {
+      if (note) return note;
+      var panel = $('panel-find');
+      if (!panel) return null;
+      note = el('div', 'offline-note');
+      note.id = 'offline-note';
+      note.setAttribute('role', 'note');
+      note.hidden = true;
+      var dot = el('span', 'offline-note-dot');
+      dot.setAttribute('aria-hidden', 'true');
+      note.appendChild(dot);
+      note.appendChild(el('span', 'offline-note-text', 'You’re offline — demo kitchen’s still open'));
+      panel.insertBefore(note, panel.firstChild);
+      return note;
+    }
+
+    function sync() {
+      var n = ensureNote();
+      if (n) n.hidden = !isOffline();
+    }
+
+    function init() {
+      sync();
+      window.addEventListener('offline', function () {
+        sync();
+        announce('You’re offline — searches will use the demo data.');
+      });
+      window.addEventListener('online', function () {
+        sync();
+        announce('Back online.');
+      });
+    }
+
+    return { init: init, isOffline: isOffline, sync: sync };
+  })();
+
+  /* ================================================================== *
    * FIND — bubble landing -> Preferences -> Swipe deck (router/orchestrator)
    *
    * Flow:
@@ -704,14 +753,17 @@
       state.nextPage = null;
       deck.showLoading();
 
-      if (store.getKey()) {
+      if (store.getKey() && !offline.isOffline()) {
         resolveOriginLive(function (origin, label) {
           if (label) state.originLabel = label;
           state.origin = origin;
           setOriginText($('deck-origin'));
           gmaps.searchNearby(origin, function (err, list, more) {
             if (err) {
-              settings.showError(err);
+              // offline mid-search: land in demo mode quietly — the
+              // paper note explains, no error prompt needed
+              if (offline.isOffline()) offline.sync();
+              else settings.showError(err);
               loadDemoInto(origin);
               return;
             }
@@ -721,7 +773,8 @@
           });
         });
       } else {
-        // DEMO MODE — instant.
+        // DEMO MODE — instant. (Also the quiet offline path: no network,
+        // no live calls — the demo kitchen is always open.)
         state.originLabel = state.originLabel || 'near you';
         loadDemoInto(state.origin || DEMO_ORIGIN);
       }
@@ -825,7 +878,11 @@
       if (state.nextPage && typeof state.nextPage.fetch === 'function') {
         state.nextPage.fetch(function (err, list, more) {
           state.loadingMore = false;
-          if (err) { settings.showError(err); state.hasMore = false; if (cb) cb([]); return; }
+          if (err) {
+            if (offline.isOffline()) offline.sync();
+            else settings.showError(err);
+            state.hasMore = false; if (cb) cb([]); return;
+          }
           state.nextPage = more || null;
           state.hasMore = !!more;
           var seen = {};
@@ -908,7 +965,7 @@
           var q = locInput ? locInput.value.trim() : '';
           if (!q) { if (locInput) locInput.focus(); return; }
           state.originLabel = q;
-          if (store.getKey()) {
+          if (store.getKey() && !offline.isOffline()) {
             gmaps.geocode(q, function (err, origin) {
               if (err || !origin) { settings.showError(err || 'Could not find that place.'); return; }
               state.origin = origin;
@@ -3969,12 +4026,25 @@
     popular.init();
     settings.init();
     find.init();
+    offline.init();
 
     // PWA: register the Peckish service worker, scoped to '/eats' so it
     // never controls the rest of the portfolio. Network-first, so online
     // visitors always get fresh files; offline reopens keep demo mode alive.
     try {
       if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+        // Update flow: when a NEW worker replaces the one controlling this
+        // page, quietly mention it once. First-ever install also fires
+        // controllerchange (clients.claim), so only speak when the page
+        // was already controlled — and never reload, no loops.
+        var hadController = !!navigator.serviceWorker.controller;
+        var updateToasted = false;
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          if (!hadController) { hadController = true; return; }
+          if (updateToasted) return;
+          updateToasted = true;
+          toast('Peckish refreshed — new version ready');
+        });
         navigator.serviceWorker.register('/peckish-sw.js', { scope: '/eats' }).catch(function () {
           /* registration is a progressive enhancement — never surface errors */
         });

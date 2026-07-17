@@ -224,6 +224,41 @@ changes.
 ### PWA (2026-07-08)
 Peckish is installable: `peckish.webmanifest` (standalone, portrait, watercolor icons in `images/peckish-icon-*.png`) + `peckish-sw.js` registered with **scope `/eats`** so it never controls the rest of the portfolio. Strategy: network-first with cache fallback — online visitors always get fresh files, and **demo mode works fully offline** after the first visit (verified: offline reload + full deck flow). Install tip added to the settings sheet. Icons regenerate from `scratchpad` pkicon.html if ever needed.
 
+### Service worker v2 — real offline resilience (2026-07-16)
+- **`peckish-sw.js` bumped to `CACHE = 'peckish-v2'`** with the full core
+  shell precached on install (eats.html, eats.css, exhibit-page.css,
+  eats.js, gallery.js, favicon.svg, the manifest, and all three
+  `peckish-icon-{180,192,512}.png`); activate deletes any older
+  `peckish-*` caches (v1 cleanup verified). Fetch strategy unchanged:
+  network-first with cache fallback, so fresh deploys always win online.
+- **Offline signal** — a new `offline` closure in `eats.js` (initialized
+  in `boot()`) pins a small paper note to the top of the Find panel:
+  *"You're offline — demo kitchen's still open"* (`#offline-note`,
+  JS-built, `role="note"`, rose-washed `.offline-note` CSS with evening
+  override + reduced-motion opt-out). Driven by `navigator.onLine` and
+  the `online`/`offline` events (state changes are announced through the
+  live region); appears/disappears live, no reload needed.
+- **Offline searches land in demo mode silently** — `startSearch()`, the
+  location-form geocode path, and `searchFarther()` all consult
+  `offline.isOffline()`: with a saved key but no network they skip the
+  live Google path (or, if the connection dropped mid-search, skip the
+  settings error prompt) and run the demo data instead. The existing
+  demo pipeline is untouched — offline is just routed onto it.
+- **Update flow** — `boot()` listens for `controllerchange`: when a NEW
+  service worker takes over a page that was already controlled, the
+  existing `toast()` shows *"Peckish refreshed — new version ready"*
+  once per page (guarded flag; first-ever install stays silent, and
+  nothing ever auto-reloads, so no reload loops). No push, no
+  background sync — deliberately out of scope.
+- Verified with Playwright (chromium, 390×844, real HTTP): precache
+  contents + v1 deletion asserted via `caches.keys()`/`cache.match`;
+  offline reload **with the HTTP server killed** (Playwright's
+  `setOffline` doesn't gate SW-originated fetches) boots fully from
+  cache; banner light + evening screenshots; offline search deals the
+  demo deck; back online hides the banner; a byte-changed SW triggers
+  exactly one toast and a second controller change stays quiet. Zero
+  page errors (Google Fonts noise excepted).
+
 ### Wave 5-6 (2026-07-08)
 - **Popular sparklines** — each leaderboard row draws a 7-point trend line (`svgSparkline` + `trendSeries`: deterministic, name-seeded, shaped by the row's trend direction) in the rank accent; aria-hidden, hidden <360px.
 - **Rating-save celebration** — saving a rating fires a watercolor droplet burst from the sheet (`dropletBurst(cx,cy,base)`, a reusable body-level helper), a 14 ms haptic, and a toast with the overall score.
