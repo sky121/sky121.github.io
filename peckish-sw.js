@@ -4,7 +4,7 @@
    online and demo mode keeps working offline. */
 'use strict';
 
-var CACHE = 'peckish-v1';
+var CACHE = 'peckish-v2';
 var CORE = [
   '/eats.html',
   '/assets/css/eats.css',
@@ -13,7 +13,9 @@ var CORE = [
   '/assets/js/gallery.js',
   '/favicon.svg',
   '/peckish.webmanifest',
-  '/images/peckish-icon-192.png'
+  '/images/peckish-icon-180.png',
+  '/images/peckish-icon-192.png',
+  '/images/peckish-icon-512.png'
 ];
 
 self.addEventListener('install', function (e) {
