@@ -163,6 +163,38 @@ a real decision tool instead of a name+meta list:
   shortlist + Back keep working beneath the new Pick for me button. The old
   `.sl-item` row styles were removed with the code that built them.
 
+### Rating sheet delight pass (2026-07-16)
+Scoring in the rating sheet (Rate / add / edit) now reacts to the scores
+themselves. No change to what's saved — same entry shape, same keys.
+- **Score-tinted sliders** — as a slider moves, JS sets `--score-tint` on
+  its `.slider-block` (`scoreTint(v)` in the sheet closure: a linear
+  pigment mix, low ~rose → 50 ~gold → high ~sage). The wc-range track fill
+  + thumb drink the raw tint (`var(--score-tint, var(--track-fill, …))`,
+  both WebKit and Moz pseudo-elements), while the number takes an
+  **ink-anchored `color-mix`** (38% tint / 62% ink; evening: 55% tint into
+  cream `#f1ead9`) so it stays AA-readable at every score. Browsers
+  without `color-mix` fall back to the old per-category colors (invalid
+  declaration → earlier rule wins). Sliders stay native inputs — fully
+  keyboard-operable, tint follows arrow keys.
+- **Live overall bloom** — a soft watercolor blot (`.overall-blot`, a
+  blurred blob inside the new `.overall-num-wrap` in `eats.html`) sits
+  behind the Overall number, tinted by the same `--score-tint` (set on the
+  wrap from the live average) and **gently swelling one pulse at a time**
+  while any slider moves (`.is-swell` → `blot-swell` keyframes,
+  transform/opacity only; `animationend` clears the gate). Input events
+  are **coalesced to one sync per frame** via `requestAnimationFrame`
+  (`scheduleSync`) so fine-grained drags don't thrash. The Overall number
+  gets the same AA color-mix treatment (34% tint into ink; large-text
+  sizes give extra contrast headroom over the blot).
+- **Save celebration** — the save burst now fires as a tiny `dropletBurst`
+  from the **Save button** (rect captured before `hide()` — a hidden sheet
+  measures 0×0) instead of the sheet's midpoint, alongside the existing
+  toast + haptic.
+- **Reduced motion** — numbers + tints still update instantly, but the JS
+  never adds `.is-swell`, `dropletBurst` already no-ops, and the CSS
+  reduced-motion block zeroes the blot/number transitions (selectors match
+  the tint rules' specificity so they actually win).
+
 ### End-of-deck "adjust one thing" chips (2026-07-15)
 The end-of-deck screen now recovers without a full restart. Above the
 existing actions (Compare shortlist / Widen preferences / Search farther /

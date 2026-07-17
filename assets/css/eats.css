@@ -740,10 +740,10 @@ html.evening .ctl-switch { background: rgba(233, 227, 211, 0.2); }
 .wc-range::-webkit-slider-runnable-track {
   height: 0.55rem;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--track-fill, var(--pond)) var(--fill, 50%), rgba(46,58,72,0.16) var(--fill, 50%));
+  background: linear-gradient(90deg, var(--score-tint, var(--track-fill, var(--pond))) var(--fill, 50%), rgba(46,58,72,0.16) var(--fill, 50%));
 }
 html.evening .wc-range::-webkit-slider-runnable-track {
-  background: linear-gradient(90deg, var(--track-fill, var(--pond)) var(--fill, 50%), rgba(233,227,211,0.18) var(--fill, 50%));
+  background: linear-gradient(90deg, var(--score-tint, var(--track-fill, var(--pond))) var(--fill, 50%), rgba(233,227,211,0.18) var(--fill, 50%));
 }
 .wc-range::-moz-range-track {
   height: 0.55rem;
@@ -754,7 +754,7 @@ html.evening .wc-range::-moz-range-track { background: rgba(233,227,211,0.18); }
 .wc-range::-moz-range-progress {
   height: 0.55rem;
   border-radius: 999px;
-  background: var(--track-fill, var(--pond));
+  background: var(--score-tint, var(--track-fill, var(--pond)));
 }
 .wc-range::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -762,14 +762,14 @@ html.evening .wc-range::-moz-range-track { background: rgba(233,227,211,0.18); }
   width: 1.4rem; height: 1.4rem;
   margin-top: -0.42rem;
   border-radius: 52% 48% 55% 45% / 48% 56% 44% 52%;
-  background: radial-gradient(circle at 35% 30%, #fff 0%, var(--track-fill, var(--pond)) 70%);
+  background: radial-gradient(circle at 35% 30%, #fff 0%, var(--score-tint, var(--track-fill, var(--pond))) 70%);
   border: 2px solid var(--paper);
   box-shadow: 0 2px 6px -1px rgba(46,58,72,0.5);
 }
 .wc-range::-moz-range-thumb {
   width: 1.4rem; height: 1.4rem;
   border-radius: 52% 48% 55% 45% / 48% 56% 44% 52%;
-  background: radial-gradient(circle at 35% 30%, #fff 0%, var(--track-fill, var(--pond)) 70%);
+  background: radial-gradient(circle at 35% 30%, #fff 0%, var(--score-tint, var(--track-fill, var(--pond))) 70%);
   border: 2px solid var(--paper);
   box-shadow: 0 2px 6px -1px rgba(46,58,72,0.5);
 }
@@ -3014,6 +3014,20 @@ html.evening .sheet { box-shadow: 0 -10px 40px -16px rgba(0,0,0,0.7); }
 .slider--service .slider-num { color: var(--pond-ink); }
 .slider--service .wc-range { --track-fill: var(--pond); }
 
+/* Score-reactive tint (rating sheet): JS sets --score-tint on each
+   .slider-block (rose -> gold -> sage along 0-100); the wc-range track +
+   thumb drink it raw (decorative), while the number gets an ink-anchored
+   color-mix so it stays AA-readable at every score. Browsers without
+   color-mix keep the per-category colors above (invalid declaration ->
+   earlier rule wins). */
+.slider-block .slider-num {
+  color: color-mix(in srgb, var(--score-tint, var(--pond)) 38%, var(--ink));
+  transition: color 0.25s ease;
+}
+html.evening .slider-block .slider-num {
+  color: color-mix(in srgb, var(--score-tint, var(--pond)) 55%, #f1ead9);
+}
+
 .overall-readout {
   display: flex;
   align-items: baseline;
@@ -3025,6 +3039,7 @@ html.evening .sheet { box-shadow: 0 -10px 40px -16px rgba(0,0,0,0.7); }
 }
 .overall-label { font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); }
 .overall-value {
+  position: relative; /* rides above the blot */
   font-family: var(--font-display);
   font-size: 2.4rem;
   font-weight: 500;
@@ -3032,6 +3047,43 @@ html.evening .sheet { box-shadow: 0 -10px 40px -16px rgba(0,0,0,0.7); }
   line-height: 1;
 }
 html.evening .overall-value { color: var(--pond-ink); }
+
+/* Live overall bloom: a soft watercolor blot behind the number, tinted by
+   --score-tint (set by JS on .overall-num-wrap) and gently swelling while a
+   slider moves. Keyframes touch transform/opacity only; the tint change is
+   a background-color transition. The number itself takes an ink-anchored
+   color-mix (cream-anchored in the evening) — AA-large at every score,
+   with the pond colors above as the no-color-mix fallback. */
+.overall-num-wrap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+.overall-blot {
+  position: absolute;
+  inset: -0.55rem -1rem;
+  border-radius: 58% 42% 52% 48% / 46% 58% 42% 54%;
+  background-color: var(--score-tint, var(--pond));
+  filter: blur(7px);
+  opacity: 0.3;
+  transform: scale(1);
+  transition: background-color 0.35s ease;
+  pointer-events: none;
+}
+html.evening .overall-blot { opacity: 0.34; }
+.overall-blot.is-swell { animation: blot-swell 0.5s cubic-bezier(0.33, 1, 0.55, 1); }
+@keyframes blot-swell {
+  0%   { transform: scale(1); opacity: 0.3; }
+  45%  { transform: scale(1.16); opacity: 0.42; }
+  100% { transform: scale(1); opacity: 0.3; }
+}
+.overall-readout .overall-value {
+  color: color-mix(in srgb, var(--score-tint, var(--pond-deep)) 34%, var(--ink));
+  transition: color 0.35s ease;
+}
+html.evening .overall-readout .overall-value {
+  color: color-mix(in srgb, var(--score-tint, var(--pond)) 52%, #f1ead9);
+}
 
 .sheet-actions { display: flex; gap: 0.7rem; margin-top: 0.4rem; }
 .btn-ghost, .btn-solid {
@@ -3151,7 +3203,9 @@ html.evening .eats-toast-act:hover { color: var(--pond-ink); background: rgba(12
   .empty-steam, .pop-rank.is-blooming,
   .trio-block.is-turn, .trio-vibe::before, .trio-food::before,
   .pref-group.is-step,
-  .slc, .slc-choose, .eats-toast {
+  .slc, .slc-choose, .eats-toast,
+  .overall-blot, .overall-blot.is-swell,
+  .slider-block .slider-num, .overall-readout .overall-value {
     transition: none;
     animation: none;
   }
