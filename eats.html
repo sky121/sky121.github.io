@@ -66,31 +66,40 @@
         aria-labelledby="tab-find"
         tabindex="0"
       >
-        <!-- CALM LANDING (pre-search) — stripped to just the bubble + a quiet link -->
+        <!-- CALM LANDING (pre-search) — a warm heading + one clear primary CTA
+             sitting low in the thumb zone. Watercolor lives in the background. -->
         <div class="find-landing" id="find-landing">
-          <button class="find-orb" id="find-near-me" type="button" aria-label="Find food near me with Tableau">
-            <span class="find-orb-pool" aria-hidden="true"></span>
-            <span class="find-orb-inner">
-              <span class="find-orb-text">Find</span>
-            </span>
-          </button>
+          <div class="find-hero">
+            <h2 class="find-hero-title">Where to, tonight?</h2>
+            <p class="find-hero-sub">A quiet nudge toward dinner.</p>
+          </div>
 
-          <button class="landing-loc-link" id="loc-reveal" type="button" aria-expanded="false" aria-controls="loc-form">
-            search a specific location
-          </button>
+          <div class="find-cta">
+            <button class="find-cta-btn" id="find-near-me" type="button" aria-label="Find a place to eat near me">
+              <svg class="find-cta-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 21s-6.5-5.3-6.5-10.2A6.5 6.5 0 0 1 12 4.3a6.5 6.5 0 0 1 6.5 6.5C18.5 15.7 12 21 12 21z"></path>
+                <circle cx="12" cy="10.6" r="2.4"></circle>
+              </svg>
+              <span class="find-cta-label">Find a place near me</span>
+            </button>
 
-          <form class="loc-form" id="loc-form" autocomplete="off" hidden>
-            <div class="loc-row">
-              <input
-                class="loc-input"
-                id="loc-input"
-                type="text"
-                placeholder="city or address"
-                aria-label="City or address"
-              />
-              <button class="loc-go" id="loc-go" type="submit">Search</button>
-            </div>
-          </form>
+            <button class="landing-loc-link" id="loc-reveal" type="button" aria-expanded="false" aria-controls="loc-form">
+              search a specific location
+            </button>
+
+            <form class="loc-form" id="loc-form" autocomplete="off" hidden>
+              <div class="loc-row">
+                <input
+                  class="loc-input"
+                  id="loc-input"
+                  type="text"
+                  placeholder="city or address"
+                  aria-label="City or address"
+                />
+                <button class="loc-go" id="loc-go" type="submit">Search</button>
+              </div>
+            </form>
+          </div>
         </div>
 
         <!-- ============ PREFERENCES SCREEN (post-pop) ============ -->
