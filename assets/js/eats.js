@@ -1,5 +1,5 @@
 /* ==========================================================================
-   eats.js — "Peckish" where-to-eat app.
+   eats.js — "Tableau" (formerly Peckish) where-to-eat app.
    Vanilla JS, no dependencies (Google Maps JS API loaded lazily at runtime
    only when the user has supplied a key). No leaked globals besides one
    Maps loader callback. Demo mode runs with zero console errors / no key.
@@ -666,7 +666,7 @@
     var prefsWrap = $('prefs-wrap');
     var deckWrap = $('deck-wrap');
 
-    /* Hide the shared page header (eyebrow + "Peckish" wordmark) whenever the
+    /* Hide the shared page header (eyebrow + "Tableau" wordmark) whenever the
        calm Find landing is the thing on screen. Other screens keep it. */
     function syncHeaderChrome() {
       var room = $('room');
@@ -898,44 +898,50 @@
     }
     function hasFarther() { return !!(store.getKey() && state.hasMore); }
 
-    /* --- Watercolor bubble POP, then go to Preferences --- */
+    /* --- Ink-absorption press, then a quiet wash into Preferences ---
+       The surface takes the touch like a brush on wet paper: a soft dark
+       bloom gathers INWARD at the tap point while the orb settles a hair,
+       then the landing dissolves forward into the wizard. No droplet burst,
+       no expanding rings. */
     var popping = false;
-    function popAndStart() {
+    function popAndStart(e) {
       if (popping) return;
       var orb = $('find-near-me');
       if (!orb || prefersReducedMotion) { showPrefs(true); return; }
       popping = true;
 
+      // Locate the "brush" touch so the bloom gathers where the finger
+      // landed; keyboard activation (clientX 0/undefined) blooms from centre.
       var rect = orb.getBoundingClientRect();
-      var layer = el('div', 'orb-burst');
-      layer.style.left = (rect.left + rect.width / 2) + 'px';
-      layer.style.top = (rect.top + rect.height / 2) + 'px';
-
-      var palette = ['var(--rose)', 'var(--wisteria)', 'var(--sage)', 'var(--gold)', 'var(--pond)'];
-      var DROPS = 14;
-      var base = Math.min(rect.width, rect.height);
-      for (var i = 0; i < DROPS; i++) {
-        var d = el('span', 'orb-drop');
-        var ang = (i / DROPS) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
-        var dist = base * (0.34 + Math.random() * 0.32);
-        var size = base * (0.06 + Math.random() * 0.10);
-        d.style.setProperty('--dx', (Math.cos(ang) * dist).toFixed(1) + 'px');
-        d.style.setProperty('--dy', (Math.sin(ang) * dist).toFixed(1) + 'px');
-        d.style.width = size.toFixed(1) + 'px';
-        d.style.height = size.toFixed(1) + 'px';
-        d.style.background = palette[i % palette.length];
-        d.style.animationDelay = (Math.random() * 60).toFixed(0) + 'ms';
-        layer.appendChild(d);
+      var bx = 50, by = 50;
+      if (e && e.clientX) {
+        bx = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+        by = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
       }
-      document.body.appendChild(layer);
-      orb.classList.add('is-popping');
+      var pool = orb.querySelector('.find-orb-pool');
+      var bloom = el('div', 'orb-ink-bloom');
+      bloom.style.setProperty('--bx', bx.toFixed(1) + '%');
+      bloom.style.setProperty('--by', by.toFixed(1) + '%');
+      if (pool) pool.appendChild(bloom);
+
+      orb.classList.add('is-absorbing');
+
+      // ~300ms of absorption, then dissolve the landing forward into prefs.
+      window.setTimeout(function () {
+        if (landingEl) landingEl.classList.add('is-dissolving');
+      }, 300);
 
       window.setTimeout(function () {
-        if (layer.parentNode) layer.parentNode.removeChild(layer);
-        orb.classList.remove('is-popping');
-        popping = false;
+        if (bloom.parentNode) bloom.parentNode.removeChild(bloom);
+        orb.classList.remove('is-absorbing');
         showPrefs(true);
-      }, 480);
+        if (landingEl) landingEl.classList.remove('is-dissolving');
+        if (prefsWrap) {
+          prefsWrap.classList.add('is-washing-in');
+          window.setTimeout(function () { prefsWrap.classList.remove('is-washing-in'); }, 460);
+        }
+        popping = false;
+      }, 560);
     }
 
     function init() {
@@ -4080,7 +4086,8 @@
     find.init();
     offline.init();
 
-    // PWA: register the Peckish service worker, scoped to '/eats' so it
+    // PWA: register the Tableau service worker (legacy filename
+    // peckish-sw.js), scoped to '/eats' so it
     // never controls the rest of the portfolio. Network-first, so online
     // visitors always get fresh files; offline reopens keep demo mode alive.
     try {
@@ -4095,7 +4102,7 @@
           if (!hadController) { hadController = true; return; }
           if (updateToasted) return;
           updateToasted = true;
-          toast('Peckish refreshed — new version ready');
+          toast('Tableau refreshed — new version ready');
         });
         navigator.serviceWorker.register('/peckish-sw.js', { scope: '/eats' }).catch(function () {
           /* registration is a progressive enhancement — never surface errors */
