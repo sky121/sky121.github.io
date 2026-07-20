@@ -12,7 +12,7 @@
 > icon *art* changed.
 >
 > Single source of truth so we can pick up exactly where we left off.
-> Last updated: **2026-07-19**.
+> Last updated: **2026-07-20**.
 
 ---
 
@@ -43,6 +43,42 @@
 ---
 
 ## Feature map (what's built)
+
+### Landing "clean primary CTA" — the orb is gone (2026-07-20)
+Third pass on the Find landing. The user rejected both earlier attempts — a
+floating watercolor **orb/sphere** as the button ("the giant orb floating in a
+void doesn't read as good UI/UX") — and chose a clear direction: a warm heading
++ a one-line subtitle, then a **single obvious rounded primary button** low in
+the thumb zone, with watercolor kept only as the background wash.
+- **The orb is fully removed** — the circular `.find-orb` button, its
+  `.find-orb-pool` water body, the `.orb-ink-bloom` press bloom, and the whole
+  CSS block (`.find-orb*`, `@keyframes orb-light-drift / orb-shadow-breathe /
+  orb-ink-absorb`) are deleted. The `popAndStart` ink-absorption choreography
+  (`is-absorbing` / `is-dissolving`) is gone from `eats.js`. **`dropletBurst`
+  and its `.orb-burst` / `.orb-drop` / `orb-drop-fly` CSS are kept** — the
+  rating-save celebration still uses them; they were never on the find path.
+- **New landing** (`eats.html`): a `.find-hero` (italic Cormorant
+  "Where to, tonight?" + muted Karla "A quiet nudge toward dinner.") then a
+  `.find-cta` cluster — the primary `#find-near-me` button (**same id**, so the
+  click→`showPrefs` wiring is untouched) as a solid pond-tinted **pill** with a
+  location-pin glyph + "Find a place near me", plus the unchanged "search a
+  specific location" link and its location form beneath. Layout: the CTA is
+  pushed low via `margin-top:auto` (button center ≈ 67% down at 390×844 — thumb
+  zone, not dead-center, clear of the tab bar).
+- **Look**: deep pond fill (`#4c76a0`→`#3f6187`) with paper-white text in light,
+  lighter pond fill with dark ink text under `html.evening` (both ≥4.5:1 AA);
+  soft shadow, subtle `:active` press (~2% scale + shadow tighten). No glossy
+  sphere, no rings, no droplet burst.
+- **Transition**: a quiet crossfade — `.find-landing.is-leaving` fades out, then
+  `showPrefs(true)` with the existing `.prefs-wrap.is-washing-in` wash-in.
+  `prefers-reduced-motion` jumps straight to the wizard.
+- Real `<button>` — Enter/Space activate it; `aria-label="Find a place to eat
+  near me"`. Verified (Playwright, 390×844): heading+subtitle+one button, orb
+  markup absent, `#find-near-me` is a `<button>`, click **and** Enter open the
+  wizard (`.pref-group.is-step` = 1), **`.orb-burst` created 0×** in the find
+  flow, `:active` has a `scale()` transform, reduced-motion instant, evening
+  contrast good, dropletBurst CSS intact, zero page errors (Google Fonts noise
+  excepted).
 
 ### Renamed to Tableau + new Find button (2026-07-19)
 Responding to user critique ("not a huge fan of the name Peckish… I don't like

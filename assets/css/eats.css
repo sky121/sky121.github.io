@@ -158,7 +158,7 @@ html.evening .bottab.is-active .bottab-icon { color: #a9cdec; fill: rgba(159, 19
 .bottab:focus-visible,
 .corner-gear:focus-visible,
 .loc-go:focus-visible,
-.find-orb:focus-visible,
+.find-cta-btn:focus-visible,
 .landing-loc-link:focus-visible,
 .results-back:focus-visible,
 .swipe-card:focus-visible,
@@ -234,191 +234,124 @@ html.evening :focus-visible {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   text-align: center;
-  gap: 1.8rem;
-  /* vertically center in the generous space above the bottom bar */
+  /* The hero sits in the upper-middle; the CTA is pushed low into the thumb
+     zone via margin-top:auto on .find-cta — never dead-center, never buried
+     behind the tab bar (the room's 7rem bottom padding keeps clearance). */
   min-height: min(66vh, 34rem);
   padding: 1.5rem 0 0.5rem;
 }
 
 /* When the calm Find landing is showing, retire the shared page header
-   (eyebrow + "Tableau" wordmark) so the bubble stands alone. */
+   (eyebrow + "Tableau" wordmark) so the landing composes on its own. */
 .eats-room.find-landing-on > .room-label,
 .eats-room.find-landing-on > .exhibit-title {
   display: none;
 }
 .eats-room.find-landing-on .find-landing {
-  min-height: min(74vh, 40rem);
+  min-height: min(76vh, 42rem);
 }
 
-/* ----- The FIND button: a deep, still pool ----- */
-/* A restrained composition — ink sinking into pond-deep, like looking down
-   into deep water on paper. At most two hues. Layering (back → front):
-   ::after soft breathing glow-shadow, .find-orb-pool (the water body + one
-   slow light drift on its ::before), .find-orb-inner (the word mark). All
-   motion is transform/opacity only and barely-there — expensive and calm. */
-.find-orb {
-  position: relative;
-  appearance: none;
-  border: 0;
-  cursor: pointer;
-  width: clamp(11.5rem, 56vw, 15.5rem);
-  height: clamp(11.5rem, 56vw, 15.5rem);
-  border-radius: 50%;
-  background: transparent;
-  display: grid;
-  place-items: center;
-  isolation: isolate;
-  -webkit-tap-highlight-color: transparent;
-  /* hover/press ride the independent translate/scale properties so nothing
-     fights (the orb body itself carries no transform animation) */
-  transition:
-    translate 0.5s cubic-bezier(0.22, 1, 0.36, 1),
-    scale 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+/* ----- warm hero: a heading + a one-line subtitle ----- */
+.find-hero {
+  margin-top: clamp(2.25rem, 12vh, 6rem);
 }
-
-/* the water body: pond-deep at the centre sinking to ink at the rim, with a
-   faint wet meniscus of light up top. Clips the drifting light + press bloom. */
-.find-orb-pool {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  overflow: hidden;
-  background:
-    /* wet meniscus — faint paper light near the top edge */
-    radial-gradient(58% 44% at 34% 24%, rgba(246, 241, 231, 0.26) 0%, rgba(246, 241, 231, 0) 60%),
-    /* the deep water: pond-deep centre darkening to ink at the edge */
-    radial-gradient(120% 120% at 50% 46%, rgba(74, 114, 153, 0.6) 0%, rgba(46, 58, 72, 0.94) 92%);
-  box-shadow:
-    0 20px 40px -20px rgba(46, 58, 72, 0.55),
-    inset 0 0 0 1px rgba(246, 241, 231, 0.2),
-    inset 0 10px 24px -10px rgba(246, 241, 231, 0.24),
-    inset 0 -32px 48px -18px rgba(20, 28, 38, 0.55);
-  z-index: -1;
-}
-html.evening .find-orb-pool {
-  /* moonlit water: hues lifted so the pool doesn't vanish into dark paper */
-  background:
-    radial-gradient(58% 44% at 34% 24%, rgba(210, 226, 240, 0.28) 0%, rgba(210, 226, 240, 0) 60%),
-    radial-gradient(120% 120% at 50% 46%, rgba(110, 150, 186, 0.68) 0%, rgba(52, 74, 98, 0.96) 92%);
-  box-shadow:
-    0 20px 40px -20px rgba(0, 0, 0, 0.6),
-    inset 0 0 0 1px rgba(210, 226, 240, 0.22),
-    inset 0 10px 24px -10px rgba(210, 226, 240, 0.2),
-    inset 0 -32px 48px -18px rgba(0, 0, 0, 0.55);
-}
-
-/* one slow, soft light drifting across the surface — 60s, low amplitude */
-.find-orb-pool::before {
-  content: "";
-  position: absolute;
-  inset: -12%;
-  border-radius: 50%;
-  background: radial-gradient(38% 30% at 40% 34%, rgba(159, 194, 224, 0.4) 0%, rgba(159, 194, 224, 0) 66%);
-  will-change: transform;
-  animation: orb-light-drift 60s ease-in-out infinite alternate;
-}
-html.evening .find-orb-pool::before {
-  background: radial-gradient(38% 30% at 40% 34%, rgba(184, 212, 238, 0.36) 0%, rgba(184, 212, 238, 0) 66%);
-}
-@keyframes orb-light-drift {
-  0%   { transform: translate(-4%, -3%) scale(1); }
-  100% { transform: translate(5%, 4%) scale(1.06); }
-}
-
-/* soft breathing glow-shadow behind everything (opacity/scale breathe only,
-   very slow and shallow) */
-.find-orb::after {
-  content: "";
-  position: absolute;
-  inset: -15%;
-  border-radius: 50%;
-  background: radial-gradient(50% 50% at 50% 58%, rgba(74, 114, 153, 0.42) 0%, rgba(74, 114, 153, 0) 70%);
-  z-index: -3;
-  pointer-events: none;
-  opacity: 0.6;
-  animation: orb-shadow-breathe 7s ease-in-out infinite;
-}
-html.evening .find-orb::after {
-  background: radial-gradient(50% 50% at 50% 58%, rgba(127, 168, 201, 0.4) 0%, rgba(127, 168, 201, 0) 70%);
-  opacity: 0.7;
-}
-@keyframes orb-shadow-breathe {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50%      { opacity: 0.4;  transform: scale(1.05); }
-}
-
-/* --- Ink absorption on press: a soft dark bloom gathers INWARD at the tap
-   point (positioned via --bx/--by), tightening + darkening over ~300ms. No
-   rings, no droplets. Appended into the pool so it's clipped to the circle. */
-.orb-ink-bloom {
-  position: absolute;
-  left: var(--bx, 50%);
-  top: var(--by, 50%);
-  width: 160%;
-  height: 160%;
-  margin-left: -80%;
-  margin-top: -80%;
-  border-radius: 50%;
-  pointer-events: none;
-  background: radial-gradient(circle, rgba(16, 23, 32, 0.9) 0%, rgba(30, 42, 56, 0.5) 40%, rgba(46, 58, 72, 0) 72%);
-  transform: scale(1.15);
-  opacity: 0;
-  animation: orb-ink-absorb 320ms ease-in forwards;
-}
-@keyframes orb-ink-absorb {
-  0%   { transform: scale(1.15); opacity: 0; }
-  32%  { opacity: 0.75; }
-  100% { transform: scale(0.42); opacity: 0.96; }
-}
-
-.find-orb-inner {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* warm paper-white — high contrast on the deep water in BOTH themes */
-  color: #f6f1e7;
-  text-shadow:
-    0 1px 2px rgba(20, 28, 38, 0.55),
-    0 2px 14px rgba(20, 28, 38, 0.5);
-}
-html.evening .find-orb-inner {
-  color: #f3eee3;
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.6),
-    0 2px 14px rgba(0, 0, 0, 0.55);
-}
-.find-orb-text {
+.find-hero-title {
   font-family: var(--font-display);
   font-style: italic;
   font-weight: 500;
-  font-size: clamp(1.9rem, 6.4vw, 2.5rem);
-  line-height: 1;
-  letter-spacing: 0.02em;
+  font-size: clamp(2.3rem, 9vw, 3.4rem);
+  line-height: 1.04;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  margin: 0;
 }
-.find-orb:hover  { translate: 0 -4px; scale: 1.02; }
-.find-orb:active {
-  translate: 0 -1px;
-  scale: 0.985;
-  transition-duration: 0.14s, 0.14s;
-}
-
-/* ----- PRESS: the orb settles a hair while the ink absorbs ----- */
-.find-orb.is-absorbing {
-  pointer-events: none;
-  scale: 0.975;
-  transition: scale 0.3s ease;
+.find-hero-sub {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: clamp(1rem, 3.6vw, 1.15rem);
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin: 0.7rem 0 0;
 }
 
-/* ----- The landing dissolves forward into the wizard (quiet wash) ----- */
-.find-landing.is-dissolving {
+/* ----- the CTA cluster, pushed low into the thumb zone ----- */
+.find-cta {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  width: 100%;
+  padding-bottom: 0.5rem;
+}
+
+/* ----- the primary button: a solid watercolor-tinted pill ----- */
+.find-cta-btn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 60px;
+  padding: 0 2.1rem;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 1.08rem;
+  letter-spacing: 0.005em;
+  /* warm paper-white on a deep pond fill — 4.5:1+ (WCAG AA) in both themes */
+  color: #f6f1e7;
+  background: linear-gradient(165deg, #4c76a0 0%, #3f6187 100%);
+  box-shadow:
+    0 14px 28px -12px rgba(46, 58, 72, 0.55),
+    inset 0 1px 0 rgba(246, 241, 231, 0.3);
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.16s ease,
+    filter 0.16s ease;
+}
+html.evening .find-cta-btn {
+  /* luminous lighter pond on dark paper, with dark ink text (7:1+) */
+  color: #14181f;
+  background: linear-gradient(165deg, #9cc2e2 0%, #6f9ec6 100%);
+  box-shadow:
+    0 14px 30px -12px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(246, 241, 231, 0.4);
+}
+.find-cta-icon { flex: none; }
+.find-cta-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow:
+    0 18px 32px -12px rgba(46, 58, 72, 0.6),
+    inset 0 1px 0 rgba(246, 241, 231, 0.32);
+}
+html.evening .find-cta-btn:hover {
+  box-shadow:
+    0 18px 34px -12px rgba(0, 0, 0, 0.62),
+    inset 0 1px 0 rgba(246, 241, 231, 0.42);
+}
+/* subtle press-down: ~2% scale, shadow tightens — no big animation */
+.find-cta-btn:active {
+  transform: scale(0.98) translateY(1px);
+  filter: brightness(0.98);
+  box-shadow:
+    0 6px 14px -10px rgba(46, 58, 72, 0.5),
+    inset 0 1px 0 rgba(246, 241, 231, 0.22);
+  transition-duration: 0.08s;
+}
+
+/* ----- the landing washes out quietly on the way to the wizard ----- */
+.find-landing.is-leaving {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.32s ease;
+  transition: opacity 0.24s ease;
 }
+
 .prefs-wrap.is-washing-in {
   animation: prefs-wash-in 0.42s ease both;
 }
@@ -3068,12 +3001,10 @@ html.evening .eats-toast-act:hover { color: var(--pond-ink); background: rgba(12
 
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .find-orb, .find-orb-pool,
-  .find-orb::after, .find-orb-pool::before, .bottab-icon,
+  .find-cta-btn, .bottab-icon,
   .card, .ctl-switch::after, .card-action, .sheet,
   .pop-card, .friend-chip, .range-btn,
-  .find-orb.is-absorbing, .orb-ink-bloom,
-  .find-landing.is-dissolving, .prefs-wrap.is-washing-in, .orb-drop,
+  .find-landing.is-leaving, .prefs-wrap.is-washing-in, .orb-drop,
   .pref-chip, .seg-btn, .deck-btn, .end-chip,
   .decision-card, .deck-end-card, .decision-act, .seg-bar,
   .bloom-drop, .roulette-card, .roulette-spark, .roulette-name.is-tick,

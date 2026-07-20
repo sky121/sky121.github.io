@@ -898,55 +898,31 @@
     }
     function hasFarther() { return !!(store.getKey() && state.hasMore); }
 
-    /* --- Ink-absorption press, then a quiet wash into Preferences ---
-       The surface takes the touch like a brush on wet paper: a soft dark
-       bloom gathers INWARD at the tap point while the orb settles a hair,
-       then the landing dissolves forward into the wizard. No droplet burst,
-       no expanding rings. */
-    var popping = false;
-    function popAndStart(e) {
-      if (popping) return;
-      var orb = $('find-near-me');
-      if (!orb || prefersReducedMotion) { showPrefs(true); return; }
-      popping = true;
-
-      // Locate the "brush" touch so the bloom gathers where the finger
-      // landed; keyboard activation (clientX 0/undefined) blooms from centre.
-      var rect = orb.getBoundingClientRect();
-      var bx = 50, by = 50;
-      if (e && e.clientX) {
-        bx = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
-        by = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
-      }
-      var pool = orb.querySelector('.find-orb-pool');
-      var bloom = el('div', 'orb-ink-bloom');
-      bloom.style.setProperty('--bx', bx.toFixed(1) + '%');
-      bloom.style.setProperty('--by', by.toFixed(1) + '%');
-      if (pool) pool.appendChild(bloom);
-
-      orb.classList.add('is-absorbing');
-
-      // ~300ms of absorption, then dissolve the landing forward into prefs.
+    /* --- Quiet wash forward into the wizard ---
+       Tapping the primary CTA fades the landing out, then shows the
+       Preferences wizard with a gentle wash-in. A brief crossfade, nothing
+       more — no droplet burst, no orb choreography. Under reduced motion the
+       transition is instant. */
+    var leaving = false;
+    function popAndStart() {
+      if (leaving) return;
+      if (prefersReducedMotion || !landingEl) { showPrefs(true); return; }
+      leaving = true;
+      landingEl.classList.add('is-leaving');
       window.setTimeout(function () {
-        if (landingEl) landingEl.classList.add('is-dissolving');
-      }, 300);
-
-      window.setTimeout(function () {
-        if (bloom.parentNode) bloom.parentNode.removeChild(bloom);
-        orb.classList.remove('is-absorbing');
         showPrefs(true);
-        if (landingEl) landingEl.classList.remove('is-dissolving');
+        landingEl.classList.remove('is-leaving');
+        leaving = false;
         if (prefsWrap) {
           prefsWrap.classList.add('is-washing-in');
-          window.setTimeout(function () { prefsWrap.classList.remove('is-washing-in'); }, 460);
+          window.setTimeout(function () { prefsWrap.classList.remove('is-washing-in'); }, 440);
         }
-        popping = false;
-      }, 560);
+      }, 240);
     }
 
     function init() {
-      var orb = $('find-near-me');
-      if (orb) orb.addEventListener('click', popAndStart);
+      var cta = $('find-near-me');
+      if (cta) cta.addEventListener('click', popAndStart);
 
       var prefsBack = $('prefs-back');
       if (prefsBack) prefsBack.addEventListener('click', showLanding);
