@@ -1,18 +1,24 @@
-# Peckish — project handoff & design doc
+# Tableau — project handoff & design doc
 
-> A watercolor "where to eat" web app. Tap a bubble → set quick preferences →
+> **Tableau** (formerly *Peckish*, renamed 2026-07-19) — a watercolor "where to
+> eat" web app. Tap the deep-pool **Find** button → set quick preferences →
 > **swipe a Tinder-style deck** of nearby restaurants (closest first, expanding
 > outward) → land on one. Plus a private **Visited** rating log and demo
 > **Friends** + **Popular** tabs.
 >
+> **Filenames stay legacy on purpose:** `eats.html`, `peckish-sw.js`,
+> `peckish.webmanifest`, `peckish-icon-*.png`, `og-peckish.png` keep their names
+> so installed PWAs and existing URLs never break — only user-facing strings and
+> icon *art* changed.
+>
 > Single source of truth so we can pick up exactly where we left off.
-> Last updated: **2026-07-16**.
+> Last updated: **2026-07-19**.
 
 ---
 
 ## Status: LIVE (Lab project)
 
-- **Play it:** https://sky121.github.io/eats.html — reached from the **Lab** (`lab.html`), the "Peckish" tile.
+- **Play it:** https://sky121.github.io/eats.html — reached from the **Lab** (`lab.html`), the "Tableau" tile.
 - Fully usable in **demo mode** right now (sample data, no setup). Two things turn on the "real" features and need *you* (see "What needs you" below): a **Google Maps API key** (live restaurants) and a **backend** (real Friends + Popular).
 
 ### Files (committed to `master`)
@@ -38,7 +44,32 @@
 
 ## Feature map (what's built)
 
-### Find = bubble → preferences → swipe deck
+### Renamed to Tableau + new Find button (2026-07-19)
+Responding to user critique ("not a huge fan of the name Peckish… I don't like
+the look and animation of the find button, especially the circles that come out
+when you click find — feels kinda childish").
+- **Rename → Tableau** (French for a painted scene; evokes *table*): every
+  user-facing string updated — page `<title>`, header/kicker, all toasts /
+  `announce()` / share text / offline banner / aria-labels in `eats.js`, and the
+  manifest `name`/`short_name`. **Files were NOT renamed** (see header) — a
+  manifest comment records the legacy filenames. The app icons and OG card were
+  re-rendered (headless-chromium generator) to a paper field + deep-pool disc +
+  cream serif **T**, tying them to the new Find button; same filenames/dims.
+- **Find button redesign** — the old rainbow-churn orb + droplet-burst press
+  (the "childish circles") are gone. Now a **deep still pool**: an
+  ink→pond-deep radial wash (moonlit lighter blue under `html.evening`), one
+  slow ~barely-there light drift + a breathing shadow, elegant italic Cormorant
+  "Find". Press is an **inward ink absorption** — a dark bloom gathers at the
+  exact tap point (`.orb-ink-bloom`, `--bx/--by` from the pointer), the orb
+  settles ~2%, then the landing dissolves forward into the wizard
+  (`is-absorbing` / `is-dissolving` / `is-washing-in`). **No expanding rings,
+  no `dropletBurst` in the find path** (dropletBurst stays for the rating-save
+  celebration only). `prefers-reduced-motion`: static pool, instant transition.
+  Verified: title/manifest "Tableau", zero user-facing "Peckish" across all
+  tabs, `orb-burst` created **0** times in the find flow, ink bloom appears,
+  wizard opens, reduced-motion instant, zero page errors.
+
+### Find = pool button → preferences → swipe deck
 - **Bubble landing:** a luminous watercolor "Find" bubble (only it + a discreet "search a specific location" link). Tapping it **pops** (watercolor droplet burst; reduced-motion skips straight through) → Preferences.
 - **Preferences — one-at-a-time wizard** (2026-07-08): one pref group on stage at a time (no long scroll): Back / "Skip →" step nav with a "N of 9" position marker, live match count, and **Start swiping + Surprise me always visible** so you can quit the questions early at any point; "Done →" past the last step starts the search; the wizard resets to step 1 on each visit (`prefs.showStep/nextStep`; `.pref-group.is-step` CSS). All groups optional, default "Any", persisted: Cuisine (16 chips), Price ($–$$$$), Min rating (Any/70+/80+/90+), Min reviews (Any/100+/500+/1000+), Open now, Max distance (Walking ~1mi / Short drive ~5mi / Anywhere — caps outward expansion), Dietary (Veg/Vegan/GF), Dining mode (Dine-in/Takeout/Delivery).
 - **Swipe deck:** cards nearest-first, expanding outward. Drag **left = pass / right = like** (rotation + green YES / red NOPE stamps, peeking next card); also ✗/♥ buttons + ArrowLeft/ArrowRight; reduced-motion uses fades. **Tap the card to cycle story segments: Vibe → Food → Reviews.** Card overlay: name, 0–100 rating + review count, price, cuisine, distance, open-now.

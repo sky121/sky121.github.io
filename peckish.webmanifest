@@ -1,6 +1,7 @@
 {
-  "name": "Peckish — find where to eat",
-  "short_name": "Peckish",
+  "_comment": "Filenames (peckish.webmanifest, peckish-sw.js, peckish-icon-*.png) are legacy — the app was renamed Peckish -> Tableau (2026-07-19). Kept as-is so installed PWAs and existing URLs never break.",
+  "name": "Tableau — find where to eat",
+  "short_name": "Tableau",
   "description": "Swipe to decide where to eat, and keep a watercolor log of every place you've tasted.",
   "start_url": "/eats.html",
   "scope": "/eats",
