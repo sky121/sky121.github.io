@@ -8,7 +8,21 @@
   // ---------------------------------------------------------
   // CONSTANTS / CONFIG
   // ---------------------------------------------------------
-  var VW = 540, VH = 960;            // logical portrait resolution
+  var VW = 540, VH = 960;            // logical portrait resolution (the VIEWPORT)
+  // THE WORLD is ~2.2x the viewport on each axis, so the goose flies through
+  // a sky far larger than the screen. World-space content (goose, dragon,
+  // realm gates, particles, shots) is rendered through the camera transform;
+  // the viewport is just the window the camera frames onto that world.
+  var WORLD_SCALE = 2.2;
+  var WORLD_W = Math.round(VW * WORLD_SCALE);   // 1188
+  var WORLD_H = Math.round(VH * WORLD_SCALE);   // 2112
+  // duel camera pulls back so the dragon reads as a creature you circle in
+  // open air rather than a wall filling the frame
+  var DUEL_ZOOM = 0.62;
+  var SKY_ZOOM = 1.0;
+  // parallax cloud wrap margin (clouds roam a band this much larger than the
+  // viewport on each side, so tiles stay covered as the camera pans)
+  var CLOUD_MARGIN = 360;
   var DT = 1 / 60;                    // fixed timestep
   var MAX_FRAME = 0.05;              // clamp big frames (spiral guard)
   var PAL = {
@@ -32,7 +46,7 @@
   // the Fledgling Gale: a first-flight-only training gust near the spawn.
   // Prompt strings live here pre-built (the panel draws every frame and
   // must never build strings); `w` caches each measured text width.
-  var GALE_X = VW * 0.26, GALE_Y = VH * 0.825, GALE_R = 34;
+  var GALE_X = WORLD_W * 0.42, GALE_Y = WORLD_H * 0.80, GALE_R = 34;
   var TRAINING_STEPS = [
     { text: "drag to steer — follow the spirit", w: 0 },
     { text: "tap to dodge through its drift-ring", w: 0 },
@@ -48,6 +62,11 @@
   };
   // reduced-motion rain: one faint uniform wash instead of falling streaks
   var RAIN_WASH = "rgba(74,114,153,0.06)";
+  // primary pigment per realm — off-screen edge indicators paint in this hue
+  var REALM_COLOR = {
+    ember: "#e08a5a", storm: "#7fa8c9", verdant: "#93b48b",
+    gilded: "#d9b96a", umbra: "#8a7bb0"
+  };
   var RIPPLE_STROKE = "rgba(74,114,153,0.55)";
 
   // characters/projectiles/clouds are fully procedural now — only the
@@ -1690,6 +1709,33 @@
     bowing: null,             // the Bowing flourish {t, dur, armed, show} or null
     muted: false,
     bg: { clouds: [], washPhase: 0 },
+    // THE WORLD the camera frames (both sky hub and duels use this size)
+    worldW: WORLD_W, worldH: WORLD_H,
+    // GOOSE-ANCHORED CAMERA WITH GIVE.
+    //   cx/cy  : camera centre in world coords (what sits at screen centre)
+    //   zoom   : world->screen scale (eased toward tzoom)
+    //   k      : critical-damp follow stiffness (world swings a beat behind)
+    //   lead   : seconds of goose velocity added ahead of it (see more sky
+    //            in the direction of travel)
+    //   dead   : dead-zone px so gentle drift never jitters the frame
+    cam: {
+      cx: WORLD_W / 2, cy: WORLD_H / 2,
+      zoom: 1, tzoom: 1,
+      k: 3.6, lead: 0.42, maxLead: 175, dead: 4,
+      _s: { x: 0, y: 0 },
+      // world -> screen (reuses one scratch; read x/y immediately)
+      worldToScreen: function (wx, wy) {
+        this._s.x = (wx - this.cx) * this.zoom + VW / 2;
+        this._s.y = (wy - this.cy) * this.zoom + VH / 2;
+        return this._s;
+      },
+      // one save/translate/scale/translate per frame — no allocation
+      apply: function (g) {
+        g.translate(VW / 2, VH / 2);
+        g.scale(this.zoom, this.zoom);
+        g.translate(-this.cx, -this.cy);
+      }
+    },
     player: null,
     dragon: null,
     daily: null,              // Daily Flight state {date, route, idx, mod} or null
@@ -1724,20 +1770,27 @@
     },
 
     initClouds: function () {
+      // LAYERED PARALLAX. Each band scrolls against the camera at its own
+      // rate: far bands barely move (distant sky), the near/foreground band
+      // overtakes the camera for a rush of depth. Positions live in a wrap
+      // field a little larger than the viewport and are tiled by the camera
+      // offset at draw time (fixed pool, cached sprites, zero per-frame alloc).
       this.bg.clouds.length = 0;
       var layers = [
-        { depth: 0.25, count: 4, scale: 1.7, alpha: 0.26 },
-        { depth: 0.5, count: 3, scale: 1.15, alpha: 0.38 },
-        { depth: 0.85, count: 3, scale: 0.8, alpha: 0.52 }
+        { parallax: 0.3, count: 6, scale: 1.9, alpha: 0.22, drift: -5 },  // far
+        { parallax: 0.6, count: 5, scale: 1.2, alpha: 0.34, drift: 7 },   // mid
+        { parallax: 1.18, count: 4, scale: 0.78, alpha: 0.5, drift: 11 }  // near/foreground
       ];
+      var WRAPX = VW + CLOUD_MARGIN * 2, WRAPY = VH + CLOUD_MARGIN * 2;
       for (var L = 0; L < layers.length; L++) {
         var ly = layers[L];
         for (var i = 0; i < ly.count; i++) {
           this.bg.clouds.push({
-            x: Math.random() * VW,
-            y: Math.random() * (VH + 300) - 150,
-            depth: ly.depth, scale: ly.scale * (0.7 + Math.random() * 0.6),
-            alpha: ly.alpha, speed: 8 + ly.depth * 26,
+            x: Math.random() * WRAPX,
+            y: Math.random() * WRAPY,
+            parallax: ly.parallax,
+            scale: ly.scale * (0.7 + Math.random() * 0.6),
+            alpha: ly.alpha, drift: ly.drift * (0.7 + Math.random() * 0.6),
             variant: (Math.random() * 4) | 0,
             driftPhase: Math.random() * TAU,
             flip: Math.random() < 0.5
@@ -2141,7 +2194,7 @@
       if (Save.data.gentle) startHealth += 1; // gentle breeze assist
 
       this.player = {
-        x: VW / 2, y: VH * 0.72, vx: 0, vy: 0,
+        x: WORLD_W / 2, y: WORLD_H * 0.82, vx: 0, vy: 0,
         facing: -Math.PI / 2, bank: 0,
         r: 30, health: startHealth, maxHealth: startHealth,
         iframes: 0, dodgeCd: 0, dashTime: 0,
@@ -2164,9 +2217,12 @@
       // the open sky: no dragon yet — fly into a realm to anger its ruler
       this.dragon = null;
       this.mode = "sky";
+      this.worldW = WORLD_W; this.worldH = WORLD_H;
       this.initSky();
       this.initWeather();
-      this.player.y = VH * 0.82;
+      this.player.y = WORLD_H * 0.82;
+      this.cam.tzoom = SKY_ZOOM;
+      this.snapCamera();
       // the Fledgling Gale: a gentle training gust for the very first
       // flight only — never in a Daily, never once fledged or victorious
       this.training = null;
@@ -2229,11 +2285,11 @@
       // five realms in a ring around the sky's heart — the player flies in
       // from the bottom, so the lower pair sits widest to leave a clear lane
       var spots = [
-        { x: VW * 0.5, y: VH * 0.13 },    // top center
-        { x: VW * 0.2, y: VH * 0.335 },   // upper left
-        { x: VW * 0.8, y: VH * 0.335 },   // upper right
-        { x: VW * 0.265, y: VH * 0.575 }, // lower left
-        { x: VW * 0.735, y: VH * 0.575 }  // lower right (the dusk gate)
+        { x: WORLD_W * 0.5, y: WORLD_H * 0.13 },    // top center
+        { x: WORLD_W * 0.2, y: WORLD_H * 0.335 },   // upper left
+        { x: WORLD_W * 0.8, y: WORLD_H * 0.335 },   // upper right
+        { x: WORLD_W * 0.265, y: WORLD_H * 0.575 }, // lower left
+        { x: WORLD_W * 0.735, y: WORLD_H * 0.575 }  // lower right (the dusk gate)
       ];
       this.sky = { grace: 1.0, realms: [], tint: { color: "", k: 0, x: 0, y: 0 } };
       for (var i = 0; i < RUN_BOSSES.length; i++) {
@@ -2556,7 +2612,7 @@
         ring: { active: false, x: 0, y: 0, r: 0, rest: 1.4 },
         spirit: {
           x: GALE_X, y: GALE_Y - 50,
-          ax: VW * 0.5, ay: VH * 0.76,   // drift anchor, clear of the realms
+          ax: WORLD_W * 0.5, ay: WORLD_H * 0.78,   // drift anchor, clear of the realms
           phase: Math.random() * TAU,
           puff: 0                        // happy little swell on each success
         }
@@ -2649,7 +2705,7 @@
       // it sheds one golden scale, banked straight into the hoard
       Save.data.fledged = true;
       Save.addScales(1); // addScales saves — fledged rides along
-      this.floatText(sp.x, Math.max(60, sp.y - 46), "+1 scale", PAL.gold);
+      this.floatWorld(sp.x, sp.y - 46, "+1 scale", PAL.gold);
       setTimeout(function () {
         if (Game.state === "PLAYING" && Game.mode === "sky") {
           Game.floatText(VW / 2, VH * 0.64, "the sky will remember you", PAL.gold);
@@ -2682,7 +2738,7 @@
           var msg = realm.defeated
             ? "this realm is already at peace"
             : "the route flies to " + DRAGONS[nxt].name.split(",")[0] + " first";
-          this.floatText(realm.x, Math.min(VH - 80, realm.y + realm.r * 0.5), msg, PAL.wisteria);
+          this.floatWorld(realm.x, realm.y + realm.r * 0.5, msg, PAL.wisteria);
           Audio2.tone(300, 0.14, "sine", 0.06, 220);
           return;
         }
@@ -2693,12 +2749,20 @@
       this.training = null;
       this.galeActive = false;
       this.mode = "duel";
+      this.worldW = WORLD_W; this.worldH = WORLD_H;
+      // the duel arena: a generous central band of the world the dragon roams
+      // and dashes within, so it always reads as circle-able open air but
+      // never wanders to an unreachable corner
+      this.arenaCX = WORLD_W * 0.5; this.arenaCY = WORLD_H * 0.45;
+      this.arenaHW = VW * 0.62; this.arenaHH = VH * 0.34;
       PlayerShots.clear(); DragonShots.clear();
       this.decoy = null;
-      p.x = VW / 2; p.y = VH * 0.72; p.vx = 0; p.vy = 0;
+      p.x = WORLD_W * 0.5; p.y = WORLD_H * 0.60; p.vx = 0; p.vy = 0;
       p.iframes = 1.2;
       p.charge = 0; p.charging = false;
       Audio2.chargeStop();
+      this.cam.tzoom = DUEL_ZOOM;
+      this.snapCamera();
       this.dragon = this.makeDragon(realm.type, ceremonial);
       // boss-intro flyby: a short non-interactive entrance — the dragon
       // swoops in from off-screen and holds its fire under a name card
@@ -2729,8 +2793,11 @@
       // a breather between duels: preen two feathers back
       // (TRINKET: dewdrop phial — one extra feather with the preen)
       p.health = Math.min(p.maxHealth, p.health + (Save.hasTrinket("dewdropPhial") ? 3 : 2));
-      p.x = VW / 2; p.y = VH * 0.82; p.vx = 0; p.vy = 0;
+      this.worldW = WORLD_W; this.worldH = WORLD_H;
+      p.x = WORLD_W / 2; p.y = WORLD_H * 0.82; p.vx = 0; p.vy = 0;
       p.iframes = 1.0;
+      this.cam.tzoom = SKY_ZOOM;
+      this.snapCamera();
       if (this.sky) this.sky.grace = 0.9;
       this.updateHUD();
       this.showScreen(null);
@@ -2767,7 +2834,7 @@
         stolen: stolen,
         punishDodge: punishDodge,
         name: (ceremonial ? "⟡ " : "") + spec.name,
-        x: VW / 2, y: VH * 0.24,
+        x: WORLD_W * 0.5, y: WORLD_H * 0.40,
         vx: 0, vy: 0, r: 110,
         health: hp, maxHealth: hp,
         roamSpeed: roam, enragedSpeed: enraged,
@@ -2775,7 +2842,7 @@
         phase: 1,
         state: "roam", stateT: 0, attackCd: 2.2,
         telegraph: 0, telegraphType: null, telegraphMax: 0,
-        targetX: VW / 2, targetY: VH * 0.24,
+        targetX: WORLD_W * 0.5, targetY: WORLD_H * 0.40,
         hitFlash: 0, bowT: 0,
         // health thresholds that drop scales
         dropMilestones: [0.8, 0.6, 0.45, 0.3, 0.18, 0.08].map(function (f) { return hp * f; }),
@@ -2994,7 +3061,71 @@
       setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 1000);
     },
 
+    // floating text pinned over a WORLD object (dragon, gate, goose): project
+    // through the camera to viewport-logical coords, then reuse floatText.
+    floatWorld: function (worldX, worldY, text, color) {
+      var s = this.cam.worldToScreen(worldX, worldY);
+      this.floatText(s.x, s.y, text, color);
+    },
+
     addShake: function (amt) { if (!reduceMotion) this.shake = Math.min(this.shake + amt, 22); else this.shake = Math.min(this.shake + amt * 0.3, 6); },
+
+    // ----- CAMERA -----
+    // snap the camera onto the goose (used on spawn / mode change so the
+    // world never pans a long way from an old centre). Zoom target is set
+    // by the caller; here we honour it immediately for the framing clamp.
+    snapCamera: function () {
+      // snap the centre onto the goose (zoom is left to ease toward tzoom, so
+      // entering a duel plays as a gentle pull-back rather than a jump)
+      var cam = this.cam, p = this.player;
+      if (!p) { cam.cx = this.worldW / 2; cam.cy = this.worldH / 2; return; }
+      var halfW = (VW / 2) / cam.tzoom, halfH = (VH / 2) / cam.tzoom;
+      cam.cx = this.clampCam(p.x, halfW, this.worldW - halfW, this.worldW / 2);
+      cam.cy = this.clampCam(p.y, halfH, this.worldH - halfH, this.worldH / 2);
+    },
+
+    clampCam: function (v, lo, hi, mid) {
+      if (hi < lo) return mid;        // world smaller than view: centre it
+      return v < lo ? lo : (v > hi ? hi : v);
+    },
+
+    // goose-anchored follow with velocity lead + dead-zone, eased through a
+    // critically-damped step so hard turns let the world swing a beat behind.
+    updateCamera: function (dt) {
+      var cam = this.cam, p = this.player;
+      // ease the zoom (a gentle pull-back on entering a duel)
+      cam.zoom += (cam.tzoom - cam.zoom) * (1 - Math.exp(-4 * dt));
+      if (!p) return;
+
+      // velocity lead: bias the target ahead so you see more sky in the
+      // direction of travel (dropped under reduced motion for a stable frame)
+      var tx = p.x, ty = p.y;
+      if (!reduceMotion) {
+        var lx = p.vx * cam.lead, ly = p.vy * cam.lead;
+        var lm = Math.hypot(lx, ly);
+        if (lm > cam.maxLead) { var s = cam.maxLead / lm; lx *= s; ly *= s; }
+        tx += lx; ty += ly;
+      }
+
+      // THE BOWING: ease gently toward the bowing dragon (cheap — just blends
+      // the follow target a little toward it while it dips its head)
+      if (this.bowing && this.dragon) {
+        tx += (this.dragon.x - tx) * 0.28;
+        ty += (this.dragon.y - ty) * 0.28;
+      }
+
+      // clamp the target so the viewport never shows the void beyond the world
+      var halfW = (VW / 2) / cam.zoom, halfH = (VH / 2) / cam.zoom;
+      tx = this.clampCam(tx, halfW, this.worldW - halfW, this.worldW / 2);
+      ty = this.clampCam(ty, halfH, this.worldH - halfH, this.worldH / 2);
+
+      // critically-damped approach, with a small dead-zone
+      var f = 1 - Math.exp(-cam.k * dt);
+      var ddx = tx - cam.cx, ddy = ty - cam.cy;
+      if (Math.abs(ddx) > cam.dead) cam.cx += ddx * f;
+      if (Math.abs(ddy) > cam.dead) cam.cy += ddy * f;
+    },
+
 
     // =========================================================
     // UPDATE
@@ -3049,6 +3180,7 @@
       if (this.introT > 0) this.introT -= dt;
 
       this.updatePlayer(dt);
+      this.updateCamera(dt);
       // Dusk Cowl shadow decoy fades on its own if nothing takes the bait
       if (this.decoy) { this.decoy.t -= dt; if (this.decoy.t <= 0) this.decoy = null; }
       if (this.mode === "sky") this.updateSky(dt);
@@ -3066,16 +3198,15 @@
 
     updateBg: function (dt) {
       this.bg.washPhase += dt * 0.15;
+      // gentle ambient drift on the wrap field (keeps clouds alive even with a
+      // still camera — e.g. the title screen). Camera parallax is applied at
+      // draw time; here we only nudge the base seed positions.
+      var WRAPX = VW + CLOUD_MARGIN * 2;
       var c = this.bg.clouds;
       for (var i = 0; i < c.length; i++) {
-        c[i].y += c[i].speed * dt;
-        c[i].x += Math.sin(this.time * 0.14 + c[i].driftPhase) * 3.2 * dt;
-        if (c[i].y - 140 > VH) {
-          c[i].y = -170 - Math.random() * 120;
-          c[i].x = Math.random() * VW;
-          c[i].variant = (Math.random() * 4) | 0;
-          c[i].flip = Math.random() < 0.5;
-        }
+        c[i].x += (c[i].drift + Math.sin(this.time * 0.14 + c[i].driftPhase) * 3.2) * dt;
+        if (c[i].x < 0) c[i].x += WRAPX;
+        else if (c[i].x >= WRAPX) c[i].x -= WRAPX;
       }
       var mo = this.bg.motes || [];
       for (var m = 0; m < mo.length; m++) {
@@ -3126,7 +3257,11 @@
       var flyV = this.flySpeed(); // DAILY: Tailwind lifts this 12%
       var targetVX = 0, targetVY = 0, steering = false;
       if (Input.pointerDown) {
-        var dx = Input.px - p.x, dy = Input.py - p.y;
+        // steer relative to the goose ON SCREEN: the pointer is in viewport
+        // coords, so project the goose through the camera and drag from there
+        // (keeps the pull threshold in screen px regardless of camera zoom)
+        var gs = this.cam.worldToScreen(p.x, p.y);
+        var dx = Input.px - gs.x, dy = Input.py - gs.y;
         var dist = Math.hypot(dx, dy);
         if (dist > 6) {
           var pull = Math.min(1, dist / 160);
@@ -3155,12 +3290,17 @@
       p.x += p.vx * dt;
       p.y += p.vy * dt;
 
-      // bounds (soft)
-      var m = 26;
-      if (p.x < m) { p.x = m; p.vx *= -0.3; }
-      if (p.x > VW - m) { p.x = VW - m; p.vx *= -0.3; }
-      if (p.y < m + 70) { p.y = m + 70; p.vy *= -0.3; }
-      if (p.y > VH - m) { p.y = VH - m; p.vy *= -0.3; }
+      // SOFT WORLD BOUNDARIES: no hard walls — nearing an edge applies a
+      // gentle inward pull that grows with how far you press past the margin,
+      // so the vast sky feels open but you can't fly off into the void
+      var edge = 140;
+      if (p.x < edge) p.vx += (edge - p.x) * 7 * dt;
+      else if (p.x > this.worldW - edge) p.vx -= (p.x - (this.worldW - edge)) * 7 * dt;
+      if (p.y < edge) p.vy += (edge - p.y) * 7 * dt;
+      else if (p.y > this.worldH - edge) p.vy -= (p.y - (this.worldH - edge)) * 7 * dt;
+      // final safety clamp exactly at the world skin (no bounce)
+      if (p.x < 6) p.x = 6; else if (p.x > this.worldW - 6) p.x = this.worldW - 6;
+      if (p.y < 6) p.y = 6; else if (p.y > this.worldH - 6) p.y = this.worldH - 6;
 
       // facing & banking
       var speed = Math.hypot(p.vx, p.vy);
@@ -3178,7 +3318,7 @@
         p.wardCd = (p.wardCd == null ? 8 : p.wardCd) - dt;
         if (p.wardCd <= 0) {
           p.ward = true;
-          this.floatText(p.x, p.y - 40, "leaf ward", PAL.sage);
+          this.floatWorld(p.x, p.y - 40, "leaf ward", PAL.sage);
           Particles.ring(p.x, p.y, PAL.sage, 16, 380, 0.35, 4);
         }
       }
@@ -3195,7 +3335,7 @@
             this.addShake(6);
             this.hitStop = 0.04;
             Particles.sparkBurst(p.x, p.y, 10, PAL.ember, 460, 0.35);
-            this.floatText(p.x, p.y - 30, "ram!", PAL.ember);
+            this.floatWorld(p.x, p.y - 30, "ram!", PAL.ember);
           }
         }
       }
@@ -3431,7 +3571,7 @@
         d.phase = 2;
         d.telegraph = 0; d.telegraphType = null;
         d.attackCd = 1.0;
-        this.floatText(d.x, d.y, "Phase II", PAL.rose);
+        this.floatWorld(d.x, d.y, "Phase II", PAL.rose);
         this.addShake(8);
         Particles.burst(d.x, d.y, 18, PAL.rose, 5, 24, 0.4);
         Audio2.tone(120, 0.5, "sawtooth", 0.2, 220);
@@ -3444,8 +3584,8 @@
         var dx = d.targetX - d.x, dy = d.targetY - d.y;
         var dist = Math.hypot(dx, dy);
         if (dist < 24 || d.stateT > 2.2) {
-          d.targetX = 90 + Math.random() * (VW - 180);
-          d.targetY = VH * 0.14 + Math.random() * VH * 0.22;
+          d.targetX = this.arenaCX + (Math.random() - 0.5) * 2 * this.arenaHW;
+          d.targetY = this.arenaCY + (Math.random() - 0.5) * 2 * this.arenaHH;
           d.stateT = 0;
         }
         var sp = d.phase === 2 ? d.enragedSpeed : d.roamSpeed;
@@ -3474,11 +3614,13 @@
         Particles.spawn(d.x, d.y, 0, 0, 30, 1.3, 0.4,
           d.type === "storm" ? "#9fc2e0" : d.type === "verdant" ? PAL.sage : d.type === "gilded" ? PAL.gold : d.type === "umbra" ? "#8a7bb0" : PAL.ember, 0.22, 0.92);
         d.stateT += dt;
-        // keep in bounds
-        if (d.x < 90) { d.x = 90; d.dashVx = Math.abs(d.dashVx); }
-        if (d.x > VW - 90) { d.x = VW - 90; d.dashVx = -Math.abs(d.dashVx); }
-        if (d.y < 90) { d.y = 90; d.dashVy = Math.abs(d.dashVy); }
-        if (d.y > VH * 0.7) { d.y = VH * 0.7; d.dashVy = -Math.abs(d.dashVy); }
+        // keep within the duel arena
+        var axl = this.arenaCX - this.arenaHW, axr = this.arenaCX + this.arenaHW;
+        var ayt = this.arenaCY - this.arenaHH, ayb = this.arenaCY + this.arenaHH;
+        if (d.x < axl) { d.x = axl; d.dashVx = Math.abs(d.dashVx); }
+        if (d.x > axr) { d.x = axr; d.dashVx = -Math.abs(d.dashVx); }
+        if (d.y < ayt) { d.y = ayt; d.dashVy = Math.abs(d.dashVy); }
+        if (d.y > ayb) { d.y = ayb; d.dashVy = -Math.abs(d.dashVy); }
         if (d.stateT > 0.55) this.dragonEndAttack();
       }
       // ----- sweeping breath (ember) / sweeping sun-beam ray (gilded) -----
@@ -3758,8 +3900,8 @@
         var ln2 = d.phase === 2 ? 4 : 3;
         for (var li2 = 0; li2 < ln2; li2++) {
           var lt = ln2 === 1 ? 0.5 : li2 / (ln2 - 1);
-          var lx = VW * (0.18 + 0.64 * lt) + (Math.random() - 0.5) * 56;
-          var ly = VH * (0.34 + Math.random() * 0.2);
+          var lx = this.arenaCX + (lt - 0.5) * 1.7 * this.arenaHW + (Math.random() - 0.5) * 56;
+          var ly = this.arenaCY - this.arenaHH * 0.3 + Math.random() * this.arenaHH * 0.5;
           // launch velocity decays exponentially so each lure settles ~at
           // its scatter point, then hovers (no steering, gentle drift)
           var lu = DragonShots.spawn({
@@ -3799,8 +3941,8 @@
         // dissolve into dusk, slip to a rippling point, burst back in shadow
         d.state = "veil"; d.stateT = 0;
         d.veiled = true; d.veilMoved = false;
-        d.veilX = 90 + Math.random() * (VW - 180);
-        d.veilY = VH * 0.14 + Math.random() * VH * 0.34;
+        d.veilX = this.arenaCX + (Math.random() - 0.5) * 2 * this.arenaHW;
+        d.veilY = this.arenaCY + (Math.random() - 0.5) * 2 * this.arenaHH;
         Particles.burst(d.x, d.y, 10, "#4a3f6e", 3, 18, 0.35);
         Audio2.noise(0.3, 0.1, 600);
         Audio2.tone(320, 0.35, "sine", 0.08, 110);
@@ -3907,7 +4049,7 @@
         if (self.tk && self.tk.quill && Math.random() < dt * 9) {
           Particles.spark(s.x, s.y, s.rot + Math.PI + (Math.random() - 0.5) * 1.2, 80 + Math.random() * 100, "#bfe3ff", 0.26, 1.5);
         }
-        if (s.life <= 0 || s.x < -40 || s.x > VW + 40 || s.y < -40 || s.y > VH + 40) { s.active = false; return; }
+        if (s.life <= 0 || s.x < -40 || s.x > self.worldW + 40 || s.y < -40 || s.y > self.worldH + 40) { s.active = false; return; }
         // the cloud spirit (training step 3): dragonfire only ever warms it.
         // A truly charged breath (big shot) completes the lesson; a soft
         // tap just makes it puff and earns a gentle nudge.
@@ -3924,7 +4066,7 @@
               self.trainingStepDone(); // it puffs happily — never hurt
             } else if (self.time - tr.hintT > 2.5) {
               tr.hintT = self.time;
-              self.floatText(tsp.x, Math.max(60, tsp.y - 40), "hold longer — let the fire bloom", PAL.wisteria);
+              self.floatWorld(tsp.x, tsp.y - 40, "hold longer — let the fire bloom", PAL.wisteria);
             }
             return;
           }
@@ -3975,7 +4117,7 @@
         s.life -= dt;
         s.trail.unshift({ x: s.x, y: s.y });
         if (s.trail.length > 5) s.trail.pop();
-        if (s.life <= 0 || s.x < -50 || s.x > VW + 50 || s.y < -50 || s.y > VH + 50) { s.active = false; return; }
+        if (s.life <= 0 || s.x < -50 || s.x > self.worldW + 50 || s.y < -50 || s.y > self.worldH + 50) { s.active = false; return; }
         // hit player
         if (p.iframes <= 0) {
           var dx = s.x - p.x, dy = s.y - p.y;
@@ -4020,7 +4162,7 @@
         }
       }
 
-      this.floatText(x, y - 10, "-" + Math.round(dmg), dmg > 9 ? PAL.rose : "#fbf7ee");
+      this.floatWorld(x, y - 10, "-" + Math.round(dmg), dmg > 9 ? PAL.rose : "#fbf7ee");
 
       if (d.health <= 0) this.dragonDefeated();
     },
@@ -4048,7 +4190,7 @@
         p.iframes = 0.8;
         Particles.burst(p.x, p.y, 10, PAL.sage, 4, 16, 0.4);
         Particles.ring(p.x, p.y, PAL.sage, 20, 540, 0.4, 5);
-        this.floatText(p.x, p.y - 34, "ward spent", PAL.sage);
+        this.floatWorld(p.x, p.y - 34, "ward spent", PAL.sage);
         Audio2.noise(0.14, 0.1, 1800);
         var wdx = p.x - x, wdy = p.y - y;
         var wl = Math.hypot(wdx, wdy) || 1;
@@ -4074,7 +4216,7 @@
       // POWER: reflect
       if (this.powers.reflect && this.dragon && this.dragon.state !== "bow") {
         this.damageDragon(4, this.dragon.x + (Math.random() - 0.5) * 40, this.dragon.y + (Math.random() - 0.5) * 40);
-        this.floatText(this.dragon.x, this.dragon.y + 30, "reflect!", PAL.wisteria);
+        this.floatWorld(this.dragon.x, this.dragon.y + 30, "reflect!", PAL.wisteria);
       }
       this.updateHUD();
       if (p.health <= 0) this.playerDefeated();
@@ -4126,9 +4268,9 @@
       Particles.ring(this.player.x, this.player.y, PAL.gold, 12, 360, 0.32, 3);
       Particles.sparkBurst(this.player.x, this.player.y, 6, PAL.gold, 300, 0.3);
       if (s.rare) {
-        this.floatText(this.player.x, this.player.y - 30, "+" + worth + " lustrous!", PAL.rose);
+        this.floatWorld(this.player.x, this.player.y - 30, "+" + worth + " lustrous!", PAL.rose);
       } else {
-        this.floatText(this.player.x, this.player.y - 30, "+" + worth + " scale" + (worth > 1 ? "s" : ""), PAL.gold);
+        this.floatWorld(this.player.x, this.player.y - 30, "+" + worth + " scale" + (worth > 1 ? "s" : ""), PAL.gold);
       }
       this.updateHUD();
       if (this.scaleProgress >= this.nextPowerAt) {
@@ -4326,7 +4468,7 @@
           Particles.ring(d.x, d.y, "#fff3c4", 24, 620, 0.8, 6);
           for (var ci3 = 0; ci3 < 10; ci3++) {
             Particles.glow(
-              VW * (0.15 + Math.random() * 0.7), VH * (0.5 + Math.random() * 0.4),
+              d.x + (Math.random() - 0.5) * VW * 1.1, d.y + Math.random() * VH * 0.5,
               (Math.random() - 0.5) * 0.6, -1.4 - Math.random() * 1.6,
               8 + Math.random() * 12, 0.9, 1.3 + Math.random() * 0.6, PAL.gold, 0.6, 0.99);
           }
@@ -4490,17 +4632,26 @@
       this.drawSky(g);
 
       g.save();
-      // screen shake
+      // screen shake (screen space — shakes the whole framed view)
       if (this.shake > 0) {
         var s = this.shake;
         g.translate((Math.random() - 0.5) * s, (Math.random() - 0.5) * s);
       }
 
-      this.drawClouds(g, 0.5);   // far/mid clouds behind action
+      // far/mid parallax clouds behind the action (screen space, camera-scrolled)
+      this.drawClouds(g, false);
+
+      // ambient weather is a VIEWPORT-SPACE atmosphere overlay (mist/rain/
+      // golden) — it reads as light through the whole frame, so it stays in
+      // screen coords rather than pinned to a patch of world
+      if ((this.state === "PLAYING" || this.state === "PAUSED" || this.state === "POWER" || this.state === "DEAD" || this.state === "WIN") &&
+          this.mode === "sky" && this.weather) this.drawWeather(g);
 
       if (this.state === "PLAYING" || this.state === "PAUSED" || this.state === "POWER" || this.state === "DEAD" || this.state === "WIN") {
-        // ambient weather sits between the sky backdrop and the realm rings
-        if (this.mode === "sky" && this.weather) this.drawWeather(g);
+        // ----- WORLD SPACE: everything the camera frames renders through one
+        // save/translate/scale/restore -----
+        g.save();
+        this.cam.apply(g);
         if (this.mode === "sky" && this.sky) this.drawRealms(g);
         if (this.mode === "sky" && this.galeActive) this.drawGale(g);
         if (this.dragon) this.drawDragon(g);
@@ -4510,11 +4661,24 @@
         this.drawPlayerShots(g);
         if (this.player && this.state !== "DEAD") this.drawPlayer(g);
         if (this.player && this.state === "PLAYING") this.drawChargeUI(g);
+        g.restore();
+        // ----- back to SCREEN SPACE -----
       }
 
-      this.drawClouds(g, 0.85, true); // nearest clouds in front for depth
+      this.drawClouds(g, true); // nearest clouds in front for depth
+
+      // soft off-screen awareness: watercolor edge chevrons toward the duel
+      // dragon / realm gates when they drift out of frame
+      if (this.state === "PLAYING" || this.state === "PAUSED") this.drawEdgeIndicators(g);
 
       g.restore();
+
+      // training prompt: screen-space instructional card (world visuals of the
+      // gale/spirit are drawn in-world above; the prompt stays centred)
+      if ((this.state === "PLAYING" || this.state === "PAUSED") &&
+          this.mode === "sky" && this.galeActive && this.training) {
+        this.drawTrainingPrompt(g);
+      }
 
       // boss-intro name card (steady — drawn outside the shake transform)
       if (this.introT > 0 && this.mode === "duel" && this.dragon &&
@@ -4579,7 +4743,10 @@
       // realm-proximity tint: nearing a realm warms the sky toward its pigment
       var tint = (this.mode === "sky" && this.sky) ? this.sky.tint : null;
       if (tint && tint.k > 0.02) {
-        var tg = g.createRadialGradient(tint.x, tint.y, 0, tint.x, tint.y, VH * 0.85);
+        // the tint is centred on a realm (world coords) — project to screen
+        var tp = this.cam.worldToScreen(tint.x, tint.y);
+        var tgx = tp.x, tgy = tp.y;
+        var tg = g.createRadialGradient(tgx, tgy, 0, tgx, tgy, VH * 0.85);
         tg.addColorStop(0, Fx.rgba(tint.color, 0.12 * tint.k));
         tg.addColorStop(0.55, Fx.rgba(tint.color, 0.05 * tint.k));
         tg.addColorStop(1, Fx.rgba(tint.color, 0));
@@ -4643,26 +4810,38 @@
       g.restore();
     },
 
-    drawClouds: function (g, depthFilter, front) {
+    // PARALLAX CLOUDS. Drawn in SCREEN space, offset by the camera centre
+    // times each cloud's parallax factor, then wrapped into a band a bit
+    // larger than the viewport. front=true draws only the near/foreground
+    // band (parallax >= 1) over the action; front=false draws far+mid behind.
+    // Under reduced motion every band moves 1:1 with the camera (no
+    // differential) for a stable frame.
+    drawClouds: function (g, front) {
       var c = this.bg.clouds;
       if (!Fx.cloudSprites.length) return;
+      var cam = this.cam;
+      var WRAPX = VW + CLOUD_MARGIN * 2, WRAPY = VH + CLOUD_MARGIN * 2;
       g.save();
       for (var i = 0; i < c.length; i++) {
         var cl = c[i];
-        var isFront = cl.depth >= 0.8;
+        var isFront = cl.parallax >= 1;
         if (front && !isFront) continue;
         if (!front && isFront) continue;
+        var par = reduceMotion ? 1 : cl.parallax;
+        // wrap the parallax-scrolled position into the field band
+        var sx = (cl.x - cam.cx * par) % WRAPX; if (sx < 0) sx += WRAPX; sx -= CLOUD_MARGIN;
+        var sy = (cl.y - cam.cy * par) % WRAPY; if (sy < 0) sy += WRAPY; sy -= CLOUD_MARGIN;
         var img = Fx.cloudSprites[cl.variant % Fx.cloudSprites.length];
         g.globalAlpha = cl.alpha;
         var w = 360 * cl.scale, h = 200 * cl.scale;
         if (cl.flip) {
           g.save();
-          g.translate(cl.x, cl.y);
+          g.translate(sx, sy);
           g.scale(-1, 1);
           g.drawImage(img, -w / 2, -h / 2, w, h);
           g.restore();
         } else {
-          g.drawImage(img, cl.x - w / 2, cl.y - h / 2, w, h);
+          g.drawImage(img, sx - w / 2, sy - h / 2, w, h);
         }
       }
       g.restore();
@@ -5172,8 +5351,8 @@
         g.lineJoin = "round";
         for (var gz = 0; gz < HARMONY_GEESE.length; gz++) {
           var gs = HARMONY_GEESE[gz];
-          var gx = ((this.time * gs.spd + gs.phase * 140) % (VW + 80)) - 40;
-          var gy = VH * gs.y0 + Math.sin(this.time * gs.freq + gs.phase) * gs.amp;
+          var gx = ((this.time * gs.spd + gs.phase * 140) % (this.worldW + 80)) - 40;
+          var gy = this.worldH * gs.y0 + Math.sin(this.time * gs.freq + gs.phase) * gs.amp;
           var fl2 = Math.sin(this.time * 5.2 + gs.phase * 3) * gs.size * 0.4;
           g.lineWidth = 1.7;
           g.globalAlpha = 0.65;
@@ -5185,6 +5364,82 @@
         }
         g.restore();
       }
+    },
+
+    // ----- OFF-SCREEN AWARENESS (screen space) -----
+    // a small watercolor chevron + dot at the frame edge, pointing toward a
+    // world object that has drifted out of view. The duel dragon gets a clear
+    // one in its realm hue; sky realm gates get fainter ones.
+    drawEdgeIndicators: function (g) {
+      if (this.mode === "duel") {
+        var d = this.dragon;
+        if (d && d.state !== "bow" && !d.veiled) {
+          this.edgeChevron(g, d.x, d.y, REALM_COLOR[d.type] || PAL.ember, 0.85, 13);
+        }
+      } else if (this.mode === "sky" && this.sky) {
+        for (var i = 0; i < this.sky.realms.length; i++) {
+          var rm = this.sky.realms[i];
+          // in a daily, only the next stop is worth pointing at
+          if (this.daily && (rm.defeated || rm.routeIdx !== this.daily.idx)) continue;
+          this.edgeChevron(g, rm.x, rm.y, rm.pal.a, rm.defeated ? 0.28 : 0.5, 10);
+        }
+      }
+    },
+
+    edgeChevron: function (g, wx, wy, color, alpha, size) {
+      var s = this.cam.worldToScreen(wx, wy);
+      var padT = 74, pad = 30;   // extra top inset clears the HUD
+      // on-screen? nothing to point at
+      if (s.x >= pad && s.x <= VW - pad && s.y >= padT && s.y <= VH - pad) return;
+      var cx = VW / 2, cy = VH / 2;
+      var ang = Math.atan2(s.y - cy, s.x - cx);
+      // place on an inset ellipse hugging the frame
+      var ex = cx + Math.cos(ang) * (VW / 2 - pad);
+      var ey = cy + Math.sin(ang) * (VH / 2 - padT * 0.7);
+      g.save();
+      Fx.drawDot(g, ex, ey, size + 9, color, alpha * 0.5, true);
+      g.translate(ex, ey);
+      g.rotate(ang);
+      g.globalAlpha = alpha;
+      g.fillStyle = color;
+      g.beginPath();
+      g.moveTo(size, 0);
+      g.lineTo(-size * 0.7, size * 0.66);
+      g.lineTo(-size * 0.7, -size * 0.66);
+      g.closePath();
+      g.fill();
+      g.restore();
+    },
+
+    // ----- FLEDGLING GALE prompt (screen space instructional card) -----
+    drawTrainingPrompt: function (g) {
+      var tr = this.training;
+      if (!tr || tr.outro > 0 || tr.waitT > 0 || tr.step >= 3) return;
+      var st = TRAINING_STEPS[tr.step];
+      var px = VW / 2, py = VH * 0.34;
+      g.save();
+      g.font = 'italic 500 20px "Cormorant Garamond", Georgia, serif';
+      if (!st.w) st.w = g.measureText(st.text).width;
+      g.strokeStyle = Fx.rgba(PAL.paper, 0.88);
+      g.lineWidth = 42;
+      g.lineCap = "round";
+      g.beginPath(); g.moveTo(px - st.w / 2, py); g.lineTo(px + st.w / 2, py); g.stroke();
+      g.textAlign = "center";
+      g.fillStyle = Fx.rgba(PAL.ink, 0.92);
+      g.fillText(st.text, px, py + 7);
+      // three little progress motes beneath the prompt
+      for (var d2 = 0; d2 < 3; d2++) {
+        var dx2 = px + (d2 - 1) * 18, dy2 = py + 34;
+        g.beginPath();
+        g.arc(dx2, dy2, 4, 0, TAU);
+        if (d2 < tr.step) { g.fillStyle = Fx.rgba(PAL.gold, 0.9); g.fill(); }
+        else {
+          g.strokeStyle = Fx.rgba(PAL.ink, 0.4);
+          g.lineWidth = 1.4;
+          g.stroke();
+        }
+      }
+      g.restore();
     },
 
     // ----- THE FLEDGLING GALE (draw) -----
@@ -5258,36 +5513,7 @@
       g.scale(sc, sc);
       g.drawImage(simg, -simg.width / 2, -simg.height / 2);
       g.restore();
-
-      // prompt panel: pre-built strings from TRAINING_STEPS only — the
-      // measured width is cached on first draw (never rebuilt per frame)
-      if (tr.outro <= 0 && tr.waitT <= 0 && tr.step < 3) {
-        var st = TRAINING_STEPS[tr.step];
-        var px = VW / 2, py = VH * 0.38;
-        g.save();
-        g.font = 'italic 500 20px "Cormorant Garamond", Georgia, serif';
-        if (!st.w) st.w = g.measureText(st.text).width;
-        g.strokeStyle = Fx.rgba(PAL.paper, 0.88);
-        g.lineWidth = 42;
-        g.lineCap = "round";
-        g.beginPath(); g.moveTo(px - st.w / 2, py); g.lineTo(px + st.w / 2, py); g.stroke();
-        g.textAlign = "center";
-        g.fillStyle = Fx.rgba(PAL.ink, 0.92);
-        g.fillText(st.text, px, py + 7);
-        // three little progress motes beneath the prompt
-        for (var d2 = 0; d2 < 3; d2++) {
-          var dx2 = px + (d2 - 1) * 18, dy2 = py + 34;
-          g.beginPath();
-          g.arc(dx2, dy2, 4, 0, TAU);
-          if (d2 < tr.step) { g.fillStyle = Fx.rgba(PAL.gold, 0.9); g.fill(); }
-          else {
-            g.strokeStyle = Fx.rgba(PAL.ink, 0.4);
-            g.lineWidth = 1.4;
-            g.stroke();
-          }
-        }
-        g.restore();
-      }
+      // (the step prompt itself is drawn screen-space in drawTrainingPrompt)
     },
 
     drawDragon: function (g) {
@@ -5569,6 +5795,10 @@
     forceHurt: function () { if (Game.player) { Game.player.iframes = 0; Game.hurtPlayer(99, Game.player.x, Game.player.y + 50); } },
     forceWeather: function (mood) { Game.forceWeather(mood); },
     state: function () { return Game.state; },
-    bowing: function () { return Game.bowing; }
+    bowing: function () { return Game.bowing; },
+    camera: function () { return Game.cam; },
+    world: function () { return { w: Game.worldW, h: Game.worldH }; },
+    // project a world point to viewport-logical coords (for test assertions)
+    project: function (x, y) { var s = Game.cam.worldToScreen(x, y); return { x: s.x, y: s.y }; }
   };
 })();
