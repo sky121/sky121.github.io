@@ -65,7 +65,7 @@
   // primary pigment per realm — off-screen edge indicators paint in this hue
   var REALM_COLOR = {
     ember: "#e08a5a", storm: "#7fa8c9", verdant: "#93b48b",
-    gilded: "#d9b96a", umbra: "#8a7bb0"
+    gilded: "#d9b96a", umbra: "#8a7bb0", selene: "#b9c6e2"
   };
   var RIPPLE_STROKE = "rgba(74,114,153,0.55)";
 
@@ -1298,7 +1298,8 @@
       storm: { hi: "#7fa8c9", lo: "#3d6288", belly: "#d3e2ef", memHi: "#5f86ab", memLo: "#2e4d6e", bone: "#dbe6f0", boneTip: "#8fa6bd", eye: "#bfe3ff", spade: "#4f6d94", vein: "#a292c4" },
       verdant: { hi: "#93b48b", lo: "#597a52", belly: "#e9efdb", memHi: "#7a9a6f", memLo: "#42603d", bone: "#e3e8cf", boneTip: "#9aa87f", eye: "#e5f0a8", spade: "#6e8a4f", vein: "#cdb878" },
       gilded: { hi: "#d9b96a", lo: "#a8863c", belly: "#f6ecd0", memHi: "#c2a052", memLo: "#7c6128", bone: "#f2e6c4", boneTip: "#b3903f", eye: "#fff3c4", spade: "#b3903f", vein: "#cdb878" },
-      umbra: { hi: "#8a7bb0", lo: "#4a3f6e", belly: "#d8d2e8", memHi: "#6d5f96", memLo: "#362d54", bone: "#d5cde6", boneTip: "#8d80ab", eye: "#e6d8ff", spade: "#5d4f86", vein: "#a292c4" }
+      umbra: { hi: "#8a7bb0", lo: "#4a3f6e", belly: "#d8d2e8", memHi: "#6d5f96", memLo: "#362d54", bone: "#d5cde6", boneTip: "#8d80ab", eye: "#e6d8ff", spade: "#5d4f86", vein: "#a292c4" },
+      selene: { hi: "#c8d4e8", lo: "#3a4668", belly: "#eef1f8", memHi: "#9aa9c8", memLo: "#2c3654", bone: "#e8edf6", boneTip: "#9fadc6", eye: "#eaf1ff", spade: "#4a5878", vein: "#a9b7d6" }
     },
     // o: { t, swayPhase, flapPhase, phase2, flash, bow, variant, simple }
     dragon: function (g, o) {
@@ -1720,7 +1721,9 @@
     gildedHeart: { name: "Gilded Heart", glyph: "🥇", desc: "Begin each run with your charge igniting 25% faster." },
     gildedGift: { name: "Aurelia's Gift", glyph: "🪙", desc: "Begin each run already wielding Tailwind Fury." },
     duskHeart: { name: "Dusk Heart", glyph: "🌙", desc: "Begin each run with your dodge granting 0.15s longer i-frames." },
-    umbraGift: { name: "Umbra's Gift", glyph: "🌌", desc: "Begin each run already wielding Mirror Plume." }
+    umbraGift: { name: "Umbra's Gift", glyph: "🌌", desc: "Begin each run already wielding Mirror Plume." },
+    moonHeart: { name: "Moon Heart", glyph: "🌙", desc: "Begin each run with a longer dodge leap — your dash carries you farther." },
+    seleneGift: { name: "Selene's Gift", glyph: "🌕", desc: "Begin each run already wielding Mirror Plume — moonlight throws every blow back." }
   };
   // each dragon's two relics: the common heart + the ≥N-scales gift —
   // once BOTH are yours, repeat victories reach deeper into the hoard
@@ -1729,7 +1732,8 @@
     storm: ["galeFeather", "stormGift"],
     verdant: ["thistleDown", "verdantGift"],
     gilded: ["gildedHeart", "gildedGift"],
-    umbra: ["duskHeart", "umbraGift"]
+    umbra: ["duskHeart", "umbraGift"],
+    selene: ["moonHeart", "seleneGift"]
   };
 
   // gifts from the hoard: rarer trinkets offered on repeat victories once a
@@ -1746,7 +1750,9 @@
     luckyCoin: { name: "Aurelia's Lucky Coin", glyph: "🌟", dragon: "gilded", desc: "A small coin tucked beneath one wing — now and then it catches the sun in the open sky." },
     burnishedPinfeather: { name: "Burnished Pinfeather", glyph: "🏵️", dragon: "gilded", desc: "A pinfeather burnished to a mirror shine — lustrous scales gleam one scale brighter." },
     duskMoth: { name: "Dusk Moth", glyph: "🦋", dragon: "umbra", desc: "A pale moth that mistook you for the moon — it keeps you company in the open sky." },
-    hushBead: { name: "Hush Bead", glyph: "📿", dragon: "umbra", desc: "A bead of bottled dusk — your dodge holds its hush a breath longer." }
+    hushBead: { name: "Hush Bead", glyph: "📿", dragon: "umbra", desc: "A bead of bottled dusk — your dodge holds its hush a breath longer." },
+    moondrop: { name: "Moondrop", glyph: "🌙", dragon: "selene", desc: "A bead of caught moonlight — a silver mote circles you in the open sky." },
+    tideBell: { name: "Tide Bell", glyph: "🔔", dragon: "selene", desc: "A little bell of tide-silver — it chimes softly whenever a dodge slips you through enemy fire." }
   };
   // grant order per dragon: first repeat victory → first trinket, second →
   // second, later wins bank +2 bonus scales instead
@@ -1755,7 +1761,8 @@
     storm: ["chargedQuill", "weathervane"],
     verdant: ["pressedMeadowsweet", "dewdropPhial"],
     gilded: ["luckyCoin", "burnishedPinfeather"],
-    umbra: ["duskMoth", "hushBead"]
+    umbra: ["duskMoth", "hushBead"],
+    selene: ["moondrop", "tideBell"]
   };
 
   // ceremonial-duel trophies: cosmetic washes for Gary's coat (no power)
@@ -1764,9 +1771,10 @@
     tempestPlume: { name: "Tempest Plume", glyph: "🌀", color: "#7fa8c9", desc: "Gary wears a storm-blue coat, a gift of Tempest's ceremony." },
     sorrelPlume: { name: "Sorrel Plume", glyph: "🍃", color: "#93b48b", desc: "Gary wears a moss-green coat, a gift of Sorrel's ceremony." },
     gildedPlume: { name: "Gilded Plume", glyph: "✨", color: "#cdb878", desc: "Gary wears a gold-washed coat, a gift of Aurelia's ceremony." },
-    duskPlume: { name: "Dusk Plume", glyph: "🌆", color: "#8a7bb0", desc: "Gary wears a twilight-violet coat, a gift of Umbra's ceremony." }
+    duskPlume: { name: "Dusk Plume", glyph: "🌆", color: "#8a7bb0", desc: "Gary wears a twilight-violet coat, a gift of Umbra's ceremony." },
+    moonlitPlume: { name: "Moonlit Plume", glyph: "🌙", color: "#c8d4e8", desc: "Gary wears a pale silver-blue coat, a gift of Selene's ceremony." }
   };
-  var DRAGON_PLUME = { ember: "cinderPlume", storm: "tempestPlume", verdant: "sorrelPlume", gilded: "gildedPlume", umbra: "duskPlume" };
+  var DRAGON_PLUME = { ember: "cinderPlume", storm: "tempestPlume", verdant: "sorrelPlume", gilded: "gildedPlume", umbra: "duskPlume", selene: "moonlitPlume" };
 
   // regalia: hoard equipment that changes Gary's silhouette AND his fight
   // (earned at the second ceremonial victory against each dragon)
@@ -1775,27 +1783,30 @@
     tempestSpade: { name: "Tempest's Spade", glyph: "🌩️", dragon: "storm", desc: "A storm-forged tail spade — fully charged shots loose a rearward fan of lightning." },
     sorrelMantle: { name: "Sorrel's Mantle", glyph: "🍂", dragon: "verdant", desc: "A leaf-woven mantle — it slowly grows a ward that blocks one hit." },
     gildedCrest: { name: "Gilded Crest", glyph: "👑", dragon: "gilded", desc: "A gilded crest — scales are worth double while your health is full." },
-    duskCowl: { name: "Dusk Cowl", glyph: "🦇", dragon: "umbra", desc: "A cowl of dusk — dodging leaves a shadow decoy that draws the next aimed attack." }
+    duskCowl: { name: "Dusk Cowl", glyph: "🦇", dragon: "umbra", desc: "A cowl of dusk — dodging leaves a shadow decoy that draws the next aimed attack." },
+    moonCrown: { name: "Moon Crown", glyph: "🌙", dragon: "selene", desc: "A crown of moon-silver — once per duel, a killing blow leaves you clinging to one feather instead of falling." }
   };
-  var DRAGON_REGALIA = { ember: "emberHorns", storm: "tempestSpade", verdant: "sorrelMantle", gilded: "gildedCrest", umbra: "duskCowl" };
+  var DRAGON_REGALIA = { ember: "emberHorns", storm: "tempestSpade", verdant: "sorrelMantle", gilded: "gildedCrest", umbra: "duskCowl", selene: "moonCrown" };
   // every attack in the game, for ceremonial cross-kit stealing
-  var ALL_ATTACKS = ["volley", "aimed", "breath", "fan", "lance", "nova", "spiral", "seeds", "lures", "ray", "coins", "veil", "echoes", "crescent"];
+  var ALL_ATTACKS = ["volley", "aimed", "breath", "fan", "lance", "nova", "spiral", "seeds", "lures", "ray", "coins", "veil", "echoes", "crescent", "moonbeam", "phases", "tides"];
   var BASE_KIT = {
     ember: ["volley", "aimed", "breath"],
     storm: ["fan", "lance", "nova"],
     verdant: ["spiral", "seeds"],
     gilded: ["lures", "ray", "coins"],
-    umbra: ["veil", "echoes", "crescent"]
+    umbra: ["veil", "echoes", "crescent"],
+    selene: ["moonbeam", "phases", "tides"]
   };
 
   // the gauntlet: dragons faced in order within a single run
-  var RUN_BOSSES = ["ember", "storm", "verdant", "gilded", "umbra"];
+  var RUN_BOSSES = ["ember", "storm", "verdant", "gilded", "umbra", "selene"];
   var DRAGONS = {
     ember: { name: "Ember, the Cinder Wyrm", health: 100, roamSpeed: 105, enragedSpeed: 150 },
     storm: { name: "Tempest, the Storm Wyrm", health: 115, roamSpeed: 120, enragedSpeed: 170 },
     verdant: { name: "Sorrel, the Verdant Wyrm", health: 130, roamSpeed: 112, enragedSpeed: 160 },
     gilded: { name: "Aurelia, the Gilded Wyrm", health: 145, roamSpeed: 110, enragedSpeed: 165 },
-    umbra: { name: "Umbra, the Dusk Wyrm", health: 160, roamSpeed: 118, enragedSpeed: 172 }
+    umbra: { name: "Umbra, the Dusk Wyrm", health: 160, roamSpeed: 118, enragedSpeed: 172 },
+    selene: { name: "Selene, the Moonlit Wyrm", health: 175, roamSpeed: 122, enragedSpeed: 178 }
   };
 
   // THE BOWING — the painterly beat between the killing blow and the win
@@ -1806,7 +1817,8 @@
     storm:   ["#8fd0ff", PAL.wisteria],      // rain-light and static
     verdant: [PAL.sage, "#d9ecc2"],          // leaf and blossom
     gilded:  ["#fff3c4", PAL.gold],          // treasure-light
-    umbra:   [PAL.wisteria, "#8a7bb0"]       // falling dusk
+    umbra:   [PAL.wisteria, "#8a7bb0"],      // falling dusk
+    selene:  ["#c8d4e8", "#eef1f8"]          // silver and moonlight
   };
   var BOW_SLOWMO = 0.35;   // dt scale for dragon/shots/particles while it bows
   var BOW_DUR = 2.2;       // seconds of flourish, measured in real time
@@ -2323,9 +2335,12 @@
       if (Save.hasRelic("verdantGift")) { this.powers.split = true; }
       if (Save.hasRelic("gildedGift")) { this.powers.velocity = true; }
       if (Save.hasRelic("umbraGift")) { this.powers.reflect = true; }
+      if (Save.hasRelic("seleneGift")) { this.powers.reflect = true; }
       this.refreshTrinkets(); // cache trinket flags for the hot loops
       this.renderPowers();
       this.decoy = null; // Dusk Cowl shadow decoy (fresh run, no ghosts)
+      this.tideBellCd = 0; // Tide Bell chime throttle
+      this.moonCrownUsed = false; // Moon Crown guard (armed at run start too)
 
       // the open sky: no dragon yet — fly into a realm to anger its ruler
       this.dragon = null;
@@ -2393,16 +2408,22 @@
         storm: { a: "#7fa8c9", b: "#3d6288" },
         verdant: { a: PAL.sage, b: "#597a52" },
         gilded: { a: "#d9b96a", b: "#a8863c" },
-        umbra: { a: "#8a7bb0", b: "#4a3f6e" }
+        umbra: { a: "#8a7bb0", b: "#4a3f6e" },
+        selene: { a: "#c8d4e8", b: "#3a4668" }
       };
-      // five realms in a ring around the sky's heart — the player flies in
-      // from the bottom, so the lower pair sits widest to leave a clear lane
+      // six realms in a 2x3 lattice across the world — three well-spaced rows
+      // of a left/right pair. The rows sit far enough apart (~500px) that no
+      // label ever meets the badge above the gate below it, the columns sit
+      // far enough apart (~430px+) that paired labels never touch, the middle
+      // row bows widest, and the whole centre + bottom stays an open lane so
+      // the player (spawning at bottom-centre) always flies in cleanly.
       var spots = [
-        { x: WORLD_W * 0.5, y: WORLD_H * 0.13 },    // top center
-        { x: WORLD_W * 0.2, y: WORLD_H * 0.335 },   // upper left
-        { x: WORLD_W * 0.8, y: WORLD_H * 0.335 },   // upper right
-        { x: WORLD_W * 0.265, y: WORLD_H * 0.575 }, // lower left
-        { x: WORLD_W * 0.735, y: WORLD_H * 0.575 }  // lower right (the dusk gate)
+        { x: WORLD_W * 0.30, y: WORLD_H * 0.12 },   // top left    (ember)
+        { x: WORLD_W * 0.70, y: WORLD_H * 0.12 },   // top right   (storm)
+        { x: WORLD_W * 0.16, y: WORLD_H * 0.37 },   // mid left    (verdant)
+        { x: WORLD_W * 0.84, y: WORLD_H * 0.37 },   // mid right   (gilded)
+        { x: WORLD_W * 0.32, y: WORLD_H * 0.60 },   // lower left  (umbra)
+        { x: WORLD_W * 0.68, y: WORLD_H * 0.60 }    // lower right (the moonlit gate)
       ];
       this.sky = { grace: 1.0, realms: [], tint: { color: "", k: 0, x: 0, y: 0 } };
       for (var i = 0; i < RUN_BOSSES.length; i++) {
@@ -2690,6 +2711,12 @@
           Particles.glow(p.x + Math.cos(ma2) * 44, p.y - 20 + Math.sin(ma2 * 1.7) * 18,
             0, 0, 4, 0.9, 0.3, PAL.wisteria, 0.6, 0.9);
         }
+        // TRINKET: moondrop — a silver mote keeps a slow moon-orbit around Gary
+        if (this.tk.moondrop && Math.random() < dt * 8) {
+          var md2 = this.time * 1.9 + 1.6;
+          Particles.glow(p.x + Math.cos(md2) * 50, p.y + Math.sin(md2) * 50,
+            0, 0, 5, 0.9, 0.32, "#c8d4e8", 0.7, 0.92);
+        }
       }
       // the Fledgling Gale: runs even during grace (it isn't a realm) so
       // the training keeps breathing while the sky settles
@@ -2870,6 +2897,7 @@
       this.arenaHW = VW * 0.62; this.arenaHH = VH * 0.34;
       PlayerShots.clear(); DragonShots.clear();
       this.decoy = null;
+      this.moonCrownUsed = false; // Moon Crown: the once-per-duel guard re-arms
       p.x = WORLD_W * 0.5; p.y = WORLD_H * 0.60; p.vx = 0; p.vy = 0;
       p.iframes = 1.2;
       p.charge = 0; p.charging = false;
@@ -2961,7 +2989,10 @@
         dropMilestones: [0.8, 0.6, 0.45, 0.3, 0.18, 0.08].map(function (f) { return hp * f; }),
         dashVx: 0, dashVy: 0,
         // dusk veil (umbra kit; stealable): untargetable while veiled
-        veiled: false, veilMoved: false, veilX: 0, veilY: 0, echoFired: false
+        veiled: false, veilMoved: false, veilX: 0, veilY: 0, echoFired: false,
+        // moon phases (selene kit; stealable): a live damage multiplier that
+        // waxes vulnerable / wanes resistant, plus tide-pull bookkeeping
+        moonMult: 1, moonEmitT: 0, waned: false, tidePulsed: false
       };
       return d;
     },
@@ -2981,7 +3012,9 @@
         vane: Save.hasTrinket("weathervane"),
         petal: Save.hasTrinket("pressedMeadowsweet"),
         coin: Save.hasTrinket("luckyCoin"),
-        moth: Save.hasTrinket("duskMoth")
+        moth: Save.hasTrinket("duskMoth"),
+        moondrop: Save.hasTrinket("moondrop"),
+        tideBell: Save.hasTrinket("tideBell")
       };
     },
 
@@ -3506,7 +3539,8 @@
       if (Save.hasRegalia("duskCowl")) {
         this.decoy = { x: p.x, y: p.y, facing: p.facing, t: 2, maxT: 2 };
       }
-      var dash = 760;
+      // RELIC: moon heart — the dodge carries you farther (a longer leap)
+      var dash = Save.hasRelic("moonHeart") ? 900 : 760;
       p.vx = Math.cos(ang) * dash;
       p.vy = Math.sin(ang) * dash;
       p.facing = ang;
@@ -3675,6 +3709,8 @@
           ? (Math.random() < 0.4 ? "#fff3c4" : PAL.gold)  // treasure-light shed like dust
           : d.type === "umbra"
           ? (Math.random() < 0.4 ? PAL.wisteria : "#8a7bb0") // dusk shed like falling night
+          : d.type === "selene"
+          ? (Math.random() < 0.4 ? PAL.wisteria : "#c8d4e8") // silver moonlight shed
           : (Math.random() < 0.4 ? PAL.rose : PAL.ember);
         Particles.glow(d.x + Math.cos(ea) * er, d.y + Math.sin(ea) * er,
           (Math.random() - 0.5) * 0.8, -1.1 - Math.random() * 1.4,
@@ -3728,7 +3764,7 @@
         d.x += d.dashVx * dt; d.y += d.dashVy * dt;
         d.dashVx *= Math.pow(0.2, dt); d.dashVy *= Math.pow(0.2, dt);
         Particles.spawn(d.x, d.y, 0, 0, 30, 1.3, 0.4,
-          d.type === "storm" ? "#9fc2e0" : d.type === "verdant" ? PAL.sage : d.type === "gilded" ? PAL.gold : d.type === "umbra" ? "#8a7bb0" : PAL.ember, 0.22, 0.92);
+          d.type === "storm" ? "#9fc2e0" : d.type === "verdant" ? PAL.sage : d.type === "gilded" ? PAL.gold : d.type === "umbra" ? "#8a7bb0" : d.type === "selene" ? "#c8d4e8" : PAL.ember, 0.22, 0.92);
         d.stateT += dt;
         // keep within the duel arena
         var axl = this.arenaCX - this.arenaHW, axr = this.arenaCX + this.arenaHW;
@@ -3745,13 +3781,29 @@
         d.vx *= 0.94; d.vy *= 0.94;
         d.x += d.vx * dt; d.y += d.vy * dt;
         var isRay = d.telegraphType === "ray";
+        var isMoon = d.telegraphType === "moonbeam";
         var rayDur = d.phase === 2 ? 1.45 : 1.1;
-        // emit breath cone (ray: a denser, faster, short-lived gold line)
+        // selene's beam sweeps slower and wider; in phase 2 it sweeps back
+        var moonDur = d.phase === 2 ? 2.0 : 1.35;
+        // emit breath cone (ray: a denser, faster, short-lived gold line;
+        // moonbeam: a slow silver beam raking a wide arc)
         d.breathT = (d.breathT || 0) + dt;
-        if (d.breathT > (isRay ? 0.026 : 0.045)) {
+        if (d.breathT > (isRay ? 0.026 : isMoon ? 0.05 : 0.045)) {
           d.breathT = 0;
           var sweep, spd;
-          if (isRay) {
+          if (isMoon) {
+            var mp = Math.min(1, d.stateT / moonDur);
+            var span = 1.7; // a wide silver arc
+            // phase 2: rake out then immediately back (triangle 0->1->0)
+            var frac = d.phase === 2 ? (mp < 0.5 ? mp / 0.5 : 1 - (mp - 0.5) / 0.5) : mp;
+            sweep = d.breathAng + (frac - 0.5) * span * (d.raySign || 1);
+            spd = 240; // slow beam
+            DragonShots.spawn({
+              x: d.x + Math.cos(sweep) * 66, y: d.y + Math.sin(sweep) * 66,
+              vx: Math.cos(sweep) * spd, vy: Math.sin(sweep) * spd,
+              r: 16, dmg: 1, life: 2.8, color: "#c8d4e8", rot: sweep, kind: "moon"
+            });
+          } else if (isRay) {
             var rp = Math.min(1, d.stateT / rayDur);
             sweep = d.breathAng + (rp - 0.5) * (d.phase === 2 ? 1.8 : 1.35) * (d.raySign || 1);
             spd = 430;
@@ -3770,7 +3822,7 @@
             });
           }
         }
-        if (d.stateT > (isRay ? rayDur : (d.phase === 2 ? 1.7 : 1.3))) this.dragonEndAttack();
+        if (d.stateT > (isMoon ? moonDur : isRay ? rayDur : (d.phase === 2 ? 1.7 : 1.3))) this.dragonEndAttack();
       }
       // ----- blooming petal spiral (verdant) -----
       else if (d.state === "spiral") {
@@ -3846,6 +3898,96 @@
         }
         if (d.stateT > 1.2) this.dragonEndAttack();
       }
+      // ----- moon phases (selene): wax bright & vulnerable, then wane dark -----
+      else if (d.state === "phases") {
+        d.stateT += dt;
+        d.vx *= 0.9; d.vy *= 0.9;
+        d.x += d.vx * dt; d.y += d.vy * dt;
+        d.facing = this.angleLerp(d.facing, Math.atan2(this.player.y - d.y, this.player.x - d.x), 1 - Math.pow(0.05, dt));
+        var pcyc = d.phase === 2 ? 1.4 : 1.6;
+        if (d.stateT < pcyc * 0.5) {
+          // WAXING: brighter, takes +25% damage, her shots come slow
+          d.moonMult = 1.25;
+          d.moonEmitT = (d.moonEmitT || 0) + dt;
+          if (d.moonEmitT > 0.34) {
+            d.moonEmitT = 0;
+            var wbase = Math.atan2(this.player.y - d.y, this.player.x - d.x);
+            for (var wi = -1; wi <= 1; wi++) {
+              var wa = wbase + wi * 0.42;
+              DragonShots.spawn({
+                x: d.x + Math.cos(wa) * d.r * 0.4, y: d.y + Math.sin(wa) * d.r * 0.4,
+                vx: Math.cos(wa) * 165, vy: Math.sin(wa) * 165, // slow while waxing
+                r: 15, dmg: 1, life: 3.4, color: "#c8d4e8", rot: wa, kind: "moon"
+              });
+            }
+          }
+        } else {
+          // WANING: dimmer, takes -50% damage, looses a quick aimed volley once
+          d.moonMult = 0.5;
+          if (!d.waned) {
+            d.waned = true;
+            var vn = d.phase === 2 ? 7 : 5;
+            var vspread = Math.PI * 0.5;
+            var vbase = Math.atan2(this.player.y - d.y, this.player.x - d.x) - vspread / 2;
+            for (var vvi = 0; vvi < vn; vvi++) {
+              var vaa = vbase + vspread * (vvi / (vn - 1));
+              DragonShots.spawn({
+                x: d.x, y: d.y,
+                vx: Math.cos(vaa) * 420, vy: Math.sin(vaa) * 420, // quick aimed volley
+                r: 14, dmg: 1, life: 2.8, color: "#c8d4e8", rot: vaa, kind: "moon"
+              });
+            }
+            Audio2.tone(300, 0.2, "sine", 0.09, 150);
+          }
+        }
+        if (d.stateT > pcyc) { d.moonMult = 1; this.dragonEndAttack(); }
+      }
+      // ----- moon tides (selene): a gentle radial pull, then a slow ring -----
+      else if (d.state === "tides") {
+        d.stateT += dt;
+        d.vx *= 0.93; d.vy *= 0.93;
+        d.x += d.vx * dt; d.y += d.vy * dt;
+        var tdur = 1.4;
+        // a small constant accel draws Gary toward her — capped, and paused
+        // during a dodge, so slipping the pull is always possible
+        var pl = this.player;
+        if (pl.iframes <= 0 && d.stateT < tdur) {
+          var tdx = d.x - pl.x, tdy = d.y - pl.y;
+          var tl = Math.hypot(tdx, tdy) || 1;
+          if (tl > d.r * 0.7) {
+            var pull = d.phase === 2 ? 340 : 200; // stronger in phase 2
+            pl.vx += (tdx / tl) * pull * dt;
+            pl.vy += (tdy / tl) * pull * dt;
+          }
+        }
+        // inward silver motes as the tell
+        if (!reduceMotion && d.stateT < tdur && Math.random() < dt * 20) {
+          var ta = Math.random() * TAU, tr = d.r * (2.4 + Math.random() * 1.2);
+          Particles.glow(d.x + Math.cos(ta) * tr, d.y + Math.sin(ta) * tr,
+            -Math.cos(ta) * 46, -Math.sin(ta) * 46, 5, 0.7, 0.5, "#c8d4e8", 0.5, 0.95);
+        }
+        // release: a ring of slow silver shots (doubled in phase 2)
+        if (!d.tidePulsed && d.stateT >= tdur) {
+          d.tidePulsed = true;
+          var rings = d.phase === 2 ? 2 : 1;
+          for (var rri = 0; rri < rings; rri++) {
+            var rn = 10;
+            var roff = Math.random() * TAU + rri * (Math.PI / rn);
+            var rspd = 155 + rri * 55;
+            for (var mi = 0; mi < rn; mi++) {
+              var raa = roff + (mi / rn) * TAU;
+              DragonShots.spawn({
+                x: d.x + Math.cos(raa) * d.r * 0.4, y: d.y + Math.sin(raa) * d.r * 0.4,
+                vx: Math.cos(raa) * rspd, vy: Math.sin(raa) * rspd,
+                r: 14, dmg: 1, life: 3.2, color: "#c8d4e8", rot: raa, kind: "moon"
+              });
+            }
+          }
+          Particles.ring(d.x, d.y, "#c8d4e8", d.r * 0.5, 620, 0.42, 6);
+          Audio2.tone(200, 0.3, "sine", 0.1, 80);
+        }
+        if (d.stateT > tdur + 0.18) this.dragonEndAttack();
+      }
     },
 
     dragonBeginAttack: function () {
@@ -3866,6 +4008,9 @@
       } else if (d.type === "umbra") {
         choices = ["veil", "echoes", "crescent"];
         if (d.phase === 2) choices = ["veil", "echoes", "crescent", "dash", "dash"];
+      } else if (d.type === "selene") {
+        choices = ["moonbeam", "phases", "tides"];
+        if (d.phase === 2) choices = ["moonbeam", "phases", "tides", "dash", "dash"];
       } else {
         choices = ["volley", "aimed", "breath"];
         if (d.phase === 2) choices = ["volley", "aimed", "breath", "dash", "dash"];
@@ -3877,11 +4022,13 @@
         : (d.telegraphType === "nova" || d.telegraphType === "spiral") ? 0.7
         : d.telegraphType === "ray" ? 0.65
         : d.telegraphType === "crescent" ? 0.6
-        : d.telegraphType === "echoes" ? 0.55 : 0.5;
+        : d.telegraphType === "echoes" ? 0.55
+        : d.telegraphType === "moonbeam" ? 0.65
+        : d.telegraphType === "tides" ? 0.7 : 0.5;
       // DAILY: Long Night — every wind-up is 15% shorter
       if (this.dailyMod("longNight")) d.telegraph *= 0.85;
       d.telegraphMax = d.telegraph;
-      if (d.telegraphType === "breath" || d.telegraphType === "ray") {
+      if (d.telegraphType === "breath" || d.telegraphType === "ray" || d.telegraphType === "moonbeam") {
         // REGALIA: Dusk Cowl — a fresh shadow decoy draws the telegraphed aim
         var at0 = (this.decoy && this.decoy.t > 0) ? this.decoy : this.player;
         d.breathAng = Math.atan2(at0.y - d.y, at0.x - d.x);
@@ -4086,6 +4233,21 @@
         Audio2.noise(0.14, 0.08, 900);
         d.state = "roam"; d.stateT = 0; d.attackCd = d.phase === 2 ? 1.3 : 2.1;
       }
+      // ----- selene kit (MOON) -----
+      else if (t === "moonbeam") {
+        // a slow silver beam rakes a wide arc (reuses the breath state)
+        d.state = "breath"; d.stateT = 0; d.breathT = 0;
+        if (d.breathAng == null) d.breathAng = Math.atan2(aimP.y - d.y, aimP.x - d.x);
+        Audio2.tone(440, 0.6, "sine", 0.09, 320);
+      } else if (t === "phases") {
+        // wax bright & vulnerable, then wane dark & resistant
+        d.state = "phases"; d.stateT = 0; d.moonEmitT = 0; d.waned = false;
+        Audio2.tone(360, 0.4, "sine", 0.08, 200);
+      } else if (t === "tides") {
+        // a gentle radial pull, then a released ring of slow silver shots
+        d.state = "tides"; d.stateT = 0; d.tidePulsed = false;
+        Audio2.tone(240, 0.5, "sine", 0.09, 90);
+      }
     },
 
     // false-scale detonation: five radial gold shots
@@ -4146,11 +4308,13 @@
       d.attackCd = d.phase === 2 ? 1.0 : 1.8;
       d.telegraphType = null;
       d.veiled = false; // safety: never leave a dragon untargetable
+      d.moonMult = 1;   // safety: never leave a phase multiplier stuck
     },
 
     // ----- SHOTS / COLLISIONS -----
     updateShots: function (dt) {
       var p = this.player, d = this.dragon, self = this;
+      if (this.tideBellCd > 0) this.tideBellCd -= dt; // Tide Bell chime throttle
 
       PlayerShots.forEach(function (s) {
         s.x += s.vx * dt; s.y += s.vy * dt;
@@ -4242,6 +4406,15 @@
             self.hurtPlayer(1, s.x, s.y);
             s.active = false;
           }
+        } else if (self.tk && self.tk.tideBell && p.dashTime > 0 && self.tideBellCd <= 0) {
+          // TRINKET: tide bell — a dodge slipping through fire rings softly
+          var bdx = s.x - p.x, bdy = s.y - p.y;
+          var brr = p.r * 0.9 + s.r;
+          if (bdx * bdx + bdy * bdy < brr * brr) {
+            self.tideBellCd = 0.5;
+            Audio2.tone(1318.5, 0.5, "sine", 0.045, 1100);
+            Audio2.tone(1976, 0.3, "sine", 0.02, 1600);
+          }
         }
       });
 
@@ -4257,6 +4430,8 @@
       var d = this.dragon;
       if (!d || d.state === "bow") return;
       if (d.veiled) return; // dissolved into dusk — untargetable
+      // selene's phases: waxing takes +25%, waning takes -50% (live multiplier)
+      dmg = dmg * (d.moonMult || 1);
       var before = d.health;
       d.health = Math.max(0, d.health - dmg);
       if (this.runStats) this.runStats.dmg += Math.min(dmg, before);
@@ -4311,6 +4486,25 @@
         var wdx = p.x - x, wdy = p.y - y;
         var wl = Math.hypot(wdx, wdy) || 1;
         p.vx += (wdx / wl) * 200; p.vy += (wdy / wl) * 200;
+        return;
+      }
+      // REGALIA: Moon Crown — once per duel a killing blow leaves you at one
+      // feather instead of felling you (the guard re-arms each duel)
+      if (p.health - dmg <= 0 && !this.moonCrownUsed && Save.hasRegalia("moonCrown")) {
+        this.moonCrownUsed = true;
+        p.health = 1;
+        p.iframes = 1.1;       // a longer breath of mercy after the save
+        p.hurtFlash = 0.5;
+        this.flashWhite = 0.3;
+        this.addShake(12);
+        buzz([20, 40, 20]);
+        Particles.burst(p.x, p.y, 14, "#c8d4e8", 4, 18, 0.45);
+        Particles.ring(p.x, p.y, "#eef1f8", 22, 640, 0.5, 6);
+        this.floatWorld(p.x, p.y - 34, "the moon holds you", "#c8d4e8");
+        Audio2.tone(660, 0.5, "sine", 0.09, 990);
+        var mkx = p.x - x, mky = p.y - y, mkl = Math.hypot(mkx, mky) || 1;
+        p.vx += (mkx / mkl) * 260; p.vy += (mky / mkl) * 260;
+        this.updateHUD();
         return;
       }
       p.health -= dmg;
@@ -4523,7 +4717,8 @@
 
       // grant this dragon's relic
       var relicId;
-      if (d.type === "umbra") relicId = this.scaleProgress >= 24 ? "umbraGift" : "duskHeart";
+      if (d.type === "selene") relicId = this.scaleProgress >= 28 ? "seleneGift" : "moonHeart";
+      else if (d.type === "umbra") relicId = this.scaleProgress >= 24 ? "umbraGift" : "duskHeart";
       else if (d.type === "gilded") relicId = this.scaleProgress >= 20 ? "gildedGift" : "gildedHeart";
       else if (d.type === "verdant") relicId = this.scaleProgress >= 16 ? "verdantGift" : "thistleDown";
       else if (d.type === "storm") relicId = this.scaleProgress >= 12 ? "stormGift" : "galeFeather";
@@ -5223,6 +5418,14 @@
             var dut = 1 - du / s.trail.length;
             Fx.drawDot(g, s.trail[du].x, s.trail[du].y, s.r * 0.65 * dut, "#6d5f96", dut * 0.24, true);
           }
+        } else if (s.kind === "moon") {
+          // soft silver blot with a faint crescent rim (a dark dot nudged
+          // over one edge carves the crescent shadow) — 4 draw calls
+          Fx.drawDot(g, s.x, s.y, s.r * 1.7, "#3a4668", 0.34, false);       // deep indigo rim
+          Fx.drawDot(g, s.x, s.y, s.r * 1.2, "#c8d4e8", 0.72, true);        // silver body
+          Fx.drawDot(g, s.x, s.y, s.r * 0.5, "#eef1f8", 0.82, true);        // moonlit core
+          Fx.drawDot(g, s.x - Math.cos(s.rot) * s.r * 0.5, s.y - Math.sin(s.rot) * s.r * 0.5,
+            s.r * 0.95, "#3a4668", 0.2, true);                             // crescent shadow
         } else if (s.kind === "coin") {
           // spinning gilded disc, flashing thin as it turns
           g.save();
@@ -5674,14 +5877,21 @@
       // enraged: heat aura beneath the body (storm: cold static halo)
       if (d.phase === 2 && d.state !== "bow") {
         var hp = 0.5 + Math.sin(this.time * 5) * 0.5;
-        var auraA = d.type === "storm" ? "#3d6288" : d.type === "verdant" ? "#597a52" : d.type === "umbra" ? "#4a3f6e" : PAL.emberDeep;
-        var auraB = d.type === "storm" ? PAL.wisteria : d.type === "verdant" ? PAL.gold : d.type === "umbra" ? PAL.wisteria : PAL.rose;
+        var auraA = d.type === "storm" ? "#3d6288" : d.type === "verdant" ? "#597a52" : d.type === "umbra" ? "#4a3f6e" : d.type === "selene" ? "#3a4668" : PAL.emberDeep;
+        var auraB = d.type === "storm" ? PAL.wisteria : d.type === "verdant" ? PAL.gold : d.type === "umbra" ? PAL.wisteria : d.type === "selene" ? "#c8d4e8" : PAL.rose;
         Fx.drawDot(g, 0, 0, d.r * (1.35 + hp * 0.12), auraA, 0.1 + hp * 0.08, true);
         Fx.drawDot(g, 0, 0, d.r * 0.9, auraB, 0.07 + hp * 0.07, true);
       }
       // bowing: warm golden halo of respect
       if (d.state === "bow") {
         Fx.drawDot(g, 0, 0, d.r * 1.5, PAL.gold, 0.2 + Math.sin(this.time * 3) * 0.06, true);
+      }
+      // selene phases: a silver moon-glow that swells while waxing (bright &
+      // vulnerable) and dims while waning (dark & resistant) — the tell
+      if (d.state === "phases") {
+        var pw = d.stateT < (d.phase === 2 ? 1.4 : 1.6) * 0.5 ? 1 : 0.22;
+        Fx.drawDot(g, 0, 0, d.r * (1.2 + pw * 0.4), "#c8d4e8", 0.1 + pw * 0.22, true);
+        Fx.drawDot(g, 0, 0, d.r * 0.7, "#eef1f8", 0.07 + pw * 0.2, true);
       }
 
       // ----- telegraphs: painterly, readable wind-ups -----
@@ -5692,18 +5902,20 @@
                : d.type === "storm" ? "#bfe3ff"
                : d.type === "verdant" ? "#d9ecc2"
                : d.type === "umbra" ? "#cbb8e8"
+               : d.type === "selene" ? "#dfe8f6"
                : PAL.gold;
-        var aim = d.telegraphType === "breath" ? d.breathAng : Math.atan2(this.player.y - d.y, this.player.x - d.x);
+        var aim = (d.telegraphType === "breath" || d.telegraphType === "moonbeam") ? d.breathAng : Math.atan2(this.player.y - d.y, this.player.x - d.x);
 
         // charging glow gathers on the dragon
         Fx.drawDot(g, 0, 0, d.r * (0.9 + prog * 0.5), tc, 0.16 + prog * 0.24, true);
 
         g.save();
         g.rotate(aim);
-        if (d.telegraphType === "nova" || d.telegraphType === "spiral") {
-          // radial wind-up: a swelling disc + jittering arcs (static or vines)
-          var rc1 = d.telegraphType === "spiral" ? PAL.sage : PAL.wisteria;
-          var rc2 = d.telegraphType === "spiral" ? "#d9ecc2" : "#8fd0ff";
+        if (d.telegraphType === "nova" || d.telegraphType === "spiral" || d.telegraphType === "tides") {
+          // radial wind-up: a swelling disc + jittering arcs (static, vines,
+          // or — for the moon tides — silver threads drawing inward)
+          var rc1 = d.telegraphType === "spiral" ? PAL.sage : d.telegraphType === "tides" ? "#c8d4e8" : PAL.wisteria;
+          var rc2 = d.telegraphType === "spiral" ? "#d9ecc2" : d.telegraphType === "tides" ? "#eef1f8" : "#8fd0ff";
           var nr = d.r * (0.7 + prog * 0.9);
           var ng = g.createRadialGradient(0, 0, d.r * 0.3, 0, 0, nr);
           ng.addColorStop(0, Fx.rgba(rc1, 0.28 * (0.3 + prog * 0.7)));
@@ -5712,7 +5924,7 @@
           g.fillStyle = ng;
           g.beginPath(); g.arc(0, 0, nr, 0, TAU); g.fill();
           g.globalCompositeOperation = "lighter";
-          g.strokeStyle = Fx.rgba(d.telegraphType === "spiral" ? "#eef5da" : "#dff0ff", 0.3 + prog * 0.5 * pul);
+          g.strokeStyle = Fx.rgba(d.telegraphType === "spiral" ? "#eef5da" : d.telegraphType === "tides" ? "#eef1f8" : "#dff0ff", 0.3 + prog * 0.5 * pul);
           g.lineWidth = 2.5;
           for (var zi = 0; zi < 5; zi++) {
             var za = (zi / 5) * TAU + this.time * 3;
@@ -5757,6 +5969,11 @@
           // because it isn't aiming at you (yet)
           Fx.drawDot(g, 0, 0, d.r * (0.65 + prog * 0.55), "#4a3f6e", 0.16 + prog * 0.22, false);
           Fx.drawDot(g, 0, 0, d.r * 0.4, "#362d54", 0.1 + prog * 0.24, false);
+        } else if (d.telegraphType === "phases") {
+          // gathering moonlight: a silver glow swells inward — no aim line,
+          // the phases don't fire straight at you
+          Fx.drawDot(g, 0, 0, d.r * (0.7 + prog * 0.5), "#c8d4e8", 0.14 + prog * 0.2, true);
+          Fx.drawDot(g, 0, 0, d.r * 0.42, "#eef1f8", 0.1 + prog * 0.22, true);
         } else {
           // aimed / volley: tapered light beam toward the player
           var bl = Math.min(560, Math.hypot(this.player.x - d.x, this.player.y - d.y) + 60);
@@ -5820,6 +6037,8 @@
       g.scale(k, k);
       // dusk veil: one alpha fades the whole cached figure
       if (d.state === "veil") g.globalAlpha = Math.max(0.04, Math.min(1, veilA));
+      // moon phases: waning dims the whole figure (still fully targetable)
+      else if (d.state === "phases") g.globalAlpha = d.stateT < (d.phase === 2 ? 1.4 : 1.6) * 0.5 ? 1 : 0.55;
       g.drawImage(scr, -230, -150);
       // dusk echoes: two ghost silhouettes flank it — the SAME cached rig
       // drawn twice more at low alpha (no extra rigging per frame)
