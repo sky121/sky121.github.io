@@ -2018,11 +2018,155 @@
       return card;
     }
 
+    /* ---- shortlist "constellation": a tiny no-deps relative map ----
+       Plots YOU at center and each shortlisted place by its real bearing
+       and distance from the search origin (state.origin), scaled so the
+       farthest sits near the panel edge. Fewer than two places with usable
+       coords → no panel (a one-dot map is just noise). Dots are real
+       buttons: tapping one scrolls its compare card into view and pulses
+       it. Inline SVG draws the faint rays — no map libraries. */
+    var CONST_C = 50, CONST_MINR = 17, CONST_MAXR = 40; // in the 0..100 square
+
+    // Reuse panelArt's palette hash: pull the first pigment hex it emits.
+    function constTint(r, i) {
+      var m = String(panelArt(r, 'const', i)).match(/#([0-9a-fA-F]{6})/);
+      return m ? '#' + m[1] : 'var(--pond)';
+    }
+
+    function constPlace(p) { // recompute x,y from angle + distance-radius
+      p.x = CONST_C + p.radius * Math.sin(p.ang);
+      p.y = CONST_C - p.radius * Math.cos(p.ang); // north is up (−y)
+    }
+
+    function buildConstellation() {
+      var origin = state.origin;
+      if (!origin || origin.lat == null || origin.lng == null) return null;
+      var cosLat = Math.cos(origin.lat * Math.PI / 180);
+      var pts = [], maxDist = 0;
+      shortlist.forEach(function (r) {
+        var loc = r.location;
+        if (!loc || loc.lat == null || loc.lng == null || r.distance == null) return;
+        var east = (loc.lng - origin.lng) * cosLat;
+        var north = loc.lat - origin.lat;
+        var mag = Math.sqrt(east * east + north * north);
+        if (!(mag > 0)) return; // sits exactly on the origin — no bearing
+        if (r.distance > maxDist) maxDist = r.distance;
+        pts.push({ r: r, ang: Math.atan2(east, north), dist: r.distance });
+      });
+      if (pts.length < 2 || !(maxDist > 0)) return null;
+
+      // radius is a strictly increasing function of real distance, so the
+      // farthest dot always renders farther from centre than the nearest.
+      pts.forEach(function (p) {
+        p.radius = CONST_MINR + (p.dist / maxDist) * (CONST_MAXR - CONST_MINR);
+        constPlace(p);
+      });
+      // Nudge coincident dots apart along their circle (distance/radius held
+      // fixed, so the geometric ordering survives — only bearing shifts).
+      var MINSEP = 13;
+      for (var pass = 0; pass < 8; pass++) {
+        var moved = false;
+        for (var a = 0; a < pts.length; a++) {
+          for (var b = a + 1; b < pts.length; b++) {
+            var dx = pts[a].x - pts[b].x, dy = pts[a].y - pts[b].y;
+            var d = Math.sqrt(dx * dx + dy * dy);
+            if (d < MINSEP) {
+              var push = (MINSEP - d) / 60 + 0.05;
+              pts[a].ang += push; pts[b].ang -= push;
+              constPlace(pts[a]); constPlace(pts[b]);
+              moved = true;
+            }
+          }
+        }
+        if (!moved) break;
+      }
+
+      var panel = el('div', 'slc-constellation');
+      panel.setAttribute('role', 'group');
+      panel.setAttribute('aria-label', 'Map of your shortlist relative to you');
+      var plot = el('div', 'slc-const-plot');
+
+      var svgNS = 'http://www.w3.org/2000/svg';
+      var svg = document.createElementNS(svgNS, 'svg');
+      svg.setAttribute('class', 'slc-const-web');
+      svg.setAttribute('viewBox', '0 0 100 100');
+      svg.setAttribute('preserveAspectRatio', 'none'); // plot box is square
+      svg.setAttribute('aria-hidden', 'true');
+      pts.forEach(function (p) {
+        var ln = document.createElementNS(svgNS, 'line');
+        ln.setAttribute('x1', CONST_C); ln.setAttribute('y1', CONST_C);
+        ln.setAttribute('x2', p.x.toFixed(2)); ln.setAttribute('y2', p.y.toFixed(2));
+        ln.setAttribute('class', 'slc-const-ray');
+        svg.appendChild(ln);
+      });
+      plot.appendChild(svg);
+
+      // YOU, at the centre — a small feather/home dot.
+      var you = el('div', 'slc-const-you');
+      you.setAttribute('aria-hidden', 'true');
+      you.appendChild(el('span', 'slc-const-you-pip'));
+      you.appendChild(el('span', 'slc-const-you-tag', 'You'));
+      plot.appendChild(you);
+
+      pts.forEach(function (p, i) {
+        var dot = el('button', 'slc-const-dot');
+        dot.type = 'button';
+        dot.style.left = p.x.toFixed(2) + '%';
+        dot.style.top = p.y.toFixed(2) + '%';
+        dot.setAttribute('aria-label', 'Highlight ' + p.r.name);
+        var pip = el('span', 'slc-const-pip');
+        pip.style.background = constTint(p.r, i);
+        dot.appendChild(pip);
+        var tag = el('span', 'slc-const-tag');
+        tag.appendChild(el('span', 'slc-const-tag-name', p.r.name));
+        tag.appendChild(el('span', 'slc-const-tag-dist', fmtDist(p.r.distance)));
+        dot.appendChild(tag);
+        (function (place) {
+          dot.addEventListener('click', function () { highlightCard(place.id); });
+        })(p.r);
+        plot.appendChild(dot);
+      });
+
+      panel.appendChild(plot);
+      return panel;
+    }
+
+    /* Tap a constellation dot → bring its compare card into view and pulse
+       it (echoing the winner glow). Reduced motion: instant scroll + a
+       static outline that clears after a beat, no animation. */
+    var constHiTimer = null;
+    function highlightCard(id) {
+      if (!shortlistEl) return;
+      var card = null, cards = shortlistEl.querySelectorAll('.slc');
+      for (var i = 0; i < cards.length; i++) {
+        if (cards[i].dataset.id === id) { card = cards[i]; break; }
+      }
+      if (!card) return;
+      haptic(8);
+      if (constHiTimer) { window.clearTimeout(constHiTimer); constHiTimer = null; }
+      var others = shortlistEl.querySelectorAll('.slc.is-highlight');
+      for (var j = 0; j < others.length; j++) others[j].classList.remove('is-highlight');
+      // reflow so re-tapping the same card restarts the pulse
+      void card.offsetWidth;
+      var name = card.querySelector('.slc-name');
+      announce('Showing ' + (name ? name.textContent : 'place') + ' in your shortlist.');
+      try {
+        card.scrollIntoView({ block: 'center', behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+      } catch (e) { try { card.scrollIntoView(); } catch (e2) {} }
+      card.classList.add('is-highlight');
+      constHiTimer = window.setTimeout(function () {
+        card.classList.remove('is-highlight');
+        constHiTimer = null;
+      }, prefersReducedMotion ? 1400 : 1250);
+    }
+
     function renderShortlist() {
       var listEl = shortlistEl && shortlistEl.querySelector('.shortlist-list');
       if (!listEl) return;
       clear(listEl);
       if (!shortlist.length) { backFromShortlist(); return; }
+      var con = buildConstellation();
+      if (con) listEl.appendChild(con); // above the compare cards
       shortlist.forEach(function (r) { listEl.appendChild(buildCompareCard(r)); });
     }
 
