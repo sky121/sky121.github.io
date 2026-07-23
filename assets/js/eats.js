@@ -1132,7 +1132,7 @@
       var next = $('step-next');
       var where = $('step-where');
       if (back) back.style.visibility = (step === 0 || single) ? 'hidden' : 'visible';
-      if (next) next.textContent = (single || step === groups.length - 1) ? 'Done →' : 'Skip →';
+      if (next) next.textContent = (single || step === groups.length - 1) ? 'Done →' : 'Continue →';
       var legend = groups[step].querySelector('.pref-legend');
       var title = legend ? legend.textContent.replace(/\(optional\)/, '').trim() : '';
       if (where) where.textContent = single ? 'just this one' : ((step + 1) + ' of ' + groups.length);
