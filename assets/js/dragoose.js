@@ -1077,11 +1077,13 @@
         g.closePath();
         var wg = g.createLinearGradient(8, -4, tipX, tipY + 8);
         wg.addColorStop(0, CW);
+        wg.addColorStop(0.62, this.mix(CW, CS, 0.4));
         wg.addColorStop(1, CS);
         g.fillStyle = wg;
         g.fill();
         g.strokeStyle = ink; g.globalAlpha = 0.7; g.lineWidth = 2; g.stroke();
-        // primary feather chords running back toward the shoulder
+        // primary feather chords running back toward the shoulder, with soft
+        // tip separations so the wing reads as layered flight feathers
         if (!o.simple) {
           g.globalAlpha = 0.26; g.lineWidth = 1.3;
           g.beginPath();
@@ -1089,6 +1091,15 @@
           g.quadraticCurveTo((tipX + 16) / 2, (tipY + 12) / 2 + 4, 16, 2);
           g.moveTo(tipX - 8, tipY + 14);
           g.quadraticCurveTo((tipX + 18) / 2, (tipY + 22) / 2 + 6, 15, 7);
+          g.moveTo(tipX - 2, tipY + 1);
+          g.quadraticCurveTo((tipX + 14) / 2, (tipY + 6) / 2 + 2, 18, -3);
+          g.stroke();
+          // leading-edge rim light — a soft glide catching the sun
+          g.globalAlpha = 0.5; g.lineWidth = 1.6;
+          g.strokeStyle = this.mix(CW, "#fffdf4", 0.55);
+          g.beginPath();
+          g.moveTo(9, -11);
+          g.bezierCurveTo(24, -25 - a * 12, 42, tipY - 5, tipX - 1, tipY + 1);
           g.stroke();
         }
         g.globalAlpha = 1;
@@ -1131,10 +1142,14 @@
       g.bezierCurveTo(-22, -6, -15, -24, 0, -26);
       g.closePath();
       var bgd = g.createLinearGradient(-18, -14, 16, 28);
-      bgd.addColorStop(0, CB); bgd.addColorStop(1, CS);
+      bgd.addColorStop(0, this.mix(CB, "#fffdf4", 0.3)); bgd.addColorStop(0.55, CB); bgd.addColorStop(1, CS);
       g.fillStyle = bgd; g.fill();
       g.strokeStyle = ink; g.globalAlpha = 0.78; g.lineWidth = 2.2; g.stroke();
       g.globalAlpha = 1;
+      // a soft breast highlight lifts the body off the flat silhouette
+      if (!o.simple) {
+        Fx.drawDot(g, -6, -8, 11, this.mix(CB, "#fffdf4", 0.5), 0.28, false);
+      }
       // folded-feather linework along the back
       if (!o.simple) {
         g.globalAlpha = 0.22; g.strokeStyle = ink; g.lineWidth = 1.3;
@@ -1294,10 +1309,29 @@
       var col = function (c) { return flash > 0 ? self.mix(c, "#fbf7ee", flash) : c; };
       var sway = o.swayPhase || 0;
       var fl = o.flapPhase || 0;
+      var t = o.t || 0;
+      var simple = !!o.simple;
       var bow = Math.max(0, Math.min(1, o.bow || 0));
-      var wingK = Math.sin(fl) * (1 - bow * 0.85);
-      var billow = Math.sin(fl - 0.9) * (1 - bow * 0.85);
+
+      // ---- WING-BEAT CYCLE -------------------------------------------------
+      // flapPhase accumulates with flight speed (and 1.5x while enraged). We
+      // shape it into a real beat rather than a flat sine: a lingering raised
+      // GLIDE at the top, a quick powerful DOWNSTROKE (phase skewed so the
+      // wing snaps down and eases back up), the finger spars FANNING wide on
+      // the power stroke and gathering on recovery, and the membrane billowing
+      // a beat behind the bones (secondary motion). Breathing swells the fore-
+      // body at rest.
+      var s1 = Math.sin(fl);
+      var wingK = Math.sin(fl + 0.34 * s1) * (1 - bow * 0.9);   // vertical sweep
+      var billow = Math.sin(fl - 0.95) * (1 - bow * 0.9);       // membrane lag
+      var spread = 0.82 + 0.20 * wingK;                         // finger fan
+      var breath = Math.sin(t * 1.5) * (1 - bow);               // idle breathing
       var i, side;
+
+      // painterly light tints (light falls from the upper-left / leading edge)
+      var memBack = this.mix(P0.memHi, "#fff3da", 0.24);        // light through skin
+      var rimHi = this.mix(P0.hi, "#fff6e2", 0.5);              // sun on the bones
+      var spineHi = this.mix(P0.hi, "#fff2d8", 0.4);            // dorsal ridge glint
 
       // serpentine body chain: head end steady, tail whips
       // (denser segments = smooth taper, no michelin bumps)
@@ -1307,30 +1341,36 @@
         segs.push({
           x: Math.sin(sway + ti * 5.1) * (1.5 + ti * ti * 30) * 0.55,
           y: -64 + i * 24,
-          r: 34 - ti * 23
+          r: (34 - ti * 23) * (1 + (1 - ti) * breath * 0.03)
         });
       }
 
       g.save();
       g.lineJoin = "round"; g.lineCap = "round";
 
-      // ---- wings (under the body): swept bat wings, scalloped membrane ----
+      // ---- wings (under the body): anatomical membrane wing ---------------
+      // shoulder -> elbow -> wrist arm, then FOUR finger spars fanning out
+      // with the membrane stretched (translucent, veined) between them; a
+      // thumb claw hooks at the wrist. Everything sweeps through the beat.
       for (side = -1; side <= 1; side += 2) {
         g.save();
         g.scale(side, 1);
-        if (bow > 0) { g.translate(24, -42); g.scale(1 - bow * 0.32, 1); g.translate(-24, 42); }
-        var S = { x: 24, y: -42 };                                 // shoulder
-        var E = { x: 108, y: -96 + wingK * 30 };                   // elbow
-        var W = { x: 172, y: -70 + wingK * 48 };                   // wrist
-        var F1 = { x: 230 - Math.abs(wingK) * 10, y: -28 + wingK * 62 }; // leading finger tip
-        var F2 = { x: 202 - Math.abs(wingK) * 8, y: 42 + wingK * 34 };
-        var F3 = { x: 134, y: 86 + wingK * 16 };
-        var Tb = { x: 12, y: 74 };                                 // hip root
-        // deep concave scallops between finger tips (pulled toward wrist)
-        var sc1 = { x: (F1.x + F2.x) / 2 - 34, y: (F1.y + F2.y) / 2 - 10 + billow * 16 };
-        var sc2 = { x: (F2.x + F3.x) / 2 - 38, y: (F2.y + F3.y) / 2 - 12 + billow * 12 };
-        var sc3 = { x: (F3.x + Tb.x) / 2 - 18, y: (F3.y + Tb.y) / 2 - 16 + billow * 8 };
-        // membrane
+        if (bow > 0) { g.translate(24, -42); g.scale(1 - bow * 0.34, 1); g.translate(-24, 42); }
+        var S = { x: 24, y: -42 };                                  // shoulder
+        var E = { x: 104, y: -92 + wingK * 32 };                    // elbow
+        var W = { x: 172, y: -60 + wingK * 52 };                    // wrist
+        var F1 = { x: W.x + 62 * spread, y: W.y - 8 + wingK * 22 };  // leading spar (longest)
+        var F2 = { x: W.x + 48 * spread, y: W.y + 48 + wingK * 12 };
+        var F3 = { x: W.x + 14 * spread, y: W.y + 100 + wingK * 6 };
+        var F4 = { x: W.x - 34 * spread, y: W.y + 132 };            // trailing spar (short)
+        var Tb = { x: 12, y: 80 };                                  // hip root
+        // concave scallops between the spar tips (trailing-edge sag, billows)
+        var sc1 = { x: (F1.x + F2.x) / 2 - 20, y: (F1.y + F2.y) / 2 + billow * 16 };
+        var sc2 = { x: (F2.x + F3.x) / 2 - 26, y: (F2.y + F3.y) / 2 + billow * 13 };
+        var sc3 = { x: (F3.x + F4.x) / 2 - 24, y: (F3.y + F4.y) / 2 + billow * 10 };
+        var sc4 = { x: (F4.x + Tb.x) / 2 - 12, y: (F4.y + Tb.y) / 2 + billow * 6 };
+
+        // --- membrane: translucent, backlit near the wrist, deep at trailing edge ---
         g.beginPath();
         g.moveTo(S.x, S.y);
         g.quadraticCurveTo((S.x + E.x) / 2 + 6, S.y - 34 + wingK * 9, E.x, E.y);
@@ -1338,18 +1378,38 @@
         g.lineTo(F1.x, F1.y);
         g.quadraticCurveTo(sc1.x, sc1.y, F2.x, F2.y);
         g.quadraticCurveTo(sc2.x, sc2.y, F3.x, F3.y);
-        g.quadraticCurveTo(sc3.x, sc3.y, Tb.x, Tb.y);
+        g.quadraticCurveTo(sc3.x, sc3.y, F4.x, F4.y);
+        g.quadraticCurveTo(sc4.x, sc4.y, Tb.x, Tb.y);
         g.closePath();
-        var mg = g.createLinearGradient(S.x, S.y - 20, F1.x, F2.y);
-        mg.addColorStop(0, col(P0.memHi));
+        var mg = g.createLinearGradient(W.x, W.y - 26, (F3.x + Tb.x) / 2, (F3.y + Tb.y) / 2);
+        mg.addColorStop(0, col(memBack));
+        mg.addColorStop(0.5, col(P0.memHi));
         mg.addColorStop(1, col(P0.memLo));
         g.fillStyle = mg;
-        g.globalAlpha = 0.96;
+        g.globalAlpha = 0.84;
         g.fill();
-        g.strokeStyle = ink; g.lineWidth = 3; g.globalAlpha = 0.75; g.stroke();
+        // ambient occlusion where the wing tucks under the body
+        if (!simple) {
+          var ao = g.createLinearGradient(S.x, S.y, S.x + 76, S.y + 34);
+          ao.addColorStop(0, Fx.rgba(ink, 0.32));
+          ao.addColorStop(1, Fx.rgba(ink, 0));
+          g.fillStyle = ao; g.fill();
+        }
+        g.globalAlpha = 1;
+        g.strokeStyle = ink; g.lineWidth = 2.6; g.globalAlpha = 0.7; g.stroke();
         g.globalAlpha = 1;
 
-        // wing bones: arm, then three membrane fingers
+        // --- membrane veins fanning from the wrist (visible through the skin) ---
+        if (!simple) {
+          g.strokeStyle = Fx.rgba(P0.memLo, 0.5); g.lineWidth = 1.2;
+          g.beginPath();
+          g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + sc1.x) / 2, (W.y + sc1.y) / 2, sc1.x, sc1.y + 6);
+          g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + sc2.x) / 2, (W.y + sc2.y) / 2, sc2.x, sc2.y + 6);
+          g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + sc3.x) / 2, (W.y + sc3.y) / 2, sc3.x, sc3.y + 4);
+          g.stroke();
+        }
+
+        // --- spar bones: arm, then four fingers (dark under-tone, tapering) ---
         g.strokeStyle = col(P0.lo);
         g.lineWidth = 7;
         g.beginPath();
@@ -1359,27 +1419,43 @@
         g.stroke();
         g.lineWidth = 4;
         g.beginPath(); g.moveTo(W.x, W.y); g.lineTo(F1.x, F1.y); g.stroke();
-        g.lineWidth = 3.2;
-        g.beginPath(); g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + F2.x) / 2 + 10, (W.y + F2.y) / 2, F2.x, F2.y); g.stroke();
+        g.lineWidth = 3.4;
+        g.beginPath(); g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + F2.x) / 2 + 8, (W.y + F2.y) / 2, F2.x, F2.y); g.stroke();
+        g.lineWidth = 3;
         g.beginPath(); g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + F3.x) / 2 + 2, (W.y + F3.y) / 2, F3.x, F3.y); g.stroke();
-        // wrist talon
+        g.lineWidth = 2.6;
+        g.beginPath(); g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + F4.x) / 2 - 6, (W.y + F4.y) / 2, F4.x, F4.y); g.stroke();
+
+        // --- rim light along the leading arm edge (sun catches the bone) ---
+        g.strokeStyle = col(rimHi); g.lineWidth = 2.2; g.globalAlpha = 0.7;
+        g.beginPath();
+        g.moveTo(S.x + 2, S.y - 3);
+        g.quadraticCurveTo((S.x + E.x) / 2 + 6, S.y - 31 + wingK * 9, E.x + 1, E.y - 2);
+        g.quadraticCurveTo((E.x + W.x) / 2 + 8, (E.y + W.y) / 2 - 16, W.x, W.y - 2);
+        g.lineTo(F1.x, F1.y);
+        g.stroke();
+        g.globalAlpha = 1;
+
+        // --- thumb claw hooking at the wrist ---
         g.fillStyle = col(P0.bone);
         g.beginPath();
         g.moveTo(W.x - 3, W.y - 6);
-        g.lineTo(W.x + 13, W.y - 20);
+        g.lineTo(W.x + 15, W.y - 22);
         g.lineTo(W.x + 6, W.y - 1);
         g.closePath();
         g.fill();
+        g.strokeStyle = ink; g.lineWidth = 1.2; g.globalAlpha = 0.5; g.stroke();
+        g.globalAlpha = 1;
 
-        // enraged: membrane veins glow
-        if (o.phase2 && flash <= 0) {
+        // enraged: membrane veins smoulder along the spars
+        if (o.phase2 && flash <= 0 && !simple) {
           g.save();
           g.globalCompositeOperation = "lighter";
-          g.globalAlpha = 0.3 + 0.2 * Math.sin((o.t || 0) * 6);
+          g.globalAlpha = 0.28 + 0.2 * Math.sin(t * 6);
           g.strokeStyle = P0.vein;
-          g.lineWidth = 2.4;
+          g.lineWidth = 2.2;
           g.beginPath(); g.moveTo(W.x, W.y); g.lineTo(F1.x, F1.y); g.stroke();
-          g.beginPath(); g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + F2.x) / 2 + 10, (W.y + F2.y) / 2, F2.x, F2.y); g.stroke();
+          g.beginPath(); g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + F2.x) / 2 + 8, (W.y + F2.y) / 2, F2.x, F2.y); g.stroke();
           g.beginPath(); g.moveTo(W.x, W.y); g.quadraticCurveTo((W.x + F3.x) / 2 + 2, (W.y + F3.y) / 2, F3.x, F3.y); g.stroke();
           g.restore();
         }
@@ -1412,20 +1488,31 @@
           g.stroke();
         }
       };
-      g.globalAlpha = 0.8; g.strokeStyle = ink;
-      strokeChain(2.4);
+      g.globalAlpha = 0.82; g.strokeStyle = ink;
+      strokeChain(2.6);            // ink silhouette / soft flank AO
       g.globalAlpha = 1;
-      var bodyGrad = g.createLinearGradient(0, -100, 0, 190);
+      var bodyGrad = g.createLinearGradient(0, -104, 0, 196);
       bodyGrad.addColorStop(0, col(P0.hi));
+      bodyGrad.addColorStop(0.5, col(this.mix(P0.hi, P0.lo, 0.4)));
       bodyGrad.addColorStop(1, col(P0.lo));
       g.strokeStyle = bodyGrad;
       strokeChain(0);
-      // subtle belly keel (narrow, close in tone, fades toward the tail)
+      // belly keel (narrow, lighter, brightest at the throat, fades to the tail)
       g.strokeStyle = col(P0.belly);
       g.globalAlpha = 0.55;
       for (i = 0; i < n - 2; i++) {
         g.lineWidth = segs[i].r * 0.55;
         g.beginPath(); g.moveTo(segs[i].x, segs[i].y); g.lineTo(segs[i + 1].x, segs[i + 1].y); g.stroke();
+      }
+      g.globalAlpha = 1;
+      // dorsal spine rim-light: a thin bright ridge catching the sun off-centre
+      g.strokeStyle = col(spineHi); g.globalAlpha = 0.5; g.lineCap = "round";
+      for (i = 0; i < n - 3; i++) {
+        g.lineWidth = segs[i].r * 0.3;
+        g.beginPath();
+        g.moveTo(segs[i].x - segs[i].r * 0.18, segs[i].y);
+        g.lineTo(segs[i + 1].x - segs[i + 1].r * 0.18, segs[i + 1].y);
+        g.stroke();
       }
       g.globalAlpha = 1;
       // scale seams across the back
@@ -1457,6 +1544,25 @@
       g.translate(segs[0].x * 0.6, -102 + bow * 20);
       g.scale(1.22, 1.22);
       if (bow > 0) g.rotate(bow * 0.1);
+      // occipital frill: a translucent webbed crest fanning back from the jaw
+      // (drawn first, behind everything) — reads reptilian and takes the
+      // membrane tint so each dragon keeps its identity
+      if (!simple) {
+        for (side = -1; side <= 1; side += 2) {
+          g.beginPath();
+          g.moveTo(side * 11, 3);
+          g.quadraticCurveTo(side * 40, 9, side * 31, 35);
+          g.quadraticCurveTo(side * 21, 21, side * 8, 12);
+          g.closePath();
+          g.fillStyle = Fx.rgba(col(P0.memHi), 0.6); g.fill();
+          g.strokeStyle = ink; g.lineWidth = 1; g.globalAlpha = 0.38; g.stroke();
+          g.globalAlpha = 1;
+          g.strokeStyle = col(P0.boneTip); g.lineWidth = 1.2; g.globalAlpha = 0.7;
+          g.beginPath(); g.moveTo(side * 10, 5); g.lineTo(side * 33, 31); g.stroke();
+          g.beginPath(); g.moveTo(side * 12, 8); g.lineTo(side * 25, 30); g.stroke();
+          g.globalAlpha = 1;
+        }
+      }
       // horns sweep back past the shoulders (behind the skull)
       for (side = -1; side <= 1; side += 2) {
         g.beginPath();
@@ -1544,6 +1650,13 @@
       g.moveTo(3.6, -23.5); g.lineTo(2, -26.5);
       g.stroke();
       g.globalAlpha = 1;
+      // a faint vent-glow smoulders at the nostrils (per-type eye tint) —
+      // stronger when enraged; cheap and restrained
+      if (!simple) {
+        var ventA = (o.phase2 ? 0.34 : 0.2) + (o.phase2 ? 0.12 * Math.sin(t * 7) : 0);
+        Fx.drawDot(g, -2.6, -25.5, 3.4, P0.eye, ventA, true);
+        Fx.drawDot(g, 2.6, -25.5, 3.4, P0.eye, ventA, true);
+      }
       g.restore();
 
       g.restore();
@@ -3513,7 +3626,10 @@
       if (d.hitFlash > 0) d.hitFlash -= dt;
 
       // animation phases: slow powerful wing beats, serpentine tail sway
+      // wing-beat cadence follows the mood: slow majestic glide when roaming,
+      // harder/faster beats when enraged (1.5x) or dashing (a driving surge)
       var animSpd = d.phase === 2 ? 1.5 : 1;
+      if (d.state === "dash" || d.state === "telegraph") animSpd *= 1.35;
       d.flapPhase = (d.flapPhase || 0) + dt * TAU * 0.42 * animSpd * (d.state === "bow" ? 0.4 : 1);
       d.swayPhase = (d.swayPhase || 0) + dt * 2.1 * animSpd * (d.state === "bow" ? 0.4 : 1);
 
@@ -5727,7 +5843,14 @@
       return "rgb(" + r + "," + gg + "," + bl + ")";
     },
     hex: function (h) {
+      // accept both "#rrggbb"/"#rgb" and "rgb(r,g,b)" so mixed colours can be
+      // safely re-mixed (rim lights / mid-stops chain mix() on mix() results)
+      if (h.charAt(0) !== "#") {
+        var m = h.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+        if (m) return [+m[1], +m[2], +m[3]];
+      }
       h = h.replace("#", "");
+      if (h.length === 3) h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
       return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)];
     }
   };
