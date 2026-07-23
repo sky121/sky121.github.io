@@ -1843,6 +1843,151 @@ html.evening .slc.is-spot { background: rgba(127, 168, 201, 0.12); }
   box-shadow: 0 0 0 2px rgba(205, 184, 120, 0.55), 0 16px 32px -14px rgba(205, 184, 120, 0.8);
 }
 html.evening .slc.is-winner { background: rgba(205, 184, 120, 0.12); }
+
+/* --- shortlist constellation (JS-built in buildConstellation) --- */
+.slc-constellation {
+  position: relative;
+  height: 11rem;
+  border-radius: 18px;
+  border: 1px solid var(--card-line);
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 22% 18%, rgba(127, 168, 201, 0.16) 0%, rgba(127, 168, 201, 0) 60%),
+    radial-gradient(110% 90% at 82% 78%, rgba(162, 146, 196, 0.16) 0%, rgba(162, 146, 196, 0) 62%),
+    radial-gradient(100% 100% at 50% 50%, rgba(246, 241, 231, 0.5) 0%, rgba(246, 241, 231, 0) 70%),
+    var(--card-bg);
+  box-shadow: var(--card-shadow);
+}
+html.evening .slc-constellation {
+  background:
+    radial-gradient(120% 80% at 22% 18%, rgba(127, 168, 201, 0.2) 0%, rgba(127, 168, 201, 0) 60%),
+    radial-gradient(110% 90% at 82% 78%, rgba(162, 146, 196, 0.22) 0%, rgba(162, 146, 196, 0) 62%),
+    var(--card-bg);
+}
+/* the plotting area is a square sized to the panel height, centred — so a
+   0..100 coordinate maps isotropically (bearing + distance stay true) */
+.slc-const-plot {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  aspect-ratio: 1 / 1;
+  height: 100%;
+}
+.slc-const-web {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.slc-const-ray {
+  stroke: var(--pond-deep);
+  stroke-width: 0.6;
+  stroke-dasharray: 1.4 2.2;
+  stroke-linecap: round;
+  opacity: 0.45;
+  vector-effect: non-scaling-stroke;
+}
+html.evening .slc-const-ray { stroke: var(--pond); opacity: 0.5; }
+
+/* YOU — the feather dot at centre */
+.slc-const-you {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  z-index: 2;
+}
+.slc-const-you-pip {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(45deg);
+  background: radial-gradient(circle at 35% 30%, #fdfaf2 0%, var(--pond) 55%, var(--pond-deep) 100%);
+  box-shadow: 0 0 0 3px rgba(127, 168, 201, 0.22), 0 2px 5px -2px rgba(46, 58, 72, 0.5);
+}
+.slc-const-you-tag {
+  margin-top: 0.26rem;
+  font-family: var(--font-ui);
+  font-size: 0.56rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+/* each shortlisted place — a real button with a generous transparent hit area */
+.slc-const-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.slc-const-pip {
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(246, 241, 231, 0.7), 0 2px 5px -2px rgba(46, 58, 72, 0.55);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+html.evening .slc-const-pip { box-shadow: 0 0 0 2px rgba(43, 49, 64, 0.7), 0 2px 5px -2px rgba(0, 0, 0, 0.6); }
+.slc-const-tag {
+  position: absolute;
+  top: calc(50% + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+  pointer-events: none;
+  max-width: 5.4rem;
+}
+.slc-const-tag-name {
+  font-family: var(--font-ui);
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: var(--ink);
+  max-width: 5.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slc-const-tag-dist {
+  font-family: var(--font-ui);
+  font-size: 0.52rem;
+  color: var(--ink-soft);
+  margin-top: 0.05rem;
+}
+.slc-const-dot:hover .slc-const-pip { transform: scale(1.18); }
+.slc-const-dot:focus-visible { outline: none; }
+.slc-const-dot:focus-visible .slc-const-pip {
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--pond-deep);
+}
+
+/* pulse a compare card when its constellation dot is tapped */
+.slc.is-highlight { animation: slc-highlight 1.2s ease; }
+@keyframes slc-highlight {
+  0%   { box-shadow: 0 0 0 0 rgba(205, 184, 120, 0); border-color: var(--card-line); }
+  20%  { box-shadow: 0 0 0 3px rgba(205, 184, 120, 0.6), 0 16px 32px -14px rgba(205, 184, 120, 0.8); border-color: var(--gold); }
+  70%  { box-shadow: 0 0 0 3px rgba(205, 184, 120, 0.5), 0 14px 30px -14px rgba(205, 184, 120, 0.7); border-color: var(--gold); }
+  100% { box-shadow: 0 0 0 0 rgba(205, 184, 120, 0); border-color: var(--card-line); }
+}
+
 /* mid-shuffle the controls go quiet (JS guards the keyboard path) */
 .shortlist.is-picking .slc-acts,
 .shortlist.is-picking .shortlist-pickme,
@@ -3019,6 +3164,13 @@ html.evening .eats-toast-act:hover { color: var(--pond-ink); background: rgba(12
   }
   /* the winner still reads chosen, just without the lift */
   .slc.is-winner { transform: none; }
+  /* highlight becomes a static outline (no pulse), cleared by JS after a beat */
+  .slc.is-highlight {
+    animation: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(205, 184, 120, 0.55);
+  }
+  .slc-const-pip { transition: none; }
   .social-enter { animation: none; opacity: 1; }
   /* swap fling/rotation for quick fades; JS also detects this flag */
   .swipe-card.is-settling { transition: opacity 0.18s ease; }

@@ -12,7 +12,7 @@
 > icon *art* changed.
 >
 > Single source of truth so we can pick up exactly where we left off.
-> Last updated: **2026-07-20**.
+> Last updated: **2026-07-21**.
 
 ---
 
@@ -43,6 +43,46 @@
 ---
 
 ## Feature map (what's built)
+
+### Shortlist "constellation" — a tiny no-deps relative map (2026-07-21)
+The compare view (shortlist badge / end-of-deck "Compare shortlist") now opens
+with a small **constellation panel** above the compare cards — a watercolor
+plot of where the shortlisted places sit relative to *you*, so geography is
+part of the decision, not buried in a distance line.
+- **The panel** (`buildConstellation` in the deck closure, `.slc-constellation*`
+  CSS) — a rounded ~11rem watercolor panel. **YOU** is a small pond feather dot
+  dead centre; each shortlisted place is a watercolor dot placed by its **real
+  bearing + distance** from the search origin (`state.origin`, the same origin
+  the haversine `distance` uses). Bearing comes from the lat/lng offset
+  (longitude compressed by `cos(lat)`); the **radius is a strictly increasing
+  function of the real distance** (`MINR + dist/maxDist·(MAXR−MINR)`) so the
+  farthest spot always sits nearest the edge and the nearest hugs the centre —
+  ordering that survives the collision nudge below.
+- **Isotropic without measuring layout** — `.slc-const-plot` is an
+  `aspect-ratio: 1/1` box sized to the panel height and centred, so a 0..100
+  coordinate maps to equal pixels on both axes (no distance distortion). The
+  faint **dotted rays** from centre to each dot are one inline `<svg>`
+  (viewBox 0 0 100, `preserveAspectRatio="none"`) — no map libraries.
+- **Dot styling** — pigment tint pulled from the same `panelArt` palette hash
+  as the place's cards (first hex it emits), the name in tiny type beneath
+  (CSS-truncated with ellipsis) and distance on a second line via `fmtDist`.
+  Coincident dots are nudged apart along their circle (angle only — radius/
+  distance held fixed) so two spots never stack.
+- **Tap to highlight** — dots are real `<button>`s (`aria-label "Highlight
+  <name>"`, ≥44px hit area via transparent padding around the visual pip).
+  Tapping scrolls the matching compare card into view and pulses it ~1.2s with
+  a gold glow echoing `.slc.is-winner` (`.slc.is-highlight` + `slc-highlight`
+  keyframe; `highlightCard` clears any prior highlight and reflows so re-taps
+  restart the pulse).
+- **Graceful absence** — needs **≥2 places with usable coords** (`location`
+  lat/lng + non-null `distance`, and a resolvable origin); below that the panel
+  doesn't render (a one-dot map is noise). Demo data carries coords, so it
+  works with zero setup.
+- **Evening** overrides tuned; **reduced motion** swaps the pulse for an instant
+  scroll + a static gold outline that `highlightCard` clears after a beat (no
+  animation). Verified at 390px with Playwright: 3-dot plot with distinct
+  positions, geometric radius-vs-distance ordering asserted, tap-pulse, the
+  1-place bail, and the reduced-motion path.
 
 ### Landing "clean primary CTA" — the orb is gone (2026-07-20)
 Third pass on the Find landing. The user rejected both earlier attempts — a
