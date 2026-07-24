@@ -23,6 +23,16 @@
   // parallax cloud wrap margin (clouds roam a band this much larger than the
   // viewport on each side, so tiles stay covered as the camera pans)
   var CLOUD_MARGIN = 360;
+  // foreground dust/pollen wrap margin (a smaller near-field than the clouds)
+  var DUST_MARGIN = 80;
+  // wind-streak wrap band (streaks live a little past the viewport edges)
+  var WIND_MARGIN = 90;
+  // GAME-FEEL: dynamic zoom — the frame eases this fraction wider when the
+  // goose sustains high speed (multiplies the base tzoom; clamped by the
+  // camera's void-guard, so a wider view never shows past the world skin)
+  var DYN_ZOOM_MIN = 0.94;           // widest fraction of base zoom at top speed
+  var DYN_ZOOM_LO = 220;             // speed where the frame starts to open
+  var DYN_ZOOM_HI = 460;             // speed where it reaches DYN_ZOOM_MIN
   var DT = 1 / 60;                    // fixed timestep
   var MAX_FRAME = 0.05;              // clamp big frames (spiral guard)
   var PAL = {
@@ -1846,6 +1856,9 @@
     cam: {
       cx: WORLD_W / 2, cy: WORLD_H / 2,
       zoom: 1, tzoom: 1,
+      // dynZoom: speed-reactive multiplier on tzoom (1 at rest, eases toward
+      // DYN_ZOOM_MIN in sustained fast flight so the sky opens up a touch)
+      dynZoom: 1,
       k: 3.6, lead: 0.42, maxLead: 175, dead: 4,
       _s: { x: 0, y: 0 },
       // world -> screen (reuses one scratch; read x/y immediately)
@@ -1931,6 +1944,44 @@
           spd: 6 + Math.random() * 16,
           phase: Math.random() * TAU,
           tw: 0.6 + Math.random() * 1.6
+        });
+      }
+
+      // GAME-FEEL: speed-reactive WIND STREAKS — a fixed pool of faint tapered
+      // strokes in SCREEN space (air rushing over the whole frame reads best as
+      // a light overlay, independent of the camera transform). They stream past
+      // opposite the goose's travel; alpha scales with speed and fades when slow.
+      this.bg.wind = [];
+      var WWRAPX = VW + WIND_MARGIN * 2, WWRAPY = VH + WIND_MARGIN * 2;
+      for (var wI = 0; wI < 16; wI++) {
+        this.bg.wind.push({
+          x: Math.random() * WWRAPX - WIND_MARGIN,
+          y: Math.random() * WWRAPY - WIND_MARGIN,
+          len: 20 + Math.random() * 30,
+          wdt: 1.0 + Math.random() * 1.3,
+          spd: 0.7 + Math.random() * 0.7,
+          a: 0.55 + Math.random() * 0.45
+        });
+      }
+      this.windInten = 0;
+
+      // GAME-FEEL: foreground DUST/POLLEN — a sparse near-field of tiny motes
+      // that rush past FASTER than the nearest cloud band (parallax > 1.2),
+      // reinforcing speed and depth. World-anchored like the clouds: seeds live
+      // in a wrap field the camera parallax-scrolls at draw time (zero alloc).
+      this.bg.dust = [];
+      var DWRAPX = VW + DUST_MARGIN * 2, DWRAPY = VH + DUST_MARGIN * 2;
+      for (var dI = 0; dI < 26; dI++) {
+        this.bg.dust.push({
+          x: Math.random() * DWRAPX,
+          y: Math.random() * DWRAPY,
+          parallax: 1.45 + Math.random() * 0.35,   // > near cloud band (1.18)
+          r: 0.8 + Math.random() * 1.6,
+          alpha: 0.16 + Math.random() * 0.2,
+          drift: 8 + Math.random() * 14,
+          phase: Math.random() * TAU,
+          tw: 0.8 + Math.random() * 1.8,
+          gold: Math.random() < 0.5
         });
       }
     },
@@ -3239,8 +3290,19 @@
     // critically-damped step so hard turns let the world swing a beat behind.
     updateCamera: function (dt) {
       var cam = this.cam, p = this.player;
-      // ease the zoom (a gentle pull-back on entering a duel)
-      cam.zoom += (cam.tzoom - cam.zoom) * (1 - Math.exp(-4 * dt));
+      // GAME-FEEL: dynamic zoom — ease a widen factor from goose speed and
+      // layer it on top of the base tzoom. Slow, eased approach (no lurching);
+      // frozen at 1 under reduced motion. The zoom clamp below still guards the
+      // void, so a wider frame never reveals past the world skin.
+      var dynT = 1;
+      if (!reduceMotion && p) {
+        var sp = Math.hypot(p.vx, p.vy);
+        var wide = Math.max(0, Math.min(1, (sp - DYN_ZOOM_LO) / (DYN_ZOOM_HI - DYN_ZOOM_LO)));
+        dynT = 1 - (1 - DYN_ZOOM_MIN) * wide;
+      }
+      cam.dynZoom += (dynT - cam.dynZoom) * (1 - Math.exp(-2.2 * dt));
+      // ease the zoom (a gentle pull-back on entering a duel + the dyn widen)
+      cam.zoom += (cam.tzoom * cam.dynZoom - cam.zoom) * (1 - Math.exp(-4 * dt));
       if (!p) return;
 
       // velocity lead: bias the target ahead so you see more sky in the
@@ -3327,6 +3389,7 @@
 
       this.updatePlayer(dt);
       this.updateCamera(dt);
+      this.updateWind(dt);
       // Dusk Cowl shadow decoy fades on its own if nothing takes the bait
       if (this.decoy) { this.decoy.t -= dt; if (this.decoy.t <= 0) this.decoy = null; }
       if (this.mode === "sky") this.updateSky(dt);
@@ -3360,6 +3423,45 @@
         mt.y += mt.spd * dt;
         mt.x += Math.sin(this.time * mt.tw + mt.phase) * 8 * dt;
         if (mt.y - 6 > VH) { mt.y = -6; mt.x = Math.random() * VW; }
+      }
+      // foreground dust seeds drift gently within their wrap field (the fast
+      // rush past the frame comes from the camera parallax at draw time)
+      var du = this.bg.dust || [];
+      var DWRAPY = VH + DUST_MARGIN * 2;
+      for (var d2 = 0; d2 < du.length; d2++) {
+        var dm = du[d2];
+        dm.y += dm.drift * dt;
+        if (dm.y >= DWRAPY) dm.y -= DWRAPY;
+      }
+    },
+
+    // GAME-FEEL: advance the screen-space wind streaks. Intensity eases with
+    // goose speed above a threshold; when slow the streaks freeze and fade.
+    // Dropped entirely under reduced motion (a stable frame). No allocation:
+    // off-band streaks are re-seeded in place.
+    updateWind: function (dt) {
+      if (reduceMotion) { this.windInten = 0; return; }
+      var w = this.bg.wind, p = this.player;
+      if (!w || !p) return;
+      var spd = Math.hypot(p.vx, p.vy);
+      var target = Math.max(0, Math.min(1, (spd - 260) / 240));
+      this.windInten += (target - this.windInten) * (1 - Math.exp(-6 * dt));
+      if (this.windInten < 0.01) return;   // slow: streaks hold, no drift
+      // stream OPPOSITE travel (air rushes backward past the goose)
+      var dirx = 0, diry = 1;
+      if (spd > 1) { dirx = -p.vx / spd; diry = -p.vy / spd; }
+      var travel = (140 + spd * 1.5) * dt;
+      var WWRAPX = VW + WIND_MARGIN * 2, WWRAPY = VH + WIND_MARGIN * 2;
+      for (var i = 0; i < w.length; i++) {
+        var s = w[i];
+        s.x += dirx * travel * s.spd;
+        s.y += diry * travel * s.spd;
+        // re-seed a streak that leaves the band (keeps density even)
+        if (s.x < -WIND_MARGIN || s.x > VW + WIND_MARGIN ||
+            s.y < -WIND_MARGIN || s.y > VH + WIND_MARGIN) {
+          s.x = Math.random() * WWRAPX - WIND_MARGIN;
+          s.y = Math.random() * WWRAPY - WIND_MARGIN;
+        }
       }
     },
 
@@ -3456,7 +3558,10 @@
         var target = Math.atan2(p.vy, p.vx);
         p.facing = this.angleLerp(p.facing, target, 1 - Math.pow(0.0001, dt));
       }
-      var targetBank = Math.max(-0.5, Math.min(0.5, p.vx / 700));
+      // BANKING/TILT: roll slightly into horizontal motion, eased so it settles
+      // when gliding straight. Render-only (drawn as bank*0.5 rad ≈ ±0.28 max) —
+      // never touches the hitbox or position. Frozen to 0 under reduced motion.
+      var targetBank = reduceMotion ? 0 : Math.max(-0.56, Math.min(0.56, p.vx / 620));
       p.bank += (targetBank - p.bank) * (1 - Math.pow(0.001, dt));
 
       // REGALIA: Sorrel's Mantle slowly regrows a one-hit leaf ward
@@ -4974,9 +5079,16 @@
         if (this.player && this.state === "PLAYING") this.drawChargeUI(g);
         g.restore();
         // ----- back to SCREEN SPACE -----
+
+        // speed-reactive wind streaks: a light screen-space air overlay
+        this.drawWind(g);
       }
 
       this.drawClouds(g, true); // nearest clouds in front for depth
+
+      // foreground dust/pollen: the nearest layer, rushing past over everything
+      if (this.state === "PLAYING" || this.state === "PAUSED" || this.state === "POWER" ||
+          this.state === "DEAD" || this.state === "WIN") this.drawDust(g);
 
       // soft off-screen awareness: watercolor edge chevrons toward the duel
       // dragon / realm gates when they drift out of frame
@@ -5154,6 +5266,61 @@
         } else {
           g.drawImage(img, sx - w / 2, sy - h / 2, w, h);
         }
+      }
+      g.restore();
+    },
+
+    // GAME-FEEL: faint SCREEN-space wind streaks. Short tapered strokes trailing
+    // opposite the goose's travel, alpha scaling with windInten (speed). Subtle
+    // air-over-glass, not cartoon speed-lines. Skipped under reduced motion.
+    drawWind: function (g) {
+      if (reduceMotion) return;
+      var w = this.bg.wind;
+      if (!w || this.windInten < 0.02) return;
+      var p = this.player;
+      if (!p) return;
+      var spd = Math.hypot(p.vx, p.vy);
+      var dirx = 0, diry = 1;
+      if (spd > 1) { dirx = -p.vx / spd; diry = -p.vy / spd; }
+      var inten = this.windInten;
+      g.save();
+      g.globalCompositeOperation = "lighter";
+      g.lineCap = "round";
+      g.strokeStyle = "#eef4fb";
+      for (var i = 0; i < w.length; i++) {
+        var s = w[i];
+        var len = s.len * (0.55 + 0.7 * inten);
+        var ex = s.x + dirx * len, ey = s.y + diry * len;
+        // tapered: a faint fat under-stroke and a brighter thin core
+        g.globalAlpha = 0.05 * inten * s.a;
+        g.lineWidth = s.wdt * 2.1;
+        g.beginPath(); g.moveTo(s.x, s.y); g.lineTo(ex, ey); g.stroke();
+        g.globalAlpha = 0.10 * inten * s.a;
+        g.lineWidth = s.wdt;
+        g.beginPath();
+        g.moveTo(s.x + dirx * len * 0.35, s.y + diry * len * 0.35);
+        g.lineTo(ex, ey); g.stroke();
+      }
+      g.restore();
+    },
+
+    // GAME-FEEL: sparse foreground DUST/POLLEN, parallax-scrolled faster than the
+    // near cloud band so it rushes past for depth. World-anchored seeds tiled by
+    // the camera offset (same wrap trick as the clouds). Skipped under RM.
+    drawDust: function (g) {
+      if (reduceMotion) return;
+      var du = this.bg.dust;
+      if (!du || !du.length) return;
+      var cam = this.cam;
+      var WRAPX = VW + DUST_MARGIN * 2, WRAPY = VH + DUST_MARGIN * 2;
+      g.save();
+      for (var i = 0; i < du.length; i++) {
+        var dm = du[i];
+        var par = dm.parallax;
+        var sx = (dm.x - cam.cx * par) % WRAPX; if (sx < 0) sx += WRAPX; sx -= DUST_MARGIN;
+        var sy = (dm.y - cam.cy * par) % WRAPY; if (sy < 0) sy += WRAPY; sy -= DUST_MARGIN;
+        var tw = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(this.time * dm.tw + dm.phase));
+        Fx.drawDot(g, sx, sy, dm.r * 3.4, dm.gold ? "#cdb878" : "#f6f1e7", dm.alpha * tw, true);
       }
       g.restore();
     },
@@ -6139,6 +6306,12 @@
     state: function () { return Game.state; },
     bowing: function () { return Game.bowing; },
     camera: function () { return Game.cam; },
+    // GAME-FEEL test hooks: goose roll (bank; render tilt ≈ bank*0.5 rad),
+    // the dynamic-zoom multiplier, and current wind-streak intensity
+    bank: function () { return Game.player ? Game.player.bank : 0; },
+    tilt: function () { return Game.player ? Game.player.bank * 0.5 : 0; },
+    dynZoom: function () { return Game.cam.dynZoom; },
+    windInten: function () { return Game.windInten || 0; },
     world: function () { return { w: Game.worldW, h: Game.worldH }; },
     // project a world point to viewport-logical coords (for test assertions)
     project: function (x, y) { var s = Game.cam.worldToScreen(x, y); return { x: s.x, y: s.y }; }
