@@ -726,6 +726,14 @@ html.evening .card-action--primary:hover { color: #3a1620; }
 }
 .pref-group--inline .pref-legend { margin-bottom: 0; }
 .pref-opt { text-transform: none; letter-spacing: 0; font-style: italic; opacity: 0.75; }
+.pref-note {
+  flex-basis: 100%;
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  font-style: italic;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
 
 .chip-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 
@@ -1270,6 +1278,9 @@ html.evening .card-review { background: rgba(43,49,64,0.92); }
   color: #1c2417;
   font-weight: 600;
 }
+.ov-badge.is-open { background: rgba(147,180,139,0.95); color: #1c2417; } /* explicit for clarity */
+.ov-badge.is-soon { background: rgba(205,184,120,0.97); color: #3a2c08; } /* warm gold — closing soon */
+.ov-badge.is-opens { background: rgba(147,180,203,0.97); color: #12283a; } /* pond — opens later */
 .ov-badge.is-closed { background: rgba(217,139,160,0.95); color: #3a1620; }
 .ov-tags {
   font-size: 0.74rem;
@@ -1464,7 +1475,29 @@ html.evening .bloom-drop { mix-blend-mode: screen; }
   color: var(--ink);
   margin: 0.2rem 0 0.4rem;
 }
-.decision-meta { font-size: 0.92rem; color: var(--ink-soft); margin-bottom: 1.3rem; }
+.decision-meta { font-size: 0.92rem; color: var(--ink-soft); margin-bottom: 0.75rem; }
+/* "should we go now?" status pill on the pick screen — same states as the deck chip */
+.decision-chip {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 auto 1.3rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  color: #2e6f45;
+  background: rgba(69, 168, 102, 0.12);
+  border: 1px solid rgba(69, 168, 102, 0.4);
+}
+.decision-chip.is-soon { color: #7a5c14; background: rgba(205, 184, 120, 0.2); border-color: rgba(205, 184, 120, 0.55); }
+.decision-chip.is-opens { color: #35618c; background: rgba(127, 168, 201, 0.16); border-color: rgba(127, 168, 201, 0.5); }
+.decision-chip.is-closed { color: #a83c55; background: rgba(216, 96, 122, 0.12); border-color: rgba(216, 96, 122, 0.42); }
+html.evening .decision-chip { color: #7ed49a; background: rgba(69, 168, 102, 0.18); border-color: rgba(126, 212, 154, 0.42); }
+html.evening .decision-chip.is-soon { color: #e8cd7a; background: rgba(205, 184, 120, 0.2); border-color: rgba(205, 184, 120, 0.55); }
+html.evening .decision-chip.is-opens { color: #9fc2e0; background: rgba(127, 168, 201, 0.2); border-color: rgba(127, 168, 201, 0.5); }
+html.evening .decision-chip.is-closed { color: #f0a9ba; background: rgba(216, 96, 122, 0.18); border-color: rgba(216, 96, 122, 0.45); }
 .decision-actions {
   display: flex;
   flex-direction: column;
@@ -1768,8 +1801,12 @@ html.evening .slc { background: rgba(233, 227, 211, 0.05); }
   border-radius: 999px;
   padding: 0.14rem 0.5rem;
 }
+.slc-open.is-soon { color: #7a5c14; background: rgba(205, 184, 120, 0.18); border-color: rgba(205, 184, 120, 0.5); }
+.slc-open.is-opens { color: #35618c; background: rgba(127, 168, 201, 0.14); border-color: rgba(127, 168, 201, 0.46); }
 .slc-open.is-closed { color: #a83c55; background: rgba(216, 96, 122, 0.1); border-color: rgba(216, 96, 122, 0.4); }
 html.evening .slc-open { color: #7ed49a; background: rgba(69, 168, 102, 0.16); border-color: rgba(126, 212, 154, 0.4); }
+html.evening .slc-open.is-soon { color: #e8cd7a; background: rgba(205, 184, 120, 0.18); border-color: rgba(205, 184, 120, 0.5); }
+html.evening .slc-open.is-opens { color: #9fc2e0; background: rgba(127, 168, 201, 0.18); border-color: rgba(127, 168, 201, 0.46); }
 html.evening .slc-open.is-closed { color: #f0a9ba; background: rgba(216, 96, 122, 0.16); border-color: rgba(216, 96, 122, 0.45); }
 /* fixed fact slots — score+spark / price+cuisine / distance+travel */
 .slc-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-top: 0.25rem; }

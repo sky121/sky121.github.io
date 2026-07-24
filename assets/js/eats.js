@@ -299,75 +299,75 @@
      `cuisines` are normalized keys matching the Preferences chips. Spread at
      varied distances so the nearest-first expansion + distance cap read well. */
   var DEMO_RESTAURANTS = [
-    { name: 'Little Wren Bakery', rating: 4.8, reviews: 1340, price: 1, type: 'Bakery · Café', cuisines: ['cafe'], lat: 37.7959, lng: -122.3949, open: true, phone: '+14155550178',
+    { name: 'Little Wren Bakery', rating: 4.8, reviews: 1340, price: 1, type: 'Bakery · Café', cuisines: ['cafe'], lat: 37.7959, lng: -122.3949, open: true, phone: '+14155550178', openH: 7, closeH: 15,
       diet: ['vegetarian'], dining: ['dine-in', 'takeout'], extras: ['kids'],
       vibe: 'Sunlit corner café, marble counters, fresh flowers', food: 'Morning buns, laminated pastries, flat whites',
       reviews_q: [ { by: 'Maya O.', score: 96, text: 'The morning bun is a religious experience. Get there early.' }, { by: 'Devin P.', score: 90, text: 'Cozy, sunny, perfect for a slow Saturday.' } ] },
-    { name: 'Tonkotsu Lane', rating: 4.7, reviews: 1582, price: 2, type: 'Ramen · Japanese', cuisines: ['japanese'], lat: 37.7948, lng: -122.3958, open: true, phone: '+14155550133',
+    { name: 'Tonkotsu Lane', rating: 4.7, reviews: 1582, price: 2, type: 'Ramen · Japanese', cuisines: ['japanese'], lat: 37.7948, lng: -122.3958, open: true, phone: '+14155550133', openH: 11, closeH: 22,
       diet: [], dining: ['dine-in'], extras: ['alcohol'],
       vibe: 'Tiny steamy counter, paper lanterns, jazz on vinyl', food: 'Rich tonkotsu, chashu, soft egg, chili oil',
       reviews_q: [ { by: 'Hana S.', score: 94, text: 'Broth so silky it ruined other ramen for me.' }, { by: 'Leo C.', score: 88, text: 'Tiny room, worth the wait. The chashu melts.' }, { by: 'Priya R.', score: 90, text: 'Order the spicy miso. Trust me.' } ] },
-    { name: 'Marigold & Sage', rating: 4.6, reviews: 812, price: 3, type: 'Californian · Farm-to-table', cuisines: ['american', 'mediterranean'], lat: 37.7929, lng: -122.3971, open: true, phone: '+14155550142',
+    { name: 'Marigold & Sage', rating: 4.6, reviews: 812, price: 3, type: 'Californian · Farm-to-table', cuisines: ['american', 'mediterranean'], lat: 37.7929, lng: -122.3971, open: true, phone: '+14155550142', openH: 17, closeH: 23,
       diet: ['vegetarian', 'gluten-free'], dining: ['dine-in'], extras: ['outdoor', 'alcohol'],
       vibe: 'Linen tablecloths, candlelight, garden patio', food: 'Heirloom tomato, roast chicken, market salads',
       reviews_q: [ { by: 'Theo B.', score: 92, text: 'Tasting menu was a quiet, beautiful treat.' }, { by: 'Maya O.', score: 89, text: 'Everything tastes like it was picked this morning.' } ] },
-    { name: 'Casa Poblana', rating: 4.5, reviews: 967, price: 2, type: 'Mexican · Taquería', cuisines: ['mexican'], lat: 37.7901, lng: -122.4003, open: true, phone: '+14155550110',
+    { name: 'Casa Poblana', rating: 4.5, reviews: 967, price: 2, type: 'Mexican · Taquería', cuisines: ['mexican'], lat: 37.7901, lng: -122.4003, open: true, phone: '+14155550110', openH: 11, closeH: 23,
       diet: ['vegetarian', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups', 'alcohol', 'kids'],
       vibe: 'Bright tiles, mariachi murals, buzzy and loud', food: 'Al pastor tacos, fresh salsa, horchata',
       reviews_q: [ { by: 'Leo C.', score: 93, text: 'Al pastor for days. Bring cash, bring friends.' }, { by: 'Devin P.', score: 85, text: 'Lines out the door for a reason.' } ] },
-    { name: 'Verde Trattoria', rating: 4.5, reviews: 1104, price: 3, type: 'Italian · Pasta', cuisines: ['italian'], lat: 37.7966, lng: -122.3902, open: true, phone: '+14155550121',
+    { name: 'Verde Trattoria', rating: 4.5, reviews: 1104, price: 3, type: 'Italian · Pasta', cuisines: ['italian'], lat: 37.7966, lng: -122.3902, open: true, phone: '+14155550121', openH: 16, closeH: 23,
       diet: ['vegetarian'], dining: ['dine-in', 'takeout'], extras: ['alcohol'],
       vibe: 'Warm trattoria, exposed brick, cozy two-tops', food: 'Cacio e pepe, fresh pappardelle, tiramisu',
       reviews_q: [ { by: 'Hana S.', score: 91, text: 'Cacio e pepe done exactly right. Cozy little room.' }, { by: 'Theo B.', score: 87, text: 'The pasta is hand-rolled and it shows.' } ] },
-    { name: 'Saffron House', rating: 4.6, reviews: 729, price: 2, type: 'Indian · Curry house', cuisines: ['indian'], lat: 37.7937, lng: -122.4012, open: true, phone: '+14155550188',
+    { name: 'Saffron House', rating: 4.6, reviews: 729, price: 2, type: 'Indian · Curry house', cuisines: ['indian'], lat: 37.7937, lng: -122.4012, open: true, phone: '+14155550188', openH: 11, closeH: 22,
       diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups', 'kids'],
       vibe: 'Jewel-tone walls, brass lanterns, fragrant air', food: 'Butter chicken, garlic naan, dal makhani',
       reviews_q: [ { by: 'Priya R.', score: 90, text: 'Butter chicken was rich; staff were lovely.' }, { by: 'Maya O.', score: 88, text: 'Best dal in the city, and lots of vegan options.' } ] },
-    { name: 'Foggy Bell Coffee', rating: 4.4, reviews: 455, price: 1, type: 'Coffee · Light bites', cuisines: ['cafe'], lat: 37.7972, lng: -122.3985, open: true, phone: '+14155550144',
+    { name: 'Foggy Bell Coffee', rating: 4.4, reviews: 455, price: 1, type: 'Coffee · Light bites', cuisines: ['cafe'], lat: 37.7972, lng: -122.3985, open: true, phone: '+14155550144', openH: 6, closeH: 16,
       diet: ['vegetarian', 'vegan'], dining: ['takeout', 'dine-in'], extras: ['outdoor'],
       vibe: 'Minimalist, big windows, foggy-day calm', food: 'Single-origin pour-overs, oat lattes, scones',
       reviews_q: [ { by: 'Devin P.', score: 86, text: 'Flat white + a window seat. My new spot.' }, { by: 'Leo C.', score: 82, text: 'Quiet enough to actually get work done.' } ] },
-    { name: 'Olive & Thyme', rating: 4.3, reviews: 388, price: 3, type: 'Mediterranean', cuisines: ['mediterranean'], lat: 37.7918, lng: -122.3949, open: true, phone: '+14155550155',
+    { name: 'Olive & Thyme', rating: 4.3, reviews: 388, price: 3, type: 'Mediterranean', cuisines: ['mediterranean'], lat: 37.7918, lng: -122.3949, open: true, phone: '+14155550155', openH: 11, closeH: 22,
       diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout'], extras: ['outdoor', 'groups', 'alcohol'],
       vibe: 'Whitewashed walls, olive branches, sea-blue tile', food: 'Mezze platters, lamb kebab, lemony hummus',
       reviews_q: [ { by: 'Theo B.', score: 86, text: 'The mezze spread is a feast for two.' }, { by: 'Priya R.', score: 84, text: 'Great for a group with mixed diets.' } ] },
-    { name: 'The Copper Kettle', rating: 4.2, reviews: 642, price: 2, type: 'Brunch · American', cuisines: ['american'], lat: 37.7983, lng: -122.3962, open: false, phone: '+14155550166',
+    { name: 'The Copper Kettle', rating: 4.2, reviews: 642, price: 2, type: 'Brunch · American', cuisines: ['american'], lat: 37.7983, lng: -122.3962, open: false, phone: '+14155550166', openH: 8, closeH: 14,
       diet: ['vegetarian'], dining: ['dine-in'], extras: ['groups', 'kids'],
       vibe: 'Copper pots, checkered floor, weekend bustle', food: 'Buttermilk pancakes, hash, bottomless coffee',
       reviews_q: [ { by: 'Hana S.', score: 83, text: 'Classic diner energy and giant pancakes.' }, { by: 'Maya O.', score: 80, text: 'Go on a weekday to skip the wait.' } ] },
-    { name: 'Pier 9 Oyster Co.', rating: 4.4, reviews: 521, price: 4, type: 'Seafood · Raw bar', cuisines: ['seafood'], lat: 37.7995, lng: -122.3915, open: false, phone: '+14155550199',
+    { name: 'Pier 9 Oyster Co.', rating: 4.4, reviews: 521, price: 4, type: 'Seafood · Raw bar', cuisines: ['seafood'], lat: 37.7995, lng: -122.3915, open: false, phone: '+14155550199', openH: 16, closeH: 22,
       diet: ['gluten-free'], dining: ['dine-in'], extras: ['outdoor', 'alcohol'],
       vibe: 'Waterfront deck, string lights, sunset views', food: 'Oysters, cioppino, grilled day-boat fish',
       reviews_q: [ { by: 'Leo C.', score: 88, text: 'Sunset on the patio is unbeatable.' }, { by: 'Devin P.', score: 78, text: 'Pricey and service lagged, but the view…' } ] },
-    { name: 'Smoke & Ember BBQ', rating: 4.6, reviews: 980, price: 2, type: 'BBQ · Smokehouse', cuisines: ['bbq', 'american'], lat: 37.7912, lng: -122.3886, open: true, phone: '+14155550201',
+    { name: 'Smoke & Ember BBQ', rating: 4.6, reviews: 980, price: 2, type: 'BBQ · Smokehouse', cuisines: ['bbq', 'american'], lat: 37.7912, lng: -122.3886, open: true, phone: '+14155550201', openH: 11, closeH: 21,
       diet: [], dining: ['dine-in', 'takeout'], extras: ['outdoor', 'groups', 'alcohol'],
       vibe: 'Reclaimed wood, smoke in the air, picnic tables', food: 'Brisket, burnt ends, smoked ribs, slaw',
       reviews_q: [ { by: 'Theo B.', score: 92, text: 'The brisket falls apart. Come hungry.' }, { by: 'Hana S.', score: 87, text: 'Burnt ends sell out by 2pm. Get there early.' } ] },
-    { name: 'Seoul & Stone', rating: 4.5, reviews: 712, price: 2, type: 'Korean · BBQ', cuisines: ['korean'], lat: 37.8002, lng: -122.4001, open: true, phone: '+14155550213',
+    { name: 'Seoul & Stone', rating: 4.5, reviews: 712, price: 2, type: 'Korean · BBQ', cuisines: ['korean'], lat: 37.8002, lng: -122.4001, open: true, phone: '+14155550213', openH: 17, closeH: 24,
       diet: ['vegetarian'], dining: ['dine-in'], extras: ['groups', 'alcohol'],
       vibe: 'Tabletop grills, neon glow, lively groups', food: 'Galbi, bibimbap, bubbling kimchi jjigae',
       reviews_q: [ { by: 'Priya R.', score: 90, text: 'Tabletop grill is so fun for a group.' }, { by: 'Maya O.', score: 85, text: 'The banchan alone is worth coming for.' } ] },
-    { name: 'Pho & Lantern', rating: 4.4, reviews: 533, price: 1, type: 'Vietnamese · Noodles', cuisines: ['vietnamese'], lat: 37.7886, lng: -122.3961, open: true, phone: '+14155550224',
+    { name: 'Pho & Lantern', rating: 4.4, reviews: 533, price: 1, type: 'Vietnamese · Noodles', cuisines: ['vietnamese'], lat: 37.7886, lng: -122.3961, open: true, phone: '+14155550224', openH: 10, closeH: 21,
       diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['kids'],
       vibe: 'Steamy storefront, herbs on every table', food: 'Beef pho, fresh rolls, lemongrass tofu',
       reviews_q: [ { by: 'Devin P.', score: 88, text: 'Broth simmered all day — you can taste it.' }, { by: 'Leo C.', score: 84, text: 'Cheap, fast, and deeply comforting.' } ] },
-    { name: 'Bangkok Orchid', rating: 4.5, reviews: 604, price: 2, type: 'Thai · Street food', cuisines: ['thai'], lat: 37.8021, lng: -122.3958, open: true, phone: '+14155550235',
+    { name: 'Bangkok Orchid', rating: 4.5, reviews: 604, price: 2, type: 'Thai · Street food', cuisines: ['thai'], lat: 37.8021, lng: -122.3958, open: true, phone: '+14155550235', openH: 11, closeH: 22,
       diet: ['vegetarian', 'vegan'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups'],
       vibe: 'Orchids, gold accents, gentle chimes', food: 'Pad see ew, green curry, mango sticky rice',
       reviews_q: [ { by: 'Hana S.', score: 89, text: 'Green curry with real heat — finally.' }, { by: 'Priya R.', score: 86, text: 'Mango sticky rice is the perfect finish.' } ] },
-    { name: 'The Stacked Patty', rating: 4.3, reviews: 1190, price: 1, type: 'Burgers · American', cuisines: ['burgers', 'american'], lat: 37.7869, lng: -122.3922, open: true, phone: '+14155550246',
+    { name: 'The Stacked Patty', rating: 4.3, reviews: 1190, price: 1, type: 'Burgers · American', cuisines: ['burgers', 'american'], lat: 37.7869, lng: -122.3922, open: true, phone: '+14155550246', openH: 11, closeH: 23,
       diet: ['vegetarian'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups', 'kids'],
       vibe: 'Retro diner booths, chrome, milkshake machines', food: 'Smash burgers, crispy fries, thick shakes',
       reviews_q: [ { by: 'Theo B.', score: 87, text: 'Smash burger with the crispy edges. Yes.' }, { by: 'Maya O.', score: 82, text: 'Killer veggie burger too, not an afterthought.' } ] },
-    { name: 'Crosta Pizzeria', rating: 4.6, reviews: 1420, price: 2, type: 'Pizza · Neapolitan', cuisines: ['pizza', 'italian'], lat: 37.7849, lng: -122.4005, open: true, phone: '+14155550257',
+    { name: 'Crosta Pizzeria', rating: 4.6, reviews: 1420, price: 2, type: 'Pizza · Neapolitan', cuisines: ['pizza', 'italian'], lat: 37.7849, lng: -122.4005, open: true, phone: '+14155550257', openH: 12, closeH: 23,
       diet: ['vegetarian'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['groups', 'alcohol', 'kids'],
       vibe: 'Wood-fired oven glow, communal tables', food: 'Blistered margherita, burrata, charred crust',
       reviews_q: [ { by: 'Leo C.', score: 91, text: 'Leopard-spotted crust, perfect char.' }, { by: 'Devin P.', score: 88, text: 'The margherita is all you need.' } ] },
-    { name: 'Garden & Grain', rating: 4.4, reviews: 410, price: 2, type: 'Vegetarian · Bowls', cuisines: ['vegetarian', 'mediterranean'], lat: 37.8035, lng: -122.3902, open: true, phone: '+14155550268',
+    { name: 'Garden & Grain', rating: 4.4, reviews: 410, price: 2, type: 'Vegetarian · Bowls', cuisines: ['vegetarian', 'mediterranean'], lat: 37.8035, lng: -122.3902, open: true, phone: '+14155550268', openH: 9, closeH: 20,
       diet: ['vegetarian', 'vegan', 'gluten-free'], dining: ['dine-in', 'takeout', 'delivery'], extras: ['outdoor', 'kids'],
       vibe: 'Leafy, airy, reclaimed-wood and plants', food: 'Grain bowls, roasted veg, tahini everything',
       reviews_q: [ { by: 'Priya R.', score: 89, text: 'Finally a veg spot that feels indulgent.' }, { by: 'Hana S.', score: 85, text: 'Everything is vegan and you would not guess.' } ] },
-    { name: 'Lupo Rosso', rating: 4.7, reviews: 860, price: 3, type: 'Italian · Wine bar', cuisines: ['italian'], lat: 37.7831, lng: -122.3948, open: false, phone: '+14155550279',
+    { name: 'Lupo Rosso', rating: 4.7, reviews: 860, price: 3, type: 'Italian · Wine bar', cuisines: ['italian'], lat: 37.7831, lng: -122.3948, open: false, phone: '+14155550279', openH: 17, closeH: 24,
       diet: ['vegetarian'], dining: ['dine-in'], extras: ['alcohol'],
       vibe: 'Dim, romantic, candle-lit wine cellar', food: 'Handmade ravioli, natural wine, affogato',
       reviews_q: [ { by: 'Maya O.', score: 93, text: 'Date-night perfection. The ravioli, swoon.' }, { by: 'Theo B.', score: 89, text: 'Ask the somm to pick — never wrong.' } ] }
@@ -437,6 +437,11 @@
   // Pre-built demo result objects (with distance to DEMO_ORIGIN).
   function demoResults() {
     return DEMO_RESTAURANTS.map(function (r, i) {
+      // Derive open-now from the demo hours + the real clock so the "Open now"
+      // filter and the card's status chip always agree (falls back to the
+      // static flag if a place somehow lacks hours).
+      var st = openState({ openH: r.openH, closeH: r.closeH, open: r.open });
+      var isOpen = st ? (st.key === 'open' || st.key === 'soon') : r.open;
       return {
         id: 'demo-' + i,
         name: r.name,
@@ -448,7 +453,9 @@
         diet: r.diet || [],
         dining: r.dining || [],
         extras: r.extras || [], // live results leave this undefined (not fetched)
-        open: r.open,
+        open: isOpen,
+        openH: r.openH,
+        closeH: r.closeH,
         phone: r.phone,
         photoUrl: null, // watercolor placeholder
         // story segments — demo content (live mode fills from Place details)
@@ -602,6 +609,65 @@
     var s = '';
     for (var i = 0; i < p; i++) s += '$';
     return s;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * OPEN-HOURS AWARENESS
+   * From a place's hours (openH/closeH, 0-24 local) + the current clock,
+   * derive one of four gentle states for the deck chip / decision screen:
+   *   open   — Open now (comfortably)
+   *   soon   — Closes soon (open, within ~60 min of closing)
+   *   opens  — Opens at H (closed now, but opens later today)
+   *   closed — Closed (and not reopening today)
+   * closeH may be 24 (midnight) or a touch past for late spots. When a
+   * place has no hours (live Google results), we fall back to the binary
+   * `open` flag and NEVER invent a precise time. Returns null when nothing
+   * is known (no chip rather than a guess).
+   * ------------------------------------------------------------------ */
+  var CLOSES_SOON_MIN = 60;
+  function fmtHour(h) {
+    h = ((Math.round(h) % 24) + 24) % 24;
+    if (h === 0) return 'midnight';
+    if (h === 12) return 'noon';
+    var ap = h < 12 ? 'am' : 'pm';
+    var hr = h % 12;
+    return hr + ap;
+  }
+  function openState(r, now) {
+    if (!r) return null;
+    var oh = r.openH, ch = r.closeH;
+    if (oh == null || ch == null) {
+      // Live / hours unknown — fall back to the binary flag, no fake times.
+      if (r.open === true) return { key: 'open', label: 'Open now' };
+      if (r.open === false) return { key: 'closed', label: 'Closed' };
+      return null;
+    }
+    now = now || new Date();
+    var mins = now.getHours() * 60 + now.getMinutes();
+    var openM = oh * 60, closeM = ch * 60;
+    var isOpen, toClose;
+    if (closeM > openM) {           // same-day hours
+      isOpen = mins >= openM && mins < closeM;
+      toClose = closeM - mins;
+    } else {                        // wraps past midnight
+      isOpen = mins >= openM || mins < closeM;
+      toClose = (mins >= openM) ? (closeM + 1440 - mins) : (closeM - mins);
+    }
+    if (isOpen) {
+      if (toClose <= CLOSES_SOON_MIN) return { key: 'soon', label: 'Closes at ' + fmtHour(ch), close: ch };
+      return { key: 'open', label: 'Open now', close: ch };
+    }
+    if (mins < openM) return { key: 'opens', label: 'Opens at ' + fmtHour(oh), open: oh };
+    return { key: 'closed', label: 'Closed' };
+  }
+  /* Build a small watercolor status chip (or null). `base` sets the class
+     family (ov-badge on cards, decision-chip on the pick screen) so each
+     context keeps its own sizing; the state adds an is-<key> modifier. */
+  function openChipEl(r, base, now) {
+    var st = openState(r, now);
+    if (!st) return null;
+    var chip = el('span', base + ' is-' + st.key, st.label);
+    return chip;
   }
 
   /* ================================================================== *
@@ -1479,9 +1545,8 @@
         dg.appendChild(el('span', 'ov-travel', fmtTravel(r.distance)));
         meta.appendChild(dg);
       }
-      if (r.open != null) {
-        meta.appendChild(el('span', 'ov-badge' + (r.open ? '' : ' is-closed'), r.open ? 'Open now' : 'Closed'));
-      }
+      var chip = openChipEl(r, 'ov-badge');
+      if (chip) meta.appendChild(chip);
       ov.appendChild(meta);
       // your own Visited score, if you've eaten here before
       var mine = myRatingFor(r.name);
@@ -1509,7 +1574,8 @@
         bits.push(fmtDist(r.distance) + ' away');
         bits.push('about ' + fmtTravel(r.distance));
       }
-      if (r.open != null) bits.push(r.open ? 'open now' : 'closed');
+      var ost = openState(r);
+      if (ost) bits.push(ost.label.toLowerCase());
       var mine = myRatingFor(r.name);
       if (mine) bits.push('you rated it ' + fmtScore(overallOf(mine)) + ' before');
       return bits.join(', ');
@@ -1770,6 +1836,86 @@
       return share;
     }
 
+    /* ---- Add to calendar ----
+       Builds a tiny, valid .ics for a dinner tonight and hands it to the
+       browser as a download (Blob URL, with a data-URI fallback). Floating
+       local time — starts at the next round hour, runs ~90 min. Demo-safe:
+       no backend, no dependency, never throws. */
+    function icsEscape(s) {
+      return String(s == null ? '' : s)
+        .replace(/\\/g, '\\\\')
+        .replace(/;/g, '\\;')
+        .replace(/,/g, '\\,')
+        .replace(/\r?\n/g, '\\n');
+    }
+    function icsStamp(d, floating) {
+      function p(n) { return (n < 10 ? '0' : '') + n; }
+      if (floating) {
+        return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
+          'T' + p(d.getHours()) + p(d.getMinutes()) + '00';
+      }
+      return d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) +
+        'T' + p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds()) + 'Z';
+    }
+    function buildCalendarAction(r) {
+      var btn = el('button', 'decision-act', 'Add to calendar');
+      btn.type = 'button';
+      btn.addEventListener('click', function () {
+        try {
+          var now = new Date();
+          var start = new Date(now.getTime());
+          start.setSeconds(0, 0);
+          start.setMinutes(0);
+          start.setHours(start.getHours() + 1); // next round hour
+          var end = new Date(start.getTime() + 90 * 60000); // ~90 min
+          var mapsHref = r.mapsUri ||
+            (r.placeId ? 'https://www.google.com/maps/place/?q=place_id:' + encodeURIComponent(r.placeId) : null) ||
+            'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(r.name);
+          var lines = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Tableau//Dinner//EN',
+            'CALSCALE:GREGORIAN',
+            'METHOD:PUBLISH',
+            'BEGIN:VEVENT',
+            'UID:tableau-' + (r.id || r.placeId || icsStamp(now)) + '-' + now.getTime() + '@tableau',
+            'DTSTAMP:' + icsStamp(now, false),
+            'DTSTART:' + icsStamp(start, true),
+            'DTEND:' + icsStamp(end, true),
+            'SUMMARY:' + icsEscape('Dinner at ' + r.name)
+          ];
+          if (r.address) lines.push('LOCATION:' + icsEscape(r.address));
+          lines.push('DESCRIPTION:' + icsEscape('A Tableau pick for tonight.\n' + mapsHref));
+          lines.push('END:VEVENT');
+          lines.push('END:VCALENDAR');
+          var ics = lines.join('\r\n');
+          var fname = 'dinner-at-' + String(r.name || 'place').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') + '.ics';
+          var href = null, revoke = null;
+          try {
+            if (window.Blob && window.URL && URL.createObjectURL) {
+              var blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+              href = URL.createObjectURL(blob);
+              revoke = href;
+            }
+          } catch (e) { href = null; }
+          if (!href) href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+          var a = el('a');
+          a.href = href;
+          a.download = fname;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          if (revoke) window.setTimeout(function () { try { URL.revokeObjectURL(revoke); } catch (e) {} }, 4000);
+          announce('Calendar invite for dinner at ' + r.name + ' downloaded');
+          toast('Calendar invite saved');
+        } catch (e) {
+          announce('Couldn’t build the calendar invite');
+          toast('Couldn’t add to calendar');
+        }
+      });
+      return btn;
+    }
+
     function onLike(r) {
       setMode('decision');
       haptic(18); // arrival: the decision screen is the payoff moment
@@ -1790,6 +1936,16 @@
       if (mine) bits.push('you rated it ' + fmtScore(overallOf(mine)));
       var metaLine = bits.join('  ·  ');
       if (metaEl) metaEl.textContent = metaLine;
+
+      // "Should we go now?" — the same open/closes-soon/opens-at/closed state
+      // the deck card showed, restated on the pick screen. Rebuilt each visit.
+      if (metaEl && metaEl.parentNode) {
+        var prevChip = metaEl.parentNode.querySelector('.decision-chip');
+        if (prevChip) prevChip.parentNode.removeChild(prevChip);
+        var dChip = openChipEl(r, 'decision-chip');
+        if (dChip) metaEl.parentNode.insertBefore(dChip, metaEl.nextSibling);
+      }
+
       var mapsHref = r.mapsUri ||
         (r.placeId ? 'https://www.google.com/maps/dir/?api=1&destination_place_id=' + encodeURIComponent(r.placeId) + '&destination=' + encodeURIComponent(r.name) : null) ||
         'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(r.name);
@@ -1803,6 +1959,7 @@
           call.href = 'tel:' + r.phone;
           actionsEl.appendChild(call);
         }
+        actionsEl.appendChild(buildCalendarAction(r));
         actionsEl.appendChild(buildShareAction(r, metaLine, mapsHref));
         var rate = el('button', 'decision-act', 'I ate here → Rate');
         rate.type = 'button';
@@ -1823,7 +1980,8 @@
         });
         actionsEl.appendChild(save);
       }
-      announce('Tonight: ' + r.name);
+      var dst = openState(r);
+      announce('Tonight: ' + r.name + (dst ? '. ' + dst.label : ''));
       var nm = $('decision-name');
       if (nm) { nm.setAttribute('tabindex', '-1'); nm.focus(); }
     }
@@ -1969,7 +2127,8 @@
       var body = el('div', 'slc-body');
       var head = el('div', 'slc-head');
       head.appendChild(el('h3', 'slc-name', r.name));
-      if (r.open != null) head.appendChild(el('span', 'slc-open' + (r.open ? '' : ' is-closed'), r.open ? 'Open now' : 'Closed'));
+      var slChip = openChipEl(r, 'slc-open');
+      if (slChip) head.appendChild(slChip);
       body.appendChild(head);
 
       var scoreRow = el('div', 'slc-row');
