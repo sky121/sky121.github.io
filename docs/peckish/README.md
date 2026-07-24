@@ -44,6 +44,29 @@
 
 ## Feature map (what's built)
 
+### Deck time-awareness + Add to calendar (2026-07-23)
+The old binary "Open now" badge becomes a real, time-aware state, and the
+"Tonight" decision screen gains a calendar hand-off.
+- **Open-state chip** (`openState(r, now)` + `openChipEl`): demo places now
+  carry lightweight `openH`/`closeH` hours (varied across the ~18-place demo
+  set; midnight-wrap handled). From the current local time the state resolves
+  to **Open now**, **Closes at H** (open and within `CLOSES_SOON_MIN` = 60 min
+  of closing — a warm gold/rose tint), **Opens at H** (closed now, opens later
+  today), or **Closed**, shown as a small watercolor chip on the deck card
+  (the old open-now slot) and again on the decision screen so "should we go
+  now?" is answered in context. Live (Google) places with no hours fall back
+  to the existing binary flag — never a fake precise time.
+- **Add to calendar** (`buildCalendarAction`/`icsStamp`/`icsEscape`): a new
+  decision-screen action builds a tiny valid **.ics** (Blob download) for a
+  dinner tonight — `SUMMARY:Dinner at <name>`, location = address if present,
+  ~90 min from the next round hour, floating local time. No backend, demo-safe.
+- Evening overrides + AA on every chip state; ≥44px calendar target; the
+  decision actions (Maps / Call / Share / Rate / calendar) read as a tidy
+  consistent stack. Verified with Playwright (mocked page clock): all four
+  states render with correct labels at 21:30 and 09:00, the decision chip
+  matches, and the .ics contains `BEGIN:VCALENDAR` + `SUMMARY:Dinner at …` +
+  `DTSTART`; zero page errors.
+
 ### Shortlist "constellation" — a tiny no-deps relative map (2026-07-21)
 The compare view (shortlist badge / end-of-deck "Compare shortlist") now opens
 with a small **constellation panel** above the compare cards — a watercolor
