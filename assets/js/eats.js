@@ -1275,8 +1275,269 @@
       });
     }
 
-    return { init: init, render: render, current: current, defaults: defaults, jumpTo: jumpTo };
+    /* key -> human label across every preference vocabulary (cuisine,
+       dietary, dining, extras). The match-reason chips speak the user's
+       own words back to them, so they read labels from here rather than
+       keeping a second copy of the list. Built once, lazily. */
+    var LABELS = null;
+    function labelFor(key) {
+      if (!LABELS) {
+        LABELS = {};
+        [CUISINES, DIETARY, DINING, EXTRAS].forEach(function (set) {
+          set.forEach(function (it) { if (!(it[0] in LABELS)) LABELS[it[0]] = it[1]; });
+        });
+      }
+      return LABELS[key] || String(key);
+    }
+
+    return { init: init, render: render, current: current, defaults: defaults, jumpTo: jumpTo, labelFor: labelFor };
   })();
+
+  /* ================================================================== *
+   * MATCH REASONS — "why this pick"
+   *
+   * A card states FACTS (score, price, distance, open state). These chips
+   * state the JUDGEMENT behind showing you the place: which of your own
+   * preferences it answers, whose verdict backs it, whether it is close
+   * enough to just walk. Everything below is derived from signals that
+   * already exist in the app — your saved prefs, the real distance, the
+   * shared openState(), your Visited log, your friends' feed. Nothing is
+   * invented: if a place answers nothing, it gets no chips at all.
+   *
+   * Each candidate carries:
+   *   group   one chip per group, max — keeps the row from repeating itself
+   *   weight  usefulness. Personal history (100/96) > a friend's verdict
+   *           (90/86) > a preference you explicitly set (84-80) > pure
+   *           proximity (78-70) > quality (76-68) > urgency (72) >
+   *           softer preference matches (66-54). Generic facts score low
+   *           and therefore lose their slot to anything concrete.
+   *   texts   phrasings, most concrete first. DEDUPE walks this list and
+   *           takes the first phrasing the surrounding UI is not already
+   *           showing, so a chip never parrots the line above it (e.g.
+   *           "4 min walk" is dropped next to the card's travel hint and
+   *           becomes "practically next door"). If every phrasing is
+   *           already on screen the whole reason is dropped.
+   * ================================================================== */
+
+  /* One glyph family per reason kind; the kind also names the CSS modifier
+     so the chip picks up its pigment (sage / gold / pond / wisteria / rose). */
+  var REASON_GLYPH = {
+    pref:   '✓', // ✓  answers something you asked for
+    rating: '★', // ★  quality
+    near:   '◎', // ◎  proximity
+    time:   '◷', // ◷  hours
+    mine:   '♡', // ♡  your own visit
+    friend: '✧'  // ✧  a friend's visit
+  };
+
+  /* Normalise a phrase for the dedupe test: lowercase, punctuation to
+     spaces, and drop the filler words that make two identical claims look
+     different ("you rated THIS 82" vs "you rated IT 82"). */
+  var REASON_STOP = { a: 1, an: 1, the: 1, is: 1, it: 1, this: 1, that: 1, at: 1, of: 1, and: 1, to: 1, in: 1 };
+  function normReason(s) {
+    var words = String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').split(' ');
+    var out = [];
+    for (var i = 0; i < words.length; i++) {
+      if (words[i] && !REASON_STOP[words[i]]) out.push(words[i]);
+    }
+    return out.join(' ');
+  }
+
+  /* Honest relative claim: is this among the best-rated of what we actually
+     found? Needs a real pool to compare against, else we say nothing. */
+  function isTopRatedNearby(r) {
+    var pool = (state.results || []).filter(function (x) { return x.rating; });
+    if (!r.rating || pool.length < 5) return false;
+    var better = 0;
+    for (var i = 0; i < pool.length; i++) {
+      if (pool[i].id !== r.id && pool[i].rating > r.rating) better++;
+    }
+    return better < 3;
+  }
+
+  /* The warmest thing a friend said about this place (highest overall). */
+  function bestFriendRating(name) {
+    var list = (social && social.ratingsFor) ? social.ratingsFor(name) : [];
+    var best = null;
+    for (var i = 0; i < list.length; i++) {
+      var o = overallOf(list[i]);
+      if (!best || o > best.overall) best = { entry: list[i], overall: o };
+    }
+    return best;
+  }
+  function firstName(n) { return String(n == null ? '' : n).split(' ')[0]; }
+
+  /* Will it still be open `hours` from now? Asked by probing the SHARED
+     openState() at a future clock rather than re-deriving the hours math. */
+  function stillOpenIn(r, hours) {
+    var st = openState(r, new Date(Date.now() + hours * 3600000));
+    return !!st && (st.key === 'open' || st.key === 'soon');
+  }
+
+  /* Build the ranked candidate list (before dedupe / capping). */
+  function reasonCandidates(r) {
+    var p = state.prefs || (prefs && prefs.current()) || {};
+    var out = [];
+    function add(group, weight, kind, texts) {
+      out.push({ group: group, weight: weight, kind: kind, texts: texts });
+    }
+    var i;
+
+    // --- you have been here, and it went well -------------------------
+    var mine = myRatingFor(r.name);
+    if (mine) {
+      var mo = overallOf(mine);
+      if (mo >= 78) add('mine', 100, 'mine', ['You rated it ' + fmtScore(mo), 'You loved it last time']);
+      else if (mo >= 62) add('mine', 96, 'mine', ['You rated it ' + fmtScore(mo), 'You liked it before']);
+    }
+
+    // --- a friend's verdict -------------------------------------------
+    var fr = bestFriendRating(r.name);
+    if (fr) {
+      var fn = firstName(fr.entry.friend && fr.entry.friend.name);
+      if (fn && fr.overall >= 85) add('friend', 90, 'friend', [fn + ' loved it']);
+      else if (fn && fr.overall >= 72) add('friend', 86, 'friend', [fn + ' rated it well']);
+    }
+
+    // --- a cuisine you picked -----------------------------------------
+    if (p.cuisine && p.cuisine.length) {
+      var cz = r.cuisines || [];
+      for (i = 0; i < p.cuisine.length; i++) {
+        if (cz.indexOf(p.cuisine[i]) !== -1) {
+          add('cuisine', 84, 'pref', [prefs.labelFor(p.cuisine[i]) + ' — your pick']);
+          break;
+        }
+      }
+    }
+
+    // --- a dietary need you set (all of them must be met) --------------
+    if (p.dietary && p.dietary.length) {
+      var dt = r.diet || [];
+      var allDiet = p.dietary.every(function (d) { return dt.indexOf(d) !== -1; });
+      if (allDiet) add('diet', 82, 'pref', [prefs.labelFor(p.dietary[0]) + ', as you asked']);
+    }
+
+    // --- close by ------------------------------------------------------
+    if (r.distance != null) {
+      if (p.distance === 'walk' && r.distance <= 1.3) {
+        add('near', 80, 'near', [fmtTravel(r.distance), 'Close enough to walk']);
+      } else if (r.distance <= 0.25) {
+        add('near', 78, 'near', [fmtTravel(r.distance), 'Practically next door']);
+      } else if (r.distance <= 0.5) {
+        add('near', 70, 'near', [fmtTravel(r.distance), 'A short stroll away']);
+      }
+    }
+
+    // --- how well it is rated ------------------------------------------
+    var score = r.rating ? r.rating * 20 : 0;
+    if (p.minRating && score >= p.minRating) {
+      add('rating', 76, 'rating', ['Above your ' + p.minRating + ' bar']);
+    } else if (score >= 90 && isTopRatedNearby(r)) {
+      add('rating', 74, 'rating', ['One of the best nearby']);
+    } else if (score >= 90 && (r.reviews || 0) >= 200) {
+      // a high score with only a handful of votes isn't a reason yet
+      add('rating', 68, 'rating', ['Very well loved']);
+    }
+
+    // --- the clock (reads the shared openState, never its own math) -----
+    var ost = openState(r);
+    if (ost && ost.key === 'soon') {
+      add('time', 72, 'time', ['Closing soon — go now']);
+    } else if (ost && ost.key === 'open' && r.closeH != null && stillOpenIn(r, 2)) {
+      add('time', 58, 'time', ['Open till ' + fmtHour(r.closeH)]);
+    }
+
+    // --- price band you chose -------------------------------------------
+    if (p.price && p.price.length && r.price && p.price.indexOf(r.price) !== -1) {
+      add('price', 66, 'pref', ['Right in your price range']);
+    }
+
+    // --- how you want to eat --------------------------------------------
+    if (p.dining && p.dining.length) {
+      var dn = r.dining || [];
+      for (i = 0; i < p.dining.length; i++) {
+        if (dn.indexOf(p.dining[i]) !== -1) {
+          add('dining', 62, 'pref', [prefs.labelFor(p.dining[i]) + ', as you asked']);
+          break;
+        }
+      }
+    }
+
+    // --- the extras you ticked (live results carry none: r.extras undefined)
+    if (p.extras && p.extras.length && r.extras) {
+      var ex = r.extras || [];
+      var allExtras = p.extras.every(function (x) { return ex.indexOf(x) !== -1; });
+      if (allExtras) add('extras', 60, 'pref', [prefs.labelFor(p.extras[0]) + ', as you asked']);
+    }
+
+    // --- enough reviews to trust it --------------------------------------
+    if (p.minReviews && (r.reviews || 0) >= p.minReviews) {
+      add('reviews', 54, 'pref', ['Plenty of reviews behind it']);
+    }
+
+    return out;
+  }
+
+  /* matchReasons(place, { max, shown })
+       max    how many chips this surface can hold (card 2, decision 3)
+       shown  the text that surface is ALREADY displaying — used to dedupe
+     Returns [] (render nothing) when nothing meaningful qualifies. */
+  function matchReasons(r, opts) {
+    if (!r) return [];
+    opts = opts || {};
+    var max = opts.max || 3;
+    var shown = normReason(opts.shown || '');
+    // `skip` drops whole groups a surface already says louder than a chip
+    // could (the card's "You rated this 82" pill vs a `mine` verdict chip):
+    // text dedupe can't catch that, and on a 2-slot surface the echo costs
+    // half the reasons.
+    var skip = opts.skip || {};
+    var cands = reasonCandidates(r);
+    cands.sort(function (a, b) { return b.weight - a.weight; });
+    var seenGroup = {};
+    var picked = [];
+    for (var i = 0; i < cands.length && picked.length < max; i++) {
+      var c = cands[i];
+      if (skip[c.group]) continue;
+      if (seenGroup[c.group]) continue;
+      var text = null;
+      for (var t = 0; t < c.texts.length; t++) {
+        var n = normReason(c.texts[t]);
+        if (!n) continue;
+        if (shown && shown.indexOf(n) !== -1) continue; // already on screen
+        text = c.texts[t];
+        break;
+      }
+      if (!text) continue;      // every phrasing would only echo the UI
+      seenGroup[c.group] = true;
+      picked.push({ group: c.group, kind: c.kind, glyph: REASON_GLYPH[c.kind] || '', text: text });
+      shown = shown ? (shown + ' ' + normReason(text)) : normReason(text);
+    }
+    return picked;
+  }
+
+  /* A row of reason chips, or null when there is nothing to say.
+     `base` names the class family ('ov-reason' on cards, 'decision-reason'
+     on the pick screen) so each surface keeps its own sizing. The row is a
+     list so AT reads the chips as discrete items in rank order; the glyphs
+     are decorative and hidden. Nothing here is focusable — these are text. */
+  function reasonsRowEl(list, base) {
+    if (!list || !list.length) return null;
+    var row = el('div', base + 's');
+    row.setAttribute('role', 'list');
+    row.setAttribute('aria-label', 'Why this one');
+    for (var i = 0; i < list.length; i++) {
+      var chip = el('span', base + ' ' + base + '--' + list[i].kind);
+      chip.setAttribute('role', 'listitem');
+      chip.style.setProperty('--i', String(i));
+      var g = el('span', base + '-glyph', list[i].glyph);
+      g.setAttribute('aria-hidden', 'true');
+      chip.appendChild(g);
+      chip.appendChild(el('span', base + '-text', list[i].text));
+      row.appendChild(chip);
+    }
+    return row;
+  }
 
   /* ================================================================== *
    * DECK — Tinder-style swipe stack.
@@ -1310,6 +1571,12 @@
     var history = [];   // swipes this deck: {i, id, dir} — fuels Undo
     var shortlist = []; // liked-and-saved places for this outing
     var peekEl = null;  // "coming up" strip — built lazily below the deck
+
+    /* Match-reason chips per surface. Two on the card (the info scrap is
+       narrow — three wrap to a second row and crowd the name), three on the
+       decision screen, where the pick has to justify itself. */
+    var CARD_REASON_MAX = 2;
+    var DECISION_REASON_MAX = 3;
 
 
     function setMode(mode) {
@@ -1554,17 +1821,47 @@
         var you = el('span', 'ov-you', 'You rated this ' + fmtScore(overallOf(mine)));
         ov.appendChild(you);
       }
+      // "why this pick" — capped at CARD_REASON_MAX on the card: the info
+      // scrap is only ~88% of a 390px card, and three chips push the row to
+      // two lines and crowd the name. The pick screen shows the fuller set.
+      // the card already prints a prominent "You rated this 82" pill, so a
+      // `mine` verdict chip beside it would spend one of only two slots
+      // repeating it — let a fresher reason have the room instead. The pick
+      // screen keeps `mine`: there the score is buried in a long meta line.
+      var reasons = matchReasons(r, {
+        max: CARD_REASON_MAX,
+        shown: cardShownText(r),
+        skip: myRatingFor(r.name) ? { mine: true } : null
+      });
+      var reasonRow = reasonsRowEl(reasons, 'ov-reason');
+      if (reasonRow) ov.appendChild(reasonRow);
       trio.appendChild(ov);
       card.appendChild(trio);
 
       renderTrio(card, false);
-      card.setAttribute('aria-label', a11ySummary(r));
+      card.setAttribute('aria-label', a11ySummary(r, reasons));
 
       if (depth === 0) attachDrag(card);
       return card;
     }
 
-    function a11ySummary(r) {
+    /* Everything the card's info scrap prints, verbatim — the dedupe input
+       for matchReasons(). Kept next to buildCard so the two stay in step. */
+    function cardShownText(r) {
+      var bits = [r.name];
+      if (r.rating) bits.push(fmtScore(r.rating * 20));
+      if (r.reviews) bits.push(r.reviews.toLocaleString());
+      if (r.price) bits.push(priceStr(r.price));
+      if (r.type) bits.push(r.type);
+      if (r.distance != null) { bits.push(fmtDist(r.distance)); bits.push(fmtTravel(r.distance)); }
+      var ost = openState(r);
+      if (ost) bits.push(ost.label);
+      var mine = myRatingFor(r.name);
+      if (mine) bits.push('You rated this ' + fmtScore(overallOf(mine)));
+      return bits.join(' · ');
+    }
+
+    function a11ySummary(r, reasons) {
       var bits = [r.name];
       if (r.rating) bits.push(fmtScore(r.rating * 20) + ' out of 100');
       if (r.reviews) bits.push(r.reviews.toLocaleString() + ' reviews');
@@ -1578,6 +1875,9 @@
       if (ost) bits.push(ost.label.toLowerCase());
       var mine = myRatingFor(r.name);
       if (mine) bits.push('you rated it ' + fmtScore(overallOf(mine)) + ' before');
+      // the strongest match reason rides along in the label so the "why"
+      // lands the moment you enter the card, not only when you read on
+      if (reasons && reasons.length) bits.push('why this one: ' + reasons[0].text);
       return bits.join(', ');
     }
 
@@ -1939,11 +2239,26 @@
 
       // "Should we go now?" — the same open/closes-soon/opens-at/closed state
       // the deck card showed, restated on the pick screen. Rebuilt each visit.
+      var dLabel = '';
       if (metaEl && metaEl.parentNode) {
         var prevChip = metaEl.parentNode.querySelector('.decision-chip');
         if (prevChip) prevChip.parentNode.removeChild(prevChip);
         var dChip = openChipEl(r, 'decision-chip');
-        if (dChip) metaEl.parentNode.insertBefore(dChip, metaEl.nextSibling);
+        if (dChip) { dLabel = dChip.textContent; metaEl.parentNode.insertBefore(dChip, metaEl.nextSibling); }
+      }
+
+      // "Why this one" — the fuller set, sitting right under the name where
+      // there is room for it. Rebuilt each visit like the status chip.
+      var dReasons = [];
+      if (metaEl && metaEl.parentNode) {
+        var prevRow = metaEl.parentNode.querySelector('.decision-reasons');
+        if (prevRow) prevRow.parentNode.removeChild(prevRow);
+        dReasons = matchReasons(r, {
+          max: DECISION_REASON_MAX,
+          shown: r.name + ' · ' + metaLine + ' · ' + dLabel
+        });
+        var dRow = reasonsRowEl(dReasons, 'decision-reason');
+        if (dRow) metaEl.parentNode.insertBefore(dRow, metaEl.nextSibling);
       }
 
       var mapsHref = r.mapsUri ||
@@ -1981,7 +2296,8 @@
         actionsEl.appendChild(save);
       }
       var dst = openState(r);
-      announce('Tonight: ' + r.name + (dst ? '. ' + dst.label : ''));
+      var why = dReasons.map(function (x) { return x.text; }).join('; ');
+      announce('Tonight: ' + r.name + (dst ? '. ' + dst.label : '') + (why ? '. Why this one: ' + why : ''));
       var nm = $('decision-name');
       if (nm) { nm.setAttribute('tabindex', '-1'); nm.focus(); }
     }
@@ -3806,7 +4122,20 @@
 
     function listFriends() { return FRIENDS.slice(); }
 
-    return { getFriendsFeed: getFriendsFeed, getPopular: getPopular, listFriends: listFriends };
+    /* Synchronous read of the feed for ONE place (name match, like
+       myRatingFor). The match-reason chips are built inside a card render
+       and cannot await the promise API; this reads the same entries
+       getFriendsFeed() serves, so there is no second copy of the data.
+       Returns [] when none of your friends has rated the place. */
+    function ratingsFor(place) {
+      if (!place) return [];
+      var n = String(place).toLowerCase();
+      return FRIENDS_FEED.filter(function (e) {
+        return String(e.place || '').toLowerCase() === n;
+      });
+    }
+
+    return { getFriendsFeed: getFriendsFeed, getPopular: getPopular, listFriends: listFriends, ratingsFor: ratingsFor };
   })();
 
   /* ================================================================== *

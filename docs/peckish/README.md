@@ -44,6 +44,88 @@
 
 ## Feature map (what's built)
 
+### "Why this pick" — match-reason chips (2026-07-23)
+The app had rich signals it never surfaced: your saved preferences, the real
+distance, the time-awareness state, your own Visited scores, your friends'
+ratings. A card stated **facts**; it never said why the place was in front of
+you. Small watercolor **reason chips** now carry that judgement.
+
+- **`matchReasons(place, { max, shown })`** (module level, between the `prefs`
+  and `deck` closures) returns a ranked, capped, de-duplicated list. Every
+  candidate is built by `reasonCandidates()` from signals that already exist —
+  nothing is invented, and a place that answers nothing gets **no chips at
+  all** (no filler). Candidates carry `group` (one chip per group), `weight`
+  (usefulness) and `texts` (phrasings, most concrete first).
+- **The reason set + weights** (higher wins the slot):
+
+  | # | group | weight | chip | condition |
+  |---|---|---|---|---|
+  | 1 | `mine` | 100 / 96 | "You loved it last time" / "You liked it before" | `myRatingFor()` overall ≥ 78 / ≥ 62 |
+  | 2 | `friend` | 90 / 86 | "Maya loved it" / "Maya rated it well" | best `social.ratingsFor()` overall ≥ 85 / ≥ 72 |
+  | 3 | `cuisine` | 84 | "Japanese — your pick" | you picked that cuisine |
+  | 4 | `diet` | 82 | "Vegan, as you asked" | every dietary need you set is met |
+  | 5 | `near` | 80 / 78 / 70 | "Close enough to walk" / "Practically next door" / "A short stroll away" | Walking pref + ≤ 1.3 mi / ≤ 0.25 mi / ≤ 0.5 mi |
+  | 6 | `rating` | 76 / 74 / 68 | "Above your 90 bar" / "One of the best nearby" / "Very well loved" | clears your min-rating / top-3 of what we actually found / ≥ 90 with ≥ 200 reviews |
+  | 7 | `time` | 72 / 58 | "Closing soon — go now" / "Open till 10pm" | `openState` is `soon` / is `open` and still open in 2 h |
+  | 8 | `price` | 66 | "Right in your price range" | price level you chose |
+  | 9 | `dining` | 62 | "Takeout, as you asked" | a dining mode you chose |
+  | 10 | `extras` | 60 | "Outdoor seating, as you asked" | every extra you ticked (skipped for live places, which carry none) |
+  | 11 | `reviews` | 54 | "Plenty of reviews behind it" | clears your min-reviews |
+
+  Personal history and explicit preference matches outrank pure facts, so a
+  generic chip only appears when nothing more concrete is available.
+- **Dedupe** — the chips must never parrot the line above them. Each surface
+  passes the text it is *already showing* as `shown`; `normReason()` lowercases,
+  strips punctuation and drops filler words (`this`/`it`/`the`…) so
+  *"You rated **this** 82"* and *"You rated **it** 82"* compare equal. A
+  candidate walks its `texts` list and takes the first phrasing not already on
+  screen — so "3 min walk" next to the card's travel hint becomes "Practically
+  next door", and the "You rated this 82" pill pushes the reason to "You loved
+  it last time". If every phrasing would echo the UI, the reason is dropped.
+- **Group suppression (orchestrator refinement)** — text dedupe can't catch a
+  *semantic* echo: the card prints a prominent "You rated this 82" pill, and a
+  `mine` verdict chip beside it spent one of only **two** card slots restating
+  it. `matchReasons` now takes a `skip` map of groups, and the card passes
+  `{ mine: true }` whenever that pill is present, so a fresher reason takes the
+  room (verified: *Tonkotsu Lane*, pill "You rated this 88" → chips
+  `["Maya loved it", "Practically next door"]`). The **pick screen keeps
+  `mine`** — there the score is buried mid-way through a long meta line rather
+  than standing alone as a pill, and there are three slots to spend.
+- **Where they show** — **2 chips max on the deck card** (`.ov-reasons` in the
+  `.trio-info` scrap): the scrap is ~88% of a 390px card, and a third chip
+  wraps to a second row and crowds the name. The **Tonight decision screen**
+  shows the fuller **3** (`.decision-reasons`, sitting between the meta line
+  and the open-state chip, where there is room).
+- **Reads `openState`, never re-derives it.** "Still open in 2 h?" is answered
+  by probing the *shared* `openState(r, futureDate)` — no second copy of the
+  hours math. New: `social.ratingsFor(place)` (synchronous read of the same
+  feed `getFriendsFeed()` serves — a card render cannot await a promise) and
+  `prefs.labelFor(key)` (so chips speak your own words back to you).
+- **Pigment carries the kind**: sage = answers a preference you set, gold =
+  quality, pond = logistics (how close / how long it's open), rose ♡ = your own
+  verdict, wisteria ✧ = a friend's. Evening overrides + AA on all ten states.
+- **A11y**: the row is a `role="list"` labelled "Why this one", each chip a
+  non-interactive `role="listitem"` span with an `aria-hidden` glyph, so AT
+  reads them as discrete items in rank order. The **top reason is folded into
+  the card's `aria-label`** ("…, why this one: You loved it last time") and the
+  decision screen's `announce()` carries the full set. A place with no reasons
+  adds nothing to either.
+- **Motion**: card chips never animate (they rebuild on every swipe); only the
+  decision set breathes in, inside `@media (prefers-reduced-motion:
+  no-preference)` — reduced motion gets nothing at all.
+- Verified with Playwright at 390×844 (21 assertions, zero page errors — the
+  Google Fonts connection reset is sandbox noise). Through the wizard with
+  *Cuisine = Japanese + Thai* and *Min rating = 90+*: **Bangkok Orchid** →
+  `["Thai — your pick", "Above your 90 bar"]`; **Tonkotsu Lane** (visited 82,
+  Maya 87) → `["You loved it last time", "Maya loved it"]`, its decision screen
+  → those two plus `"Japanese — your pick"`. No chip echoed visible card text,
+  the ≤2 / ≤3 caps held, no chip exceeded the info scrap and the page never
+  scrolled horizontally. Empty case (all prefs "Any", clock at 02:30 local):
+  **The Stacked Patty** — 0.6 mi, 86/100, never visited, no friend rating,
+  closed — renders **no row at all**. Urgency case (15:40 local): Foggy Bell
+  Coffee shows the gold "Closes at 4pm" badge *and* a "Closing soon — go now"
+  chip. Reduced-motion run: chips render with `animation-name: none`.
+
 ### Deck time-awareness + Add to calendar (2026-07-23)
 The old binary "Open now" badge becomes a real, time-aware state, and the
 "Tonight" decision screen gains a calendar hand-off.
