@@ -260,6 +260,33 @@
   };
 
   // ---------------------------------------------------------
+  // AUDIO DEPTH: per-realm colour + flight bed tuning
+  // ---------------------------------------------------------
+  // One table drives both halves of a dragon's sound: the sustained realm
+  // AMBIENCE (a two-partial drone through a slowly breathing filter — held,
+  // non-melodic, so it tints the duel music instead of arguing with it) and
+  // the dragon's synthesized VOICE (roar on the intro flyby / phase II, a
+  // softer keen during the Bowing). Six audibly distinct colours:
+  //   ember  warm low grit · storm  airy high crackle · verdant mid woody
+  //   gilded bright shimmer · umbra dark hollow      · selene cool glassy
+  var DRAGON_AUDIO = {
+    ember:   { drone: 82.41,  ratio: 1.5,   wave: "sawtooth", filt: "lowpass",  cut: 300,  q: 3.0, lfo: 0.06,  sweep: 120, gain: 0.90,
+               voice: 150, vsweep: 0.42, vwave: "sawtooth", vlp: 900,  growl: 26, keen: 330 },
+    storm:   { drone: 196.00, ratio: 1.5,   wave: "triangle", filt: "bandpass", cut: 1500, q: 1.6, lfo: 0.21,  sweep: 700, gain: 0.70,
+               voice: 215, vsweep: 0.60, vwave: "square",   vlp: 3200, growl: 33, keen: 523 },
+    verdant: { drone: 146.83, ratio: 1.335, wave: "triangle", filt: "lowpass",  cut: 780,  q: 2.0, lfo: 0.11,  sweep: 240, gain: 0.85,
+               voice: 124, vsweep: 0.50, vwave: "triangle", vlp: 700,  growl: 20, keen: 294 },
+    gilded:  { drone: 329.63, ratio: 2.0,   wave: "sine",     filt: "bandpass", cut: 2300, q: 2.2, lfo: 0.26,  sweep: 900, gain: 0.60,
+               voice: 262, vsweep: 0.55, vwave: "sawtooth", vlp: 2400, growl: 30, keen: 659 },
+    umbra:   { drone: 61.74,  ratio: 1.5,   wave: "sine",     filt: "lowpass",  cut: 170,  q: 1.2, lfo: 0.045, sweep: 70,  gain: 1.00,
+               voice: 88,  vsweep: 0.38, vwave: "sawtooth", vlp: 420,  growl: 17, keen: 233 },
+    selene:  { drone: 261.63, ratio: 1.5,   wave: "sine",     filt: "bandpass", cut: 1750, q: 3.2, lfo: 0.15,  sweep: 520, gain: 0.65,
+               voice: 330, vsweep: 0.68, vwave: "sine",     vlp: 1700, growl: 23, keen: 784 }
+  };
+  var WIND_MAX = 0.15;    // wind bed ceiling BEFORE the master gain (0.5)
+  var AMB_MAX = 0.055;    // realm-ambience ceiling — deliberately near-subliminal
+
+  // ---------------------------------------------------------
   // AUDIO MODULE (Web Audio, synthesized)
   // ---------------------------------------------------------
   var Audio2 = {
@@ -286,6 +313,17 @@
     setMuted: function (m) {
       this.muted = m;
       if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.5, this.ctx.currentTime, 0.02);
+      // the sustained beds run continuously, so muting has to reach into them
+      // directly — the master ramp already silences them, this just makes sure
+      // nothing is left leaning on the mix when the toggle comes back on
+      if (m) {
+        this.windLevel = 0; this.ambLevel = 0;
+        if (this.bedsBuilt) {
+          var t = this.ctx.currentTime;
+          this.windGain.gain.setTargetAtTime(0, t, 0.03);
+          this.ambGain.gain.setTargetAtTime(0, t, 0.05);
+        }
+      }
     },
     tone: function (freq, dur, type, vol, slideTo) {
       if (!this.ready || this.muted) return;
@@ -440,6 +478,248 @@
       this.tone(293.7, 2.0, "sine", 0.06);   // D4
       this.tone(392.0, 1.8, "sine", 0.05);   // G4
       this.tone(493.9, 1.6, "sine", 0.04);   // B4 — the warm third on top
+    },
+
+    /* =====================================================================
+       FLIGHT BEDS — the sky you're flying through, not an event in it.
+       ONE persistent graph, built lazily the first time either bed is
+       actually wanted, then never rebuilt (no createX in the loop):
+
+         windSrc(2s looping brown noise) -> HP90 -> windLP -> windGain ┐
+         ambA ─┐                                                      ├-> master
+         ambB ─┴-> ambFilter -> ambGain ───────────────────────────────┘
+                     ▲
+                   ambLfo -> ambLfoDepth   (slow filter breathing)
+
+       Both bed levels are eased in plain JS (windLevel / ambLevel) and
+       pushed to their AudioParams with short setTargetAtTime glides at
+       ~14 Hz, never assigned per frame — smooth, and no automation spam.
+       Everything hangs off master, so the mute toggle silences it for free.
+       ================================================================== */
+    windSrc: null, windLP: null, windGain: null,
+    ambA: null, ambB: null, ambFilter: null, ambGain: null,
+    ambLfo: null, ambLfoDepth: null,
+    bedsBuilt: false,
+    windLevel: 0, windCut: 240,
+    ambLevel: 0, ambType: null, ambWant: null, ambWantLvl: 0,
+    pushT: 0, ambScanT: 0,
+
+    buildBeds: function () {
+      if (this.bedsBuilt || !this.ready) return;
+      try {
+        var ctx = this.ctx, t = ctx.currentTime, i;
+        // ---- wind: two seconds of brown-ish noise on a seamless loop ----
+        var n = Math.floor(ctx.sampleRate * 2);
+        var buf = ctx.createBuffer(1, n, ctx.sampleRate);
+        var d = buf.getChannelData(0);
+        var last = 0;
+        for (i = 0; i < n; i++) {
+          last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+          d[i] = last * 3.4;
+        }
+        // blend the tail into the head and loop short of it, so the seam
+        // never ticks once every two seconds
+        var fade = Math.floor(ctx.sampleRate * 0.05);
+        for (i = 0; i < fade; i++) {
+          var k = i / fade;
+          d[i] = d[i] * k + d[n - fade + i] * (1 - k);
+        }
+        this.windSrc = ctx.createBufferSource();
+        this.windSrc.buffer = buf;
+        this.windSrc.loop = true;
+        this.windSrc.loopStart = 0;
+        this.windSrc.loopEnd = (n - fade) / ctx.sampleRate;
+        var hp = ctx.createBiquadFilter();
+        hp.type = "highpass"; hp.frequency.value = 90;   // kill the DC rumble
+        this.windLP = ctx.createBiquadFilter();
+        this.windLP.type = "lowpass";
+        this.windLP.frequency.value = this.windCut;
+        this.windLP.Q.value = 0.7;
+        this.windGain = ctx.createGain();
+        this.windGain.gain.value = 0;
+        this.windSrc.connect(hp); hp.connect(this.windLP);
+        this.windLP.connect(this.windGain); this.windGain.connect(this.master);
+        this.windSrc.start(t);
+
+        // ---- realm ambience: two held partials, retuned per dragon ----
+        this.ambGain = ctx.createGain();
+        this.ambGain.gain.value = 0;
+        this.ambGain.connect(this.master);
+        this.ambFilter = ctx.createBiquadFilter();
+        this.ambFilter.type = "lowpass";
+        this.ambFilter.frequency.value = 400;
+        this.ambFilter.Q.value = 2;
+        this.ambFilter.connect(this.ambGain);
+        this.ambA = ctx.createOscillator();
+        this.ambA.type = "sine"; this.ambA.frequency.value = 110;
+        this.ambB = ctx.createOscillator();
+        this.ambB.type = "sine"; this.ambB.frequency.value = 165;
+        var ga = ctx.createGain(); ga.gain.value = 0.62;
+        var gb = ctx.createGain(); gb.gain.value = 0.30;
+        this.ambA.connect(ga); ga.connect(this.ambFilter);
+        this.ambB.connect(gb); gb.connect(this.ambFilter);
+        this.ambLfo = ctx.createOscillator();
+        this.ambLfo.type = "sine"; this.ambLfo.frequency.value = 0.08;
+        this.ambLfoDepth = ctx.createGain();
+        this.ambLfoDepth.gain.value = 120;
+        this.ambLfo.connect(this.ambLfoDepth);
+        this.ambLfoDepth.connect(this.ambFilter.frequency);
+        this.ambA.start(t); this.ambB.start(t); this.ambLfo.start(t);
+        this.bedsBuilt = true;
+      } catch (e) { this.bedsBuilt = false; }
+    },
+
+    // retune the ambience to a realm's colour. Only ever called while the
+    // bed is silent (see frame), so the waveform/filter-type switch is
+    // inaudible; the glides are there for the frequencies' sake.
+    ambTune: function (type) {
+      var a = DRAGON_AUDIO[type];
+      if (!a || !this.bedsBuilt) return;
+      try {
+        var t = this.ctx.currentTime;
+        this.ambA.type = a.wave;
+        this.ambB.type = a.wave;
+        this.ambA.frequency.setTargetAtTime(a.drone, t, 0.2);
+        this.ambB.frequency.setTargetAtTime(a.drone * a.ratio, t, 0.2);
+        this.ambFilter.type = a.filt;
+        this.ambFilter.frequency.setTargetAtTime(a.cut, t, 0.2);
+        this.ambFilter.Q.setTargetAtTime(a.q, t, 0.2);
+        this.ambLfo.frequency.setTargetAtTime(a.lfo, t, 0.2);
+        this.ambLfoDepth.gain.setTargetAtTime(a.sweep, t, 0.2);
+      } catch (e) {}
+    },
+
+    // driven once per rendered frame from the main loop (NOT from the fixed
+    // update — the beds should also settle while paused or on the title)
+    frame: function (dt) {
+      if (!(dt > 0)) return;
+      if (dt > 0.1) dt = 0.1;
+      var playing = Game.state === "PLAYING";
+      var p = playing ? Game.player : null;
+
+      // ---- wind bed: rides the goose's speed, same curve as the streaks ----
+      var spd = p ? Math.sqrt(p.vx * p.vx + p.vy * p.vy) : 0;
+      var s01 = (spd - 110) / 430;
+      if (s01 < 0) s01 = 0; else if (s01 > 1) s01 = 1;
+      var wt = playing ? WIND_MAX * s01 : 0;
+      // duels duck the bed hard — it must never mask a telegraph or a hit
+      if (playing && Game.mode === "duel") wt *= 0.45;
+      if (playing && Game.bowing) wt *= 0.25;
+      if (this.muted) wt = 0;
+      this.windLevel += (wt - this.windLevel) * (1 - Math.exp(-3.5 * dt));
+      if (this.windLevel < 0.00005) this.windLevel = 0;
+      this.windCut = 240 + s01 * 1500;
+
+      // ---- realm ambience: full in a duel, a whisper near a sky gate ----
+      // (scanned 4x/second — six realms, no allocation)
+      this.ambScanT -= dt;
+      if (this.ambScanT <= 0) {
+        this.ambScanT = 0.25;
+        this.ambWant = null; this.ambWantLvl = 0;
+        if (playing && Game.mode === "duel" && Game.dragon) {
+          this.ambWant = Game.dragon.type;
+          this.ambWantLvl = Game.dragon.phase === 2 ? 1.15 : 1;
+        } else if (playing && Game.mode === "sky" && Game.sky && p) {
+          var rs = Game.sky.realms, best = null, bestQ = 0;
+          for (var i = 0; i < rs.length; i++) {
+            var rm = rs[i];
+            var dx = p.x - rm.x, dy = p.y - rm.y;
+            var reach = rm.r * 2.6;
+            var q = 1 - Math.sqrt(dx * dx + dy * dy) / reach;
+            if (q > bestQ) { bestQ = q; best = rm; }
+          }
+          if (best) { this.ambWant = best.type; this.ambWantLvl = 0.34 * bestQ; }
+        }
+      }
+      var spec = DRAGON_AUDIO[this.ambType];
+      var at = 0;
+      if (spec && this.ambWant === this.ambType) at = AMB_MAX * spec.gain * this.ambWantLvl;
+      if (this.muted) at = 0;
+      this.ambLevel += (at - this.ambLevel) * (1 - Math.exp(-2.2 * dt));
+      if (this.ambLevel < 0.00004) this.ambLevel = 0;
+      // swap colour only once the old one has faded out
+      if (this.ambWant !== this.ambType && this.ambLevel <= 0.0004) {
+        this.ambType = this.ambWant;
+        if (this.ambType) this.ambTune(this.ambType);
+      }
+
+      // ---- push to the graph (built on first real demand) ----
+      if (!this.ready) return;
+      if (!this.bedsBuilt) {
+        if (this.windLevel <= 0 && this.ambLevel <= 0) return;
+        this.buildBeds();
+        if (!this.bedsBuilt) return;
+      }
+      this.pushT -= dt;
+      if (this.pushT > 0) return;
+      this.pushT = 0.07;
+      try {
+        var ct = this.ctx.currentTime;
+        this.windGain.gain.setTargetAtTime(this.windLevel, ct, 0.05);
+        this.windLP.frequency.setTargetAtTime(this.windCut, ct, 0.08);
+        this.ambGain.gain.setTargetAtTime(this.ambLevel, ct, 0.12);
+      } catch (e) {}
+    },
+
+    /* ---- DRAGON VOICES: short synthesized calls, each well under 1s.
+       Summed peaks are kept low on purpose (roar ≈ 0.30, keen ≈ 0.08
+       before the 0.5 master) so nothing ever clips. ---- */
+    roar: function (type) {
+      if (!this.ready || this.muted) return;
+      var a = DRAGON_AUDIO[type] || DRAGON_AUDIO.ember;
+      try {
+        var ctx = this.ctx, t = ctx.currentTime, dur = 0.72;
+        // the call itself, sagging as it lands
+        var o = ctx.createOscillator();
+        o.type = a.vwave;
+        o.frequency.setValueAtTime(a.voice * 1.18, t);
+        o.frequency.exponentialRampToValueAtTime(Math.max(40, a.voice * a.vsweep), t + dur);
+        // growl: a fast per-type tremolo riding the body
+        var trem = ctx.createGain(); trem.gain.value = 0.72;
+        var lfo = ctx.createOscillator();
+        lfo.type = "sine"; lfo.frequency.value = a.growl;
+        var lfoG = ctx.createGain(); lfoG.gain.value = 0.28;
+        lfo.connect(lfoG); lfoG.connect(trem.gain);
+        var body = ctx.createGain();
+        body.gain.setValueAtTime(0.0001, t);
+        body.gain.exponentialRampToValueAtTime(0.15, t + 0.05);
+        body.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        // the throat closing: timbre darkens across the call
+        var lp = ctx.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.setValueAtTime(a.vlp * 1.6, t);
+        lp.frequency.exponentialRampToValueAtTime(Math.max(120, a.vlp * 0.5), t + dur);
+        o.connect(trem); trem.connect(body); body.connect(lp); lp.connect(this.master);
+        o.start(t); o.stop(t + dur + 0.05);
+        lfo.start(t); lfo.stop(t + dur + 0.05);
+      } catch (e) {}
+      this.noise(0.34, 0.075, a.vlp);                          // breath rasp
+      this.tone(a.voice * 0.5, 0.42, "sine", 0.07, a.voice * 0.32); // weight
+    },
+    // the Bowing's softer counterpart: a sigh/keen, the fight going out of it
+    keen: function (type) {
+      if (!this.ready || this.muted) return;
+      var a = DRAGON_AUDIO[type] || DRAGON_AUDIO.ember;
+      try {
+        var ctx = this.ctx, t = ctx.currentTime, dur = 0.95;
+        var o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(a.keen * 1.06, t);
+        o.frequency.exponentialRampToValueAtTime(Math.max(60, a.keen * 0.72), t + dur);
+        var g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(0.055, t + 0.22);   // a breath drawn in
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        var v = ctx.createOscillator();
+        v.type = "sine"; v.frequency.value = 5.2;
+        var vg = ctx.createGain(); vg.gain.value = a.keen * 0.012;  // slow waver
+        v.connect(vg); vg.connect(o.frequency);
+        o.connect(g); g.connect(this.master);
+        o.start(t); o.stop(t + dur + 0.05);
+        v.start(t); v.stop(t + dur + 0.05);
+      } catch (e) {}
+      // the octave above, fainter — keeps the six voices distinguishable
+      this.tone(a.keen * 2, 0.66, "sine", 0.022, a.keen * 1.5);
     }
   };
 
@@ -2963,6 +3243,10 @@
       this.introT = this.introDur;
       d.introToX = d.x; d.introToY = d.y;
       if (!reduceMotion) d.y = -d.r; // starts above the sky, swoops down
+      // it announces itself part-way through the swoop
+      setTimeout(function () {
+        if (Game.state === "PLAYING" && Game.mode === "duel" && Game.dragon === d) Audio2.roar(d.type);
+      }, reduceMotion ? 120 : 380);
       this.updateHUD();
       // first-duel tutorial hint (one-time)
       if (!ceremonial && !Save.data.seenHints.duel) {
@@ -3832,6 +4116,7 @@
         this.addShake(8);
         Particles.burst(d.x, d.y, 18, PAL.rose, 5, 24, 0.4);
         Audio2.tone(120, 0.5, "sawtooth", 0.2, 220);
+        Audio2.roar(d.type);   // it finds its voice
       }
 
       d.stateT += dt;
@@ -4957,6 +5242,9 @@
     // banked before this runs, so it never touches them. Reduced motion
     // keeps the old quick transition — no slow-mo, no petals.
     beginBowing: function (showWin) {
+      // the keen sounds either way — reduced motion drops the flourish, not
+      // the dragon's last breath
+      if (this.dragon) Audio2.keen(this.dragon.type);
       if (reduceMotion) { setTimeout(showWin, 600); return; }
       var d = this.dragon;
       var colors = (d && BOW_MOTES[d.type]) || BOW_MOTES.ember;
@@ -6275,6 +6563,7 @@
       steps++;
     }
     if (steps >= 5) accum = 0; // spiral guard
+    Audio2.frame(dt);          // sustained beds settle on the real frame clock
     Game.render(accum / DT);
     requestAnimationFrame(loop);
   }
@@ -6312,6 +6601,29 @@
     tilt: function () { return Game.player ? Game.player.bank * 0.5 : 0; },
     dynZoom: function () { return Game.cam.dynZoom; },
     windInten: function () { return Game.windInten || 0; },
+    // AUDIO test hooks: the sustained beds are inspectable without listening
+    audio: function () {
+      return {
+        ready: Audio2.ready,
+        muted: Audio2.muted,
+        graph: Audio2.bedsBuilt,
+        ctxState: Audio2.ctx ? Audio2.ctx.state : "none",
+        master: Audio2.master ? Audio2.master.gain.value : 0,
+        wind: Audio2.windLevel,
+        windParam: Audio2.windGain ? Audio2.windGain.gain.value : 0,
+        windCut: Audio2.windCut,
+        amb: Audio2.ambLevel,
+        ambParam: Audio2.ambGain ? Audio2.ambGain.gain.value : 0,
+        ambType: Audio2.ambType,
+        ambWant: Audio2.ambWant,
+        ambFilterType: Audio2.ambFilter ? Audio2.ambFilter.type : null,
+        ambDrone: Audio2.ambA ? Audio2.ambA.frequency.value : 0
+      };
+    },
+    audioSpec: function (type) { return DRAGON_AUDIO[type] || null; },
+    roar: function (type) { Audio2.roar(type); },
+    keen: function (type) { Audio2.keen(type); },
+    unlockAudio: function () { Audio2.init(); Audio2.resume(); Audio2.musicStart(); },
     world: function () { return { w: Game.worldW, h: Game.worldH }; },
     // project a world point to viewport-logical coords (for test assertions)
     project: function (x, y) { var s = Game.cam.worldToScreen(x, y); return { x: s.x, y: s.y }; }
