@@ -1704,6 +1704,115 @@ html.evening .end-chip--gold:hover { color: #f6edcd; border-color: var(--gold); 
   border: 1px solid rgba(205, 184, 120, 0.55);
 }
 
+/* ==========================================================================
+   "WHY THIS PICK" — match-reason chips
+   Small watercolor washes that say why a place is in front of you. Two
+   surfaces share the pigment vocabulary and differ only in scale:
+     .ov-reason        on the deck card's info scrap (max 2, one row)
+     .decision-reason  on the Tonight pick screen (max 3, centred)
+   Pigment carries the kind: sage = answers a preference you set, gold =
+   quality, pond = logistics (how close, how long it's open), rose = your
+   own verdict, wisteria = a friend's.
+   ========================================================================== */
+.ov-reasons,
+.decision-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.ov-reasons {
+  gap: 0.26rem 0.3rem;
+  margin-top: 0.4rem;
+}
+.decision-reasons {
+  gap: 0.4rem;
+  justify-content: center;
+  max-width: 21rem;
+  margin: 0 auto 0.95rem;
+}
+.ov-reason,
+.decision-reason {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.26rem;
+  max-width: 100%;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  /* neutral fallback — every kind below overrides all three */
+  color: var(--ink-soft);
+  background: rgba(46, 58, 72, 0.07);
+  border: 1px solid rgba(46, 58, 72, 0.18);
+}
+.ov-reason {
+  padding: 0.15rem 0.46rem;
+  font-size: 0.67rem;
+  line-height: 1.3;
+}
+.decision-reason {
+  padding: 0.26rem 0.62rem;
+  font-size: 0.76rem;
+  line-height: 1.32;
+}
+.ov-reason-glyph,
+.decision-reason-glyph { font-size: 0.86em; line-height: 1; flex: 0 0 auto; }
+/* long phrasings wrap inside the chip rather than pushing the row wide */
+.ov-reason-text,
+.decision-reason-text { min-width: 0; overflow-wrap: anywhere; }
+
+/* ---- pigments (light) ---- */
+.ov-reason--pref, .decision-reason--pref {
+  color: #3d6135; background: rgba(147, 180, 139, 0.18); border-color: rgba(147, 180, 139, 0.5);
+}
+.ov-reason--rating, .decision-reason--rating {
+  color: #6f5a15; background: rgba(205, 184, 120, 0.22); border-color: rgba(205, 184, 120, 0.55);
+}
+.ov-reason--near, .decision-reason--near,
+.ov-reason--time, .decision-reason--time {
+  color: #2f5a84; background: rgba(127, 168, 201, 0.18); border-color: rgba(127, 168, 201, 0.5);
+}
+.ov-reason--mine, .decision-reason--mine {
+  color: #9a3450; background: rgba(217, 139, 160, 0.18); border-color: rgba(217, 139, 160, 0.5);
+}
+.ov-reason--friend, .decision-reason--friend {
+  color: #55418a; background: rgba(162, 146, 196, 0.2); border-color: rgba(162, 146, 196, 0.5);
+}
+
+/* ---- pigments (evening) ---- */
+html.evening .ov-reason, html.evening .decision-reason {
+  color: var(--ink-soft); background: rgba(233, 227, 211, 0.08); border-color: rgba(233, 227, 211, 0.2);
+}
+html.evening .ov-reason--pref, html.evening .decision-reason--pref {
+  color: #a9cf9f; background: rgba(147, 180, 139, 0.2); border-color: rgba(147, 180, 139, 0.45);
+}
+html.evening .ov-reason--rating, html.evening .decision-reason--rating {
+  color: #e0c67d; background: rgba(205, 184, 120, 0.2); border-color: rgba(205, 184, 120, 0.5);
+}
+html.evening .ov-reason--near, html.evening .decision-reason--near,
+html.evening .ov-reason--time, html.evening .decision-reason--time {
+  color: #a5c8e4; background: rgba(127, 168, 201, 0.2); border-color: rgba(127, 168, 201, 0.5);
+}
+html.evening .ov-reason--mine, html.evening .decision-reason--mine {
+  color: #ecaebd; background: rgba(217, 139, 160, 0.2); border-color: rgba(217, 139, 160, 0.5);
+}
+html.evening .ov-reason--friend, html.evening .decision-reason--friend {
+  color: #c6b6e4; background: rgba(162, 146, 196, 0.22); border-color: rgba(162, 146, 196, 0.5);
+}
+
+/* Card chips never animate — they rebuild on every swipe. Only the pick
+   screen's fuller set breathes in, and only when motion is welcome. */
+@media (prefers-reduced-motion: no-preference) {
+  .decision-reason {
+    animation: reason-wash-in 340ms ease both;
+    animation-delay: calc(var(--i, 0) * 80ms);
+  }
+  @keyframes reason-wash-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
 /* ----- undo button (small, quiet, left of Pass) ----- */
 .deck-btn--undo { width: 3rem; height: 3rem; color: var(--ink-soft); }
 .deck-btn--undo:hover { color: var(--ink); border-color: var(--pond-ink); }
