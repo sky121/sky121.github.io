@@ -12,7 +12,7 @@
 > icon *art* changed.
 >
 > Single source of truth so we can pick up exactly where we left off.
-> Last updated: **2026-07-21**.
+> Last updated: **2026-08-03**.
 
 ---
 
@@ -43,6 +43,83 @@
 ---
 
 ## Feature map (what's built)
+
+### Popular, deepened — three sections, no invented data (2026-08-03)
+Popular was still the thin demo leaderboard while the rest of the app grew. It
+is now three answers to *"where is everyone eating?"*, all built from signals
+the app already had. Everything lives in the rewritten `popular` closure
+(`eats.js`), plus one shared row builder and ~180 lines of CSS.
+
+**1. Trending now** (the existing `social.getPopular` feed, rows upgraded)
+- Ordered by **`reviews`** — the one genuine popularity signal the feed
+  carries ("how many people reviewed it in this range"). The mock's own `rank`
+  already agrees; recomputing the order keeps the rows honest if a real
+  backend ever returns an unsorted list.
+- Each row: watercolor **thumb** (`panelArt`, or the place's photo in live
+  mode) with a rank badge, name, **score + review count**, **price · cuisine**,
+  **distance + walk time**, the **open-state chip** (`openChipEl` — the same
+  Open now / Closes at 8pm / Opens at 4pm states the deck shows), and its
+  **trend sparkline** (`svgSparkline`).
+- A **movement indicator** (Rising / Holding steady / Cooling) renders **only
+  from the feed's own `trend` field** — a row without one shows nothing. It is
+  never inferred from the sparkline, because the sparkline is drawn *from* it.
+
+**2. Near you right now** — the "I want to leave in five minutes" list
+- Places that are **open this minute or closing soon** within **0.6 mi**
+  (≈ a 12-minute walk), **ranked by closeness**, five max.
+- Open/closed comes from the shared **`openState()`** — the hours math is never
+  re-derived here. A **closing-soon** row is flagged urgent (warm gold border)
+  and keeps the chip's own words ("Closes at 2pm").
+- The right-hand stat is the ranking signal itself: `0.3 mi / 6 MIN WALK`.
+- Nothing open nearby (3am, say) → **the section is not rendered at all**.
+
+**3. Loved by people with your taste** — reuses the taste-match model
+- `friends.matchByFriend()` (the same `tasteMatch` the Friends tab prints) now
+  ranks your friends; for the best-matched ones we surface the places they
+  rated **80+ overall** that your **Visited log has never seen**. First
+  (best-matched) friend to name a place wins it; four rows max.
+- Each row names the source — **"Maya, 32% taste match"** — with their score in
+  the aside and their note as a quiet one-line quote.
+- **No Visited data or no overlap → no section.** A taste match nobody can
+  compute is not a recommendation, so there is no weak fallback.
+
+**Shared row anatomy + tap-through**
+- One `buildRow()` renders all three sections, so the tab reads as one thing.
+  The meta line is built from **non-breaking groups** (score+reviews /
+  price+cuisine / distance+walk) separated by space — dots live only *inside* a
+  group, so a wrapping row never starts or ends on a stranded separator.
+- Up to **2 reason chips** per row via the shared `matchReasons(place, { max,
+  shown, skip })`, mirroring the deck card: `shown` is everything the row
+  literally prints, and `skip` drops the group the row already states loudest —
+  Trending skips `reviews` + `near`, Near-you skips `near` + `time`, Loved-by
+  skips `friend` + `near`. Chips reuse the `ov-reason` pigment family.
+- The whole card is **one tap target**: a transparent `.pop-row-hit` button
+  stretched over it (≥44px, `:focus-visible` ring) opens the **existing**
+  decision screen — `find.showPick(place, siblings)` → `deck.pickFrom()` →
+  the deck's own `onLike()`. Same screen, same actions, same announcement; the
+  rest of the section becomes the deck queue so **"Keep looking"** walks it
+  instead of dead-ending. Rows with no place record behind them are simply not
+  tappable.
+- Sample data is labelled **once per section** (the trending list sits directly
+  under the panel's demo banner) instead of once per row.
+- `announce()` summarises the tab after render ("Popular: 6 trending today,
+  5 open near you right now, 2 loved by people with your taste").
+
+**Only additive hooks were added to other modules** — `friends` exports
+`tasteMatch`/`matchByFriend`, `deck` exports `pickFrom`, `find` exports
+`showPick`. The deck, landing, wizard, constellation, Friends tab and the
+time-awareness / reason engines are untouched and reused as-is.
+
+*Verified* (Playwright chromium, 390×844, mocked page clock): all three
+sections render with a seeded Visited log; "Near you right now" contains only
+open/closing-soon places, ordered `[0.084, 0.142, 0.241, 0.275, 0.300]` mi with
+closer-but-closed places (Verde Trattoria 0.188 mi, Pier 9 0.289 mi) correctly
+excluded at 13:30; the taste section excludes every visited place and names a
+friend with a match %, and **disappears** with an empty Visited log; tapping a
+row opens the decision screen for that place (name asserted) and "Keep looking"
+lands on the next card; ≤2 reason chips with no echo of the row's own text;
+`scrollWidth === clientWidth` at 390px; no entrance animation under
+`prefers-reduced-motion`; light + evening; zero page errors.
 
 ### "Why this pick" — match-reason chips (2026-07-23)
 The app had rich signals it never surfaced: your saved preferences, the real
@@ -536,7 +613,7 @@ Rate any place with **Food / Vibe / Service sliders (0–100)** → live Overall
 
 ### Friends + Popular — DEMO UIs (backend-ready)
 - **Friends:** sample feed of friends' ratings (sort + per-friend filter), clearly demo-badged; per-friend **taste match** pills, a filtered **detail header** (watercolor ring + "You both loved" strip), and a **share-your-shortlist nudge** (see the 2026-07-16 section above).
-- **Popular:** trending leaderboard with Today / This Month / This Year toggle, top-3 accents.
+- **Popular:** three sections — **Trending now** (leaderboard, Today / This Month / This Year toggle, top-3 accents), **Near you right now** (open + closest, from the shared `openState`), **Loved by people with your taste** (taste-matched friends' unvisited favourites). Rows are tappable and open the deck's decision screen. See the 2026-08-03 section above.
 - Both read through a **promise-based mock `social` API** (loading/error states) — see the "MOCK SOCIAL API" comment in `eats.js`. Swapping in a real backend is a contained change to those resolvers, not a rewrite.
 
 ### Chrome
@@ -557,7 +634,7 @@ Fixed **bottom tab bar** (Find / Visited / Friends / Popular, icons + labels, sa
 ---
 
 ## Roadmap / ideas (next)
-- Wire the **backend** (Firebase/Supabase) → real Friends, real Popular, accounts, cross-device Visited sync.
+- Wire the **backend** (Firebase/Supabase) → real Friends, real Popular, accounts, cross-device Visited sync. (Popular's three sections already consume the promise API + the local place pool, so a real feed drops in at the resolvers.)
 - ~~A **Liked shortlist**~~ **DONE 2026-07-08** (see Swipe QoL above).
 - ~~**Undo last swipe**, and a "seen already" memory~~ **DONE 2026-07-08** (see Swipe QoL above).
 - More preference facets (outdoor seating, reservations, good-for-groups, serves alcohol, kid-friendly) — Google attributes exist for some.
