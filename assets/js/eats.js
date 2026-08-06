@@ -16,7 +16,7 @@
      - visited      Visited store rendering + CRUD
      - social       MOCK SOCIAL API (friends feed + popular leaderboard)
      - friends      Friends-tab rendering (consumes social.* promises)
-     - popular      Popular-tab rendering (consumes social.* promises)
+     - popular      Popular tab: trending / open near you / loved by your taste
      - settings     API key panel
    ========================================================================== */
 (function () {
@@ -783,6 +783,16 @@
       syncHeaderChrome();
       startSearch();
     }
+    /* A place chosen somewhere else in the app (a Popular row) lands on the
+       deck's own decision screen — no search runs, nothing is re-derived.
+       `rest` becomes the queue behind it so "Keep looking" keeps working. */
+    function showPick(r, rest) {
+      hideAll();
+      surprisePending = false;
+      if (deckWrap) deckWrap.hidden = false;
+      syncHeaderChrome();
+      deck.pickFrom(r, rest);
+    }
     /* "Surprise me": same search pipeline, but deliver() hands the matches
        to the roulette rather than the deck. */
     function showSurprise() {
@@ -1035,6 +1045,7 @@
       showLanding: showLanding,
       showPrefs: showPrefs,
       showDeck: showDeck,
+      showPick: showPick,
       showSurprise: showSurprise,
       syncHeaderChrome: syncHeaderChrome,
       startSearch: startSearch,
@@ -2944,7 +2955,31 @@
     /* Friends-tab CTA needs read access to the shortlist + the share flow. */
     function shortlistCount() { return shortlist.length; }
 
-    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown, surprise: surprise, shortlistCount: shortlistCount, shareShortlist: shareShortlist };
+    /* ---- a pick chosen OUTSIDE the deck (a Popular row) -----------------
+       Same screen, same actions, same announcements as a swipe-right: this
+       only seeds the queue first so "Keep looking" walks the rest of the
+       section the row came from instead of dead-ending. The shortlist is
+       deliberately left alone — an outing's saves survive the detour. */
+    function pickFrom(r, rest) {
+      if (!r) return;
+      clearRoulette();
+      var seen = {};
+      seen[r.id] = true;
+      queue = [r];
+      (rest || []).forEach(function (x) {
+        if (!x || seen[x.id]) return;
+        seen[x.id] = true;
+        queue.push(x);
+      });
+      idx = 0;
+      history = [];
+      updateUndo();
+      renderStack(false);      // the deck waiting behind the decision screen
+      setControlsEnabled(true);
+      onLike(r);
+    }
+
+    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown, surprise: surprise, shortlistCount: shortlistCount, shareShortlist: shareShortlist, pickFrom: pickFrom };
   })();
 
   /* paint a wc-range fill % (shared) */
@@ -4440,11 +4475,28 @@
       }
     }
 
-    return { init: init, render: render };
+    /* The taste-match model is shared, not copied: Popular's "loved by people
+       with your taste" section ranks friends with the same tasteMatch() the
+       Friends tab prints on every entry. */
+    return { init: init, render: render, tasteMatch: tasteMatch, matchByFriend: matchByFriend };
   })();
 
   /* ================================================================== *
-   * POPULAR — trending leaderboard (consumes social.getPopular)
+   * POPULAR — three answers to "where is everyone eating?"
+   *
+   *   1. Trending now            the mock leaderboard (social.getPopular),
+   *                              ordered by the one popularity signal the
+   *                              feed actually carries: `reviews` — how many
+   *                              people reviewed the place in the range.
+   *   2. Near you right now      places OPEN this minute (or closing soon)
+   *                              within a five-minute walk, closest first.
+   *                              Hours come from the shared openState().
+   *   3. Loved by your taste     places your best taste-matched friends
+   *                              rated highly and you have NOT logged.
+   *
+   * Nothing here invents data: every row is a join between an existing feed
+   * entry and the sample place record of the same name, and every section
+   * that has nothing honest to say renders nothing at all.
    * ================================================================== */
   var popular = (function () {
     var listEl = $('popular-list');
@@ -4452,58 +4504,176 @@
     var btns = toggle ? Array.prototype.slice.call(toggle.querySelectorAll('.range-btn')) : [];
     var state3 = { range: 'today', token: 0 };
 
+    /* "I want to leave in five minutes": a ~12 minute walk, no farther. */
+    var NEAR_MAX_MI = 0.6;
+    var NEAR_MAX_ROWS = 5;
+    /* A friend "loved" a place at 80+ overall — the same bar the Friends tab
+       uses for its "You both loved" strip. */
+    var LOVED_MIN = 80;
+    var LOVED_MAX_ROWS = 4;
+    var ROW_REASON_MAX = 2;   // rows are dense already; two chips, one line
+
+    /* Movement, straight from the feed's own `trend` field — never inferred
+       from the synthesized sparkline (that line is drawn FROM this). Rows
+       whose feed entry carries no trend simply show no indicator. */
     var TREND = {
-      up: { glyph: '▲', cls: 'up', label: 'trending up' },
-      down: { glyph: '▼', cls: 'down', label: 'trending down' },
-      flat: { glyph: '—', cls: 'flat', label: 'holding steady' }
+      up: { glyph: '▲', cls: 'up', text: 'Rising', label: 'trending up' },
+      down: { glyph: '▼', cls: 'down', text: 'Cooling', label: 'trending down' },
+      flat: { glyph: '—', cls: 'flat', text: 'Holding steady', label: 'holding steady' }
     };
 
-    function buildRow(item) {
-      var li = el('li', 'pop-card pop-rank-' + item.rank);
-      if (item.rank <= 3) li.classList.add('pop-top', 'pop-top-' + item.rank);
-
-      var rank = el('div', 'pop-rank', String(item.rank));
-      rank.setAttribute('aria-hidden', 'true');
-      li.appendChild(rank);
-
-      var body = el('div', 'pop-body');
-      body.appendChild(el('h3', 'pop-name', item.place));
-      var meta = el('p', 'pop-meta');
-      if (item.cuisine) meta.appendChild(el('span', 'pop-cuisine', item.cuisine));
-      if (item.loc) {
-        meta.appendChild(el('span', 'dotsep', '·'));
-        meta.appendChild(el('span', 'pop-loc', item.loc));
+    /* ---------------- the place pool behind every section --------------
+       A real search wins (those places are genuinely near you); with no
+       search yet we use the same sample set the rest of demo mode runs on.
+       Rebuilt per render so open/closed is derived at the current clock. */
+    function localPlaces() {
+      return (state.results && state.results.length) ? state.results : demoResults();
+    }
+    function placeByName(pool, name) {
+      var n = String(name || '').toLowerCase();
+      for (var i = 0; i < pool.length; i++) {
+        if (String(pool[i].name || '').toLowerCase() === n) return pool[i];
       }
-      body.appendChild(meta);
-      body.appendChild(el('span', 'v-demo-tag', 'Sample'));
+      return null;
+    }
+
+    /* ---------------- sections 2 + 3 live in JS-built containers -------- */
+    var secs = {};
+    function ensureSection(key, title, sub) {
+      if (secs[key]) return secs[key];
+      var panel = $('panel-popular');
+      if (!panel || !listEl) return null;
+      var wrap = el('section', 'pop-sec');
+      wrap.hidden = true;
+      var head = el('div', 'pop-sec-head');
+      var titleRow = el('div', 'pop-sec-titlerow');
+      titleRow.appendChild(el('h3', 'pop-sec-title', title));
+      // sample data says so once per section (the trending list sits under
+      // the panel's own demo banner already)
+      var tag = el('span', 'v-demo-tag', 'Sample');
+      tag.hidden = true;
+      titleRow.appendChild(tag);
+      head.appendChild(titleRow);
+      head.appendChild(el('p', 'pop-sec-sub', sub));
+      wrap.appendChild(head);
+      var list = el('ol', 'popular-list');
+      wrap.appendChild(list);
+      panel.appendChild(wrap);
+      secs[key] = { wrap: wrap, list: list, tag: tag };
+      return secs[key];
+    }
+    function hideSection(key) {
+      if (secs[key]) { secs[key].wrap.hidden = true; clear(secs[key].list); }
+    }
+
+    /* One non-breaking meta group: "0.1 mi · 3 min walk". */
+    function metaGroup(parts) {
+      if (parts == null) return null;
+      if (!(parts instanceof Array)) parts = [parts];
+      var g = el('span', 'pop-mgroup');
+      parts.forEach(function (part) {
+        if (part == null || part === '') return;
+        if (g.childNodes.length) g.appendChild(el('span', 'dotsep', '·'));
+        g.appendChild(typeof part === 'string' ? document.createTextNode(part) : part);
+      });
+      return g.childNodes.length ? g : null;
+    }
+
+    /* ---------------- the shared row -----------------------------------
+       Every section renders the same anatomy — watercolor thumb, name, one
+       meta line, status chips, up to two match-reason chips, and a small
+       right-hand stat — so the tab reads as one thing. The whole card is a
+       single tap target: a transparent button stretched over it opens the
+       SAME decision screen a swipe-right opens (deck.pickFrom via
+       find.showPick). Rows with no place record behind them are not
+       tappable rather than opening a screen with nothing in it.
+
+       cfg: { place, name, mod, rank, source, meta:[groups], chips:[nodes],
+              aside, shown, skip, siblings } */
+    function buildRow(cfg) {
+      var r = cfg.place;
+      var li = el('li', 'pop-card pop-row' + (cfg.mod ? ' ' + cfg.mod : ''));
+      li.setAttribute('data-name', cfg.name);
+      if (r && r.distance != null) li.setAttribute('data-mi', r.distance.toFixed(3));
+
+      // --- thumb: the place's own watercolor art (or its photo, live mode)
+      var thumb = el('span', 'pop-thumb');
+      thumb.setAttribute('aria-hidden', 'true');
+      var photo = r && (((r.segments && r.segments.vibe) || {}).photoUrl || r.photoUrl);
+      if (photo) thumb.style.background = 'url("' + String(photo).replace(/"/g, '') + '") center / cover';
+      else thumb.style.background = panelArt(r || { name: cfg.name, cuisines: [] }, 'vibe', 0);
+      if (cfg.rank) {
+        var rk = el('span', 'pop-thumb-rank', String(cfg.rank));
+        rk.setAttribute('aria-hidden', 'true');
+        thumb.appendChild(rk);
+      }
+      li.appendChild(thumb);
+
+      // --- body
+      var body = el('span', 'pop-row-body');
+      body.appendChild(el('span', 'pop-name', cfg.name));
+      if (cfg.source) body.appendChild(cfg.source);
+      // The meta line is a set of NON-BREAKING groups (score+reviews,
+      // price+cuisine, distance+walk) laid out with a wide gap. Dots live
+      // only inside a group, so a wrap can never strand or lead with one.
+      var meta = el('span', 'pop-meta');
+      (cfg.meta || []).forEach(function (group) {
+        var g = metaGroup(group);
+        if (g) meta.appendChild(g);
+      });
+      if (meta.childNodes.length) body.appendChild(meta);
+
+      var chipRow = el('span', 'pop-chips');
+      (cfg.chips || []).forEach(function (c) { if (c) chipRow.appendChild(c); });
+      if (chipRow.childNodes.length) body.appendChild(chipRow);
+
+      // --- why this one: the shared reason engine, deduped against what
+      // this very row already prints (`shown`) and told which groups the
+      // row states louder than a chip could (`skip`), exactly as the deck
+      // card does it.
+      var reasons = [];
+      if (r) {
+        reasons = matchReasons(r, { max: ROW_REASON_MAX, shown: cfg.shown || '', skip: cfg.skip || null });
+        var rr = reasonsRowEl(reasons, 'ov-reason');
+        if (rr) body.appendChild(rr);
+      }
       li.appendChild(body);
 
-      var stat = el('div', 'pop-stat');
-      var score = el('div', 'pop-score');
-      score.appendChild(el('span', 'big', fmtScore(item.score)));
-      score.appendChild(el('span', 'lbl', 'avg overall'));
-      stat.appendChild(score);
+      if (cfg.aside) li.appendChild(cfg.aside);
 
-      var t = TREND[item.trend] || TREND.flat;
-      var line = el('div', 'pop-reviews');
-      var tr = el('span', 'pop-trend pop-trend--' + t.cls, t.glyph);
-      tr.setAttribute('aria-label', t.label);
-      tr.setAttribute('role', 'img');
-      line.appendChild(tr);
-      line.appendChild(document.createTextNode(item.reviews.toLocaleString() + ' reviews'));
-      stat.appendChild(line);
-
-      // 7-point trend sparkline, synthesized deterministically from the
-      // row itself (name-seeded wobble shaped by the trend direction)
-      var sparkColor = item.rank === 1 ? 'var(--gold)'
-        : item.rank === 2 ? 'var(--wisteria)'
-        : item.rank === 3 ? 'var(--pond-deep)'
-        : 'var(--ink-soft)';
-      stat.appendChild(svgSparkline(trendSeries(item), sparkColor));
-
-      li.appendChild(stat);
+      if (r) {
+        var hit = el('button', 'pop-row-hit');
+        hit.type = 'button';
+        var why = reasons.map(function (x) { return x.text; }).join(', ');
+        hit.setAttribute('aria-label', 'Pick ' + cfg.name + ' — ' +
+          String(cfg.shown || '').replace(/\s+/g, ' ') + (why ? '. Why: ' + why : ''));
+        hit.addEventListener('click', function () { openPick(r, cfg.siblings); });
+        li.appendChild(hit);
+      } else {
+        li.classList.add('pop-row--flat');
+      }
       return li;
     }
+
+    /* The deck's decision screen, opened from here. One flow, one screen. */
+    function openPick(r, siblings) {
+      if (!r) return;
+      haptic(12);
+      tabs.activate('find');
+      find.showPick(r, siblings || []);
+    }
+
+    /* Small right-hand stat block (reuses the leaderboard's numeral style). */
+    function statEl(big, lbl) {
+      var s = el('span', 'pop-stat');
+      var sc = el('span', 'pop-score');
+      sc.appendChild(el('span', 'big', big));
+      sc.appendChild(el('span', 'lbl', lbl));
+      s.appendChild(sc);
+      return s;
+    }
+
+    /* ================= 1. TRENDING NOW ================================ */
 
     /* Synthesize a plausible 7-point series ending at the row's score:
        up-trends climb ~6 points, down-trends fall, flat wobbles. Seeded
@@ -4522,6 +4692,240 @@
       return pts;
     }
 
+    function movementChip(item) {
+      var t = TREND[item.trend];
+      if (!t) return null;                 // no trend data — say nothing
+      var chip = el('span', 'pop-move pop-move--' + t.cls);
+      var g = el('span', 'pop-trend pop-trend--' + t.cls, t.glyph);
+      g.setAttribute('aria-hidden', 'true');
+      chip.appendChild(g);
+      chip.appendChild(el('span', 'pop-move-text', t.text));
+      chip.setAttribute('aria-label', t.label);
+      return chip;
+    }
+
+    function renderTrending(list, pool) {
+      clear(listEl);
+      // Order by review volume — the feed's only genuine popularity signal
+      // ("what people are reviewing most right now"). The mock's own `rank`
+      // already agrees; recomputing keeps the row honest for a real backend.
+      list = list.slice().sort(function (a, b) { return (b.reviews || 0) - (a.reviews || 0); });
+      if (!list.length) { showTrendingEmpty(); return 0; }
+      var places = list.map(function (it) { return placeByName(pool, it.place); });
+      list.forEach(function (item, i) {
+        item.rank = i + 1;
+        var r = places[i];
+        var rating = el('span', 'pop-rating');
+        rating.appendChild(el('span', 'pop-star', '★ '));
+        rating.appendChild(document.createTextNode(fmtScore(item.score)));
+        var meta = [
+          [rating, item.reviews.toLocaleString() + ' review' + (item.reviews === 1 ? '' : 's')],
+          [(r && r.price) ? priceStr(r.price) : '', item.cuisine || (r && r.type) || '']
+        ];
+        if (r && r.distance != null) meta.push([fmtDist(r.distance), fmtTravel(r.distance)]);
+        else if (item.loc) meta.push([item.loc]);
+
+        var chips = [];
+        var oChip = r ? openChipEl(r, 'ov-badge') : null;
+        if (oChip) chips.push(oChip);
+        var mv = movementChip(item);
+        if (mv) chips.push(mv);
+
+        var aside = el('span', 'pop-stat');
+        var sparkColor = item.rank === 1 ? 'var(--gold)'
+          : item.rank === 2 ? 'var(--wisteria)'
+          : item.rank === 3 ? 'var(--pond-deep)'
+          : 'var(--ink-soft)';
+        aside.appendChild(svgSparkline(trendSeries(item), sparkColor));
+        aside.appendChild(el('span', 'pop-stat-lbl', state3.range === 'today' ? 'today'
+          : (state3.range === 'month' ? 'this month' : 'this year')));
+
+        var shown = [item.place, fmtScore(item.score), item.reviews.toLocaleString() + ' reviews',
+          (r && r.price ? priceStr(r.price) : ''), item.cuisine || '',
+          (r && r.distance != null ? fmtDist(r.distance) + ' ' + fmtTravel(r.distance) : ''),
+          (oChip ? oChip.textContent : ''), (mv ? TREND[item.trend].text : '')].join(' · ');
+
+        var row = buildRow({
+          place: r,
+          name: item.place,
+          mod: 'pop-row--trend' + (item.rank <= 3 ? ' pop-top pop-top-' + item.rank : ''),
+          rank: item.rank,
+          meta: meta,
+          chips: chips,
+          aside: aside,
+          shown: shown,
+          // the row already prints the review count and the walk, loudly
+          skip: { reviews: true, near: true },
+          siblings: places.filter(function (p, j) { return p && j !== i; })
+        });
+        enterStagger(row, i);
+        listEl.appendChild(row);
+      });
+      return list.length;
+    }
+    /* The leaderboard's own quiet empty state (a backend could return none). */
+    function showTrendingEmpty() {
+      clear(listEl);
+      var empty = el('li', 'empty');
+      empty.appendChild(el('div', 'empty-glyph', '✧'));
+      empty.appendChild(el('p', 'empty-title', 'Nothing trending yet'));
+      empty.appendChild(el('p', 'empty-sub', 'Try another time range.'));
+      listEl.appendChild(empty);
+    }
+
+    /* ================= 2. NEAR YOU RIGHT NOW ========================== */
+
+    function nearbyRows(pool) {
+      var rows = [];
+      for (var i = 0; i < pool.length; i++) {
+        var r = pool[i];
+        if (r.distance == null || r.distance > NEAR_MAX_MI) continue;
+        var st = openState(r);                       // shared clock logic
+        if (!st || (st.key !== 'open' && st.key !== 'soon')) continue;
+        rows.push({ r: r, st: st });
+      }
+      rows.sort(function (a, b) { return a.r.distance - b.r.distance; });
+      return rows.slice(0, NEAR_MAX_ROWS);
+    }
+
+    function renderNearby(pool) {
+      var sec = ensureSection('near', 'Near you right now',
+        'Open this minute, close enough to leave in five.');
+      if (!sec) return 0;
+      var rows = nearbyRows(pool);
+      if (!rows.length) { hideSection('near'); return 0; }
+      sec.wrap.hidden = false;
+      clear(sec.list);
+      var all = rows.map(function (x) { return x.r; });
+      rows.forEach(function (x, i) {
+        var r = x.r;
+        var meta = [];
+        if (r.rating) {
+          var rating = el('span', 'pop-rating');
+          rating.appendChild(el('span', 'pop-star', '★ '));
+          rating.appendChild(document.createTextNode(fmtScore(r.rating * 20)));
+          meta.push([rating]);
+        }
+        meta.push([r.price ? priceStr(r.price) : '', r.type || '']);
+
+        var chips = [];
+        var oChip = openChipEl(r, 'ov-badge');
+        if (oChip) chips.push(oChip);
+
+        var aside = statEl(fmtDist(r.distance), fmtTravel(r.distance));
+        var shown = [r.name, (r.rating ? fmtScore(r.rating * 20) : ''), priceStr(r.price), r.type || '',
+          fmtDist(r.distance), fmtTravel(r.distance), x.st.label].join(' · ');
+
+        var row = buildRow({
+          place: r,
+          name: r.name,
+          // closing soon is the urgent case — warm border, same words
+          mod: 'pop-row--near' + (x.st.key === 'soon' ? ' pop-row--urgent' : ''),
+          meta: meta,
+          chips: chips,
+          aside: aside,
+          shown: shown,
+          // this section IS "how close" and "how long it's open"
+          skip: { near: true, time: true },
+          siblings: all.filter(function (p) { return p !== r; })
+        });
+        enterStagger(row, i);
+        sec.list.appendChild(row);
+      });
+      if (sec.tag) sec.tag.hidden = !rows.every(function (x) { return String(x.r.id || '').indexOf('demo-') === 0; });
+      return rows.length;
+    }
+
+    /* ================= 3. LOVED BY PEOPLE WITH YOUR TASTE ============== */
+
+    /* Friends ranked by the SHARED taste-match model (friends.matchByFriend),
+       then the places they rated 80+ that your Visited log has never seen.
+       No overlap to measure -> no rows -> the section is not rendered at
+       all (a taste match nobody can compute is not a recommendation). */
+    function tasteRows(feed) {
+      if (!feed || !feed.length) return [];
+      var matches = friends.matchByFriend(feed);
+      var ranked = [];
+      for (var name in matches) {
+        if (matches[name]) ranked.push({ name: name, m: matches[name] });
+      }
+      if (!ranked.length) return [];
+      ranked.sort(function (a, b) { return (b.m.pct - a.m.pct) || a.name.localeCompare(b.name); });
+
+      var seen = {}, out = [];
+      ranked.forEach(function (f) {
+        feed.forEach(function (e) {
+          if (!e.friend || e.friend.name !== f.name) return;
+          if (overallOf(e) < LOVED_MIN) return;          // they didn't love it
+          if (myRatingFor(e.place)) return;              // already in your log
+          var k = String(e.place || '').toLowerCase();
+          if (!k || seen[k]) return;                     // best match names it
+          seen[k] = true;
+          out.push({ entry: e, friend: f });
+        });
+      });
+      return out.slice(0, LOVED_MAX_ROWS);
+    }
+
+    function renderTaste(feed, pool) {
+      var rows = tasteRows(feed);
+      if (!rows.length) { hideSection('taste'); return 0; }
+      var sec = ensureSection('taste', 'Loved by people with your taste',
+        'Rated highly by the friends whose log looks most like yours — and new to you.');
+      if (!sec) return 0;
+      sec.wrap.hidden = false;
+      clear(sec.list);
+      var all = rows.map(function (x) { return placeByName(pool, x.entry.place); });
+      rows.forEach(function (x, i) {
+        var e = x.entry;
+        var r = all[i];
+        var who = firstName(e.friend.name);
+        var theirs = fmtScore(overallOf(e));
+
+        var source = el('span', 'pop-source');
+        source.appendChild(el('strong', 'pop-source-who', who));
+        source.appendChild(document.createTextNode(', ' + x.friend.m.pct + '% taste match'));
+
+        var meta = [[(r && r.price) ? priceStr(r.price) : '', (r && r.type) || e.loc || '']];
+        if (r && r.distance != null) meta.push([fmtDist(r.distance), fmtTravel(r.distance)]);
+
+        var chips = [];
+        var oChip = r ? openChipEl(r, 'ov-badge') : null;
+        if (oChip) chips.push(oChip);
+        if (e.note) {
+          var q = el('span', 'pop-quote', '“' + e.note + '”');
+          chips.push(q);
+        }
+
+        var aside = statEl(theirs, who + '’s score');
+        var shown = [e.place, who, x.friend.m.pct + '% taste match', theirs,
+          (r && r.price ? priceStr(r.price) : ''), (r && r.type) || '',
+          (r && r.distance != null ? fmtDist(r.distance) + ' ' + fmtTravel(r.distance) : ''),
+          (oChip ? oChip.textContent : ''), e.note || ''].join(' · ');
+
+        var row = buildRow({
+          place: r,
+          name: e.place,
+          mod: 'pop-row--taste',
+          source: source,
+          meta: meta,
+          chips: chips,
+          aside: aside,
+          shown: shown,
+          // the row names the friend AND prints the walk — a chip repeating
+          // either in other words would waste one of only two slots
+          skip: { friend: true, near: true },
+          siblings: all.filter(function (p, j) { return p && j !== i; })
+        });
+        enterStagger(row, i);
+        sec.list.appendChild(row);
+      });
+      if (sec.tag) sec.tag.hidden = !rows.every(function (x) { return x.entry.demo !== false; });
+      return rows.length;
+    }
+
+    /* ================= render orchestration ============================ */
+
     function showLoading() {
       clear(listEl);
       var sk = el('li', 'social-loading');
@@ -4537,6 +4941,7 @@
       empty.appendChild(el('p', 'empty-title', 'Couldn’t load trends'));
       empty.appendChild(el('p', 'empty-sub', 'Try another time range.'));
       listEl.appendChild(empty);
+      hideSection('taste');
     }
 
     function setRange(range) {
@@ -4552,31 +4957,22 @@
     function render() {
       if (!listEl) return;
       var token = ++state3.token;
+      var pool = localPlaces();
       showLoading();
-      social.getPopular({ range: state3.range }).then(function (list) {
-        if (token !== state3.token) return; // stale response
-        clear(listEl);
-        list.forEach(function (item, i) {
-          var row = buildRow(item);
-          enterStagger(row, i);
-          // top-3 rank badges bloom softly just after their row lands
-          if (!prefersReducedMotion && item.rank <= 3) {
-            var badge = row.querySelector('.pop-rank');
-            if (badge) {
-              badge.classList.add('is-blooming');
-              badge.style.animationDelay = (i * 40 + 380) + 'ms';
-              badge.addEventListener('animationend', function onBloom(e2) {
-                if (e2.animationName !== 'rank-bloom') return;
-                badge.classList.remove('is-blooming');
-                badge.style.animationDelay = '';
-                badge.removeEventListener('animationend', onBloom);
-              });
-            }
-          }
-          listEl.appendChild(row);
-        });
+      // local sections need no network — paint them immediately
+      var nNear = renderNearby(pool);
+      Promise.all([
+        social.getPopular({ range: state3.range }),
+        social.getFriendsFeed({ sort: 'recent' })
+      ]).then(function (res) {
+        if (token !== state3.token) return;   // stale response
+        var nTrend = renderTrending(res[0] || [], pool);
+        var nTaste = renderTaste(res[1] || [], pool);
         var label = state3.range === 'today' ? 'today' : (state3.range === 'month' ? 'this month' : 'this year');
-        announce('Top ' + list.length + ' places ' + label);
+        var bits = ['Popular: ' + nTrend + ' trending ' + label];
+        if (nNear) bits.push(nNear + ' open near you right now');
+        if (nTaste) bits.push(nTaste + ' loved by people with your taste');
+        announce(bits.join(', ') + '.');
       }).catch(function () {
         if (token === state3.token) showError();
       });
