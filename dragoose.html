@@ -70,9 +70,14 @@
             <span id="hoard-records" class="hoard-records" hidden></span>
           </div>
 
-          <button id="wardrobe-btn" class="wardrobe-btn" type="button">
-            <span aria-hidden="true">&#129718;</span> Wardrobe
-          </button>
+          <div class="sheet-row">
+            <button id="wardrobe-btn" class="wardrobe-btn" type="button">
+              <span aria-hidden="true">&#129718;</span> Wardrobe
+            </button>
+            <button id="options-btn" class="wardrobe-btn wardrobe-btn--options" type="button">
+              <span aria-hidden="true">&#9881;</span> Options
+            </button>
+          </div>
 
           <ul class="howto" aria-label="How to play">
             <li><span class="howto-key">drag</span> steer</li>
@@ -80,9 +85,7 @@
             <li><span class="howto-key">hold</span> charge fire</li>
           </ul>
 
-          <button id="gentle-btn" class="gentle-btn" type="button" aria-pressed="false">
-            Gentle breeze &mdash; slower dragons, +1 feather
-          </button>
+          <p id="options-summary" class="options-summary"></p>
 
           <a class="back-link" href="lab.html">&larr; Back to the Lab</a>
         </div>
@@ -188,6 +191,81 @@
             <div id="wardrobe-trinkets" class="wardrobe-list"></div>
           </div>
           <button id="btn-wardrobe-close" class="btn" type="button">Close</button>
+        </div>
+      </section>
+
+      <!-- ===================== OPTIONS & ACCESSIBILITY ===================== -->
+      <section id="screen-options" class="screen screen--options" aria-label="Options and accessibility" hidden>
+        <div class="overlay-card options-card">
+          <p class="overlay-kicker">how the sky treats you</p>
+          <h2 class="overlay-title">Options</h2>
+          <div class="options-scroll" id="options-scroll">
+
+            <h3 class="opt-heading">Winds</h3>
+            <p class="opt-note">
+              how hard the dragons press. Chosen here, felt from your next take-off &mdash;
+              a Daily Flight always flies at <em>True flight</em>, so every sky is the same sky.
+            </p>
+            <div id="opt-diff" class="opt-segs opt-segs--stack" role="group" aria-label="Difficulty">
+              <button class="opt-seg" type="button" data-diff="fair" aria-pressed="false">
+                <span class="opt-seg-name">Fair winds</span>
+                <span class="opt-seg-desc">dragons wind up about a quarter slower, and Gary carries one more feather</span>
+              </button>
+              <button class="opt-seg" type="button" data-diff="true" aria-pressed="false">
+                <span class="opt-seg-name">True flight</span>
+                <span class="opt-seg-desc">the sky as it was written</span>
+              </button>
+              <button class="opt-seg" type="button" data-diff="harrowing" aria-pressed="false">
+                <span class="opt-seg-name">Harrowing</span>
+                <span class="opt-seg-desc">dragons cycle their attacks ~18% faster and lose their temper at two thirds' health, not half</span>
+              </button>
+            </div>
+
+            <h3 class="opt-heading">Telegraph marks</h3>
+            <p class="opt-note">
+              every wind-up already glows &mdash; this paints a small ink mark and a matching
+              broken ring on it too, so the tell never rests on colour alone.
+            </p>
+            <button id="opt-cb" class="opt-toggle" type="button" aria-pressed="false">
+              <span class="opt-toggle-name">Shapes on telegraphs</span>
+              <span class="opt-toggle-state" id="opt-cb-state">off</span>
+            </button>
+            <p class="opt-fine">
+              sweep &middot; radial &middot; aimed &middot; gathering &middot; rush &mdash; one mark each, drawn the moment a dragon winds up
+            </p>
+
+            <h3 class="opt-heading">Calm effects</h3>
+            <p class="opt-note">
+              softens the white flashes and the screen's shudder. Banking, parallax, the
+              wind streaks and the camera keep every bit of their sway.
+            </p>
+            <button id="opt-calm" class="opt-toggle" type="button" aria-pressed="false">
+              <span class="opt-toggle-name">Reduced flash &amp; shake</span>
+              <span class="opt-toggle-state" id="opt-calm-state">off</span>
+            </button>
+
+            <h3 class="opt-heading">Sound</h3>
+            <p class="opt-note">the beds settle to their new level within a breath.</p>
+            <p class="opt-level-label" id="opt-music-label">Music &amp; ambience</p>
+            <div id="opt-music" class="opt-segs" role="group" aria-labelledby="opt-music-label">
+              <button class="opt-seg opt-seg--level" type="button" data-vol="0" aria-pressed="false">hush</button>
+              <button class="opt-seg opt-seg--level" type="button" data-vol="0.5" aria-pressed="false">soft</button>
+              <button class="opt-seg opt-seg--level" type="button" data-vol="1" aria-pressed="false">full</button>
+            </div>
+            <p class="opt-level-label" id="opt-wind-label">Wind</p>
+            <div id="opt-wind" class="opt-segs" role="group" aria-labelledby="opt-wind-label">
+              <button class="opt-seg opt-seg--level" type="button" data-vol="0" aria-pressed="false">hush</button>
+              <button class="opt-seg opt-seg--level" type="button" data-vol="0.5" aria-pressed="false">soft</button>
+              <button class="opt-seg opt-seg--level" type="button" data-vol="1" aria-pressed="false">full</button>
+            </div>
+            <button id="opt-mute" class="opt-toggle" type="button" aria-pressed="false">
+              <span class="opt-toggle-name">Mute everything</span>
+              <span class="opt-toggle-state" id="opt-mute-state">off</span>
+            </button>
+            <p class="opt-fine">mute always wins, whatever the levels say</p>
+
+          </div>
+          <button id="btn-options-close" class="btn" type="button">Close</button>
         </div>
       </section>
 

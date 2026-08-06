@@ -131,6 +131,12 @@
   // ---------------------------------------------------------
   var Save = {
     data: { scales: 0, relics: [], wins: 0, duels: {}, plumes: [], plume: "", regalia: [], trinkets: [], crowned: false, seenHints: {}, gentle: false, fledged: false,
+      // OPTIONS (all graceful on old saves — see load())
+      difficulty: "true",   // 'fair' | 'true' | 'harrowing'
+      cbTelegraph: false,   // shape/pattern cue on every wind-up
+      calmFx: false,        // damped screen flashes + shake
+      volMusic: 1,          // music & realm ambience, 0..1
+      volWind: 1,           // the flight wind bed, 0..1
       records: { fastestCrown: null, mostScalesRun: 0, totalDuelsWon: 0 },
       daily: null },
     load: function () {
@@ -149,8 +155,21 @@
             this.data.trinkets = Array.isArray(p.trinkets) ? p.trinkets : [];
             this.data.crowned = !!p.crowned;
             this.data.seenHints = (p.seenHints && typeof p.seenHints === "object") ? p.seenHints : {};
-            this.data.gentle = !!p.gentle;
             this.data.fledged = !!p.fledged; // older saves lack it -> false
+            // DIFFICULTY: the old binary 'gentle' flag grew into three named
+            // tiers. A save written before the tiers existed has no
+            // 'difficulty' key at all, so it is read off 'gentle':
+            //   gentle:true -> 'fair'   ·   gentle:false/absent -> 'true'
+            // 'gentle' is still written on every save (see sync below) so any
+            // older reader of the hoard keeps working unchanged.
+            var dif = (typeof p.difficulty === "string") ? p.difficulty : "";
+            if (dif !== "fair" && dif !== "true" && dif !== "harrowing") dif = p.gentle ? "fair" : "true";
+            this.data.difficulty = dif;
+            this.data.gentle = (dif === "fair");
+            this.data.cbTelegraph = !!p.cbTelegraph;
+            this.data.calmFx = !!p.calmFx;
+            this.data.volMusic = this.lvl(p.volMusic);
+            this.data.volWind = this.lvl(p.volWind);
             var rec = (p.records && typeof p.records === "object") ? p.records : {};
             this.data.records = {
               fastestCrown: (typeof rec.fastestCrown === "number") ? rec.fastestCrown : null,
@@ -171,7 +190,14 @@
         }
       } catch (e) {}
     },
+    // a 0..1 level, defaulting to full when a save predates the sliders
+    lvl: function (v) {
+      if (typeof v !== "number" || !isFinite(v)) return 1;
+      return v < 0 ? 0 : (v > 1 ? 1 : v);
+    },
     save: function () {
+      // keep the legacy flag in step with the tier before every write
+      this.data.gentle = (this.data.difficulty === "fair");
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(this.data)); } catch (e) {}
     },
     addScales: function (n) { this.data.scales += n; this.save(); },
@@ -290,7 +316,10 @@
   // AUDIO MODULE (Web Audio, synthesized)
   // ---------------------------------------------------------
   var Audio2 = {
-    ctx: null, master: null, duelBus: null, muted: false, ready: false, chargeOsc: null, chargeGain: null,
+    ctx: null, master: null, duelBus: null, musicBus: null, muted: false, ready: false, chargeOsc: null, chargeGain: null,
+    // player-set bed levels (0..1). Mute still wins over both — it pulls the
+    // master to zero and zeroes the sustained beds outright.
+    musicVol: 1, windVol: 1,
     init: function () {
       if (this.ready) return;
       try {
@@ -305,11 +334,26 @@
         // so it honors the mute toggle for free)
         this.duelBus = this.ctx.createGain();
         this.duelBus.gain.value = 0;
-        this.duelBus.connect(this.master);
+        // music bus: the drifting chord pads + the duel intensity layer, so
+        // one option trims all of the *scored* music without touching SFX
+        this.musicBus = this.ctx.createGain();
+        this.musicBus.gain.value = this.musicVol;
+        this.musicBus.connect(this.master);
+        this.duelBus.connect(this.musicBus);
         this.ready = true;
       } catch (e) {}
     },
     resume: function () { if (this.ctx && this.ctx.state === "suspended") this.ctx.resume(); },
+    // OPTIONS: music/ambience and wind levels, applied immediately. The music
+    // bus glides; the two sustained beds simply ease toward their new ceiling
+    // on the next frames (no automation spam, no clicks).
+    setLevels: function (music, wind) {
+      this.musicVol = (typeof music === "number") ? music : this.musicVol;
+      this.windVol = (typeof wind === "number") ? wind : this.windVol;
+      if (this.musicBus && this.ctx) {
+        try { this.musicBus.gain.setTargetAtTime(this.musicVol, this.ctx.currentTime, 0.08); } catch (e) {}
+      }
+    },
     setMuted: function (m) {
       this.muted = m;
       if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.5, this.ctx.currentTime, 0.02);
@@ -385,7 +429,7 @@
           g.gain.setValueAtTime(0.0001, t);
           g.gain.linearRampToValueAtTime(0.028 - i * 0.004, t + CHORD_LEN * 0.4);
           g.gain.linearRampToValueAtTime(0.0001, t + CHORD_LEN * 1.05);
-          o.connect(g); g.connect(self.master);
+          o.connect(g); g.connect(self.musicBus || self.master);
           o.start(t); o.stop(t + CHORD_LEN * 1.1);
         }
         // ---- duel intensity layer (fed into the duel bus) ----
@@ -605,7 +649,8 @@
       // duels duck the bed hard — it must never mask a telegraph or a hit
       if (playing && Game.mode === "duel") wt *= 0.45;
       if (playing && Game.bowing) wt *= 0.25;
-      if (this.muted) wt = 0;
+      wt *= this.windVol;            // OPTIONS: wind level
+      if (this.muted) wt = 0;        // ...but mute always wins
       this.windLevel += (wt - this.windLevel) * (1 - Math.exp(-3.5 * dt));
       if (this.windLevel < 0.00005) this.windLevel = 0;
       this.windCut = 240 + s01 * 1500;
@@ -634,7 +679,8 @@
       var spec = DRAGON_AUDIO[this.ambType];
       var at = 0;
       if (spec && this.ambWant === this.ambType) at = AMB_MAX * spec.gain * this.ambWantLvl;
-      if (this.muted) at = 0;
+      at *= this.musicVol;           // OPTIONS: ambience rides with the music
+      if (this.muted) at = 0;        // ...but mute always wins
       this.ambLevel += (at - this.ambLevel) * (1 - Math.exp(-2.2 * dt));
       if (this.ambLevel < 0.00004) this.ambLevel = 0;
       // swap colour only once the old one has faded out
@@ -811,6 +857,7 @@
         return;
       }
       if (k === "escape" && down) {
+        if (Game.optionsOpen) { Game.closeOptions(); return; }
         if (Game.wardrobeOpen) { Game.closeWardrobe(); return; }
         Game.togglePause(); return;
       }
@@ -2114,6 +2161,45 @@
   var BOW_DUR = 2.2;       // seconds of flourish, measured in real time
 
   // ---------------------------------------------------------
+  // DIFFICULTY — three named tiers, the grown-up form of the old
+  // binary 'gentle breeze' assist. Deliberately only two knobs each,
+  // both already existing numbers; no new attacks, no kit changes.
+  //   cycle   : multiplier on how fast attackCd drains while roaming
+  //             (1 = today's default; 0.78 = the old gentle assist)
+  //   feather : extra starting feathers
+  //   enrage  : health fraction at which a dragon turns to Phase II
+  //             (ceremonial dragons keep their existing +0.1 head start)
+  // ---------------------------------------------------------
+  var DIFFICULTY = {
+    fair:      { id: "fair",      name: "Fair winds",  cycle: 0.78, feather: 1, enrage: 0.5,  blurb: "slower wind-ups, one more feather" },
+    "true":    { id: "true",      name: "True flight", cycle: 1,    feather: 0, enrage: 0.5,  blurb: "the sky as it was written" },
+    harrowing: { id: "harrowing", name: "Harrowing",   cycle: 1.18, feather: 0, enrage: 0.65, blurb: "faster wind-ups, earlier fury" }
+  };
+  var DIFF_ORDER = ["fair", "true", "harrowing"];
+
+  // COLOURBLIND-SAFE TELEGRAPHS — every wind-up belongs to one of five
+  // families, and (with the option on) each family carries a shape as well
+  // as a colour: a dash rhythm on the warning ring plus a small ink mark
+  // above the dragon. Resolved once when the attack is chosen, never per
+  // frame; the dash arrays are module constants so setLineDash allocates
+  // nothing in the render loop.
+  var TELE_FAMILY = {
+    breath: "sweep",
+    nova: "radial", spiral: "radial", tides: "radial",
+    veil: "pull", phases: "pull",
+    dash: "rush"
+    // everything else (aimed, volley, lance, fan, ray, seeds, coins,
+    // lures, echoes, crescent, moonbeam) is an aimed shot -> "aimed"
+  };
+  var CB_DASH = {
+    sweep:  [26, 12],
+    radial: [3, 10],
+    aimed:  [46, 16],
+    pull:   [10, 8, 3, 8],
+    rush:   [16, 7, 3, 7]
+  };
+
+  // ---------------------------------------------------------
   // GAME OBJECT
   // ---------------------------------------------------------
   var Game = {
@@ -2159,6 +2245,12 @@
     daily: null,              // Daily Flight state {date, route, idx, mod} or null
     weather: null,            // sky weather mood state (initWeather) or null
     tk: null,                 // cached owned-trinket flags (refreshTrinkets)
+    // cached OPTION state for the hot loops (refreshOptions) — never read
+    // Save.data from a per-frame path
+    diff: DIFFICULTY["true"], // the tier in force for this run
+    diffCycle: 1,             // diff.cycle, lifted out for the roam loop
+    cbFx: false,              // shape cue on telegraphs
+    calmFx: false,            // damped flashes + shake
     scaleProgress: 0,         // scales collected this run
     nextPowerAt: 3,           // scales needed for next power
     powers: {},               // active power flags
@@ -2173,6 +2265,7 @@
       root.appendChild(this.floatLayer);
 
       Save.load();
+      this.refreshOptions(false);  // cache the option flags before anything reads them
       Fx.init();
       Particles.init();
       Input.init();
@@ -2283,7 +2376,27 @@
       $("screen-wardrobe").addEventListener("click", function (e) {
         if (e.target === e.currentTarget) Game.closeWardrobe();
       });
-      $("gentle-btn").addEventListener("click", function () { Game.toggleGentle(); });
+      // ----- OPTIONS & ACCESSIBILITY (a sibling of the wardrobe sheet) -----
+      $("options-btn").addEventListener("click", function () { Game.openOptions(); });
+      $("btn-options-close").addEventListener("click", function () { Game.closeOptions(); });
+      $("screen-options").addEventListener("click", function (e) {
+        if (e.target === e.currentTarget) Game.closeOptions();
+      });
+      $("opt-diff").addEventListener("click", function (e) {
+        var v = Game.segValue(e, this, "data-diff");
+        if (v !== null) Game.setDifficulty(v);
+      });
+      $("opt-music").addEventListener("click", function (e) {
+        var v = Game.segValue(e, this, "data-vol");
+        if (v !== null) Game.setVolume("music", parseFloat(v));
+      });
+      $("opt-wind").addEventListener("click", function (e) {
+        var v = Game.segValue(e, this, "data-vol");
+        if (v !== null) Game.setVolume("wind", parseFloat(v));
+      });
+      $("opt-cb").addEventListener("click", function () { Game.toggleOption("cbTelegraph"); });
+      $("opt-calm").addEventListener("click", function () { Game.toggleOption("calmFx"); });
+      $("opt-mute").addEventListener("click", function () { Game.toggleMute(); });
       $("btn-mute").addEventListener("click", function () { Game.toggleMute(); });
     },
 
@@ -2293,6 +2406,9 @@
       var btn = $("btn-mute");
       btn.setAttribute("aria-pressed", this.muted ? "true" : "false");
       $("mute-glyph").innerHTML = this.muted ? "&#128263;" : "&#9834;";
+      // the options sheet carries the same switch — keep the two in step
+      if (this.optionsOpen) this.renderOptions();
+      else this.renderOptionsSummary();
     },
 
     // ----- RESIZE / LETTERBOX -----
@@ -2328,7 +2444,7 @@
         : "A watercolor flying roguelike";
       this.renderHoard();
       this.renderTitleGoose();
-      this.renderGentle();
+      this.renderOptionsSummary();
       this.renderDailyButton();
     },
 
@@ -2349,18 +2465,132 @@
         (doneToday ? " Already flown today — a rerun won't overwrite a better result." : "");
     },
 
-    // 'Gentle breeze' assist: slower dragon attack cycling + 1 extra feather
-    renderGentle: function () {
-      var b = $("gentle-btn");
-      if (b) b.setAttribute("aria-pressed", Save.data.gentle ? "true" : "false");
+    /* ===================================================================
+       OPTIONS & ACCESSIBILITY SHEET
+       A title-screen overlay built exactly like the Wardrobe: close button,
+       tap the dim sky outside, Escape, focus lands on Close and returns to
+       the Options button. It owns no state of its own — every control is
+       painted from Save.data and writes straight back to it, then asks
+       refreshOptions() to re-cache the flags the hot loops read.
+       The old 'Gentle breeze' title toggle lives on here as the FIRST
+       DIFFICULTY TIER (Fair winds); Save keeps the legacy `gentle` flag in
+       sync on every write, so nothing that read it has broken.
+       =================================================================== */
+    optionsOpen: false,
+
+    openOptions: function () {
+      this.renderOptions();
+      $("screen-options").hidden = false;
+      $("options-scroll").scrollTop = 0;
+      // (same phantom-scroll guard as the wardrobe — see openWardrobe)
+      root.scrollTop = 0; root.scrollLeft = 0;
+      this.optionsOpen = true;
+      var cb = $("btn-options-close");
+      if (cb) { try { cb.focus({ preventScroll: true }); } catch (e) { cb.focus(); } }
+      Audio2.init(); Audio2.resume();
+      Audio2.tone(500, 0.1, "sine", 0.06, 640);
     },
 
-    toggleGentle: function () {
-      Save.data.gentle = !Save.data.gentle;
-      Save.save();
-      this.renderGentle();
+    closeOptions: function (skipFocus) {
+      if (!this.optionsOpen) return;
+      $("screen-options").hidden = true;
+      this.optionsOpen = false;
+      if (!skipFocus) {
+        var ob = $("options-btn");
+        if (ob) { try { ob.focus({ preventScroll: true }); } catch (e) { ob.focus(); } }
+      }
+      root.scrollTop = 0; root.scrollLeft = 0;
+    },
+
+    // which segment inside `container` was tapped (walks up from the target
+    // so a tap on a label inside the button still counts)
+    segValue: function (e, container, attr) {
+      var n = e.target;
+      while (n && n !== container) {
+        if (n.getAttribute && n.hasAttribute(attr)) return n.getAttribute(attr);
+        n = n.parentNode;
+      }
+      return null;
+    },
+
+    renderOptions: function () {
+      var bs = $("opt-diff").children, i;
+      for (i = 0; i < bs.length; i++) {
+        bs[i].setAttribute("aria-pressed",
+          bs[i].getAttribute("data-diff") === Save.data.difficulty ? "true" : "false");
+      }
+      this.renderVolSegs($("opt-music"), Save.data.volMusic);
+      this.renderVolSegs($("opt-wind"), Save.data.volWind);
+      this.renderOptToggle($("opt-cb"), $("opt-cb-state"), Save.data.cbTelegraph);
+      this.renderOptToggle($("opt-calm"), $("opt-calm-state"), Save.data.calmFx);
+      this.renderOptToggle($("opt-mute"), $("opt-mute-state"), this.muted);
+      this.renderOptionsSummary();
+    },
+
+    renderVolSegs: function (wrap, val) {
+      if (!wrap) return;
+      var bs = wrap.children;
+      for (var i = 0; i < bs.length; i++) {
+        var v = parseFloat(bs[i].getAttribute("data-vol"));
+        bs[i].setAttribute("aria-pressed", Math.abs(v - val) < 0.001 ? "true" : "false");
+      }
+    },
+
+    renderOptToggle: function (btn, label, on) {
+      if (btn) btn.setAttribute("aria-pressed", on ? "true" : "false");
+      if (label) label.textContent = on ? "on" : "off";
+    },
+
+    // a one-line whisper under the how-to list, so the title card still says
+    // out loud what the sheet is holding
+    renderOptionsSummary: function () {
+      var el = $("options-summary");
+      if (!el) return;
+      var d = DIFFICULTY[Save.data.difficulty] || DIFFICULTY["true"];
+      var s = d.name.toLowerCase() + " — " + d.blurb;
+      if (Save.data.cbTelegraph) s += " · shaped telegraphs";
+      if (Save.data.calmFx) s += " · calm effects";
+      if (this.muted) s += " · muted";
+      el.textContent = s;
+    },
+
+    // DIFFICULTY: takes hold from the next take-off (refreshOptions caches
+    // the tier at run start). A Daily Flight ignores it entirely — see
+    // refreshOptions — so today's sky is the same sky for everyone.
+    setDifficulty: function (id) {
+      if (!DIFFICULTY[id]) return;
+      Save.data.difficulty = id;
+      Save.save();                       // syncs the legacy `gentle` flag
+      this.refreshOptions(!!this.daily);
+      this.renderOptions();
       Audio2.init(); Audio2.resume();
-      Audio2.tone(Save.data.gentle ? 440 : 330, 0.12, "sine", 0.07, Save.data.gentle ? 620 : 250);
+      Audio2.tone(id === "harrowing" ? 320 : id === "fair" ? 520 : 420, 0.13, "sine", 0.07,
+        id === "harrowing" ? 240 : id === "fair" ? 680 : 500);
+    },
+
+    // the two accessibility flags apply the instant they are tapped
+    toggleOption: function (key) {
+      Save.data[key] = !Save.data[key];
+      Save.save();
+      this.refreshOptions(!!this.daily);
+      this.renderOptions();
+      Audio2.init(); Audio2.resume();
+      Audio2.tone(Save.data[key] ? 460 : 360, 0.12, "sine", 0.07, Save.data[key] ? 640 : 280);
+    },
+
+    // sound levels: applied immediately, with a short blip at the new level
+    setVolume: function (which, v) {
+      if (typeof v !== "number" || !isFinite(v)) return;
+      if (which === "wind") Save.data.volWind = Save.lvl(v);
+      else Save.data.volMusic = Save.lvl(v);
+      Save.save();
+      Audio2.init(); Audio2.resume(); Audio2.musicStart();
+      Audio2.setLevels(Save.data.volMusic, Save.data.volWind);
+      this.renderOptions();
+      if (v > 0) {
+        Audio2.tone(which === "wind" ? 300 : 560, 0.16, "sine", 0.05 * v,
+          which === "wind" ? 220 : 700);
+      }
     },
 
     // Gary on the title card, wearing the equipped plume + owned regalia
@@ -2613,6 +2843,9 @@
     // ----- START A RUN -----
     startRun: function (isDaily) {
       this.closeWardrobe(true); // never carry the sheet into the sky
+      this.closeOptions(true);
+      // the tier (and the accessibility flags) are locked in for the flight
+      this.refreshOptions(!!isDaily);
       Audio2.init(); Audio2.resume(); Audio2.musicStart();
       // Daily Flight: the date alone decides the realm route + one modifier
       this.daily = null;
@@ -2647,7 +2880,7 @@
       if (Save.hasRelic("emberHeart")) startHealth = 5;
       // TRINKET: warm downfeather — one extra feather, kept warm since Ember's hearth
       if (Save.hasTrinket("warmDownfeather")) startHealth += 1;
-      if (Save.data.gentle) startHealth += 1; // gentle breeze assist
+      startHealth += this.diff.feather; // Fair winds carries one more feather
 
       this.player = {
         x: WORLD_W / 2, y: WORLD_H * 0.82, vx: 0, vy: 0,
@@ -3317,7 +3550,7 @@
         facing: Math.PI / 2,
         phase: 1,
         state: "roam", stateT: 0, attackCd: 2.2,
-        telegraph: 0, telegraphType: null, telegraphMax: 0,
+        telegraph: 0, telegraphType: null, telegraphMax: 0, teleFam: "aimed",
         targetX: WORLD_W * 0.5, targetY: WORLD_H * 0.40,
         hitFlash: 0, bowT: 0,
         // health thresholds that drop scales
@@ -3340,6 +3573,20 @@
     // cache owned-trinket flags so the per-frame paths (shots, sky ambience,
     // realm draw) never call indexOf — refreshed at run start and when a
     // hoard gift is granted mid-run
+    // cache the option flags the same way — the roam loop, the telegraph
+    // pass and the shake/flash helpers all read these, never Save.data.
+    // isDaily is passed at run start: a Daily Flight is one shared sky, so
+    // it is always flown at True flight no matter what the sheet says.
+    refreshOptions: function (isDaily) {
+      var d = DIFFICULTY[Save.data.difficulty] || DIFFICULTY["true"];
+      if (isDaily) d = DIFFICULTY["true"];
+      this.diff = d;
+      this.diffCycle = d.cycle;
+      this.cbFx = !!Save.data.cbTelegraph;
+      this.calmFx = !!Save.data.calmFx;
+      Audio2.setLevels(Save.data.volMusic, Save.data.volWind);
+    },
+
     refreshTrinkets: function () {
       this.tk = {
         bell: Save.hasTrinket("cinderBell"),
@@ -3549,7 +3796,16 @@
       this.floatText(s.x, s.y, text, color);
     },
 
-    addShake: function (amt) { if (!reduceMotion) this.shake = Math.min(this.shake + amt, 22); else this.shake = Math.min(this.shake + amt * 0.3, 6); },
+    // OPTIONS · calm effects: the shake and the two screen flashes are damped
+    // at the source, so what the renderer reads is already gentled. Camera
+    // follow, banking, parallax and the wind streaks are untouched.
+    addShake: function (amt) {
+      if (this.calmFx) amt *= 0.22;
+      if (!reduceMotion) this.shake = Math.min(this.shake + amt, this.calmFx ? 5 : 22);
+      else this.shake = Math.min(this.shake + amt * 0.3, this.calmFx ? 2 : 6);
+    },
+    addFlashWhite: function (v) { this.flashWhite = this.calmFx ? v * 0.25 : v; },
+    addFlashRed: function (v) { this.flashRed = this.calmFx ? v * 0.3 : v; },
 
     // ----- CAMERA -----
     // snap the camera onto the goose (used on spawn / mode change so the
@@ -4107,8 +4363,9 @@
           ec, 0.55, 0.98);
       }
 
-      // phase transition (ceremonial dragons enrage earlier)
-      if (d.phase === 1 && d.health <= d.maxHealth * (d.ceremonial ? 0.6 : 0.5)) {
+      // phase transition (ceremonial dragons enrage earlier; Harrowing pulls
+      // the whole threshold up from half health to two thirds)
+      if (d.phase === 1 && d.health <= d.maxHealth * (this.diff.enrage + (d.ceremonial ? 0.1 : 0))) {
         d.phase = 2;
         d.telegraph = 0; d.telegraphType = null;
         d.attackCd = 1.0;
@@ -4135,9 +4392,10 @@
         d.x += d.vx * dt; d.y += d.vy * dt;
         d.facing = this.angleLerp(d.facing, Math.atan2(this.player.y - d.y, this.player.x - d.x), 1 - Math.pow(0.02, dt));
 
-        // ceremonial dragons cycle their attacks noticeably faster;
-        // the gentle-breeze assist slows every dragon's cycle ~25%
-        d.attackCd -= dt * (d.ceremonial ? 1.3 : 1) * (Save.data.gentle ? 0.78 : 1);
+        // ceremonial dragons cycle their attacks noticeably faster; the
+        // difficulty tier scales every dragon's cycle (Fair winds 0.78,
+        // True flight 1, Harrowing 1.18) — cached, never read from Save here
+        d.attackCd -= dt * (d.ceremonial ? 1.3 : 1) * this.diffCycle;
         if (d.attackCd <= 0) this.dragonBeginAttack();
       }
       // ----- telegraph (wind-up) -----
@@ -4408,6 +4666,9 @@
       // ceremonial adaptation: it has evolved a move from another dragon's kit
       if (d.ceremonial && d.stolen) { choices = choices.concat([d.stolen, d.stolen]); }
       d.telegraphType = choices[(Math.random() * choices.length) | 0];
+      // the attack's shape family, resolved once here so the render pass
+      // never does a lookup (colourblind-safe telegraph cue)
+      d.teleFam = TELE_FAMILY[d.telegraphType] || "aimed";
       d.telegraph = d.telegraphType === "dash" ? 0.6
         : (d.telegraphType === "nova" || d.telegraphType === "spiral") ? 0.7
         : d.telegraphType === "ray" ? 0.65
@@ -4885,7 +5146,7 @@
         p.health = 1;
         p.iframes = 1.1;       // a longer breath of mercy after the save
         p.hurtFlash = 0.5;
-        this.flashWhite = 0.3;
+        this.addFlashWhite(0.3);
         this.addShake(12);
         buzz([20, 40, 20]);
         Particles.burst(p.x, p.y, 14, "#c8d4e8", 4, 18, 0.45);
@@ -4901,7 +5162,7 @@
       p.iframes = 0.9;       // brief mercy invuln
       p.hurtFlash = 0.5;
       p.hitScale = 1.35;
-      this.flashRed = 0.6;
+      this.addFlashRed(0.6);
       this.addShake(12);
       this.hitStop = 0.05;
       buzz(35);
@@ -5173,7 +5434,7 @@
               (Math.random() - 0.5) * 0.6, -1.4 - Math.random() * 1.6,
               8 + Math.random() * 12, 0.9, 1.3 + Math.random() * 0.6, PAL.gold, 0.6, 0.99);
           }
-          this.flashWhite = 0.25;
+          this.addFlashWhite(0.25);
         }
       }
 
@@ -5269,7 +5530,7 @@
       this.state = "DEAD";
       Audio2.chargeStop();
       Audio2.death();
-      this.flashWhite = 0.4;
+      this.addFlashWhite(0.4);
       // DAILY: a fall still records the attempt (never over a better one)
       if (this.daily) this.recordDaily(false);
       Save.addScales(Math.floor(this.scaleProgress / 2)); // partial salvage
@@ -6290,6 +6551,62 @@
       // (the step prompt itself is drawn screen-space in drawTrainingPrompt)
     },
 
+    // OPTIONS · colourblind-safe telegraphs: one small ink mark per attack
+    // family, painted on a scrap of paper above a winding-up dragon. Shape
+    // alone carries the meaning — the mark stays legible with every hue
+    // stripped out. Drawn in the dragon's local (unrotated) space.
+    //   sweep  a fanned wedge      · radial  a ring around its heart
+    //   aimed  an arrow            · pull    two marks leaning inward
+    //   rush   three slashes
+    cbSigil: function (g, fam, x, y, r, a) {
+      if (a <= 0) return;
+      g.save();
+      g.translate(x, y);
+      // the paper the mark sits on, so it reads over any sky
+      g.globalAlpha = a * 0.88;
+      g.fillStyle = PAL.paper;
+      g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill();
+      g.globalAlpha = a * 0.45;
+      g.strokeStyle = PAL.ink;
+      g.lineWidth = 1.8;
+      g.beginPath(); g.arc(0, 0, r, 0, TAU); g.stroke();
+      // the mark itself
+      g.globalAlpha = a;
+      g.strokeStyle = PAL.ink;
+      g.fillStyle = PAL.ink;
+      g.lineWidth = 4.2;
+      g.lineCap = "round";
+      g.lineJoin = "round";
+      var u = r * 0.58, si, sx;
+      if (fam === "sweep") {
+        g.beginPath();
+        g.moveTo(-u * 0.92, -u * 0.7); g.lineTo(0, u * 0.95); g.lineTo(u * 0.92, -u * 0.7);
+        g.stroke();
+        g.beginPath(); g.arc(0, u * 0.95, u * 1.66, -Math.PI * 0.76, -Math.PI * 0.24); g.stroke();
+      } else if (fam === "radial") {
+        g.beginPath(); g.arc(0, 0, u * 1.02, 0, TAU); g.stroke();
+        g.beginPath(); g.arc(0, 0, u * 0.3, 0, TAU); g.fill();
+      } else if (fam === "pull") {
+        g.beginPath();
+        g.moveTo(-u * 0.95, -u); g.lineTo(0, -u * 0.24); g.lineTo(u * 0.95, -u);
+        g.stroke();
+        g.beginPath();
+        g.moveTo(-u * 0.95, u); g.lineTo(0, u * 0.24); g.lineTo(u * 0.95, u);
+        g.stroke();
+      } else if (fam === "rush") {
+        for (si = 0; si < 3; si++) {
+          sx = -u * 0.92 + si * u * 0.92;
+          g.beginPath(); g.moveTo(sx + u * 0.32, -u * 0.9); g.lineTo(sx - u * 0.32, u * 0.9); g.stroke();
+        }
+      } else {
+        g.beginPath(); g.moveTo(0, u * 1.05); g.lineTo(0, -u * 1.02); g.stroke();
+        g.beginPath();
+        g.moveTo(-u * 0.58, -u * 0.32); g.lineTo(0, -u * 1.02); g.lineTo(u * 0.58, -u * 0.32);
+        g.stroke();
+      }
+      g.restore();
+    },
+
     drawDragon: function (g) {
       var d = this.dragon;
 
@@ -6447,13 +6764,36 @@
         g.restore();
 
         // pulsing warning ring
+        var wr = d.r * (1.05 + prog * 0.18);
         g.save();
-        g.globalCompositeOperation = "lighter";
-        g.globalAlpha = 0.25 + prog * 0.3 * pul;
-        g.strokeStyle = tc;
-        g.lineWidth = 3;
-        g.beginPath(); g.arc(0, 0, d.r * (1.05 + prog * 0.18), 0, TAU); g.stroke();
-        g.restore();
+        if (this.cbFx) {
+          // COLOURBLIND-SAFE TELEGRAPHS: the ring breaks into a rhythm that
+          // belongs to this attack family alone, laid first in ink so the
+          // pattern survives any sky, then in the wind-up's own light. A
+          // small ink mark above the dragon names the family outright.
+          var fam = d.teleFam || "aimed";
+          g.setLineDash(CB_DASH[fam] || CB_DASH.aimed);
+          g.lineDashOffset = -this.time * 40;
+          g.lineCap = "round";
+          g.globalAlpha = 0.42 + prog * 0.3;
+          g.strokeStyle = PAL.ink;
+          g.lineWidth = 6.5;
+          g.beginPath(); g.arc(0, 0, wr, 0, TAU); g.stroke();
+          g.globalCompositeOperation = "lighter";
+          g.globalAlpha = 0.3 + prog * 0.35 * pul;
+          g.strokeStyle = tc;
+          g.lineWidth = 3.2;
+          g.beginPath(); g.arc(0, 0, wr, 0, TAU); g.stroke();
+          g.restore();             // (restores the dash pattern too)
+          this.cbSigil(g, fam, 0, -d.r * 1.66, 44, 0.72 + prog * 0.28);
+        } else {
+          g.globalCompositeOperation = "lighter";
+          g.globalAlpha = 0.25 + prog * 0.3 * pul;
+          g.strokeStyle = tc;
+          g.lineWidth = 3;
+          g.beginPath(); g.arc(0, 0, wr, 0, TAU); g.stroke();
+          g.restore();
+        }
       }
 
       // gentle hover bob (skip while dashing)
@@ -6609,6 +6949,9 @@
         graph: Audio2.bedsBuilt,
         ctxState: Audio2.ctx ? Audio2.ctx.state : "none",
         master: Audio2.master ? Audio2.master.gain.value : 0,
+        musicVol: Audio2.musicVol,
+        windVol: Audio2.windVol,
+        musicBusParam: Audio2.musicBus ? Audio2.musicBus.gain.value : null,
         wind: Audio2.windLevel,
         windParam: Audio2.windGain ? Audio2.windGain.gain.value : 0,
         windCut: Audio2.windCut,
@@ -6619,6 +6962,56 @@
         ambFilterType: Audio2.ambFilter ? Audio2.ambFilter.type : null,
         ambDrone: Audio2.ambA ? Audio2.ambA.frequency.value : 0
       };
+    },
+    // OPTIONS test hooks: what is saved, what the hot loops actually cached,
+    // and the live flash/shake magnitudes the renderer reads
+    options: function () {
+      return {
+        saved: {
+          difficulty: Save.data.difficulty, gentle: Save.data.gentle,
+          cbTelegraph: Save.data.cbTelegraph, calmFx: Save.data.calmFx,
+          volMusic: Save.data.volMusic, volWind: Save.data.volWind
+        },
+        cached: {
+          diff: Game.diff.id, cycle: Game.diffCycle, feather: Game.diff.feather,
+          enrage: Game.diff.enrage, cbFx: Game.cbFx, calmFx: Game.calmFx
+        },
+        open: Game.optionsOpen,
+        fx: { shake: Game.shake, flashRed: Game.flashRed, flashWhite: Game.flashWhite }
+      };
+    },
+    setOption: function (key, val) {
+      if (key === "difficulty") Game.setDifficulty(val);
+      else if (key === "volMusic") Game.setVolume("music", val);
+      else if (key === "volWind") Game.setVolume("wind", val);
+      else if (key === "cbTelegraph" || key === "calmFx") {
+        if (!!Save.data[key] !== !!val) Game.toggleOption(key);
+      }
+      return Save.data[key];
+    },
+    openOptions: function () { Game.openOptions(); },
+    closeOptions: function () { Game.closeOptions(); },
+    // force a wind-up of a given family on the live dragon (telegraph tests)
+    forceTelegraph: function (type) {
+      var d = Game.dragon;
+      if (!d) return null;
+      d.state = "telegraph"; d.stateT = 0;
+      d.telegraphType = type || "nova";
+      d.teleFam = TELE_FAMILY[d.telegraphType] || "aimed";
+      d.telegraph = 6; d.telegraphMax = 6;
+      d.breathAng = 0;
+      return { type: d.telegraphType, family: d.teleFam };
+    },
+    dragonStats: function () {
+      var d = Game.dragon;
+      if (!d) return null;
+      return { type: d.type, health: d.health, maxHealth: d.maxHealth, phase: d.phase,
+        attackCd: d.attackCd, state: d.state, telegraphType: d.telegraphType, teleFam: d.teleFam,
+        enrageAt: d.maxHealth * (Game.diff.enrage + (d.ceremonial ? 0.1 : 0)) };
+    },
+    playerStats: function () {
+      var p = Game.player;
+      return p ? { health: p.health, maxHealth: p.maxHealth, x: p.x, y: p.y } : null;
     },
     audioSpec: function (type) { return DRAGON_AUDIO[type] || null; },
     roar: function (type) { Audio2.roar(type); },
