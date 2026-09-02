@@ -360,7 +360,9 @@
         <div class="social-banner" role="note">
           <span class="social-banner-dot" aria-hidden="true"></span>
           <span class="social-banner-text">
-            <strong>Demo</strong> &mdash; live trends require a backend (coming soon). Rankings below are sample data.
+            <strong>Demo</strong> &mdash; live trends require a backend (coming soon). The
+            <em>Trending</em> rankings below are sample data; sections tagged
+            <span class="v-demo-tag">Sample</span> are too.
           </span>
         </div>
 
@@ -507,23 +509,29 @@
         </header>
 
         <div class="sheet-body">
+          <p class="settings-mode" id="settings-mode" role="status" aria-live="polite"></p>
+
           <p class="settings-intro">
-            Tableau runs on <strong>sample data</strong> until you add your own Google Maps API key.
-            Your key stays in this browser only (localStorage) &mdash; it's never sent anywhere but Google.
+            Tableau runs on <strong>sample data</strong> by default &mdash; nothing to set up.
+            Add your own <strong>Google Maps API key</strong> and the deck fills with real
+            restaurants near you, with their real hours and photos.
           </p>
 
-          <p class="settings-install">
-            📲 Tip: <strong>add Tableau to your home screen</strong> (browser menu &rarr; Add to Home Screen)
-            for the full-screen app feel &mdash; demo mode even works offline.
+          <p class="settings-privacy">
+            Your key is written to <strong>this browser&rsquo;s localStorage</strong> and nowhere else.
+            It is never sent to this site&rsquo;s author, never logged, and never leaves your device
+            except in your own requests to Google. &ldquo;Use sample data&rdquo; deletes it.
           </p>
 
-          <ol class="settings-guide">
-            <li>Create a project in the <strong>Google Cloud Console</strong>.</li>
-            <li>Enable <strong>Places API (New)</strong> and <strong>Maps JavaScript API</strong>.</li>
-            <li>Create an <strong>API key</strong>.</li>
-            <li>Restrict it to HTTP referrers: <code>https://sky121.github.io/*</code></li>
-            <li>Paste it below.</li>
-          </ol>
+          <details class="settings-steps">
+            <summary>How to get a key &mdash; about two minutes</summary>
+            <ol class="settings-guide">
+              <li>In the <strong>Google Cloud Console</strong>, create (or pick) a project.</li>
+              <li>Enable the <strong>Maps JavaScript API</strong> and the <strong>Places API</strong>.</li>
+              <li>Create an <strong>API key</strong> &mdash; it looks like <code>AIza&hellip;</code>, 39 characters.</li>
+              <li>Restrict it to HTTP referrers: <code>https://sky121.github.io/*</code></li>
+            </ol>
+          </details>
 
           <label class="field">
             <span class="field-label">Google Maps API key</span>
@@ -533,9 +541,14 @@
           <p class="settings-msg" id="settings-msg" role="status" aria-live="polite"></p>
 
           <div class="sheet-actions">
-            <button type="button" class="btn-ghost" id="key-clear">Clear key</button>
-            <button type="button" class="btn-solid" id="key-save">Save key</button>
+            <button type="button" class="btn-ghost" id="key-clear">Use sample data</button>
+            <button type="button" class="btn-solid" id="key-save">Save &amp; check key</button>
           </div>
+
+          <p class="settings-install">
+            &#128242; Tip: <strong>add Tableau to your home screen</strong> (browser menu &rarr; Add to Home Screen)
+            for the full-screen app feel &mdash; sample data even works offline.
+          </p>
 
           <p class="settings-backlink"><a href="lab.html">&larr; Back to the Lab</a></p>
         </div>
