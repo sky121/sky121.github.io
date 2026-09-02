@@ -434,6 +434,28 @@
     return layers.join(', ');
   }
 
+  /* Paint a thumb: the watercolor panel first (it doubles as the placeholder
+     while a photo loads), then swap the photo in ONLY once it has actually
+     decoded. A photo that 404s, is blocked, or never arrives simply leaves
+     the art in place — no broken tile, no error, no layout shift. Used by
+     every surface that shows a place picture so live and demo modes look and
+     fail the same way. */
+  function paintThumb(node, url, artCss) {
+    if (!node) return;
+    node.style.background = artCss;
+    node.classList.remove('has-photo');
+    if (!url) return;
+    var safe = String(url).replace(/["\\]/g, '');
+    if (!/^https?:\/\//i.test(safe)) return;  // only ever load real http(s) photos
+    var img = new Image();
+    img.onload = function () {
+      node.style.background = 'url("' + safe + '") center / cover';
+      node.classList.add('has-photo');
+    };
+    img.onerror = function () { /* keep the watercolor — silently */ };
+    img.src = safe;
+  }
+
   // Pre-built demo result objects (with distance to DEMO_ORIGIN).
   function demoResults() {
     return DEMO_RESTAURANTS.map(function (r, i) {
@@ -444,6 +466,7 @@
       var isOpen = st ? (st.key === 'open' || st.key === 'soon') : r.open;
       return {
         id: 'demo-' + i,
+        demo: true,   // the one flag every SAMPLE label reads
         name: r.name,
         rating: r.rating,
         reviews: r.reviews,
@@ -625,13 +648,20 @@
    * is known (no chip rather than a guess).
    * ------------------------------------------------------------------ */
   var CLOSES_SOON_MIN = 60;
+  /* Hours are numbers 0-24 (local). Demo places sit on whole hours; real
+     Google hours land on :30 and :45 constantly, so a fractional hour
+     prints its minutes ("9:30pm") rather than being rounded into a time the
+     kitchen never keeps. Whole hours read exactly as they always have. */
   function fmtHour(h) {
-    h = ((Math.round(h) % 24) + 24) % 24;
-    if (h === 0) return 'midnight';
-    if (h === 12) return 'noon';
-    var ap = h < 12 ? 'am' : 'pm';
-    var hr = h % 12;
-    return hr + ap;
+    var m = ((Math.round(h * 60) % 1440) + 1440) % 1440;
+    var hr = Math.floor(m / 60), mn = m % 60;
+    if (mn === 0) {
+      if (hr === 0) return 'midnight';
+      if (hr === 12) return 'noon';
+      return (hr % 12) + (hr < 12 ? 'am' : 'pm');
+    }
+    return (hr % 12 === 0 ? 12 : hr % 12) + ':' + (mn < 10 ? '0' + mn : mn) +
+      (hr < 12 ? 'am' : 'pm');
   }
   function openState(r, now) {
     if (!r) return null;
@@ -668,6 +698,26 @@
     if (!st) return null;
     var chip = el('span', base + ' is-' + st.key, st.label);
     return chip;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * LIVE vs SAMPLE — one honest answer, shared by every surface.
+   * A result is "sample" when it came from the built-in demo set (its id is
+   * demo-*, or it carries demo:true). The SAMPLE tag is only *drawn* in LIVE
+   * mode: in demo mode the landing, the settings sheet and the panel banners
+   * already say the whole app is sample data, so stamping every card would be
+   * noise. In live mode the tag is the only way to tell a real Google result
+   * from a fallback one — so there it always shows.
+   * ------------------------------------------------------------------ */
+  function liveMode() { return !!store.getKey(); }
+  function isSampleResult(r) {
+    if (!r) return false;
+    if (r.demo === true) return true;
+    return String(r.id || '').indexOf('demo-') === 0;
+  }
+  function sampleTagFor(r, cls) {
+    if (!liveMode() || !isSampleResult(r)) return null;
+    return el('span', 'v-demo-tag' + (cls ? ' ' + cls : ''), 'Sample');
   }
 
   /* ================================================================== *
@@ -742,6 +792,37 @@
       var landingOn = findActive && landingEl && !landingEl.hidden;
       room.classList.toggle('find-landing-on', !!landingOn);
     }
+
+    /* ---- live fallback note ----
+       When a live search cannot be completed, the deck must never be an
+       empty screen: it fills with the sample places and says so, once, in
+       one honest line. Same paper slip as the offline note (they are
+       mutually exclusive — offline has its own wording). Cleared the moment
+       a live search succeeds. */
+    var liveNote = null;
+    function ensureLiveNote() {
+      if (liveNote) return liveNote;
+      var panel = $('panel-find');
+      if (!panel) return null;
+      liveNote = el('div', 'live-note');
+      liveNote.id = 'live-note';
+      liveNote.setAttribute('role', 'note');
+      liveNote.hidden = true;
+      var dot = el('span', 'live-note-dot');
+      dot.setAttribute('aria-hidden', 'true');
+      liveNote.appendChild(dot);
+      liveNote.appendChild(el('span', 'live-note-text', ''));
+      var off = $('offline-note');
+      panel.insertBefore(liveNote, off ? off.nextSibling : panel.firstChild);
+      return liveNote;
+    }
+    function showLiveNote(text) {
+      var n = ensureLiveNote();
+      if (!n) return;
+      n.querySelector('.live-note-text').textContent = text;
+      n.hidden = false;
+    }
+    function hideLiveNote() { if (liveNote) liveNote.hidden = true; }
 
     /* When true, the next batch of results goes to the Surprise-me roulette
        instead of the swipe deck ("Surprise me" on the Preferences screen). */
@@ -827,6 +908,7 @@
       state.distanceCap = capForDistance(state.prefs.distance);
       state.hasMore = false;
       state.nextPage = null;
+      hideLiveNote();
       deck.showLoading();
 
       if (store.getKey() && !offline.isOffline()) {
@@ -836,13 +918,20 @@
           setOriginText($('deck-origin'));
           gmaps.searchNearby(origin, function (err, list, more) {
             if (err) {
-              // offline mid-search: land in demo mode quietly — the
-              // paper note explains, no error prompt needed
-              if (offline.isOffline()) offline.sync();
-              else settings.showError(err);
+              // A live search that cannot finish falls back to the sample
+              // places rather than an empty deck — and says so plainly, on
+              // screen and to screen readers. Every card it deals carries a
+              // SAMPLE tag, so nothing here can be mistaken for real.
+              if (offline.isOffline()) { offline.sync(); hideLiveNote(); loadDemoInto(origin); return; }
+              settings.showError(err);
+              showLiveNote(err + ' Sample places instead.');
               loadDemoInto(origin);
+              // spoken last so the deck's own "N places matched" line does
+              // not bury the reason the deck is full of sample places
+              announce(err + ' Showing sample places instead.');
               return;
             }
+            hideLiveNote();
             state.nextPage = more || null;
             state.hasMore = !!more;
             deliver(list, origin);
@@ -956,7 +1045,7 @@
           state.loadingMore = false;
           if (err) {
             if (offline.isOffline()) offline.sync();
-            else settings.showError(err);
+            else { settings.showError(err); showLiveNote(err + ' No more live places for now.'); announce(err); }
             state.hasMore = false; if (cb) cb([]); return;
           }
           state.nextPage = more || null;
@@ -1049,6 +1138,8 @@
       showSurprise: showSurprise,
       syncHeaderChrome: syncHeaderChrome,
       startSearch: startSearch,
+      showLiveNote: showLiveNote,
+      hideLiveNote: hideLiveNote,
       searchFarther: searchFarther,
       hasFarther: hasFarther,
       filterByPrefs: filterByPrefs
@@ -1702,12 +1793,7 @@
         item.setAttribute('data-name', r.name);
         var thumb = el('span', 'peek-thumb');
         var seg = (r.segments && r.segments.food) || {};
-        var photo = seg.photoUrl || r.photoUrl;
-        if (photo) {
-          thumb.style.background = 'url("' + String(photo).replace(/"/g, '') + '") center / cover';
-        } else {
-          thumb.style.background = panelArt(r, 'vibe', 0);
-        }
+        paintThumb(thumb, seg.photoUrl || r.photoUrl, panelArt(r, 'vibe', 0));
         item.appendChild(thumb);
         item.appendChild(el('span', 'peek-dist', fmtDist(r.distance)));
         if (deal && !prefersReducedMotion) {
@@ -1825,6 +1911,10 @@
       }
       var chip = openChipEl(r, 'ov-badge');
       if (chip) meta.appendChild(chip);
+      // live mode dealing a sample card (the fallback deck) says so on the
+      // card itself — the one place you would otherwise trust it as real.
+      var sTag = sampleTagFor(r, 'ov-sample');
+      if (sTag) meta.appendChild(sTag);
       ov.appendChild(meta);
       // your own Visited score, if you've eaten here before
       var mine = myRatingFor(r.name);
@@ -1886,6 +1976,7 @@
       if (ost) bits.push(ost.label.toLowerCase());
       var mine = myRatingFor(r.name);
       if (mine) bits.push('you rated it ' + fmtScore(overallOf(mine)) + ' before');
+      if (liveMode() && isSampleResult(r)) bits.push('sample data');
       // the strongest match reason rides along in the label so the "why"
       // lands the moment you enter the card, not only when you read on
       if (reasons && reasons.length) bits.push('why this one: ' + reasons[0].text);
@@ -1915,11 +2006,9 @@
             b.appendChild(by);
           }
         } else {
-          if (item.photoUrl) {
-            b.style.background = 'url("' + String(item.photoUrl).replace(/"/g, '') + '") center / cover';
-          } else {
-            b.style.background = panelArt(r, item.kind, item.art || 0);
-          }
+          // the watercolor panel IS the placeholder; a photo replaces it
+          // only once it has loaded, and never if it fails.
+          paintThumb(b, item.photoUrl, panelArt(r, item.kind, item.art || 0));
           if (item.caption) b.appendChild(el('span', 'trio-cap', item.caption));
         }
         b.appendChild(el('span', 'trio-tag', item.kind === 'review' ? 'Review' : item.kind === 'vibe' ? 'Vibe' : 'Food'));
@@ -2254,8 +2343,14 @@
       if (metaEl && metaEl.parentNode) {
         var prevChip = metaEl.parentNode.querySelector('.decision-chip');
         if (prevChip) prevChip.parentNode.removeChild(prevChip);
+        var prevSample = metaEl.parentNode.querySelector('.decision-sample');
+        if (prevSample) prevSample.parentNode.removeChild(prevSample);
         var dChip = openChipEl(r, 'decision-chip');
         if (dChip) { dLabel = dChip.textContent; metaEl.parentNode.insertBefore(dChip, metaEl.nextSibling); }
+        // the pick screen is the most committing screen in the app — if the
+        // place behind it is sample data in live mode, it says so here too.
+        var dSample = sampleTagFor(r, 'decision-sample');
+        if (dSample) metaEl.parentNode.insertBefore(dSample, metaEl.nextSibling);
       }
 
       // "Why this one" — the fuller set, sitting right under the name where
@@ -2446,9 +2541,7 @@
       var thumb = el('div', 'slc-thumb');
       thumb.setAttribute('aria-hidden', 'true');
       var foodSeg = (r.segments && r.segments.food) || {};
-      var photo = foodSeg.photoUrl || r.photoUrl;
-      if (photo) thumb.style.background = 'url("' + String(photo).replace(/"/g, '') + '") center / cover';
-      else thumb.style.background = panelArt(r, 'food', 0);
+      paintThumb(thumb, foodSeg.photoUrl || r.photoUrl, panelArt(r, 'food', 0));
       main.appendChild(thumb);
 
       var body = el('div', 'slc-body');
@@ -2456,6 +2549,8 @@
       head.appendChild(el('h3', 'slc-name', r.name));
       var slChip = openChipEl(r, 'slc-open');
       if (slChip) head.appendChild(slChip);
+      var slSample = sampleTagFor(r, 'slc-sample');
+      if (slSample) head.appendChild(slSample);
       body.appendChild(head);
 
       var scoreRow = el('div', 'slc-row');
@@ -2614,6 +2709,11 @@
       });
 
       panel.appendChild(plot);
+      // the map is only as real as the places on it
+      var allSample = pts.every(function (q) { return isSampleResult(q.r); });
+      if (liveMode() && allSample) {
+        panel.appendChild(el('span', 'v-demo-tag slc-const-sample', 'Sample'));
+      }
       return panel;
     }
 
@@ -2991,6 +3091,55 @@
   }
 
   /* ================================================================== *
+   * LIVE FAILURE VOCABULARY
+   * Every way live data can fail, and one calm sentence for each. Google
+   * reports these differently depending on which surface answers, so
+   * classifyLive() takes whatever we were handed — a PlacesServiceStatus
+   * string, an Error from the modern Place API (whose message carries
+   * Google's own words), or a code we raised ourselves — and names it.
+   * Nothing here ever includes the key.
+   * ================================================================== */
+  var LIVE_ERRORS = {
+    shape: 'That doesn\u2019t look like a Google Maps key \u2014 they begin with \u201cAIza\u201d and run about 39 characters. Paste the whole key.',
+    invalid: 'Google says that key isn\u2019t valid. Copy it again from the Cloud Console \u2014 keys are easy to truncate.',
+    restricted: 'Google won\u2019t accept that key from this address. In the Cloud Console add this site to the key\u2019s HTTP-referrer list, and enable the Maps JavaScript API and the Places API.',
+    quota: 'That key is over its Google quota just now. Nothing is wrong with the key \u2014 try again later, or raise the cap in the Cloud Console.',
+    network: 'Couldn\u2019t reach Google \u2014 the connection dropped. Your key is kept; try again when you\u2019re back online.',
+    rejected: 'Google turned that key away. It is one of two things: the key isn\u2019t valid, or this address isn\u2019t on its referrer list.',
+    reload: 'Key saved. Reload the page to switch Tableau over to it \u2014 Google Maps can only be keyed once per page.',
+    unknown: 'Google answered with something unexpected. Sample data will hold the fort.'
+  };
+  /* The same failures, short enough for the paper slip on the deck. */
+  var LIVE_SHORT = {
+    shape: 'That key doesn\u2019t look like a Google key.',
+    invalid: 'Google says that key isn\u2019t valid.',
+    restricted: 'Google blocked that key from this site.',
+    quota: 'Google\u2019s quota for that key is used up.',
+    network: 'Couldn\u2019t reach Google.',
+    rejected: 'Google turned that key away.',
+    reload: 'Reload the page to use the new key.',
+    unknown: 'Live search hit a snag.'
+  };
+  function liveErrorText(code) { return LIVE_ERRORS[code] || LIVE_ERRORS.unknown; }
+  function liveShortText(code) { return LIVE_SHORT[code] || LIVE_SHORT.unknown; }
+
+  function classifyLive(x) {
+    if (x == null) return 'unknown';
+    var t = typeof x;
+    var str = (t === 'string') ? x
+      : [x.message, x.name, x.status, x.code, x.reason].join(' ');
+    if (/API key not valid|API_?KEY_?INVALID|InvalidKey|MissingKey|keyInvalid|malformed/i.test(str)) return 'invalid';
+    if (/quota|OVER_QUERY_LIMIT|RESOURCE_EXHAUSTED|OverQuota|rate.?limit|dailyLimit|429/i.test(str)) return 'quota';
+    if (/referer|referrer|RefererNotAllowed|PERMISSION_DENIED|SERVICE_DISABLED|ApiNotActivated|ApiTargetBlocked|has not been used in project|not authorized|forbidden|403/i.test(str)) return 'restricted';
+    if (/REQUEST_DENIED/i.test(str)) return 'rejected';  // legacy: cannot tell the two apart
+    if (/network|Failed to fetch|NetworkError|ERR_|timed? ?out|UNKNOWN_ERROR|offline/i.test(str)) return 'network';
+    return 'unknown';
+  }
+  /* A pre-flight the API never has to answer: a key that cannot possibly be
+     a Google key is caught here, before any request (and before any cost). */
+  function keyLooksWrong(k) { return !/^AIza[0-9A-Za-z_\-]{20,}$/.test(String(k || '')); }
+
+  /* ================================================================== *
    * GMAPS — lazy Google Maps + Places
    *
    * Loaded ONLY when a key exists, via the documented async bootstrap
@@ -3021,6 +3170,13 @@
    * ================================================================== */
   var gmaps = (function () {
     var readyCbs = [];
+    // The key the Maps script was actually loaded with. Google Maps can only
+    // be keyed once per page load, so a later, different key needs a reload —
+    // we say that rather than pretending the swap worked. Kept in a closure
+    // variable only: never logged, never rendered, never stored elsewhere.
+    var loadedKey = '';
+    var authFailCb = null;   // set while a key is being validated
+    var loadFailCb = null;
 
     // The async bootstrap loader (adapted from Google's documented snippet).
     // Exposes window.__eatsMapsReady as the loader callback.
@@ -3028,6 +3184,7 @@
       if (state.mapsLoaded || state.mapsLoading) return;
       if (!key) return; // never load without a key (avoids console errors)
       state.mapsLoading = true;
+      loadedKey = key;
 
       window.__eatsMapsReady = function () {
         // Maps base is ready; the libraries are imported on demand below.
@@ -3037,10 +3194,13 @@
         cbs.forEach(function (cb) { cb(); });
       };
 
-      // Catch auth failures (invalid key / referrer / over-quota).
+      // Catch auth failures (invalid key / referrer / over-quota). Google
+      // does not tell these apart here, so the message names both causes;
+      // the validation probe below is what separates them when it can.
       window.gm_authFailure = function () {
         state.mapsLoading = false;
-        settings.showError('Your Google Maps key was rejected (invalid, wrong referrer, or over quota).');
+        if (authFailCb) { var f = authFailCb; authFailCb = null; f('rejected'); return; }
+        settings.showCode('rejected');
         settings.open();
       };
 
@@ -3058,12 +3218,13 @@
         s.defer = true;
         s.onerror = function () {
           state.mapsLoading = false;
-          settings.showError('Could not load Google Maps (network or key issue).');
+          if (loadFailCb) { var g = loadFailCb; loadFailCb = null; g('network'); return; }
+          settings.showCode('network');
         };
         document.head.appendChild(s);
       } catch (e) {
         state.mapsLoading = false;
-        settings.showError('Could not start the Google Maps loader.');
+        settings.showCode('network');
       }
     }
 
@@ -3157,6 +3318,138 @@
     // One-shot callback used to route paginated pages back to find.loadMore.
     var pendingMoreCb = null;
 
+    /* ================= REAL HOURS -> the shared openH/closeH ==========
+       Google hands us `opening_hours.periods`: one entry per opening —
+         { open:  { day: 0-6, hours, minutes, time:"1130" },
+           close: { day: 0-6, hours, minutes, time:"2200" } }
+       (the newer Place surface spells these `hour`/`minute` and nests them
+       under `regularOpeningHours`; both shapes are read below). We fold a
+       day's periods into the SAME two numbers a demo place carries —
+       openH / closeH, hours 0-24 local — so openState() does all the clock
+       reasoning exactly once, for both modes. No hours maths lives here.
+
+       THE RULE (also written up in docs/peckish/README.md):
+         1. the window CONTAINING this minute wins — including one that
+            opened yesterday evening and runs past midnight, expressed the
+            way the demo data already does it (closeH < openH);
+         2. otherwise the NEXT window that starts later today wins, so a
+            lunch-and-dinner place whose lunch is over says "Opens at 5pm"
+            instead of pointing at a service that has already ended;
+         3. otherwise — nothing left today, or the place is shut today —
+            NO times are set at all and the binary flag speaks: "Closed",
+            never an invented hour;
+         4. open 24 hours (a period with no `close`) also drops to the
+            binary flag: "Open now", with no closing time to fabricate;
+         5. if Google's own open_now disagrees with the window we derived
+            (holiday hours it knows about and `periods` does not), the times
+            are dropped and Google's flag wins;
+         6. if the place does not share this browser's UTC offset, the
+            times are dropped too — openState reasons in the browser's
+            timezone, so another zone's hours would print a confidently
+            wrong clock. Binary only.
+       ================================================================= */
+
+    // One {day, min} from either spelling of a Google opening-hours time.
+    function hoursTime(t) {
+      if (!t) return null;
+      var h = (t.hours != null) ? t.hours : t.hour;
+      var m = (t.minutes != null) ? t.minutes : t.minute;
+      if (h == null && typeof t.time === 'string' && /^\d{4}$/.test(t.time)) {
+        h = parseInt(t.time.slice(0, 2), 10);
+        m = parseInt(t.time.slice(2), 10);
+      }
+      if (h == null || isNaN(h)) return null;
+      return { day: (t.day == null ? -1 : t.day), min: h * 60 + (m || 0) };
+    }
+
+    /* Every opening that can still be running or starting TODAY, in minutes
+       from today 00:00 (a window that began yesterday has a negative start).
+       Returns null for "open 24 hours" (a period with an open and no close). */
+    function todayWindows(periods, dow) {
+      var out = [];
+      for (var i = 0; i < periods.length; i++) {
+        var o = hoursTime(periods[i] && periods[i].open);
+        var c = hoursTime(periods[i] && periods[i].close);
+        if (!o) continue;
+        if (!c) return null;                       // 24-hour place
+        for (var k = -1; k <= 0; k++) {            // yesterday's + today's
+          var day = ((dow + k) % 7 + 7) % 7;
+          if (o.day !== -1 && o.day !== day) continue;
+          var start = k * 1440 + o.min;
+          // length of the service, walking forward from open to close
+          var gap = (c.day === -1)
+            ? (c.min <= o.min ? 1 : 0)
+            : ((((c.day - o.day) % 7) + 7) % 7);
+          var end = start + gap * 1440 + (c.min - o.min);
+          if (end <= start) end += 1440;           // defensive, never empty
+          out.push({ start: start, end: end });
+        }
+      }
+      return out;
+    }
+
+    /* -> { openH, closeH } | 'always' | null  (see the rule above). */
+    function hoursForNow(periods, now) {
+      if (!periods || !periods.length) return null;
+      var wins = todayWindows(periods, now.getDay());
+      if (wins === null) return 'always';
+      if (!wins.length) return null;
+      var mins = now.getHours() * 60 + now.getMinutes();
+      var active = null, next = null, i, w;
+      for (i = 0; i < wins.length; i++) {
+        w = wins[i];
+        if (mins >= w.start && mins < w.end) {
+          if (!active || w.end > active.end) active = w;      // longest cover
+        } else if (w.start > mins && (!next || w.start < next.start)) {
+          next = w;                                           // soonest ahead
+        }
+      }
+      w = active || next;
+      if (!w) return null;                                    // done for today
+      if (w.end - w.start >= 1440) return 'always';
+      var openH = ((w.start % 1440) + 1440) % 1440 / 60;
+      var endMod = ((w.end % 1440) + 1440) % 1440;
+      // A window that ends exactly at midnight is closeH 24 — the same
+      // convention the demo places use, so openState reads it unchanged.
+      var closeH = (endMod === 0) ? 24 : endMod / 60;
+      return { openH: openH, closeH: closeH };
+    }
+
+    // Does this place keep the same clock as the browser? (unknown => yes)
+    function sameClock(utcOffsetMinutes) {
+      if (utcOffsetMinutes == null || isNaN(utcOffsetMinutes)) return true;
+      return utcOffsetMinutes === -(new Date().getTimezoneOffset());
+    }
+
+    /* Write real hours (or an honest binary) onto a result. Called with the
+       opening-hours object from a Place Details response. */
+    function applyHours(r, oh, utcOffsetMinutes) {
+      if (!r) return;
+      // Google's own verdict first — it knows about holiday hours.
+      var flag = null;
+      try {
+        if (oh && typeof oh.isOpen === 'function') flag = oh.isOpen();
+      } catch (e) {}
+      if (typeof flag !== 'boolean' && oh && typeof oh.open_now === 'boolean') flag = oh.open_now;
+      if (typeof flag !== 'boolean' && oh && typeof oh.openNow === 'boolean') flag = oh.openNow;
+      if (typeof flag === 'boolean') r.open = flag;
+
+      r.openH = null; r.closeH = null;             // never keep stale hours
+      if (!sameClock(utcOffsetMinutes)) return;    // other timezone: binary only
+      var periods = oh && (oh.periods ||
+        (oh.regularOpeningHours && oh.regularOpeningHours.periods));
+      var mapped = hoursForNow(periods, new Date());
+      if (!mapped || mapped === 'always') return;  // binary, no invented time
+
+      // the derived window must agree with Google's own open_now
+      var st = openState({ openH: mapped.openH, closeH: mapped.closeH });
+      var derivedOpen = !!st && (st.key === 'open' || st.key === 'soon');
+      if (typeof flag === 'boolean' && derivedOpen !== flag) return;
+      r.openH = mapped.openH;
+      r.closeH = mapped.closeH;
+      if (typeof flag !== 'boolean') r.open = derivedOpen;
+    }
+
     // Map a legacy PlaceResult to our internal result shape.
     function mapPlace(p, origin) {
       var loc = null;
@@ -3165,23 +3458,16 @@
           loc = { lat: p.geometry.location.lat(), lng: p.geometry.location.lng() };
         }
       } catch (e) {}
+      // A thumb-sized photo URL. getUrl() only BUILDS a string — the image
+      // itself is not fetched until a surface actually paints it, so places
+      // that never render never cost a photo request.
       var photoUrl = null;
       try {
         if (p.photos && p.photos.length && typeof p.photos[0].getUrl === 'function') {
-          photoUrl = p.photos[0].getUrl({ maxWidth: 640, maxHeight: 360 });
+          photoUrl = p.photos[0].getUrl({ maxWidth: 400, maxHeight: 400 });
         }
       } catch (e) {}
-      var openState = null;
-      try {
-        // opening_hours.isOpen() is deprecated but still the simplest signal
-        // available on a nearbySearch result without an extra Details call.
-        if (p.opening_hours && typeof p.opening_hours.isOpen === 'function') {
-          openState = p.opening_hours.isOpen();
-        } else if (p.opening_hours && typeof p.opening_hours.open_now === 'boolean') {
-          openState = p.opening_hours.open_now;
-        }
-      } catch (e) {}
-      return {
+      var out = {
         id: p.place_id,
         placeId: p.place_id,
         name: p.name || 'Unnamed place',
@@ -3193,7 +3479,11 @@
         cuisines: cuisineKeys(p.types),
         diet: [],     // Places doesn't expose dietary flags; left empty (no false filtering)
         dining: [],   // Places doesn't expose dine-in/takeout/delivery reliably on nearbySearch
-        open: openState,
+        // nearbySearch carries at most a binary open_now — real periods
+        // arrive with the Details call (fetchDetails -> applyHours).
+        open: null,
+        openH: null,
+        closeH: null,
         phone: null, // not returned by nearbySearch; the Details call (fetchDetails) adds it
         photoUrl: photoUrl,
         // story segments — populated lazily by fetchDetails (photos + reviews).
@@ -3208,6 +3498,10 @@
         mapsUri: p.place_id ? 'https://www.google.com/maps/place/?q=place_id:' + p.place_id : null,
         detailsLoaded: false
       };
+      // nearbySearch only ever carries open_now, so this sets the binary
+      // state and leaves openH/closeH null — no time is ever invented.
+      applyHours(out, p.opening_hours, p.utc_offset_minutes);
+      return out;
     }
 
     // Turn the legacy `types` array into a friendly label.
@@ -3241,11 +3535,78 @@
     }
 
     function humanizeStatus(status) {
-      var P = google.maps.places;
-      if (status === P.PlacesServiceStatus.OVER_QUERY_LIMIT) return 'Google quota reached — try again later.';
-      if (status === P.PlacesServiceStatus.REQUEST_DENIED) return 'Your Google key was rejected (check API enablement + referrer restriction).';
-      if (status === P.PlacesServiceStatus.INVALID_REQUEST) return 'That search request was invalid.';
-      return 'Live search failed (' + status + ').';
+      return liveShortText(classifyLive(status));
+    }
+
+    /* ================= KEY VALIDATION ================================
+       Saving a key makes a real attempt rather than a hopeful shrug:
+
+         · a string that cannot be a Google key is caught before any
+           request at all (keyLooksWrong);
+         · then the Maps script is loaded with the key. A script that never
+           arrives is a network failure; gm_authFailure is Google refusing
+           the key outright (it does not say which of the two reasons);
+         · then ONE tiny search runs. We prefer the modern
+           Place.searchNearby because its rejection carries Google's own
+           error text — the only surface that separates "API key not
+           valid" from "requests from this referer are blocked" from
+           "quota exceeded". Without it we fall back to the legacy
+           service's status codes, where REQUEST_DENIED covers both, and
+           the message says so honestly instead of guessing.
+
+       The probe asks for ONE result and the `id` field only — the
+       cheapest request the API sells — and it is made once per key save. */
+    function validateKey(key, done) {
+      var settled = false, timer = null;
+      function finish(code) {
+        if (settled) return;
+        settled = true;
+        if (timer) { window.clearTimeout(timer); timer = null; }
+        authFailCb = null;
+        loadFailCb = null;
+        done(code || null);
+      }
+      if (!key) { finish('invalid'); return; }
+      if (keyLooksWrong(key)) { finish('shape'); return; }
+      if (offline.isOffline()) { finish('network'); return; }
+      if (state.mapsLoaded && loadedKey && loadedKey !== key) { finish('reload'); return; }
+      timer = window.setTimeout(function () { finish('network'); }, 12000);
+      authFailCb = finish;
+      loadFailCb = finish;
+      loadOnce(key);
+      whenReady(function () { probeKey(finish); });
+    }
+
+    function probeKey(finish) {
+      var origin = state.origin || DEMO_ORIGIN;
+      try {
+        google.maps.importLibrary('places').then(function (places) {
+          if (places.Place && typeof places.Place.searchNearby === 'function') {
+            places.Place.searchNearby({
+              fields: ['id'],
+              locationRestriction: {
+                center: { lat: origin.lat, lng: origin.lng },
+                radius: 500
+              },
+              includedPrimaryTypes: ['restaurant'],
+              maxResultCount: 1
+            }).then(function () { finish(null); },
+                    function (e) { finish(classifyLive(e)); });
+            return;
+          }
+          var service = getService(places);
+          service.nearbySearch({
+            location: { lat: origin.lat, lng: origin.lng },
+            rankBy: places.RankBy ? places.RankBy.DISTANCE : undefined,
+            type: 'restaurant'
+          }, function (results, status) {
+            var P = google.maps.places;
+            if (status === P.PlacesServiceStatus.OK ||
+                status === P.PlacesServiceStatus.ZERO_RESULTS) { finish(null); return; }
+            finish(classifyLive(status));
+          });
+        }).catch(function (e) { finish(classifyLive(e)); });
+      } catch (e) { finish(classifyLive(e)); }
     }
 
     /* geocode — turn a typed address into {lat,lng} (Geocoding library). */
@@ -3294,10 +3655,7 @@
     }
 
     function humanizeError(e) {
-      var msg = (e && e.message) ? e.message : String(e || 'Unknown error');
-      if (/quota|OVER_QUERY_LIMIT|RESOURCE_EXHAUSTED/i.test(msg)) return 'Google quota reached — try again later.';
-      if (/denied|PERMISSION|referer|referrer|API key/i.test(msg)) return 'Your Google key was rejected (check API enablement + referrer restriction).';
-      return 'Live search failed: ' + msg;
+      return liveShortText(classifyLive(e));
     }
 
     /* fetchDetails — lazily enrich ONE result's card segments with Place
@@ -3321,7 +3679,11 @@
             service.getDetails({
               placeId: r.placeId,
               // Minimal fields: photos, reviews, phone, hours, name.
-              fields: ['photos', 'reviews', 'formatted_phone_number', 'international_phone_number', 'opening_hours', 'name']
+              // Minimal, and every field is used: opening_hours carries the
+              // real `periods` the status chip needs; utc_offset_minutes is
+              // how we know those hours belong on this browser's clock.
+              fields: ['photos', 'reviews', 'formatted_phone_number', 'international_phone_number',
+                'opening_hours', 'utc_offset_minutes', 'name']
             }, function (place, status) {
               var P = google.maps.places;
               if (status !== P.PlacesServiceStatus.OK || !place) { done && done(humanizeStatus(status), null); return; }
@@ -3329,18 +3691,21 @@
               // phone
               r.phone = place.international_phone_number || place.formatted_phone_number || r.phone || null;
 
-              // open-now (Details has fresher hours than nearbySearch)
+              // REAL HOURS: Details is the only call that returns `periods`,
+              // so this is where a live place stops being a binary open/shut
+              // flag and starts saying "Closes at 9:30pm" like a demo place.
               try {
-                if (place.opening_hours && typeof place.opening_hours.isOpen === 'function') {
-                  r.open = place.opening_hours.isOpen();
-                }
+                applyHours(r, place.opening_hours,
+                  (place.utc_offset_minutes != null) ? place.utc_offset_minutes : place.utc_offset);
               } catch (e) {}
 
               // photos split across vibe + food segments
               var urls = [];
               try {
-                (place.photos || []).slice(0, 6).forEach(function (ph) {
-                  if (typeof ph.getUrl === 'function') urls.push(ph.getUrl({ maxWidth: 800, maxHeight: 1000 }));
+                // four at most, card-sized: the trio only ever shows two of
+                // them, and a card face is ~330px wide on a phone.
+                (place.photos || []).slice(0, 4).forEach(function (ph) {
+                  if (typeof ph.getUrl === 'function') urls.push(ph.getUrl({ maxWidth: 640, maxHeight: 800 }));
                 });
               } catch (e) {}
               if (urls.length) {
@@ -3371,6 +3736,7 @@
 
     return {
       loadOnce: loadOnce,
+      validateKey: validateKey,
       searchNearby: searchNearby,
       geocode: geocode,
       attachAutocomplete: attachAutocomplete,
@@ -4600,8 +4966,7 @@
       var thumb = el('span', 'pop-thumb');
       thumb.setAttribute('aria-hidden', 'true');
       var photo = r && (((r.segments && r.segments.vibe) || {}).photoUrl || r.photoUrl);
-      if (photo) thumb.style.background = 'url("' + String(photo).replace(/"/g, '') + '") center / cover';
-      else thumb.style.background = panelArt(r || { name: cfg.name, cuisines: [] }, 'vibe', 0);
+      paintThumb(thumb, photo, panelArt(r || { name: cfg.name, cuisines: [] }, 'vibe', 0));
       if (cfg.rank) {
         var rk = el('span', 'pop-thumb-rank', String(cfg.rank));
         rk.setAttribute('aria-hidden', 'true');
@@ -4832,7 +5197,9 @@
         enterStagger(row, i);
         sec.list.appendChild(row);
       });
-      if (sec.tag) sec.tag.hidden = !rows.every(function (x) { return String(x.r.id || '').indexOf('demo-') === 0; });
+      // one shared answer to "is this real?" — the tag shows the moment
+      // any row in the section is backed by sample data.
+      if (sec.tag) sec.tag.hidden = !rows.some(function (x) { return isSampleResult(x.r); });
       return rows.length;
     }
 
@@ -4920,7 +5287,9 @@
         enterStagger(row, i);
         sec.list.appendChild(row);
       });
-      if (sec.tag) sec.tag.hidden = !rows.every(function (x) { return x.entry.demo !== false; });
+      // the friends feed behind this section is mock data in every mode,
+      // so the tag stays on even when the rest of the app is live.
+      if (sec.tag) sec.tag.hidden = !rows.some(function (x) { return x.entry.demo !== false; });
       return rows.length;
     }
 
@@ -4997,6 +5366,8 @@
     var navBtn = $('settings-open');
     var settingsLabel = document.querySelector('.settings-label');
     var demoHint = $('landing-demo-hint');
+    var modeEl = $('settings-mode');
+    var saveBtn = null;
     var lastFocused = null;
 
     function refreshMode() {
@@ -5005,6 +5376,12 @@
       if (settingsLabel) settingsLabel.textContent = has ? 'Live data on' : 'Use live data';
       // The discreet demo hint sits on the calm landing; hide it when live.
       if (demoHint) demoHint.hidden = has;
+      if (modeEl) {
+        modeEl.textContent = has
+          ? 'Live data is on — results come from Google Places.'
+          : 'Sample data is on — 18 hand-written places, no key needed.';
+        modeEl.className = 'settings-mode' + (has ? ' is-live' : '');
+      }
     }
 
     function setMsg(text, kind) {
@@ -5013,7 +5390,17 @@
       msg.className = 'settings-msg' + (kind ? ' is-' + kind : '');
     }
     function showError(text) {
-      setMsg(text || 'Something went wrong with Google.', 'error');
+      setMsg(text || LIVE_ERRORS.unknown, 'error');
+    }
+    /* The whole app reports live failures by CODE, so every surface says the
+       same sentence for the same failure — never one generic message. */
+    function showCode(code) {
+      setMsg(liveErrorText(code), code === 'reload' ? 'ok' : 'error');
+    }
+    function busy(on) {
+      if (!saveBtn) return;
+      saveBtn.disabled = !!on;
+      saveBtn.textContent = on ? 'Checking with Google…' : 'Save & check key';
     }
 
     function open() {
@@ -5042,25 +5429,52 @@
       $('settings-close').addEventListener('click', close);
       backdrop.addEventListener('click', function (e) { if (e.target === backdrop) close(); });
 
-      $('key-save').addEventListener('click', function () {
+      saveBtn = $('key-save');
+      saveBtn.addEventListener('click', function () {
         var k = (input.value || '').trim();
         if (!k) { setMsg('Paste a key first.', 'error'); return; }
-        if (store.setKey(k)) {
-          setMsg('Saved. Loading live data…', 'ok');
-          refreshMode();
-          // begin loading Maps now so the first search is instant
-          gmaps.loadOnce(k);
-          window.setTimeout(close, 700);
-        } else {
-          setMsg('Could not save (storage blocked).', 'error');
+        // A string that cannot be a Google key never becomes a request.
+        if (keyLooksWrong(k)) {
+          showCode('shape');
+          announce(liveErrorText('shape'));
+          return;
         }
+        if (!store.setKey(k)) {
+          setMsg('Could not save — this browser is blocking storage.', 'error');
+          return;
+        }
+        refreshMode();
+        busy(true);
+        setMsg('Checking this key with Google…', '');
+        gmaps.validateKey(k, function (code) {
+          busy(false);
+          if (!code) {
+            setMsg('Key accepted — live data is on.', 'ok');
+            announce('Key accepted. Tableau is on live data.');
+            refreshMode();
+            find.hideLiveNote();
+            window.setTimeout(close, 900);
+            return;
+          }
+          // A key that cannot work as saved goes back out again, so the app
+          // is never left half-live. Transient failures (quota, network,
+          // needing a reload) keep the key — it is probably fine.
+          var keep = (code === 'quota' || code === 'network' || code === 'reload');
+          if (!keep) store.clearKey();
+          setMsg(liveErrorText(code) + (keep ? '' : ' Tableau stays on sample data.'),
+            code === 'reload' ? 'ok' : 'error');
+          announce(liveShortText(code) + (keep ? '' : ' Staying on sample data.'));
+          refreshMode();
+        });
       });
 
       $('key-clear').addEventListener('click', function () {
         store.clearKey();
         if (input) input.value = '';
-        setMsg('Key cleared — back to sample data.', 'ok');
+        setMsg('Back on sample data — your key has been removed from this browser.', 'ok');
+        announce('Sample data is on. Your key has been removed from this browser.');
         refreshMode();
+        find.hideLiveNote();
         find.showLanding();
       });
 
@@ -5074,7 +5488,7 @@
       }
     }
 
-    return { init: init, open: open, showError: showError, refreshMode: refreshMode };
+    return { init: init, open: open, showError: showError, showCode: showCode, refreshMode: refreshMode };
   })();
 
   /* ================================================================== *

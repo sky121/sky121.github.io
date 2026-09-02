@@ -227,6 +227,53 @@ html.evening :focus-visible {
   .offline-note { animation: none; }
 }
 
+/* ---------- Live fallback note (Find tab) ----------
+   Same paper slip as the offline note, in gold rather than rose: the
+   network is fine, Google just could not answer, and the sample deck is
+   holding the place. Explanatory, never alarming. */
+
+.live-note[hidden] { display: none; }
+.live-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--ink);
+  background:
+    radial-gradient(120% 180% at 0% 0%, rgba(205, 184, 120, 0.18) 0%, rgba(205, 184, 120, 0) 60%),
+    var(--chip-bg);
+  border: 1px solid var(--gold);
+  border-radius: 12px;
+  /* tighter than the offline note: the deck below it needs the height */
+  padding: 0.5rem 0.75rem;
+  margin: 0 auto 0.75rem;
+  max-width: 30rem;
+  animation: panel-fade 0.24s ease;
+}
+.live-note-text { line-height: 1.35; }
+.live-note-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 4px rgba(205, 184, 120, 0.22);
+  flex: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-note { animation: none; }
+}
+
+/* ---------- Photo thumbs ----------
+   Every place picture is painted onto its watercolor panel only once the
+   image has really loaded (see paintThumb in eats.js), so a slow or dead
+   photo simply stays a watercolor. The swap gets a soft wash-in. */
+.has-photo { transition: background-image 0.3s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .has-photo { transition: none; }
+}
+
 /* ---------- Find landing (calm pre-search) ---------- */
 
 .find-landing[hidden] { display: none; }
@@ -1288,6 +1335,46 @@ html.evening .card-review { background: rgba(43,49,64,0.92); }
   text-shadow: 0 1px 4px rgba(0,0,0,0.5);
 }
 
+/* ---------- SAMPLE tags (live mode only) ----------
+   In live mode a card dealt from the sample set must never read as real.
+   The tag borrows the Visited log's paper pill so it looks like a label,
+   not a warning. AA on both grounds; never animated. */
+.ov-meta .v-demo-tag,
+.trio-info .ov-meta .v-demo-tag {
+  margin-top: 0;
+  border-color: rgba(205, 184, 120, 0.75);
+  color: #6b5a1d;
+  background: rgba(205, 184, 120, 0.3);
+  text-shadow: none;
+  font-weight: 600;
+}
+html.evening .ov-meta .v-demo-tag {
+  color: #f0e4bd;
+  background: rgba(205, 184, 120, 0.24);
+  border-color: rgba(205, 184, 120, 0.6);
+}
+/* sits on the same centred line as the status chip (both inline pills) */
+.v-demo-tag.decision-sample {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin: 0 0.45rem 1.3rem 0;
+  padding: 0.3rem 0.7rem;
+  border-color: rgba(205, 184, 120, 0.8);
+  color: #6b5a1d;
+  background: rgba(205, 184, 120, 0.24);
+}
+html.evening .v-demo-tag.decision-sample { color: #f0e4bd; border-color: rgba(205, 184, 120, 0.55); }
+.slc-head .v-demo-tag { margin-top: 0; flex: none; }
+.slc-const-sample {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.7rem;
+  margin-top: 0;
+  background: var(--card-bg);
+}
+.social-banner .v-demo-tag { margin-top: 0; vertical-align: baseline; }
+
 /* ----- YES / NOPE stamps ----- */
 .stamp {
   position: absolute;
@@ -1888,10 +1975,12 @@ html.evening .slc { background: rgba(233, 227, 211, 0.05); }
   border: 1px solid var(--card-line);
 }
 .slc-body { flex: 1 1 auto; min-width: 0; }
-.slc-head { display: flex; align-items: baseline; gap: 0.5rem; }
+/* wraps rather than squeezing the name when a status chip AND a SAMPLE tag
+   both sit beside it (live mode dealing fallback places) */
+.slc-head { display: flex; align-items: baseline; gap: 0.5rem 0.45rem; flex-wrap: wrap; }
 .slc-name {
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: 9rem;
   font-family: var(--font-display);
   font-weight: 500;
   font-size: 1.12rem;
@@ -3356,8 +3445,74 @@ html.evening .btn-solid { color: #1c212c; }
   border-radius: 5px;
   word-break: break-all;
 }
-.settings-msg { font-size: 0.88rem; min-height: 1.2rem; }
-.settings-msg.is-error { color: var(--rose); }
+.settings-mode {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+  border: 1px solid var(--card-line);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  margin: 0 0 0.2rem;
+}
+.settings-mode::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  flex: none;
+  background: var(--gold);
+  box-shadow: 0 0 0 4px rgba(205, 184, 120, 0.2);
+}
+.settings-mode.is-live { color: var(--ink); border-color: rgba(147, 180, 139, 0.6); }
+.settings-mode.is-live::before { background: var(--sage); box-shadow: 0 0 0 4px rgba(147, 180, 139, 0.22); }
+
+.settings-privacy {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  background: var(--chip-bg);
+  border: 1px solid var(--card-line);
+  border-left: 3px solid var(--sage);
+  border-radius: 12px;
+  padding: 0.65rem 0.8rem;
+  margin: 0;
+}
+.settings-privacy strong { color: var(--ink); font-weight: 600; }
+
+/* The step-by-step folds away so the sheet opens as one calm screen. */
+.settings-steps { font-size: 0.92rem; }
+.settings-steps > summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--pond-deep);
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+}
+.settings-steps > summary::-webkit-details-marker { display: none; }
+.settings-steps > summary::marker { content: ""; }
+.settings-steps > summary::before {
+  content: "\203A";            /* a single chevron, turned when open */
+  font-size: 1.2em;
+  line-height: 1;
+  transition: transform 0.18s ease;
+}
+.settings-steps[open] > summary::before { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) {
+  .settings-steps > summary::before { transition: none; }
+}
+html.evening .settings-steps > summary { color: var(--pond-ink); }
+.settings-steps > summary:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 3px; border-radius: 8px; }
+.settings-steps[open] > summary { margin-bottom: 0.2rem; }
+
+.settings-msg { font-size: 0.88rem; line-height: 1.5; min-height: 1.2rem; }
+.settings-msg.is-error { color: #a83c55; }   /* AA on paper (5.4:1) */
+html.evening .settings-msg.is-error { color: #f0a8bc; }
 .settings-msg.is-ok { color: var(--sage); }
 html.evening .settings-msg.is-ok { color: #b6d3af; }
 

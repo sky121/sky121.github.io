@@ -12,7 +12,7 @@
 > icon *art* changed.
 >
 > Single source of truth so we can pick up exactly where we left off.
-> Last updated: **2026-08-03**.
+> Last updated: **2026-09-02**.
 
 ---
 
@@ -43,6 +43,126 @@
 ---
 
 ## Feature map (what's built)
+
+### Live mode made first-class — real hours, real photos, honest labels (2026-09-02)
+Demo mode had grown time-awareness, reason chips, a three-section Popular and a
+constellation map; a real Google result fed almost none of it. Live mode now
+feeds the same surfaces the same shapes.
+
+**1. Real opening hours → the shared `openState()`**
+`opening_hours.periods` from a **Place Details** call is folded into the very
+same two numbers a demo place carries — `openH` / `closeH`, hours 0–24 local —
+so the deck chip, the decision screen, Popular's "Near you right now", the
+compare cards and the *Closing soon — go now* reason chip all read real hours
+through the one clock function. No hours maths was duplicated: `applyHours()`
+(in the `gmaps` closure) writes the shape, `openState()` still does all the
+reasoning. Fields read: `opening_hours.periods` (both spellings —
+`open.hours/minutes`, the newer `open.hour/minute`, and the `"1130"` `time`
+string), `opening_hours.open_now` / `isOpen()`, and **`utc_offset_minutes`**.
+
+**The rule** (deliberate, and the honest half matters most):
+1. the window **containing this minute** wins — including one that opened
+   yesterday evening and runs past midnight, expressed exactly the way the demo
+   data already does it (`closeH < openH`, e.g. 17 → 2);
+2. otherwise the **next window starting later today** wins — a lunch-and-dinner
+   place whose lunch is over says *Opens at 5pm*, never pointing at a service
+   that already ended;
+3. otherwise — nothing left today, or shut today — **no times are written at
+   all** and the binary flag speaks: *Closed*, never an invented hour;
+4. **open 24 hours** (a period with an `open` and no `close`) also drops to the
+   binary flag: *Open now*, with no closing time to fabricate;
+5. if Google's own `open_now` **disagrees** with the derived window (holiday
+   hours `periods` doesn't carry), the times are dropped and Google wins;
+6. if `utc_offset_minutes` says the place **doesn't share this browser's
+   clock**, the times are dropped too — `openState()` reasons in the browser's
+   timezone, so another zone's hours would print a confidently wrong time.
+
+`fmtHour()` now prints minutes when an hour is fractional (*9:30pm*, *8:15pm*):
+real kitchens close at :30 and :45, and rounding those to the hour is a lie
+about when to leave. Whole hours render exactly as before.
+
+**2. Real photos, watercolor fallback**
+`paintThumb(node, url, artCss)` is the one path every picture takes: it paints
+the watercolor panel **first** (so the art is also the placeholder), then swaps
+the photo in **only after it has decoded**. A 404, a blocked host or a slow
+photo simply leaves the watercolor — no broken tile, no error, no layout shift.
+Used by the trio card faces, the "coming up" peek strip, the Popular rows and
+the shortlist compare cards. Requests stay modest: search thumbs at 400×400,
+detail photos capped at **four** at 640×800, and `getUrl()` only *builds* a
+string — no image is fetched until a surface actually paints it, so places that
+never render never cost a photo request.
+
+**3. Key onboarding, and one sentence per failure**
+The settings sheet opens as **one screen**: what mode you're in, what a key
+buys, a privacy note (the key is written to *this browser's localStorage* and
+nowhere else — never sent to the site's author, never logged), the field, and a
+plainly-labelled **"Use sample data"** way back. The step-by-step folds away in
+a `<details>`.
+
+Saving now makes a **real validation attempt**, and every outcome has its own
+calm sentence (`LIVE_ERRORS` / `LIVE_SHORT` + `classifyLive()`):
+
+| Failure | What Google gives us | What we say |
+|---|---|---|
+| malformed key | *nothing — caught pre-flight, no request at all* | "That doesn't look like a Google Maps key…" |
+| invalid key | `API key not valid` in the rejection | "Google says that key isn't valid…" |
+| referer / API restriction | `PERMISSION_DENIED`, `SERVICE_DISABLED`, referer text | "Google won't accept that key from this address…" |
+| over quota | `RESOURCE_EXHAUSTED` / `OVER_QUERY_LIMIT` | "That key is over its Google quota just now…" |
+| network down | script `onerror`, offline, timeout | "Couldn't reach Google — the connection dropped…" |
+| flat refusal | `gm_authFailure`, legacy `REQUEST_DENIED` | "Google turned that key away" — naming *both* causes, because the legacy surface genuinely cannot tell them apart |
+
+The probe prefers **`Place.searchNearby`** (`fields:['id']`, `maxResultCount:1`
+— the cheapest request the API sells, once per key save) because its rejection
+carries Google's own error text, the only surface that separates invalid from
+referer-blocked from quota. Where that class is absent it falls back to the
+legacy status codes and says so honestly rather than guessing. A key that
+**cannot** work as saved (invalid / restricted / refused) is removed again so
+the app is never left half-live; transient failures (quota, network, "reload to
+re-key") keep it.
+
+**Mid-session failure never shows an empty screen:** the deck fills with the
+sample places behind a gold paper slip — *"Google's quota for that key is used
+up. Sample places instead."* — announced to screen readers after the deck
+loads, and every card it deals carries a SAMPLE tag.
+
+**4. Labelling honesty**
+One shared answer: `isSampleResult(r)` (id `demo-*` or `demo:true`) and
+`liveMode()` (a key is stored). The **SAMPLE** tag is drawn only when the app is
+**live** and the thing in front of you is sample — in demo mode the landing, the
+settings sheet and the panel banners already say so and stamping every card
+would be noise. Covered surfaces: deck card meta, the decision screen, the
+shortlist compare cards, the constellation panel, and the a11y card summary.
+Popular's section tags now fire if **any** row in the section is sample (they
+previously required *every* row), and the Popular banner names *Trending*
+specifically — in live mode "Near you right now" is genuinely live while
+Trending and "Loved by people with your taste" are still mock, and the tags now
+say exactly that. Friends stays labelled in every mode.
+
+**Verified** (no key and no outbound Google in the sandbox — everything below
+was driven against a **stubbed** `google.maps`, served by Playwright route
+interception, with a mocked page clock):
+- 15 hours cases at two clocks, asserting rendered chip text: open-with-late-
+  close, closing-within-the-hour (*Closes at 8pm*), a :15 close (*Closes at
+  8:15pm*), closed-but-opens-later (*Opens at 9pm*), **no hours at all** (binary
+  only, zero digits), two-period day active / next-service / all-over,
+  past-midnight close read at 19:30 **and** at 01:15 the next morning
+  (*Closes at 2am*), open-24-hours, `open_now` contradicting `periods`, and a
+  place in another timezone — all 15 pass.
+- Photo that loads → photo thumb; photo that 404s → watercolor, zero broken
+  images, zero page errors.
+- Four failure modes → four different sentences; malformed key makes **zero**
+  network calls; accepted key stores and switches to live; the key appears in
+  **no** console output and in no DOM text (the field is `type=password`).
+- Live results carry no SAMPLE tag; the fallback deck, its decision screen, its
+  compare cards and its constellation all do; demo mode is unchanged.
+- Demo mode end-to-end (landing → wizard → deck → decision → shortlist →
+  constellation → Popular → Friends → Visited): zero page errors, reason chips
+  and whole-hour labels identical to before.
+
+**Not verifiable here:** every Google response was a fixture. The exact wording
+of real rejections (which `classifyLive()` regexes against) and the real shape
+of `Place.searchNearby` responses should be sanity-checked once against a live
+key.
 
 ### Popular, deepened — three sections, no invented data (2026-08-03)
 Popular was still the thin demo leaderboard while the rest of the app grew. It
@@ -629,7 +749,9 @@ Fixed **bottom tab bar** (Find / Visited / Friends / Popular, icons + labels, sa
 ### Live-data caveats (already handled in code, good to know)
 - Google **doesn't label photos** as "vibe" vs "food" — live mode splits a place's available photos across those segments and fills Reviews from Place reviews (demo shows the fullest 3-way split).
 - Photos/reviews/phone need a per-place **Place Details** call — the deck lazily fetches details only for the top card + next two (cached) to save quota.
-- `open now` in distance-ranked search uses Google's `isOpen()` (deprecated but the only no-extra-call signal); **phone/Call** isn't in nearby results, so it appears only when details supply it.
+- `open now` in distance-ranked search is only a **binary** flag (that is all `nearbySearch` carries) — the real `periods` arrive with the per-place Details call, and until they do a live card shows *Open now* / *Closed* with **no invented time**. **phone/Call** isn't in nearby results either, so it appears only when details supply it.
+- Hours are reasoned in the **browser's** timezone; a place whose `utc_offset_minutes` differs falls back to the binary state rather than printing another zone's clock.
+- Saving a key spends **one** cheapest-tier Places request to validate it, so a bad key fails in the sheet instead of silently on the deck.
 
 ---
 
