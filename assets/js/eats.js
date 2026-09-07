@@ -187,6 +187,14 @@
   var KEY_VISITED = 'eats-visited';
   var KEY_PREFS = 'eats-prefs';
   var KEY_SEEN = 'eats-seen';
+  /* Feed tab memory: {follows:[handle...], hearts:[place name...]}.
+     `follows` are the sample creators you follow (they genuinely reweight
+     the feed); `hearts` are the places you hearted from a post, kept by
+     NAME because that is the join key every other surface here uses
+     (myRatingFor, Popular's placeByName) and the only id that survives a
+     reload in both demo and live mode. Hearts rehydrate the real
+     shortlist on boot — a heart is a save, not a like. */
+  var KEY_FEED = 'eats-feed';
   var SEEN_TTL_MS = 6 * 60 * 60 * 1000; // passes are remembered for ~one outing
 
   var store = {
@@ -254,8 +262,64 @@
     },
     clearSeen: function () {
       try { localStorage.removeItem(KEY_SEEN); } catch (e) {}
+    },
+    /* feed memory — follows + hearted places (see KEY_FEED above) */
+    getFeed: function () {
+      var empty = { follows: [], hearts: [] };
+      try {
+        var raw = localStorage.getItem(KEY_FEED);
+        if (!raw) return empty;
+        var o = JSON.parse(raw);
+        if (!o || typeof o !== 'object') return empty;
+        return {
+          follows: Array.isArray(o.follows) ? o.follows.slice() : [],
+          hearts: Array.isArray(o.hearts) ? o.hearts.slice() : []
+        };
+      } catch (e) { return empty; }
+    },
+    setFeed: function (o) {
+      try {
+        localStorage.setItem(KEY_FEED, JSON.stringify({
+          follows: (o && o.follows) || [],
+          hearts: (o && o.hearts) || []
+        }));
+        return true;
+      } catch (e) { return false; }
     }
   };
+
+  /* Small typed wrappers over store.getFeed()/setFeed() so the feed, the
+     deck and the shortlist all read and write the same two lists without
+     re-parsing JSON at every call site. Names are compared case-folded. */
+  var feedStore = (function () {
+    function lc(s2) { return String(s2 == null ? '' : s2).toLowerCase(); }
+    function has(list, v) {
+      for (var i = 0; i < list.length; i++) if (lc(list[i]) === lc(v)) return true;
+      return false;
+    }
+    function drop(list, v) {
+      return list.filter(function (x) { return lc(x) !== lc(v); });
+    }
+    return {
+      follows: function () { return store.getFeed().follows; },
+      isFollowing: function (handle) { return has(store.getFeed().follows, handle); },
+      setFollow: function (handle, on) {
+        var f = store.getFeed();
+        if (on && !has(f.follows, handle)) f.follows.push(handle);
+        if (!on) f.follows = drop(f.follows, handle);
+        store.setFeed(f);
+      },
+      hearts: function () { return store.getFeed().hearts; },
+      isHearted: function (name) { return has(store.getFeed().hearts, name); },
+      setHeart: function (name, on) {
+        if (!name) return;
+        var f = store.getFeed();
+        if (on && !has(f.hearts, name)) f.hearts.push(String(name));
+        if (!on) f.hearts = drop(f.hearts, name);
+        store.setFeed(f);
+      }
+    };
+  })();
 
   /* ------------------------------------------------------------------ *
    * distance — haversine (miles)
@@ -456,6 +520,841 @@
     img.src = safe;
   }
 
+
+  /* ================================================================== *
+   * FOOD ART — procedural watercolor "living stills" for the Feed.
+   *
+   * panelArt() paints a CSS gradient stack good enough for a 120px thumb.
+   * A full-bleed post is a different problem: at 390x844 a gradient stack
+   * reads as an abstract blob, so the feed paints to a canvas instead —
+   * real watercolor moves (pigment laid in overlapping translucent passes
+   * with 'multiply', irregular wet edges, a darker rim where the wash
+   * dried, paper grain over the top) arranged into one of five food
+   * COMPOSITION ARCHETYPES:
+   *
+   *   plate  a plated dish seen from above (the classic food shot)
+   *   bowl   a bowl of something brothy, three-quarter view, steam
+   *   stack  a tall side-on build: burger, pancakes, layered things
+   *   crop   a close crop of a dish edge — crust, field, toppings
+   *   table  a table scene: two plates, a glass, candle glow, dusk room
+   *
+   * Everything is seeded from the place, so a place always paints the same
+   * way, and every colour comes from that place's cuisine. Nothing here is
+   * a photograph and nothing here pretends to be: it is paint.
+   *
+   * Canvases are cached (small LRU) and painted exactly once — never per
+   * frame. The only motion is CSS on top of the finished canvas.
+   * ================================================================== */
+  var foodArt = (function () {
+    var W = 336, H = 728;        // internal paint size; CSS scales to fill
+    var CAP = 12;                // cached canvases (≈1.0MB each at this size)
+    var cache = {};              // key -> canvas
+    var order = [];              // LRU, oldest first
+
+    /* ---- colour helpers (hex in, css out) ---- */
+    function toRGB(hex) {
+      var h = String(hex).replace('#', '');
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+    }
+    function rgba(hex, a) {
+      var c = toRGB(hex);
+      return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')';
+    }
+    function toHex(c) {
+      function p(n) { n = Math.max(0, Math.min(255, Math.round(n))); return (n < 16 ? '0' : '') + n.toString(16); }
+      return '#' + p(c[0]) + p(c[1]) + p(c[2]);
+    }
+    function mix(a, b, t) {
+      var x = toRGB(a), y = toRGB(b);
+      return toHex([x[0] + (y[0] - x[0]) * t, x[1] + (y[1] - x[1]) * t, x[2] + (y[2] - x[2]) * t]);
+    }
+    function shade(hex, t) { return t < 0 ? mix(hex, '#1c2129', -t) : mix(hex, '#fffaf0', t); }
+    /* Some cuisine accents are cool (pond blue, wisteria). Ceramic can be
+       blue; a drizzle of sauce cannot. Anything that goes ON the food asks
+       for the warm version. */
+    function warmOf(hex) {
+      var c = toRGB(hex), r = c[0], g = c[1], b = c[2];
+      var mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      if (mx === mn) return '#d9a13d';
+      var h;
+      if (mx === r) h = ((g - b) / (mx - mn)) % 6;
+      else if (mx === g) h = (b - r) / (mx - mn) + 2;
+      else h = (r - g) / (mx - mn) + 4;
+      h = h * 60; if (h < 0) h += 360;
+      return (h >= 12 && h <= 65) ? hex : '#d9a13d';   // amber through gold only
+    }
+
+    /* ---- deterministic RNG (mulberry32) ---- */
+    function rngFrom(seed) {
+      var s = seed >>> 0;
+      return function () {
+        s = (s + 0x6D2B79F5) | 0;
+        var t = Math.imul(s ^ (s >>> 15), 1 | s);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    /* ---- paper grain, built once and stamped over everything ---- */
+    var grainTile = null;
+    function grain() {
+      if (grainTile) return grainTile;
+      var c = document.createElement('canvas');
+      c.width = c.height = 96;
+      var g = c.getContext('2d');
+      var img = g.createImageData(96, 96);
+      var d = img.data, rnd = rngFrom(20260907);
+      for (var i = 0; i < d.length; i += 4) {
+        var v = 128 + (rnd() - 0.5) * 96;
+        d[i] = d[i + 1] = d[i + 2] = v;
+        d[i + 3] = 26;
+      }
+      g.putImageData(img, 0, 0);
+      grainTile = c;
+      return c;
+    }
+
+    /* ---- one irregular closed watercolour edge ---- */
+    function blobPath(ctx, rnd, cx, cy, rx, ry, wob, rot, n) {
+      n = n || 13;
+      var pts = [], i, a, k;
+      for (i = 0; i < n; i++) {
+        a = rot + (i / n) * Math.PI * 2;
+        k = 1 + (rnd() * 2 - 1) * wob;
+        pts.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k]);
+      }
+      var mid = function (p, q) { return [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]; };
+      var m = mid(pts[n - 1], pts[0]);
+      ctx.beginPath();
+      ctx.moveTo(m[0], m[1]);
+      for (i = 0; i < n; i++) {
+        var p = pts[i], q = pts[(i + 1) % n], mm = mid(p, q);
+        ctx.quadraticCurveTo(p[0], p[1], mm[0], mm[1]);
+      }
+      ctx.closePath();
+    }
+
+    function comp(mode) {
+      return mode === 'over' ? 'source-over' : (mode === 'light' ? 'screen' : 'multiply');
+    }
+
+    /* A pigment pool: several overlapping translucent passes (that is what
+       makes watercolour read as watercolour), then a darker wet edge where
+       the wash pulled to the rim as it dried. `mode` is 'multiply' for a
+       glaze over what is underneath, 'over' for something solid sitting on
+       top of it (a plate, a slice of meat), 'light' for a lit haze. */
+    function pool(ctx, rnd, cx, cy, rx, ry, color, alpha, passes, wob, rim, mode) {
+      passes = passes || 3;
+      wob = wob == null ? 0.08 : wob;
+      ctx.save();
+      ctx.globalCompositeOperation = comp(mode);
+      for (var i = 0; i < passes; i++) {
+        var s = 1 - i * 0.11;
+        ctx.globalAlpha = alpha * (i === 0 ? 1 : 0.68);
+        ctx.fillStyle = i === 0 ? color : shade(color, i === 1 ? -0.1 : 0.12);
+        blobPath(ctx, rnd, cx + (rnd() - 0.5) * rx * 0.09, cy + (rnd() - 0.5) * ry * 0.09,
+                 rx * s, ry * s, wob, rnd() * 6.283);
+        ctx.fill();
+      }
+      if (rim !== false) {
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.globalAlpha = Math.min(1, alpha * 0.6);
+        ctx.strokeStyle = shade(color, -0.42);
+        ctx.lineWidth = Math.max(1.2, rx * 0.035);
+        blobPath(ctx, rnd, cx, cy, rx, ry, wob * 0.8, rnd() * 6.283);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    /* Warm light thrown onto a scene (screen, so it lifts dark ground). */
+    function soft(ctx, cx, cy, r, color, alpha) {
+      var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, rgba(color, alpha));
+      g.addColorStop(1, rgba(color, 0));
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+      ctx.restore();
+    }
+
+    /* The catch-light along the top of a piece of food — the single detail
+       that separates "cooked" from "coloured shape". */
+    function sheen(ctx, cx, cy, rx, ry, ang, alpha) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.translate(cx, cy);
+      ctx.rotate(ang);
+      var g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+      g.addColorStop(0, 'rgba(255,250,236,' + alpha + ')');
+      g.addColorStop(1, 'rgba(255,250,236,0)');
+      ctx.fillStyle = g;
+      ctx.scale(1, ry / rx);
+      ctx.beginPath(); ctx.arc(0, 0, rx, 0, 6.283); ctx.fill();
+      ctx.restore();
+    }
+
+    /* A soft cast shadow — what actually makes an object sit on a surface. */
+    function shadowEllipse(ctx, cx, cy, rx, ry, alpha, blur) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = alpha;
+      ctx.filter = 'blur(' + (blur || 10) + 'px)';
+      ctx.fillStyle = '#2a231c';
+      ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, 6.283); ctx.fill();
+      ctx.restore();
+    }
+
+    /* A loose brush stroke through a list of points. */
+    function stroke(ctx, pts, color, width, alpha, cap, mode) {
+      if (pts.length < 2) return;
+      ctx.save();
+      ctx.globalCompositeOperation = comp(mode);
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = cap || 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (var i = 1; i < pts.length - 1; i++) {
+        var mx = (pts[i][0] + pts[i + 1][0]) / 2, my = (pts[i][1] + pts[i + 1][1]) / 2;
+        ctx.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
+      }
+      ctx.lineTo(pts[pts.length - 1][0], pts[pts.length - 1][1]);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    /* A small pointed leaf (herbs, greens, garnish). */
+    function leaf(ctx, rnd, cx, cy, len, wid, ang, color, alpha) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      ctx.translate(cx, cy);
+      ctx.rotate(ang);
+      ctx.beginPath();
+      ctx.moveTo(-len / 2, 0);
+      ctx.quadraticCurveTo(0, -wid, len / 2, 0);
+      ctx.quadraticCurveTo(0, wid * (0.7 + rnd() * 0.5), -len / 2, 0);
+      ctx.fill();
+      ctx.globalAlpha = alpha * 0.5;
+      ctx.strokeStyle = shade(color, -0.4);
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function dots(ctx, rnd, cx, cy, spread, n, r, color, alpha) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      for (var i = 0; i < n; i++) {
+        var a = rnd() * 6.283, d = Math.sqrt(rnd()) * spread;
+        var rr = r * (0.6 + rnd() * 0.8);
+        ctx.beginPath();
+        ctx.ellipse(cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.8, rr, rr * (0.7 + rnd() * 0.5), rnd() * 3, 0, 6.283);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function vignette(ctx, strength) {
+      var g = ctx.createRadialGradient(W * 0.5, H * 0.38, H * 0.20, W * 0.5, H * 0.42, H * 0.76);
+      g.addColorStop(0, 'rgba(24,20,17,0)');
+      g.addColorStop(1, 'rgba(24,20,17,' + strength + ')');
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+
+    /* ---- backgrounds ----
+       Dark, warm surfaces. Food photography reads through contrast: the
+       ground has to be a real value or the plate never lifts off it. */
+    function bgCloth(ctx, rnd, f) {
+      var base = mix(f.table, '#241f1a', 0.42);
+      ctx.save();
+      ctx.fillStyle = base;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+      // brushed bands, both lighter and darker, so the surface has a weave
+      for (var i = 0; i < 7; i++) {
+        var y = H * (0.02 + i * 0.155) + rnd() * 26;
+        stroke(ctx, [[-30, y], [W * 0.45, y + 20 - rnd() * 40], [W + 30, y + 30 - rnd() * 60]],
+               i % 2 ? shade(base, 0.16) : shade(base, -0.18), 34 + rnd() * 40, 0.5, 'butt', 'over');
+      }
+      pool(ctx, rnd, W * 0.5, H * 0.42, W * 0.8, H * 0.42, shade(base, 0.13), 0.5, 2, 0.16, false, 'over');
+      soft(ctx, W * 0.26, H * 0.14, H * 0.52, '#ffe6b8', 0.30);
+      soft(ctx, W * 0.82, H * 0.86, H * 0.36, '#2a2118', 0.34);
+    }
+    function bgRoom(ctx, rnd, f) {
+      var base = mix(f.table, '#1b202b', 0.55);
+      ctx.save();
+      var g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, shade(base, -0.22));
+      g.addColorStop(0.52, base);
+      g.addColorStop(1, shade(base, -0.3));
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+      soft(ctx, W * 0.78, H * 0.2, H * 0.3, '#ffcf8c', 0.34);
+      soft(ctx, W * 0.14, H * 0.26, H * 0.22, '#9fc2e0', 0.16);
+    }
+
+    /* ---- ARCHETYPE 1: a plated dish, seen from above ---- */
+    function drawPlate(ctx, rnd, f) {
+      bgCloth(ctx, rnd, f);
+      var cx = W * 0.5, cy = H * 0.375, R = W * 0.475;
+
+      // a second dish half out of frame, top left — depth, and it says
+      // "this is a table", not "this is a diagram of a plate"
+      shadowEllipse(ctx, W * 0.04, H * 0.075, R * 0.5, R * 0.5, 0.4, 14);
+      ctx.save();
+      var sg = ctx.createRadialGradient(W * 0.0, H * 0.02, R * 0.05, W * 0.02, H * 0.06, R * 0.6);
+      sg.addColorStop(0, '#fffdf6'); sg.addColorStop(1, '#cdc0a8');
+      ctx.fillStyle = sg;
+      blobPath(ctx, rnd, W * 0.02, H * 0.055, R * 0.46, R * 0.46, 0.02, 0.7, 24); ctx.fill();
+      ctx.restore();
+      pool(ctx, rnd, W * 0.0, H * 0.05, R * 0.24, R * 0.2, f.deep, 0.85, 2, 0.2, true, 'over');
+
+      // plate — opaque, lit from the upper left, with a cast shadow
+      shadowEllipse(ctx, cx + 10, cy + 18, R * 1.0, R * 1.0, 0.5, 16);
+      ctx.save();
+      var pg = ctx.createRadialGradient(cx - R * 0.4, cy - R * 0.45, R * 0.1, cx, cy, R * 1.08);
+      pg.addColorStop(0, '#fffdf6');
+      pg.addColorStop(0.62, '#f4ecdc');
+      pg.addColorStop(1, '#d9cdb6');
+      ctx.fillStyle = pg;
+      blobPath(ctx, rnd, cx, cy, R, R, 0.012, 0.5, 30); ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = 0.35; ctx.strokeStyle = '#a89a80'; ctx.lineWidth = 2;
+      blobPath(ctx, rnd, cx, cy, R * 0.82, R * 0.82, 0.014, 1.1, 28); ctx.stroke();
+      ctx.restore();
+
+      // the dish itself, big enough to be the subject
+      var fr = R * 0.68;
+      shadowEllipse(ctx, cx + 4, cy + fr * 0.30, fr * 0.95, fr * 0.7, 0.28, 12);
+      pool(ctx, rnd, cx + fr * 0.04, cy + fr * 0.06, fr * 1.02, fr * 0.94, f.main, 0.62, 3, 0.17, true, 'over');
+      pool(ctx, rnd, cx, cy - fr * 0.04, fr * 0.72, fr * 0.64, f.deep, 0.9, 3, 0.14, true, 'over');
+      pool(ctx, rnd, cx - fr * 0.20, cy - fr * 0.20, fr * 0.38, fr * 0.32, shade(f.main, 0.22), 0.7, 2, 0.18, true, 'over');
+
+      // components fanned around the mound
+      var pieces = 5 + Math.floor(rnd() * 2);
+      for (var i = 0; i < pieces; i++) {
+        var a = -2.1 + (i / (pieces - 1)) * 4.9 + (rnd() - 0.5) * 0.26;
+        var d = fr * (0.66 + rnd() * 0.14);
+        var px = cx + Math.cos(a) * d, py = cy + Math.sin(a) * d * 0.94;
+        var pc = i % 2 ? f.deep : shade(f.main, -0.16);
+        shadowEllipse(ctx, px + 2, py + 5, fr * 0.30, fr * 0.20, 0.3, 8);
+        pool(ctx, rnd, px, py, fr * 0.30, fr * 0.21, pc, 0.95, 2, 0.14, true, 'over');
+        sheen(ctx, px - fr * 0.07, py - fr * 0.06, fr * 0.17, fr * 0.07, -0.35, 0.5);
+      }
+
+      // greens, seeds, a bright drizzle
+      for (var g2 = 0; g2 < 14; g2++) {
+        var ga = rnd() * 6.283, gd = fr * (0.28 + rnd() * 0.78);
+        leaf(ctx, rnd, cx + Math.cos(ga) * gd, cy + Math.sin(ga) * gd * 0.9,
+             fr * (0.15 + rnd() * 0.16), fr * (0.045 + rnd() * 0.045), rnd() * 3.14,
+             mix(f.fresh, '#4e6a3c', rnd() * 0.55), 0.88);
+      }
+      stroke(ctx, [[cx - fr * 0.92, cy + fr * 0.34], [cx - fr * 0.2, cy + fr * 0.62],
+                   [cx + fr * 0.4, cy + fr * 0.26], [cx + fr * 0.95, cy + fr * 0.52]],
+             shade(warmOf(f.accent), 0.12), 3.5, 0.55, 'round', 'over');
+      dots(ctx, rnd, cx, cy, fr * 0.85, 26, 2.6, shade(f.deep, -0.25), 0.75);
+      dots(ctx, rnd, cx - fr * 0.1, cy - fr * 0.18, fr * 0.55, 12, 2.4, '#fff6e2', 0.7);
+      sheen(ctx, cx - fr * 0.35, cy - fr * 0.42, fr * 0.5, fr * 0.2, -0.5, 0.34);
+      vignette(ctx, 0.5);
+    }
+
+    /* ---- ARCHETYPE 2: a bowl of something brothy ---- */
+    function drawBowl(ctx, rnd, f) {
+      bgCloth(ctx, rnd, f);
+      var cx = W * 0.5, cy = H * 0.385, rx = W * 0.435, ry = W * 0.17;
+      var deep = cy + W * 0.36;
+      var glaze = mix(f.table, '#efe7d6', 0.5);
+
+      shadowEllipse(ctx, cx + 8, cy + W * 0.30, rx * 0.9, W * 0.13, 0.5, 18);
+
+      // bowl body, lit from the left
+      ctx.save();
+      var bg = ctx.createLinearGradient(cx - rx, 0, cx + rx, 0);
+      bg.addColorStop(0, shade(glaze, 0.18));
+      bg.addColorStop(0.45, glaze);
+      bg.addColorStop(1, shade(glaze, -0.34));
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.moveTo(cx - rx, cy);
+      ctx.bezierCurveTo(cx - rx * 0.99, deep - W * 0.08, cx - rx * 0.52, deep, cx, deep);
+      ctx.bezierCurveTo(cx + rx * 0.52, deep, cx + rx * 0.99, deep - W * 0.08, cx + rx, cy);
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI, true);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 0.5; ctx.strokeStyle = shade(glaze, -0.5); ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.restore();
+      stroke(ctx, [[cx - rx * 0.92, cy + W * 0.11], [cx, cy + W * 0.165], [cx + rx * 0.92, cy + W * 0.11]],
+             shade(f.accent, -0.1), 11, 0.6, 'round', 'over');
+      sheen(ctx, cx - rx * 0.56, cy + W * 0.13, rx * 0.2, W * 0.09, 0.25, 0.4);
+
+      // broth
+      ctx.save();
+      ctx.fillStyle = shade(f.main, -0.08);
+      blobPath(ctx, rnd, cx, cy, rx * 0.94, ry * 0.94, 0.02, 0.3, 30); ctx.fill();
+      ctx.restore();
+      pool(ctx, rnd, cx - rx * 0.22, cy - ry * 0.12, rx * 0.55, ry * 0.55, shade(f.main, -0.26), 0.4, 2, 0.16, false);
+      shadowEllipse(ctx, cx, cy + ry * 0.1, rx * 0.9, ry * 0.85, 0.22, 14);
+
+      // noodles combed through the surface
+      for (var n = 0; n < 8; n++) {
+        var y0 = cy - ry * 0.58 + n * (ry * 0.18) + (rnd() - 0.5) * ry * 0.1;
+        var x0 = cx - rx * (0.5 + rnd() * 0.3), x1 = cx + rx * (0.3 + rnd() * 0.42);
+        stroke(ctx, [[x0, y0], [x0 + (x1 - x0) * 0.35, y0 - 7 + rnd() * 14],
+                     [x0 + (x1 - x0) * 0.7, y0 + 6 - rnd() * 12], [x1, y0 + (rnd() - 0.5) * 6]],
+               shade(f.cream, 0.06 + rnd() * 0.16), 4 + rnd() * 2.5, 0.8, 'round', 'over');
+      }
+      // protein rounds
+      var protein = [[-0.36, -0.16, 0.30], [-0.04, 0.24, 0.26]];
+      for (var pi = 0; pi < protein.length; pi++) {
+        var px = cx + rx * protein[pi][0], py = cy + ry * protein[pi][1], pr = rx * protein[pi][2];
+        shadowEllipse(ctx, px + 2, py + 4, pr, pr * 0.55, 0.3, 8);
+        pool(ctx, rnd, px, py, pr, pr * 0.55, pi ? shade(f.deep, 0.12) : f.deep, 0.96, 2, 0.1, true, 'over');
+        sheen(ctx, px - pr * 0.25, py - pr * 0.16, pr * 0.5, pr * 0.16, -0.3, 0.5);
+      }
+      // a halved egg
+      var ex = cx + rx * 0.44, ey = cy - ry * 0.1;
+      shadowEllipse(ctx, ex + 2, ey + 4, rx * 0.21, ry * 0.62, 0.3, 8);
+      pool(ctx, rnd, ex, ey, rx * 0.21, ry * 0.66, '#fbf3e0', 0.98, 2, 0.05, true, 'over');
+      pool(ctx, rnd, ex, ey + ry * 0.05, rx * 0.11, ry * 0.34, '#e8a733', 0.96, 2, 0.07, true, 'over');
+      sheen(ctx, ex - rx * 0.05, ey - ry * 0.22, rx * 0.09, ry * 0.1, -0.2, 0.55);
+      // nori
+      ctx.save();
+      ctx.globalAlpha = 0.94;
+      ctx.fillStyle = mix(f.fresh, '#141c1e', 0.7);
+      ctx.translate(cx + rx * 0.1, cy - ry * 0.5); ctx.rotate(-0.26);
+      blobPath(ctx, rnd, 0, 0, rx * 0.17, ry * 0.8, 0.06, 0.2, 10); ctx.fill();
+      ctx.restore();
+      // greens + chilli oil
+      for (var g3 = 0; g3 < 12; g3++) {
+        leaf(ctx, rnd, cx + (rnd() - 0.5) * rx * 1.4, cy + (rnd() - 0.5) * ry * 1.3,
+             rx * (0.09 + rnd() * 0.07), ry * (0.09 + rnd() * 0.07), rnd() * 3.14,
+             mix(f.fresh, '#4e6a3c', rnd() * 0.55), 0.9);
+      }
+      dots(ctx, rnd, cx + rx * 0.05, cy + ry * 0.1, rx * 0.65, 16, 3, shade(warmOf(f.accent), -0.05), 0.8);
+
+      // chopsticks over the far rim
+      stroke(ctx, [[cx + rx * 0.18, cy - ry * 2.5], [cx + rx * 1.3, cy + ry * 0.8]], '#8d6f4e', 6, 0.9, 'round', 'over');
+      stroke(ctx, [[cx + rx * 0.03, cy - ry * 2.35], [cx + rx * 1.15, cy + ry * 0.95]], '#a08055', 6, 0.9, 'round', 'over');
+
+      // steam: painted soft and still (the CSS layer adds the drift)
+      ctx.save();
+      ctx.filter = 'blur(9px)';
+      ctx.globalCompositeOperation = 'screen';
+      ctx.strokeStyle = '#fff2dc'; ctx.lineCap = 'round';
+      for (var s2 = 0; s2 < 3; s2++) {
+        var sx = cx + (s2 - 1) * rx * 0.42;
+        ctx.globalAlpha = 0.16 - s2 * 0.02;
+        ctx.lineWidth = 9 - s2;
+        ctx.beginPath();
+        ctx.moveTo(sx, cy - ry * 1.0);
+        ctx.bezierCurveTo(sx - 34 + rnd() * 26, cy - ry * 2.3, sx + 34 - rnd() * 26, cy - ry * 3.3, sx + (rnd() - 0.5) * 26, cy - ry * 4.4);
+        ctx.stroke();
+      }
+      ctx.restore();
+      vignette(ctx, 0.5);
+    }
+
+    /* ---- ARCHETYPE 3: a tall stacked build, side on ---- */
+    function drawStack(ctx, rnd, f) {
+      bgCloth(ctx, rnd, f);
+      var cx = W * 0.5, base = H * 0.605, wdt = W * 0.335;
+
+      shadowEllipse(ctx, cx + 6, base + 20, wdt * 1.6, W * 0.085, 0.5, 16);
+      ctx.save();
+      var pg = ctx.createLinearGradient(cx - wdt * 1.6, 0, cx + wdt * 1.6, 0);
+      pg.addColorStop(0, '#fffdf6'); pg.addColorStop(1, '#dbd0ba');
+      ctx.fillStyle = pg;
+      blobPath(ctx, rnd, cx, base + 10, wdt * 1.55, W * 0.082, 0.02, 0.2, 26); ctx.fill();
+      ctx.restore();
+
+      /* one layer of the build: a slab with a wavy underside so cheese
+         drips and lettuce frills read as themselves */
+      function slab(cy2, hw, hh, color, frill) {
+        shadowEllipse(ctx, cx + 3, cy2 + hh * 0.8, hw * 0.95, hh * 0.5, 0.3, 8);
+        ctx.save();
+        var lg = ctx.createLinearGradient(cx - hw, 0, cx + hw, 0);
+        lg.addColorStop(0, shade(color, 0.2));
+        lg.addColorStop(0.42, color);
+        lg.addColorStop(1, shade(color, -0.3));
+        ctx.fillStyle = lg;
+        ctx.beginPath();
+        ctx.moveTo(cx - hw, cy2 + (rnd() - 0.5) * hh * 0.3);
+        var up = frill ? 5 : 4, i;
+        for (i = 1; i <= up; i++) {
+          var ux = cx - hw + (2 * hw) * (i / up);
+          var uy = cy2 - hh * (0.55 + rnd() * 0.5) * Math.sin((i / up) * Math.PI) - (rnd() - 0.5) * hh * 0.25;
+          ctx.quadraticCurveTo(ux - hw / up, uy, ux, cy2 + (rnd() - 0.5) * hh * 0.3);
+        }
+        var steps = frill ? 8 : 4;
+        for (i = 0; i <= steps; i++) {
+          var tx = cx + hw - (2 * hw) * (i / steps);
+          var ty = cy2 + hh * (frill ? (i % 2 ? 1.6 : 0.7) : 1.0) + (rnd() - 0.5) * hh * 0.35;
+          ctx.lineTo(tx, ty);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 0.4; ctx.strokeStyle = shade(color, -0.45); ctx.lineWidth = 1.6; ctx.stroke();
+        ctx.restore();
+        sheen(ctx, cx - hw * 0.42, cy2 - hh * 0.5, hw * 0.42, hh * 0.34, -0.06, 0.4);
+      }
+
+      var y = base;
+      y -= wdt * 0.14; slab(y, wdt * 1.00, wdt * 0.15, mix(f.cream, '#c98b3f', 0.38), false); // bottom bun
+      y -= wdt * 0.22; slab(y, wdt * 1.08, wdt * 0.19, f.deep, false);                  // the patty
+      dots(ctx, rnd, cx, y + wdt * 0.06, wdt * 0.8, 16, 2.4, shade(f.deep, -0.4), 0.7); // char
+      y -= wdt * 0.21; slab(y, wdt * 1.12, wdt * 0.11, shade(warmOf(f.accent), 0.06), true); // melted something
+      y -= wdt * 0.14; slab(y, wdt * 1.18, wdt * 0.10, f.fresh, true);                  // greens
+      y -= wdt * 0.15; slab(y, wdt * 1.02, wdt * 0.11, f.main, false);                  // tomato / sauce
+
+      // domed top
+      y -= wdt * 0.30;
+      shadowEllipse(ctx, cx + 3, y + wdt * 0.2, wdt * 0.96, wdt * 0.2, 0.25, 10);
+      ctx.save();
+      var bun = mix(f.cream, '#c98b3f', 0.5);
+      var dg = ctx.createRadialGradient(cx - wdt * 0.4, y - wdt * 0.24, wdt * 0.05, cx, y, wdt * 1.2);
+      dg.addColorStop(0, shade(bun, 0.26));
+      dg.addColorStop(0.55, bun);
+      dg.addColorStop(1, shade(bun, -0.36));
+      ctx.fillStyle = dg;
+      ctx.beginPath();
+      ctx.moveTo(cx - wdt * 0.98, y + wdt * 0.20);
+      ctx.bezierCurveTo(cx - wdt * 1.02, y - wdt * 0.44, cx + wdt * 1.02, y - wdt * 0.44, cx + wdt * 0.98, y + wdt * 0.20);
+      ctx.quadraticCurveTo(cx, y + wdt * 0.34, cx - wdt * 0.98, y + wdt * 0.20);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      dots(ctx, rnd, cx, y - wdt * 0.04, wdt * 0.62, 22, 1.8, shade(bun, 0.34), 0.7);
+      sheen(ctx, cx - wdt * 0.3, y - wdt * 0.22, wdt * 0.3, wdt * 0.08, -0.2, 0.34);
+
+      // sides on the plate
+      for (var s = 0; s < 6; s++) {
+        var sx = cx + wdt * (0.9 + rnd() * 0.42), sy = base + 6 - rnd() * 16;
+        stroke(ctx, [[sx, sy], [sx + 10 - rnd() * 20, sy - 22 - rnd() * 22]],
+               shade(warmOf(f.accent), -0.02), 10, 0.92, 'round', 'over');
+      }
+      vignette(ctx, 0.48);
+    }
+
+    /* ---- ARCHETYPE 4: a close crop of a dish edge ---- */
+    function drawCrop(ctx, rnd, f) {
+      var board = mix('#5a4632', f.table, 0.28);   // wood, always warm
+      // the field: layered pigment across the whole frame
+      ctx.save();
+      ctx.fillStyle = shade(f.main, 0.04);
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+      pool(ctx, rnd, W * 0.34, H * 0.22, W * 0.66, H * 0.3, shade(f.main, 0.24), 0.6, 3, 0.2, false);
+      pool(ctx, rnd, W * 0.72, H * 0.44, W * 0.54, H * 0.26, shade(f.main, -0.24), 0.55, 3, 0.22, false);
+      pool(ctx, rnd, W * 0.18, H * 0.5, W * 0.44, H * 0.22, shade(f.deep, 0.22), 0.4, 3, 0.24, false);
+      // molten patches + a swirl of sauce combed through them
+      for (var m = 0; m < 8; m++) {
+        pool(ctx, rnd, W * rnd(), H * (0.04 + rnd() * 0.52), W * (0.11 + rnd() * 0.14), H * (0.045 + rnd() * 0.055),
+             shade(f.cream, -0.08), 0.34, 2, 0.26, false);
+      }
+      soft(ctx, W * 0.3, H * 0.18, H * 0.42, '#ffdcaa', 0.26);
+      for (var sw = 0; sw < 3; sw++) {
+        var sy0 = H * (0.14 + sw * 0.16);
+        stroke(ctx, [[-10, sy0 + 20], [W * 0.3, sy0 - 14], [W * 0.68, sy0 + 22], [W + 10, sy0 - 8]],
+               shade(f.deep, 0.1), 9 + rnd() * 8, 0.28);
+      }
+
+      // the crust: a scalloped, blistered edge sweeping across the lower
+      // third. This is the whole trick — an EDGE is what tells you the frame
+      // is a crop of a dish and not a swatch of colour.
+      var crust = mix(f.cream, '#c8873a', 0.55);
+      var crestY = H * 0.60, i;
+      ctx.save();
+      var cg = ctx.createLinearGradient(0, crestY - H * 0.03, 0, H * 0.84);
+      cg.addColorStop(0, shade(crust, 0.16));
+      cg.addColorStop(0.45, crust);
+      cg.addColorStop(1, shade(crust, -0.34));
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      ctx.moveTo(-12, H * 0.66);
+      var lumps = 7;
+      for (i = 0; i <= lumps; i++) {
+        var lx = -12 + ((W + 24) * i) / lumps;
+        var ly = crestY + Math.abs(i / lumps - 0.5) * H * 0.05 + (rnd() - 0.5) * H * 0.018;
+        var cxp = lx - (W + 24) / lumps / 2;
+        ctx.quadraticCurveTo(cxp, ly - H * 0.028, lx, ly);
+      }
+      ctx.lineTo(W + 12, H + 12);
+      ctx.lineTo(-12, H + 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      // the shadow the crust throws back onto the field
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = 0.4; ctx.filter = 'blur(9px)';
+      ctx.fillStyle = '#2a231c';
+      ctx.beginPath();
+      ctx.moveTo(-12, crestY - H * 0.02);
+      ctx.quadraticCurveTo(W * 0.5, crestY - H * 0.10, W + 12, crestY - H * 0.01);
+      ctx.lineTo(W + 12, crestY + H * 0.02); ctx.lineTo(-12, crestY + H * 0.03);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      // char blisters riding the crust
+      for (var b = 0; b < 22; b++) {
+        var bx = rnd() * W;
+        var by = crestY + Math.abs(bx / W - 0.5) * H * 0.05 + H * (0.015 + rnd() * 0.09);
+        dots(ctx, rnd, bx, by, 8, 2, 2.4 + rnd() * 3.4, shade(crust, -0.5), 0.34);
+      }
+      // the board it rests on, below the crust
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = board;
+      ctx.beginPath();
+      ctx.moveTo(-12, H * 0.80);
+      ctx.quadraticCurveTo(W * 0.5, H * 0.74, W + 12, H * 0.81);
+      ctx.lineTo(W + 12, H + 12); ctx.lineTo(-12, H + 12);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+
+      // toppings: flat discs, dark rim, one crescent of light
+      var n = 9 + Math.floor(rnd() * 4);
+      for (i = 0; i < n; i++) {
+        var tx = W * (0.1 + rnd() * 0.8), ty = H * (0.06 + rnd() * 0.44);
+        var rr = W * (0.06 + rnd() * 0.045);
+        shadowEllipse(ctx, tx + 3, ty + 6, rr * 0.95, rr * 0.8, 0.4, 8);
+        pool(ctx, rnd, tx, ty, rr, rr * 0.86, f.deep, 0.94, 2, 0.11, true, 'over');
+        sheen(ctx, tx - rr * 0.26, ty - rr * 0.32, rr * 0.46, rr * 0.16, -0.5, 0.4);
+      }
+      for (var g4 = 0; g4 < 15; g4++) {
+        leaf(ctx, rnd, W * (0.05 + rnd() * 0.9), H * (0.04 + rnd() * 0.5),
+             W * (0.032 + rnd() * 0.036), W * (0.012 + rnd() * 0.012), rnd() * 3.14,
+             mix(f.fresh, '#4e6a3c', rnd() * 0.55), 0.85);
+      }
+      dots(ctx, rnd, W * 0.5, H * 0.3, W * 0.55, 34, 2.4, shade(f.deep, -0.35), 0.45);
+      // one broad specular sweep, fading out at both ends
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      var g5 = ctx.createLinearGradient(0, 0, W * 1.1, H * 0.7);
+      g5.addColorStop(0, 'rgba(255,244,220,0)');
+      g5.addColorStop(0.4, 'rgba(255,244,220,0.16)');
+      g5.addColorStop(0.72, 'rgba(255,244,220,0)');
+      ctx.fillStyle = g5;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+      vignette(ctx, 0.42);
+    }
+
+    /* ---- ARCHETYPE 5: the restaurant table, dish in the foreground ---- */
+    function drawTable(ctx, rnd, f) {
+      bgRoom(ctx, rnd, f);
+      var top = H * 0.36;
+      // the table runs edge to edge — no seams, no floating panel
+      ctx.save();
+      var tg = ctx.createLinearGradient(0, top, 0, H);
+      tg.addColorStop(0, mix(f.table, '#3a2f24', 0.5));
+      tg.addColorStop(0.35, mix('#6a543c', f.table, 0.3));
+      tg.addColorStop(1, mix('#2b2119', f.table, 0.2));
+      ctx.fillStyle = tg;
+      ctx.fillRect(0, top, W, H - top);
+      ctx.restore();
+      ctx.save(); ctx.filter = 'blur(3px)';
+      stroke(ctx, [[-10, top + 2], [W * 0.5, top - 4], [W + 10, top + 3]], '#1d1712', 7, 0.34, 'butt', 'over');
+      ctx.restore();
+      for (var wgr = 0; wgr < 6; wgr++) {
+        var wy = top + H * (0.04 + wgr * 0.1) + rnd() * 10;
+        stroke(ctx, [[-10, wy], [W * 0.5, wy + 6 - rnd() * 12], [W + 10, wy - 4 + rnd() * 8]],
+               wgr % 2 ? '#7a6047' : '#3e3126', 6 + rnd() * 10, 0.22, 'butt', 'over');
+      }
+      soft(ctx, W * 0.56, top + H * 0.02, H * 0.28, '#ffcf86', 0.42);
+
+      // the hero plate, close and low in frame
+      var px = W * 0.46, py = H * 0.575, pr = W * 0.40;
+      shadowEllipse(ctx, px + 10, py + 16, pr, pr * 0.4, 0.55, 16);
+      ctx.save();
+      var pg = ctx.createRadialGradient(px - pr * 0.4, py - pr * 0.3, pr * 0.05, px, py, pr * 1.15);
+      pg.addColorStop(0, '#fffdf6'); pg.addColorStop(0.58, '#f0e6d2'); pg.addColorStop(1, '#bfb096');
+      ctx.fillStyle = pg;
+      blobPath(ctx, rnd, px, py, pr, pr * 0.4, 0.02, 0.3, 28); ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = 0.3; ctx.strokeStyle = '#9c8f78'; ctx.lineWidth = 1.8;
+      blobPath(ctx, rnd, px, py, pr * 0.82, pr * 0.33, 0.02, 1.0, 26); ctx.stroke();
+      ctx.restore();
+
+      var fr2 = pr * 0.56;
+      shadowEllipse(ctx, px + 4, py + fr2 * 0.28, fr2 * 1.0, fr2 * 0.4, 0.35, 10);
+      pool(ctx, rnd, px, py - fr2 * 0.06, fr2 * 1.02, fr2 * 0.46, f.main, 0.75, 3, 0.18, true, 'over');
+      pool(ctx, rnd, px - fr2 * 0.1, py - fr2 * 0.12, fr2 * 0.66, fr2 * 0.32, f.deep, 0.92, 2, 0.16, true, 'over');
+      for (var q = 0; q < 4; q++) {
+        var qa = -2.4 + q * 1.4 + (rnd() - 0.5) * 0.3;
+        var qx = px + Math.cos(qa) * fr2 * 0.72, qy = py + Math.sin(qa) * fr2 * 0.30;
+        pool(ctx, rnd, qx, qy, fr2 * 0.28, fr2 * 0.14, q % 2 ? f.deep : shade(f.main, -0.16), 0.95, 2, 0.14, true, 'over');
+        sheen(ctx, qx - fr2 * 0.06, qy - fr2 * 0.05, fr2 * 0.16, fr2 * 0.05, -0.35, 0.45);
+      }
+      for (var i2 = 0; i2 < 8; i2++) {
+        leaf(ctx, rnd, px + (rnd() - 0.5) * fr2 * 2.0, py + (rnd() - 0.5) * fr2 * 0.8,
+             fr2 * (0.2 + rnd() * 0.16), fr2 * (0.06 + rnd() * 0.05), rnd() * 3.14,
+             mix(f.fresh, '#4e6a3c', rnd() * 0.55), 0.9);
+      }
+      dots(ctx, rnd, px, py - fr2 * 0.1, fr2 * 0.8, 14, 2.4, '#fff6e2', 0.6);
+      sheen(ctx, px - fr2 * 0.5, py - fr2 * 0.4, fr2 * 0.55, fr2 * 0.16, -0.35, 0.4);
+      // fork resting on the cloth
+      stroke(ctx, [[px - pr * 1.12, py + pr * 0.2], [px - pr * 1.02, py - pr * 0.28]], '#e2d6bd', 5, 0.75, 'round', 'over');
+
+      // a second plate further back, half in shadow
+      var qx2 = W * 0.86, qy2 = H * 0.45, qr = W * 0.2;
+      shadowEllipse(ctx, qx2 + 5, qy2 + 8, qr, qr * 0.4, 0.45, 12);
+      ctx.save();
+      ctx.fillStyle = '#e8dcc4';
+      blobPath(ctx, rnd, qx2, qy2, qr, qr * 0.4, 0.02, 0.6, 22); ctx.fill();
+      ctx.restore();
+      pool(ctx, rnd, qx2, qy2 - qr * 0.05, qr * 0.6, qr * 0.24, f.deep, 0.9, 2, 0.2, true, 'over');
+
+      // wine glass, lit from behind
+      var gx = W * 0.155, gy = H * 0.41;
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = '#fff3dc';
+      ctx.beginPath();
+      ctx.moveTo(gx - W * 0.062, gy - H * 0.055);
+      ctx.bezierCurveTo(gx - W * 0.062, gy + H * 0.03, gx - W * 0.018, gy + H * 0.048, gx, gy + H * 0.05);
+      ctx.bezierCurveTo(gx + W * 0.018, gy + H * 0.048, gx + W * 0.062, gy + H * 0.03, gx + W * 0.062, gy - H * 0.055);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      pool(ctx, rnd, gx, gy + H * 0.012, W * 0.052, H * 0.03, shade(warmOf(f.accent), -0.12), 0.75, 2, 0.05, false, 'over');
+      stroke(ctx, [[gx, gy + H * 0.05], [gx, gy + H * 0.105]], '#efe3ca', 3, 0.6, 'round', 'over');
+      stroke(ctx, [[gx - W * 0.03, gy + H * 0.108], [gx + W * 0.03, gy + H * 0.108]], '#efe3ca', 3, 0.5, 'round', 'over');
+      stroke(ctx, [[gx - W * 0.052, gy - H * 0.05], [gx - W * 0.044, gy + H * 0.026]], '#fffaf0', 2.5, 0.7, 'round', 'over');
+
+      // candle behind the plates
+      soft(ctx, W * 0.66, H * 0.335, H * 0.12, '#ffcf86', 0.7);
+      ctx.save();
+      ctx.fillStyle = '#f0e1bf';
+      ctx.beginPath(); ctx.ellipse(W * 0.66, H * 0.355, W * 0.024, H * 0.022, 0, 0, 6.283); ctx.fill();
+      ctx.fillStyle = '#ffc95f';
+      ctx.beginPath(); ctx.ellipse(W * 0.66, H * 0.326, W * 0.010, H * 0.016, 0, 0, 6.283); ctx.fill();
+      ctx.restore();
+
+      // the room behind: warm bokeh, kept small and few
+      for (var k = 0; k < 7; k++) {
+        soft(ctx, W * rnd(), H * (0.04 + rnd() * 0.24), W * (0.025 + rnd() * 0.045), '#ffd9a0', 0.2);
+      }
+      vignette(ctx, 0.55);
+    }
+
+    var DRAW = { plate: drawPlate, bowl: drawBowl, stack: drawStack, crop: drawCrop, table: drawTable };
+    var WITH_STEAM = { bowl: 1, table: 1 };
+
+    /* Cuisine-keyed food pigments. `main` is the dish's dominant colour,
+       `deep` its browned/roasted note, `fresh` the green, `cream` the
+       starch/dairy, `table` the surface it sits on, `accent` the bright
+       thing (chilli oil, gold, sauce). */
+    var FOOD_PAL = {
+      cafe:          { main: '#c8944f', deep: '#8a5a2e', fresh: '#9db877', cream: '#f4e6c9', table: '#8a7358', accent: '#d9a86a' },
+      japanese:      { main: '#c98a45', deep: '#9c4f33', fresh: '#7e9b5e', cream: '#f3e7d2', table: '#48566e', accent: '#d98ba0' },
+      italian:       { main: '#c2503a', deep: '#8e3524', fresh: '#7fa05f', cream: '#f2e4c4', table: '#77634b', accent: '#cdb878' },
+      mexican:       { main: '#d0703a', deep: '#95391f', fresh: '#7fa25c', cream: '#f0dfb8', table: '#836348', accent: '#e0b453' },
+      indian:        { main: '#d08a2e', deep: '#a1471f', fresh: '#7d9b57', cream: '#f2e2bd', table: '#75546a', accent: '#c2547e' },
+      mediterranean: { main: '#c9a34e', deep: '#8d6a2c', fresh: '#7fa05f', cream: '#f3ead3', table: '#6a88a0', accent: '#7fa8c9' },
+      seafood:       { main: '#dda089', deep: '#b25a4a', fresh: '#8fae7d', cream: '#f0ead8', table: '#54788e', accent: '#6fa3c4' },
+      bbq:           { main: '#96522f', deep: '#54301c', fresh: '#84a05e', cream: '#e9d9b6', table: '#5a4c40', accent: '#c25a3a' },
+      korean:        { main: '#c2453a', deep: '#8a2b26', fresh: '#7f9e58', cream: '#f0e0c2', table: '#48566e', accent: '#d9a13d' },
+      vietnamese:    { main: '#c08a4a', deep: '#8a5a2e', fresh: '#7fa64f', cream: '#f3ecd6', table: '#66795a', accent: '#cdb878' },
+      thai:          { main: '#cf9a3a', deep: '#94592a', fresh: '#79a457', cream: '#f4ecd6', table: '#75688a', accent: '#a292c4' },
+      burgers:       { main: '#b9702f', deep: '#7d4420', fresh: '#86a95e', cream: '#e8c98a', table: '#7a6b5a', accent: '#c9a24e' },
+      pizza:         { main: '#c2503a', deep: '#8c3220', fresh: '#7fa05f', cream: '#f0dfae', table: '#77634b', accent: '#e6d3a3' },
+      vegetarian:    { main: '#8fae63', deep: '#5d7c42', fresh: '#a8c274', cream: '#f0efd8', table: '#77836a', accent: '#cdb878' },
+      american:      { main: '#c08a4a', deep: '#8a5a2e', fresh: '#84a95e', cream: '#f2e6cd', table: '#7a6b5a', accent: '#7fa8c9' }
+    };
+    var DEFAULT_PAL = { main: '#c09055', deep: '#8a5a35', fresh: '#8aa869', cream: '#f2e8d3', table: '#7b6a58', accent: '#cdb878' };
+
+    /* Which composition suits which cuisine — brothy things get the bowl,
+       stacked things the stack, and so on. Every list still holds more than
+       one archetype so a place with several posts does not repeat itself. */
+    var CUISINE_ARCH = {
+      japanese:      ['bowl', 'plate', 'table'],
+      korean:        ['bowl', 'crop', 'plate'],
+      vietnamese:    ['bowl', 'plate', 'table'],
+      thai:          ['bowl', 'plate', 'crop'],
+      cafe:          ['stack', 'plate', 'table'],
+      burgers:       ['stack', 'plate', 'table'],
+      pizza:         ['crop', 'plate', 'table'],
+      italian:       ['plate', 'crop', 'table'],
+      bbq:           ['plate', 'stack', 'table'],
+      indian:        ['plate', 'bowl', 'crop'],
+      mexican:       ['plate', 'crop', 'table'],
+      mediterranean: ['plate', 'table', 'bowl'],
+      seafood:       ['plate', 'table', 'bowl'],
+      vegetarian:    ['plate', 'bowl', 'table'],
+      american:      ['stack', 'plate', 'table']
+    };
+    var ANY_ARCH = ['plate', 'bowl', 'stack', 'crop', 'table'];
+
+    function cuisineOf(r) { return ((r && r.cuisines) || [])[0] || ''; }
+    function palFor(r) { return FOOD_PAL[cuisineOf(r)] || DEFAULT_PAL; }
+    function archFor(r, variant) {
+      var list = CUISINE_ARCH[cuisineOf(r)] || ANY_ARCH;
+      var h = hashStr((r && (r.name || r.id)) || 'x');
+      return list[(h + variant * 7) % list.length];
+    }
+
+    /* ---- the cache ---- */
+    function evict() {
+      var guard = order.length;   // a canvas that is on screen is never evicted
+      while (order.length > CAP && guard-- > 0) {
+        var k = order.shift();
+        var c = cache[k];
+        if (c && c.parentNode) { order.push(k); continue; } // in view — keep it
+        delete cache[k];
+      }
+    }
+
+    /* paint(place, variant) -> a finished <canvas>, painted once and reused. */
+    function paint(r, variant) {
+      var key = ((r && (r.id || r.name)) || 'x') + '|' + variant;
+      if (cache[key]) {
+        var at = order.indexOf(key);
+        if (at !== -1) order.splice(at, 1);
+        order.push(key);
+        return cache[key];
+      }
+      var cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      var ctx = cv.getContext('2d');
+      var arch = archFor(r, variant);
+      var rnd = rngFrom(hashStr(((r && (r.name || r.id)) || 'x') + '|feed|' + variant));
+      (DRAW[arch] || drawPlate)(ctx, rnd, palFor(r));
+      // paper grain over the finished paint
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = 0.55;
+      var pat = ctx.createPattern(grain(), 'repeat');
+      if (pat) { ctx.fillStyle = pat; ctx.fillRect(0, 0, W, H); }
+      ctx.restore();
+      cv.className = 'feed-art';
+      cv.setAttribute('aria-hidden', 'true');
+      cache[key] = cv;
+      order.push(key);
+      evict();
+      return cv;
+    }
+
+    return {
+      paint: paint,
+      archOf: archFor,
+      hasSteam: function (r, variant) { return !!WITH_STEAM[archFor(r, variant)]; },
+      palOf: palFor
+    };
+  })();
+
   // Pre-built demo result objects (with distance to DEMO_ORIGIN).
   function demoResults() {
     return DEMO_RESTAURANTS.map(function (r, i) {
@@ -583,6 +1482,7 @@
   var tabs = (function () {
     // Tab registry — add a tab by adding one entry here (keeps a11y wiring generic).
     var defs = [
+      { name: 'feed', tab: $('tab-feed'), panel: $('panel-feed'), onShow: function () { feed.show(); }, onHide: function () { feed.hide(); } },
       { name: 'find', tab: $('tab-find'), panel: $('panel-find'), onShow: null },
       { name: 'visited', tab: $('tab-visited'), panel: $('panel-visited'), onShow: function () { visited.render(); } },
       { name: 'friends', tab: $('tab-friends'), panel: $('panel-friends'), onShow: function () { friends.render(); } },
@@ -602,8 +1502,11 @@
         if (on) {
           if (focus) d.tab.focus();
           if (d.onShow) d.onShow();
-        }
+        } else if (d.onHide) { d.onHide(); }
       });
+      /* The Feed is full-bleed and fixed: the room's own heading and the
+         page scroll would sit behind it, so both step aside while it is up. */
+      try { document.body.classList.toggle('feed-on', which === 'feed'); } catch (e) {}
       if (typeof find !== 'undefined' && find.syncHeaderChrome) find.syncHeaderChrome();
     }
 
@@ -2486,16 +3389,45 @@
     }
 
     /* ---- shortlist: collect a few likes, compare, then commit ---- */
-    function addToShortlist(r) {
+    /* `quiet` is for saves that already spoke for themselves (a heart on a
+       Feed post announces its own line) and for rehydration at boot. */
+    function addToShortlist(r, quiet) {
       if (!r || shortlist.some(function (s) { return s.id === r.id; })) return;
       shortlist.push(r);
       updateBadge();
+      if (quiet) return;
       announce(r.name + ' saved to your shortlist. ' + shortlist.length + ' place' + (shortlist.length === 1 ? '' : 's') + ' saved.');
     }
 
     function removeFromShortlist(id) {
-      shortlist = shortlist.filter(function (s) { return s.id !== id; });
+      var gone = null;
+      shortlist = shortlist.filter(function (s) {
+        if (s.id === id) { gone = s; return false; }
+        return true;
+      });
+      // a place taken off the shortlist is no longer hearted in the Feed
+      if (gone) feedStore.setHeart(gone.name, false);
       updateBadge();
+    }
+
+    function inShortlist(id) {
+      return shortlist.some(function (s) { return s.id === id; });
+    }
+
+    /* Hearts are the one part of the shortlist that outlives the outing:
+       on boot (and whenever the deck is torn down) the places you hearted
+       in the Feed are put back on the shortlist, so the badge, the compare
+       screen and the constellation all agree with the Feed. */
+    function hydrateHearts() {
+      var names = feedStore.hearts();
+      if (!names.length) return;
+      var pool = (state.results && state.results.length) ? state.results : demoResults();
+      names.forEach(function (n) {
+        var key = String(n).toLowerCase();
+        for (var i = 0; i < pool.length; i++) {
+          if (String(pool[i].name || '').toLowerCase() === key) { addToShortlist(pool[i], true); return; }
+        }
+      });
     }
 
     function updateBadge() {
@@ -2772,6 +3704,7 @@
         onAction: function () {
           if (shortlist.some(function (s) { return s.id === r.id; })) return;
           shortlist.splice(Math.min(at, shortlist.length), 0, r);
+          feedStore.setHeart(r.name, true);
           updateBadge();
           if (shortlistEl && !shortlistEl.hidden) renderShortlist();
           else if (endEl && !endEl.hidden) showEnd(false); // refresh count + copy
@@ -3001,6 +3934,7 @@
       queue = []; idx = 0; topCard = null; animating = false;
       history = []; shortlist = [];
       updateUndo(); updateBadge();
+      hydrateHearts();   // hearted places survive "start over"
       setMode('deck');
     }
 
@@ -3079,7 +4013,7 @@
       onLike(r);
     }
 
-    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown, surprise: surprise, shortlistCount: shortlistCount, shareShortlist: shareShortlist, pickFrom: pickFrom };
+    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown, surprise: surprise, shortlistCount: shortlistCount, shareShortlist: shareShortlist, pickFrom: pickFrom, addToShortlist: addToShortlist, removeFromShortlist: removeFromShortlist, inShortlist: inShortlist, hydrateHearts: hydrateHearts };
   })();
 
   /* paint a wc-range fill % (shared) */
@@ -5356,6 +6290,628 @@
     return { init: init, render: render };
   })();
 
+
+  /* ================================================================== *
+   * FEED — the app's front door.
+   *
+   * A full-bleed vertical snap feed of watercolor food posts. What is
+   * REAL here: the scroll and snap, the art, the place behind every post
+   * (always one from the current pool — your live search results, or the
+   * sample set), hearting a post (it saves that place to the same
+   * shortlist the deck fills, and the heart persists), "Go here" (it opens
+   * the deck's own decision screen), and the ORDER, which is computed from
+   * your Visited log, your preferences, who you follow and how far away
+   * the place is.
+   *
+   * What is SAMPLE, and says so on every surface that shows it: the
+   * creators, their handles, their follower counts and the captions. There
+   * is no account and no backend behind them, and the banner at the top of
+   * the feed says exactly that.
+   *
+   * There is no video anywhere in here. The posts are painted stills that
+   * breathe — a drifting wash, a slow push, faint steam — and under
+   * prefers-reduced-motion they hold perfectly still.
+   * ================================================================== */
+  var feed = (function () {
+    var panelEl = $('panel-feed');
+    var scrollEl = $('feed-scroll');
+    var railEl = $('feed-rail');
+    var emptyEl = $('feed-empty');
+
+    var WINDOW = 2;          // posts kept mounted either side of the visible one
+    var MAX_NODES = 7;       // hard cap on post nodes in the DOM (5 + 2 spare)
+    var POSTS_PER_PLACE = 3;
+
+    var posts = [];          // ranked post descriptors
+    var mounted = {};        // index -> node
+    var freeNodes = [];      // recycled node pool
+    var poolSig = '';        // signature of the place pool these posts came from
+    var postH = 0;
+    var current = -1;
+    var ticking = false;
+    var announceTimer = null;
+    var shown = false;
+
+    /* ---- the creators. Sample data, labelled as such everywhere it
+       appears — the same discipline the Friends tab keeps. Six of them are
+       the Friends-tab names so the app reads as one world. ---- */
+    var CREATORS = [
+      { handle: '@mayaokafor', name: 'Maya Okafor', initial: 'M', color: 'rose', followers: '18.2k' },
+      { handle: '@devineats', name: 'Devin Park', initial: 'D', color: 'pond', followers: '9,410' },
+      { handle: '@priyaplates', name: 'Priya Raman', initial: 'P', color: 'wisteria', followers: '24.6k' },
+      { handle: '@leoclate', name: 'Leo Castellanos', initial: 'L', color: 'sage', followers: '6,208' },
+      { handle: '@hanasato', name: 'Hana Sato', initial: 'H', color: 'gold', followers: '31.9k' },
+      { handle: '@theobrandt', name: 'Theo Brandt', initial: 'T', color: 'pond', followers: '4,072' },
+      { handle: '@saltandpaper', name: 'Nour Haddad', initial: 'N', color: 'wisteria', followers: '52.1k' },
+      { handle: '@slowbreakfast', name: 'Ines Duarte', initial: 'I', color: 'sage', followers: '11.7k' }
+    ];
+
+    /* Captions are written in the app's voice and are demo content like the
+       creators are. For a live place we know nothing about beyond its name,
+       type and distance, the caption states only that — it never invents a
+       dish, a queue or a verdict for a real restaurant. */
+    var CLOSERS = [
+      'Worth the walk.', 'Still thinking about it.', 'Quietly perfect.',
+      'Went twice this week.', 'No notes.', 'The good kind of full.',
+      'Sat by the window for an hour.', 'Would go again tomorrow.'
+    ];
+    var LIVE_LINES = [
+      'On the list for this week.', 'Saving this one.', 'Next dinner, maybe.',
+      'Walked past it twice. Third time counts.'
+    ];
+    function captionFor(r, variant, h) {
+      var segs = r.segments || {};
+      var food = segs.food && segs.food.caption;
+      var vibe = segs.vibe && segs.vibe.caption;
+      var line = (variant % 2 === 0 ? food : vibe) || food || vibe || '';
+      if (line) {
+        return line.charAt(0).toUpperCase() + line.slice(1) + '. ' + CLOSERS[(h + variant) % CLOSERS.length];
+      }
+      var bits = [];
+      if (r.type) bits.push(r.type);
+      if (r.distance != null) bits.push(fmtDist(r.distance) + ' away');
+      return (bits.length ? bits.join(' · ') + '. ' : '') + LIVE_LINES[(h + variant) % LIVE_LINES.length];
+    }
+
+    /* ---------------- the ranking model ----------------
+       score = follow boost + taste + proximity + quality + open now, plus a
+       small seeded jitter so two identical scores don't reshuffle between
+       renders. Every term is derived from something real; nothing here is
+       random per view. With no follows and no Visited history the first two
+       terms are simply zero and the feed falls back to proximity + rating,
+       which is still a sensible order — never a blank or arbitrary one. */
+    var FOLLOW_BOOST = 34;
+
+    var affinityCache = null;
+    function cuisineAffinity() {
+      if (affinityCache) return affinityCache;
+      var byName = {};
+      DEMO_RESTAURANTS.forEach(function (d) {
+        if (d.cuisines && d.cuisines.length) byName[d.name.toLowerCase()] = d.cuisines;
+      });
+      var sums = {}, counts = {};
+      (state.visited || []).forEach(function (e) {
+        var keys = (e.cuisines && e.cuisines.length) ? e.cuisines : byName[String(e.name || '').toLowerCase()];
+        if (!keys) return;
+        var o = overallOf(e);
+        if (!isFinite(o)) return;
+        keys.forEach(function (k) {
+          sums[k] = (sums[k] || 0) + o;
+          counts[k] = (counts[k] || 0) + 1;
+        });
+      });
+      affinityCache = { sums: sums, counts: counts };
+      return affinityCache;
+    }
+
+    /* 0-40, plus the one honest sentence that explains it. */
+    function tasteScore(r) {
+      var mine = myRatingFor(r.name);
+      if (mine) {
+        var o = overallOf(mine);
+        if (o >= 75) return { s: 30, why: { kind: 'mine', text: 'You rated it ' + fmtScore(o) } };
+        if (o < 55) return { s: -18, why: null };
+        return { s: 8, why: null };
+      }
+      var best = 0, why = null;
+      var aff = cuisineAffinity();
+      (r.cuisines || []).forEach(function (k) {
+        if (!aff.counts[k]) return;
+        var avg = aff.sums[k] / aff.counts[k];
+        var damp = aff.counts[k] / (aff.counts[k] + 1);   // one visit can't carry it
+        var v = Math.max(-10, ((avg - 62) / 38) * 26) * damp;
+        if (v > best) {
+          best = v;
+          why = { kind: 'pref', text: 'More ' + prefs.labelFor(k) + ' — you rate it well' };
+        }
+      });
+      var fr = bestFriendRating(r.name);
+      if (fr && overallOf(fr) >= 80 && best < 16) {
+        best = 16;
+        why = { kind: 'friend', text: firstName(fr.friend.name) + ' loved it' };
+      }
+      return { s: best, why: why };
+    }
+
+    function scorePost(post) {
+      var r = post.place, s = 0, why = null;
+      if (feedStore.isFollowing(post.creator.handle)) {
+        s += FOLLOW_BOOST;
+        why = { kind: 'friend', text: 'You follow ' + firstName(post.creator.name) };
+      }
+      var t = tasteScore(r);
+      s += t.s;
+      if (!why && t.why && t.s >= 15) why = t.why;
+      if (r.distance != null) {
+        var near = Math.max(0, 18 - r.distance * 16);
+        s += near;
+        if (!why && near >= 13) why = { kind: 'near', text: fmtDist(r.distance) + ' from you' };
+      }
+      if (r.rating) s += (r.rating - 3.8) * 13;
+      var st = openState(r);
+      if (st && (st.key === 'open' || st.key === 'soon')) {
+        s += 6;
+        if (!why) why = { kind: 'time', text: 'Open right now' };
+      }
+      if (!why && r.rating >= 4.5) why = { kind: 'rating', text: 'Loved nearby' };
+      s += (hashStr(post.key) % 1000) / 1000 * 6;
+      post.why = why;
+      post.score = s;
+      return s;
+    }
+
+    /* Ranking alone would stack every post from your three favourite places
+       at the top and the feed would feel like a loop. This walks the ranked
+       list and takes the best post that is at least GAP_PLACE away from the
+       last post of that place (and GAP_CREATOR from that creator); when
+       nothing qualifies it takes the best one left rather than stalling. The
+       ORDER within those constraints is still entirely the score's. */
+    var GAP_PLACE = 4, GAP_CREATOR = 2;
+    function spread(list) {
+      var out = [], pending = list.slice();
+      while (pending.length) {
+        var pick = -1;
+        for (var i = 0; i < pending.length; i++) {
+          var c = pending[i], ok = true;
+          for (var k = 1; k <= GAP_PLACE && out.length - k >= 0; k++) {
+            var prev = out[out.length - k];
+            if (prev.place === c.place) { ok = false; break; }
+            if (k <= GAP_CREATOR && prev.creator === c.creator) { ok = false; break; }
+          }
+          if (ok) { pick = i; break; }
+        }
+        out.push(pending.splice(pick === -1 ? 0 : pick, 1)[0]);
+      }
+      return out;
+    }
+
+    function poolOf() {
+      return (state.results && state.results.length) ? state.results : demoResults();
+    }
+    function signatureOf(pool) {
+      return pool.length + ':' + (pool[0] ? pool[0].id : '') + ':' + (liveMode() ? 'live' : 'demo');
+    }
+
+    function build(pool) {
+      var out = [];
+      pool.forEach(function (r) {
+        for (var v = 0; v < POSTS_PER_PLACE; v++) {
+          var h = hashStr((r.id || r.name || '') + '|feedpost|' + v);
+          out.push({
+            key: (r.id || r.name || '') + '|' + v,
+            place: r,
+            variant: v,
+            creator: CREATORS[(h + v * 3) % CREATORS.length],
+            caption: captionFor(r, v, h)
+          });
+        }
+      });
+      out.forEach(scorePost);
+      out.sort(function (a, b) { return b.score - a.score; });
+      return spread(out);
+    }
+
+    /* Re-rank in place, keeping the post the reader is looking at exactly
+       where it is — following someone reshapes what comes NEXT, it does not
+       yank the current post out from under them. */
+    function rerank(keepKey) {
+      affinityCache = null;
+      posts = build(poolOf());
+      var at = 0;
+      for (var i = 0; i < posts.length; i++) if (posts[i].key === keepKey) { at = i; break; }
+      unmountAll();
+      layout();
+      // The order is rebuilt from scratch — the reader simply travels with
+      // the post they were looking at, so nothing jumps and the ranking
+      // stays exactly what the model says it should be.
+      hardScroll(at * postH);
+      sync(true);
+    }
+
+    /* ---------------- DOM ---------------- */
+    function buildNode() {
+      var art = el('div', 'feed-artwrap');
+      art.setAttribute('aria-hidden', 'true');
+      var steam = el('div', 'feed-steam');
+      steam.setAttribute('aria-hidden', 'true');
+      steam.appendChild(el('span', 'feed-steam-p'));
+      steam.appendChild(el('span', 'feed-steam-p'));
+      steam.appendChild(el('span', 'feed-steam-p'));
+      art.appendChild(steam);
+      var wash = el('div', 'feed-wash');
+      wash.setAttribute('aria-hidden', 'true');
+      art.appendChild(wash);
+
+      var node = el('article', 'feed-post');
+      node.tabIndex = -1;   // focusable only on purpose (keyboard paging)
+      node.appendChild(art);
+      var scrim = el('div', 'feed-scrim');
+      scrim.setAttribute('aria-hidden', 'true');
+      node.appendChild(scrim);
+
+      var why = el('p', 'feed-why');
+      var whyGlyph = el('span', 'feed-why-glyph');
+      whyGlyph.setAttribute('aria-hidden', 'true');
+      var whyText = el('span', 'feed-why-text');
+      why.appendChild(whyGlyph);
+      why.appendChild(whyText);
+      node.appendChild(why);
+
+      var body = el('div', 'feed-body');
+      var crow = el('div', 'feed-creator');
+      var avatar = el('span', 'feed-avatar');
+      avatar.setAttribute('aria-hidden', 'true');
+      var handle = el('span', 'feed-handle');
+      var demoTag = el('span', 'v-demo-tag feed-sample', 'Sample');
+      crow.appendChild(avatar);
+      crow.appendChild(handle);
+      crow.appendChild(demoTag);
+      body.appendChild(crow);
+
+      var name = el('h3', 'feed-place');
+      body.appendChild(name);
+      var meta = el('div', 'feed-meta');
+      body.appendChild(meta);
+      var cap = el('p', 'feed-caption');
+      body.appendChild(cap);
+      var reasons = el('div', 'feed-reasonhold');
+      body.appendChild(reasons);
+      node.appendChild(body);
+
+      var rail = el('div', 'feed-acts');
+      function act(cls, label) {
+        var b = el('button', 'feed-act ' + cls);
+        b.type = 'button';
+        var g = el('span', 'feed-act-glyph');
+        g.setAttribute('aria-hidden', 'true');
+        var l = el('span', 'feed-act-label');
+        b.appendChild(g);
+        b.appendChild(l);
+        rail.appendChild(b);
+        return { btn: b, glyph: g, label: l };
+      }
+      var heart = act('feed-act--heart', 'Save');
+      var follow = act('feed-act--follow', 'Follow');
+      var go = act('feed-act--go', 'Go here');
+      node.appendChild(rail);
+
+      node._refs = {
+        art: art, steam: steam, wash: wash, why: why, whyGlyph: whyGlyph, whyText: whyText,
+        avatar: avatar, handle: handle, name: name, meta: meta, cap: cap,
+        reasons: reasons, heart: heart, follow: follow, go: go, canvas: null
+      };
+
+      heart.btn.addEventListener('click', function () { onHeart(node); });
+      follow.btn.addEventListener('click', function () { onFollow(node); });
+      go.btn.addEventListener('click', function () { onGo(node); });
+      return node;
+    }
+
+    function heartedFor(r) {
+      return feedStore.isHearted(r.name) || deck.inShortlist(r.id);
+    }
+
+    function paintHeart(node) {
+      var p = node._post;
+      if (!p) return;
+      var on = heartedFor(p.place);
+      var h = node._refs.heart;
+      h.btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      h.btn.classList.toggle('is-on', on);
+      h.glyph.textContent = on ? '♥' : '♡';
+      h.label.textContent = on ? 'Saved' : 'Save';
+      h.btn.setAttribute('aria-label',
+        (on ? 'Remove ' : 'Save ') + p.place.name + (on ? ' from your shortlist' : ' to your shortlist'));
+    }
+    function paintFollow(node) {
+      var p = node._post;
+      if (!p) return;
+      var on = feedStore.isFollowing(p.creator.handle);
+      var f = node._refs.follow;
+      f.btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      f.btn.classList.toggle('is-on', on);
+      f.glyph.textContent = on ? '✓' : '+';
+      f.label.textContent = on ? 'Following' : 'Follow';
+      f.btn.setAttribute('aria-label',
+        (on ? 'Unfollow ' : 'Follow ') + p.creator.handle + ' (sample creator)');
+    }
+
+    function fill(node, i) {
+      var p = posts[i], r = p.place, refs = node._refs;
+      node._post = p;
+      node._index = i;
+      node.style.top = (i * postH) + 'px';
+      node.setAttribute('aria-posinset', String(i + 1));
+      node.setAttribute('aria-setsize', String(posts.length));
+
+      if (refs.canvas && refs.canvas.parentNode === refs.art) refs.art.removeChild(refs.canvas);
+      var cv = foodArt.paint(r, p.variant);
+      refs.canvas = cv;
+      refs.art.insertBefore(cv, refs.art.firstChild);
+      refs.art.classList.toggle('has-steam', foodArt.hasSteam(r, p.variant));
+      // a stable per-post offset so neighbouring posts don't drift in step
+      refs.art.style.setProperty('--art-seed', String((hashStr(p.key) % 1000) / 1000));
+
+      refs.avatar.textContent = p.creator.initial;
+      refs.avatar.className = 'feed-avatar feed-avatar--' + p.creator.color;
+      refs.handle.textContent = p.creator.handle;
+      refs.name.textContent = r.name;
+
+      clear(refs.meta);
+      var chip = openChipEl(r, 'ov-badge');
+      if (chip) refs.meta.appendChild(chip);
+      var mbits = [];
+      if (r.rating) mbits.push('★ ' + fmt1(r.rating));
+      if (r.price) mbits.push(priceStr(r.price));
+      if (r.distance != null) mbits.push(fmtDist(r.distance));
+      if (mbits.length) refs.meta.appendChild(el('span', 'feed-metatext', mbits.join('  ·  ')));
+      var stag = sampleTagFor(r, 'feed-sample');
+      if (stag) refs.meta.appendChild(stag);
+      refs.meta.appendChild(el('span', 'feed-followers', p.creator.followers + ' followers'));
+
+      refs.cap.textContent = p.caption;
+
+      clear(refs.reasons);
+      var rlist = matchReasons(r, {
+        max: 2,
+        shown: r.name + ' ' + p.caption + ' ' + (chip ? chip.textContent : '') + ' ' + (p.why ? p.why.text : ''),
+        // the "why you're seeing this" pill already said this louder
+        skip: p.why ? (function () { var sk = {}; sk[p.why.kind === 'mine' ? 'mine' : p.why.kind] = 1; return sk; })() : null
+      });
+      var row = reasonsRowEl(rlist, 'feed-reason');
+      if (row) refs.reasons.appendChild(row);
+
+      if (p.why) {
+        refs.why.hidden = false;
+        refs.whyGlyph.textContent = REASON_GLYPH[p.why.kind] || '';
+        refs.whyText.textContent = p.why.text;
+      } else {
+        refs.why.hidden = true;
+      }
+
+      paintHeart(node);
+      paintFollow(node);
+      refs.go.glyph.textContent = '↗';
+      refs.go.label.textContent = 'Go here';
+      refs.go.btn.setAttribute('aria-label', 'Go here — open the decision screen for ' + r.name);
+
+      var st = openState(r);
+      node.setAttribute('aria-label',
+        r.name + (r.type ? ', ' + r.type : '') + (st ? ', ' + st.label : '') +
+        '. Posted by ' + p.creator.handle + ', a sample creator.');
+      return node;
+    }
+
+    function mountAt(i) {
+      if (mounted[i]) return mounted[i];
+      var node = freeNodes.pop() || buildNode();
+      fill(node, i);
+      if (node.parentNode !== railEl) railEl.appendChild(node);
+      mounted[i] = node;
+      return node;
+    }
+    function release(i) {
+      var node = mounted[i];
+      if (!node) return;
+      delete mounted[i];
+      var refs = node._refs;
+      if (refs.canvas && refs.canvas.parentNode === refs.art) refs.art.removeChild(refs.canvas);
+      refs.canvas = null;
+      node._post = null;
+      if (node.parentNode) node.parentNode.removeChild(node);
+      if (freeNodes.length < MAX_NODES) freeNodes.push(node);
+    }
+    function unmountAll() {
+      for (var k in mounted) if (mounted.hasOwnProperty(k)) release(Number(k));
+      current = -1;
+    }
+
+    function layout() {
+      if (!scrollEl || !railEl) return;
+      postH = scrollEl.clientHeight || 0;
+      scrollEl.style.setProperty('--post-h', postH + 'px');
+      var topEl = panelEl.querySelector('.feed-top');
+      if (topEl) {
+        var tb = topEl.getBoundingClientRect();
+        panelEl.style.setProperty('--feed-top-h', Math.round(tb.bottom) + 'px');
+      }
+      railEl.style.height = (postH * posts.length) + 'px';
+      for (var k in mounted) {
+        if (mounted.hasOwnProperty(k)) mounted[k].style.top = (Number(k) * postH) + 'px';
+      }
+    }
+
+    /* scroll-snap-stop:always is what makes ONE swipe move ONE post — but
+       it also stops any long programmatic jump at the first snap area it
+       crosses. For deliberate jumps (Home/End, a re-rank, a resize) snapping
+       is switched off for the one frame it takes to land. */
+    function hardScroll(top) {
+      var prev = scrollEl.style.scrollSnapType;
+      scrollEl.style.scrollSnapType = 'none';
+      scrollEl.scrollTop = top;
+      // mount the window around the LANDING position before snapping is
+      // turned back on: a virtualised feed has no snap areas where nothing
+      // is mounted, and mandatory snapping would drag the scroll back to
+      // the nearest node that still exists.
+      sync(true);
+      void scrollEl.offsetHeight;
+      scrollEl.style.scrollSnapType = prev || '';
+    }
+
+    function indexAt() {
+      if (!postH) return 0;
+      var i = Math.round(scrollEl.scrollTop / postH);
+      return Math.max(0, Math.min(posts.length - 1, i));
+    }
+
+    function sync(force) {
+      if (!posts.length || !postH) return;
+      var i = indexAt();
+      var lo = Math.max(0, i - WINDOW), hi = Math.min(posts.length - 1, i + WINDOW);
+      for (var k in mounted) {
+        if (!mounted.hasOwnProperty(k)) continue;
+        var n = Number(k);
+        if (n < lo || n > hi) release(n);
+      }
+      for (var m = lo; m <= hi; m++) mountAt(m);
+      /* only the post you are actually looking at is in the tab order —
+         Tab must not walk into the actions of a post that is off screen */
+      for (var q in mounted) {
+        if (!mounted.hasOwnProperty(q)) continue;
+        var node = mounted[q], on = Number(q) === i;
+        node.classList.toggle('is-current', on);
+        var acts = node._refs;
+        acts.heart.btn.tabIndex = on ? 0 : -1;
+        acts.follow.btn.tabIndex = on ? 0 : -1;
+        acts.go.btn.tabIndex = on ? 0 : -1;
+      }
+      if (i !== current || force) {
+        current = i;
+        if (announceTimer) window.clearTimeout(announceTimer);
+        announceTimer = window.setTimeout(function () {
+          announceTimer = null;
+          var p = posts[current];
+          if (!p || !shown) return;
+          var st = openState(p.place);
+          announce(p.place.name + (st ? ', ' + st.label : '') + '. Post ' +
+                   (current + 1) + ' of ' + posts.length + '.' +
+                   (p.why ? ' ' + p.why.text + '.' : ''));
+        }, 260);
+      }
+    }
+
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(function () { ticking = false; sync(false); });
+    }
+
+    function goTo(i, focusIt) {
+      i = Math.max(0, Math.min(posts.length - 1, i));
+      if (Math.abs(i - indexAt()) > 1 || prefersReducedMotion) hardScroll(i * postH);
+      else scrollEl.scrollTo({ top: i * postH, behavior: 'smooth' });
+      sync(false);
+      if (focusIt && mounted[i]) mounted[i].focus();
+    }
+
+    /* ---------------- actions ---------------- */
+    function onHeart(node) {
+      var p = node._post;
+      if (!p) return;
+      var on = !heartedFor(p.place);
+      feedStore.setHeart(p.place.name, on);
+      if (on) deck.addToShortlist(p.place, true);
+      else deck.removeFromShortlist(p.place.id);
+      // every mounted post for this place agrees at once
+      for (var k in mounted) {
+        if (mounted.hasOwnProperty(k) && mounted[k]._post && mounted[k]._post.place === p.place) paintHeart(mounted[k]);
+      }
+      haptic(on ? 14 : 8);
+      if (on) {
+        var rect = node._refs.heart.btn.getBoundingClientRect();
+        dropletBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, 74);
+      }
+      toast(on ? p.place.name + ' saved to your shortlist' : p.place.name + ' removed from your shortlist');
+      announce(on
+        ? p.place.name + ' saved to your shortlist.'
+        : p.place.name + ' removed from your shortlist.');
+    }
+
+    function onFollow(node) {
+      var p = node._post;
+      if (!p) return;
+      var on = !feedStore.isFollowing(p.creator.handle);
+      feedStore.setFollow(p.creator.handle, on);
+      for (var k in mounted) {
+        if (mounted.hasOwnProperty(k) && mounted[k]._post && mounted[k]._post.creator === p.creator) paintFollow(mounted[k]);
+      }
+      haptic(12);
+      toast(on ? 'Following ' + p.creator.handle : 'Unfollowed ' + p.creator.handle);
+      announce((on ? 'Following ' : 'Unfollowed ') + p.creator.handle +
+               '. Your feed leans ' + (on ? 'toward' : 'away from') + ' their posts from here on.');
+      rerank(p.key);
+    }
+
+    function onGo(node) {
+      var p = node._post;
+      if (!p) return;
+      var rest = [], seen = {};
+      seen[p.place.id] = true;
+      for (var i = current + 1; i < posts.length && rest.length < 12; i++) {
+        var r = posts[i].place;
+        if (seen[r.id]) continue;
+        seen[r.id] = true;
+        rest.push(r);
+      }
+      haptic(16);
+      tabs.activate('find');
+      find.showPick(p.place, rest);
+    }
+
+    /* ---------------- lifecycle ---------------- */
+    function show() {
+      shown = true;
+      var pool = poolOf();
+      var sig = signatureOf(pool);
+      if (sig !== poolSig || !posts.length) {
+        poolSig = sig;
+        affinityCache = null;
+        posts = build(pool);
+        unmountAll();
+        layout();
+        hardScroll(0);
+      }
+      if (emptyEl) emptyEl.hidden = posts.length > 0;
+      if (scrollEl) scrollEl.hidden = !posts.length;
+      layout();
+      sync(true);
+    }
+    function hide() { shown = false; }
+
+    function init() {
+      if (!panelEl || !scrollEl || !railEl) return;
+      scrollEl.addEventListener('scroll', onScroll, { passive: true });
+      scrollEl.addEventListener('keydown', function (e) {
+        var k = e.key;
+        if (k === 'ArrowDown' || k === 'PageDown') { e.preventDefault(); goTo(indexAt() + 1); }
+        else if (k === 'ArrowUp' || k === 'PageUp') { e.preventDefault(); goTo(indexAt() - 1); }
+        else if (k === 'Home') { e.preventDefault(); goTo(0); }
+        else if (k === 'End') { e.preventDefault(); goTo(posts.length - 1); }
+      });
+      window.addEventListener('resize', function () {
+        if (!shown) return;
+        var keep = current;
+        layout();
+        if (keep >= 0 && postH) hardScroll(keep * postH);
+        sync(true);
+      });
+      // hearts made on an earlier visit are already on the shortlist by the
+      // time the feed opens (boot rehydrates them) — nothing to do here.
+    }
+
+    return { init: init, show: show, hide: hide };
+  })();
+
   /* ================================================================== *
    * SETTINGS — API key panel
    * ================================================================== */
@@ -5497,12 +7053,17 @@
   function boot() {
     tabs.init();
     sheet.init();
+    feed.init();
     visited.init();
     friends.init();
     popular.init();
     settings.init();
     find.init();
     offline.init();
+    // places hearted in the Feed on an earlier visit go back on the shortlist
+    deck.hydrateHearts();
+    // the Feed is the front door: it is the tab that opens with the app
+    tabs.activate('feed');
 
     // PWA: register the Tableau service worker (legacy filename
     // peckish-sw.js), scoped to '/eats' so it

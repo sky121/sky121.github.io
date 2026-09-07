@@ -3,8 +3,10 @@
 > **Tableau** (formerly *Peckish*, renamed 2026-07-19) — a watercolor "where to
 > eat" web app. Tap the deep-pool **Find** button → set quick preferences →
 > **swipe a Tinder-style deck** of nearby restaurants (closest first, expanding
-> outward) → land on one. Plus a private **Visited** rating log and demo
-> **Friends** + **Popular** tabs.
+> outward) → land on one. Or open the app on its front door, the **Feed** — a
+> full-bleed vertical snap feed of watercolor food posts, every one anchored to
+> a real place. Plus a private **Visited** rating log and demo **Friends** +
+> **Popular** tabs.
 >
 > **Filenames stay legacy on purpose:** `eats.html`, `peckish-sw.js`,
 > `peckish.webmanifest`, `peckish-icon-*.png`, `og-peckish.png` keep their names
@@ -12,7 +14,7 @@
 > icon *art* changed.
 >
 > Single source of truth so we can pick up exactly where we left off.
-> Last updated: **2026-09-02**.
+> Last updated: **2026-09-07**.
 
 ---
 
@@ -36,13 +38,204 @@
 
 - **Run locally:** from repo root, `python3 -m http.server`, open `http://localhost:8000/eats.html` (serve over HTTP, not `file://`).
 - **No build step** — plain HTML/CSS/JS. `node --check assets/js/eats.js` to lint JS.
-- **Architecture (`eats.js`):** single IIFE; closures roughly: `store` (localStorage), `state`, `distance` (haversine), `demo` (sample data), `tabs` (bottom-bar router, roving-tabindex a11y), `find` (bubble → prefs → swipe deck), `gmaps` (lazy Google Maps/Places, current API), `sheet` (rating sheet), `visited` (CRUD), `social` (mock Friends/Popular API), `settings` (key). Watercolor chrome comes from `exhibit-page.css`; `gallery.js` provides the theme + wash drift.
-- **localStorage keys:** `eats-gmaps-key` (the API key — never committed), `eats-prefs` (last swipe preferences), `eats-visited` (the rating log), `eats-seen` (recently passed places, 6 h TTL). `sh-theme` (shared site light/dark).
+- **Architecture (`eats.js`):** single IIFE; closures roughly: `store` (localStorage) + `feedStore` (the Feed's two lists), `state`, `distance` (haversine), `demo` (sample data), `foodArt` (the Feed's canvas painter), `feed` (the snap feed), `tabs` (bottom-bar router, roving-tabindex a11y), `find` (bubble → prefs → swipe deck), `gmaps` (lazy Google Maps/Places, current API), `sheet` (rating sheet), `visited` (CRUD), `social` (mock Friends/Popular API), `settings` (key). Watercolor chrome comes from `exhibit-page.css`; `gallery.js` provides the theme + wash drift.
+- **localStorage keys:** `eats-gmaps-key` (the API key — never committed), `eats-prefs` (last swipe preferences), `eats-visited` (the rating log), `eats-seen` (recently passed places, 6 h TTL), `eats-feed` (the Feed's follows + hearted places — see the Feed section). `sh-theme` (shared site light/dark).
 - **Ratings scale:** everything is **0–100 whole numbers** (Food/Vibe/Service → averaged Overall; Google's 0–5 is mapped ×20 for display).
 
 ---
 
 ## Feature map (what's built)
+
+### Feed — the app's front door (2026-09-07)
+*"TikTok for foodies", built honestly on a static site.* A fifth tab, first in
+the bar, opens on a **full-bleed vertical snap feed** of watercolor food posts.
+Every post is anchored to a real place in the current pool; hearting one saves
+that place to the **real shortlist**; "Go here" opens the **existing decision
+screen**; and the order is genuinely personalised. The creators are sample data
+and say so on every surface that shows them.
+
+**The line we did not cross.** This site has no backend and cannot host video,
+so the feed does not pretend to have any. There is no `<video>` anywhere in it,
+and nothing in the UI or the code calls a post a video. What a post has instead
+is a **living still**: a procedurally painted canvas with a very slow ken-burns
+push, one drifting warm wash, and — on the bowl and table compositions — three
+faint plumes of steam. Under `prefers-reduced-motion` all three are gone and the
+image is completely static (verified: zero running animations inside
+`#panel-feed`).
+
+**What is real vs sample, and where it says so**
+
+| Real | Sample (labelled) |
+|---|---|
+| the scroll, the snap, the virtualisation | the creators, handles, avatars |
+| the art (painted from the place's cuisine + name seed) | follower counts |
+| the place behind every post (demo pool or live results) | the captions |
+| heart → the shortlist the deck fills (persisted) | |
+| "Go here" → the deck's own decision screen | |
+| the ranking (Visited log + prefs + follows + distance + hours) | |
+
+The honesty labels: a `.social-banner` pinned to the top of the feed (the same
+component the Friends and Popular panels use) reads *"**Demo** — creators and
+follower counts are `Sample`. The places are real."*, and **every post** carries
+a `Sample` pill next to the handle. In live mode, a place that came from the
+demo fallback also gets the shared `sampleTagFor()` pill in its meta row, exactly
+as the deck and the decision screen do.
+
+**1. The art: `foodArt` (a canvas painter, not a gradient stack)**
+`panelArt()` is a CSS gradient stack — good enough for a 120px thumb, an abstract
+blob at 390×844. The feed paints to an offscreen `<canvas>` instead, with real
+watercolor moves: pigment laid in overlapping translucent passes with
+`globalCompositeOperation: 'multiply'`, irregular wet edges (`blobPath`), a
+darker rim where the wash dried, catch-lights via `screen`, blurred cast shadows
+(`ctx.filter`), and a procedurally generated paper-grain tile stamped over the
+finished paint. Five **composition archetypes**:
+
+- **`plate`** — a plated dish from above: cream plate nearly filling the frame,
+  a sauce pool, a mound, components fanned around it, herbs, seeds, a warm
+  drizzle, a second dish half out of frame top-left for depth.
+- **`bowl`** — a bowl of something brothy, three-quarter view: glazed body lit
+  from the left, broth surface, combed noodles, two protein rounds, a halved egg
+  with its yolk, nori, greens, chilli oil, chopsticks over the far rim, and
+  painted steam that the CSS layer then animates.
+- **`stack`** — a side-on build: plate, bottom bun, patty with char, a melted
+  layer and a lettuce frill (both drawn with wavy undersides), tomato, a domed
+  sesame top bun, fries on the side.
+- **`crop`** — a very close crop of a dish edge: a field of layered pigment,
+  flat toppings with dark rims and a crescent of light, herb flecks, and a
+  scalloped, blistered **crust sweeping across the lower third** — that edge is
+  what makes the frame read as a crop of a dish rather than a swatch of colour.
+- **`table`** — a restaurant table at night: table plane edge to edge, a hero
+  plate low and close, a second plate half in shadow, a wine glass lit from
+  behind, a candle, warm bokeh in the room.
+
+Each place picks its archetypes from a **cuisine → archetype** table
+(`CUISINE_ARCH`) so brothy cuisines get the bowl, stacked ones the stack, and so
+on; every list holds three so a place's three posts never repeat a composition.
+Colour comes from `FOOD_PAL`, a per-cuisine food palette (`main` / `deep` /
+`fresh` / `cream` / `table` / `accent`), and anything that goes **on** the food
+is passed through `warmOf()` — some cuisine accents are pond blue or rose, and
+blue ceramic is fine but a blue drizzle is not.
+
+Subjects are composed for the **top ~60% of the frame**, because the bottom is
+where the scrim and the text live. `crop` was pulled from the cuisines whose
+field reads muddy (café, japanese, vietnamese, mediterranean, vegetarian,
+burgers, bbq) after looking at the screenshots — it stayed only where it reads
+as a topped flatbread.
+
+Canvases are painted **exactly once** and held in a small LRU (`CAP = 12`, and a
+canvas that is currently on screen is never evicted); a mounted post takes the
+cached canvas node itself rather than copying it. Nothing repaints per frame.
+
+**2. Snap scroll + virtualisation**
+The scroller is `scroll-snap-type: y mandatory` with `scroll-snap-stop: always`
+(one swipe = one post). Posts are absolutely positioned at `index × --post-h`
+inside a rail whose height is `posts.length × --post-h`, and only the visible
+post ±2 is mounted — **measured: 5 post nodes in the DOM after scrolling
+through 24 posts**, from a pool of 54. Nodes are recycled through a free list
+capped at 7.
+
+One trap worth remembering: *mandatory snapping and virtualisation fight each
+other on long programmatic jumps.* There are no snap areas where nothing is
+mounted, so re-enabling snapping after a jump drags the scroll back to the
+nearest node that still exists. `hardScroll()` turns snapping off, sets
+`scrollTop`, **mounts the window around the landing position**, then turns
+snapping back on. Every deliberate jump (Home/End, a re-rank, a resize) goes
+through it. Ordinary scrolling is safe because `scroll-snap-stop: always` means
+a fling can only travel one post, which the ±2 window always covers.
+
+**3. The ranking model**
+`score = follow + taste + proximity + quality + open-now + a seeded jitter`:
+
+| term | range | source |
+|---|---|---|
+| following the creator | +34 | `eats-feed.follows` |
+| taste | −18 … +30 | your Visited rating for the place; else cuisine affinity from the Visited log (damped `n/(n+1)`); else +16 if a friend rated it 80+ |
+| proximity | 0 … +18 | `max(0, 18 − miles × 16)` |
+| quality | ~−10 … +16 | `(rating − 3.8) × 13` |
+| open now | +6 | the shared `openState()` |
+| jitter | 0 … +6 | `hashStr(post.key)` — stable, so the order never reshuffles between renders |
+
+Ranking alone stacks every post from your three favourite places at the top, so
+`spread()` then walks the ranked list and takes the best post at least 4 away
+from the last post of that place and 2 from that creator (falling back to the
+best remaining rather than stalling). The ORDER inside those constraints is
+still entirely the score's.
+
+The winning term becomes the small **"why you're seeing this"** pill at the top
+of the post ("You follow Leo", "You rated it 82", "0.2 mi from you", "Open right
+now"), and that pill's group is passed to `matchReasons()` as `skip` so the
+reason chips underneath never echo it.
+
+Following someone re-ranks the whole feed immediately and **the reader travels
+with the post they were looking at** — nothing jumps, and the ranking stays
+exactly what the model says it should be. Measured: following `@leoclate` took
+their posts in the first 12 from **1 → 4** (4 is the ceiling `GAP_CREATOR = 2`
+allows), and the order after a reload is byte-identical to the order right after
+the follow — the model is deterministic.
+
+**Empty / thin state.** With no follows and an empty Visited log the first two
+terms are simply zero and the feed falls back to proximity + rating, which is a
+sensible order rather than an arbitrary one — verified: 54 posts, nearest first
+(0.1 mi → 0.2 mi → 446 ft → …), why-pills reading "0.1 mi from you" / "Open
+right now". There is no blank screen; `#feed-empty` only appears if the pool
+itself is empty, which the demo fallback prevents.
+
+**4. Heart → the real shortlist**
+The heart writes the place NAME to `eats-feed.hearts` **and** calls
+`deck.addToShortlist(place, quiet)`, so the place appears on the deck's own
+shortlist surface, in its badge count, in the compare cards and in the
+constellation. On boot `deck.hydrateHearts()` puts hearted places back on the
+shortlist (matching by name against the current pool), and `deck.teardown()`
+re-hydrates too, so "start over" keeps your saves. Un-hearting, and removing a
+place from the shortlist compare screen, both clear the heart; the shortlist's
+Undo puts it back. Verified: heart → `eats-feed` = `{"hearts":["Smoke & Ember
+BBQ"]}`, badge `1`, the place listed on the shortlist surface, and all three
+still true after a reload.
+
+**5. Accessibility**
+The scroller is `role="feed"` with the rail as `role="none"`; each post is an
+`<article>` with `aria-posinset` / `aria-setsize` and an accessible name
+("Tonkotsu Lane, Ramen · Japanese, Open now. Posted by @saltandpaper, a sample
+creator."). `announce()` fires 260 ms after the visible post settles ("Pier 9
+Oyster Co., Open now. Post 3 of 54. You rated it 78."). Keyboard: the scroller
+takes focus, Arrow Up/Down and Page Up/Down move exactly one post, Home/End jump
+to the ends. **Only the current post's actions are in the tab order** — Tab must
+not walk into the actions of a post that is off screen — and all three actions
+are ≥56 px with a visible `--pond-deep` focus ring. Every action carries an
+explicit `aria-label` and the heart/follow buttons carry `aria-pressed`.
+
+Contrast, measured off the rendered pixels (worst pixel in each text box against
+the ground actually painted beneath it, both themes):
+
+| element | light | evening |
+|---|---|---|
+| place name | 16.8 : 1 | 17.0 : 1 |
+| caption | 15.8 : 1 | 16.1 : 1 |
+| handle | 15.2 : 1 | 15.5 : 1 |
+| meta line | 15.1 : 1 | 15.5 : 1 |
+| follower count | 12.0 : 1 | 12.3 : 1 |
+| "why" pill | 15.2 : 1 | 14.8 : 1 |
+| reason chip | 14.2 : 1 | 14.0 : 1 |
+| action label | 12.5 : 1 | 12.0 : 1 |
+| `Sample` pill | 9.3 : 1 | 8.4 : 1 |
+| banner | 16.9 : 1 | 15.5 : 1 |
+
+The floor is **8.4 : 1** — well past AA. The pills that sit high in the frame
+(the banner, the "why" pill) carry their own `rgba(10,13,18,.86)` ground because
+the top scrim is deliberately light there and the art underneath can be a white
+plate.
+
+**New localStorage key:** `eats-feed` — `{follows: [handle…], hearts: [place
+name…]}`. Follows are the sample creators you follow (they genuinely reweight
+the feed); hearts are the places you hearted, kept **by name** because that is
+the join key every other surface here already uses (`myRatingFor`, Popular's
+`placeByName`) and the only id that survives a reload in both demo and live mode.
+
+**Files touched:** `eats.html` (feed panel + a fifth tab, first in the bar),
+`assets/js/eats.js` (`feedStore`, `foodArt`, `feed`, plus `deck` gaining
+`addToShortlist(r, quiet)` / `removeFromShortlist` / `inShortlist` /
+`hydrateHearts`), `assets/css/eats.css` (the feed, and the tab bar going from 4
+to 5 columns).
 
 ### Live mode made first-class — real hours, real photos, honest labels (2026-09-02)
 Demo mode had grown time-awareness, reason chips, a three-section Popular and a
