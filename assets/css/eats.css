@@ -83,8 +83,8 @@ html.evening .bottom-bar {
   max-width: 30rem;
   margin: 0.5rem 0.7rem calc(0.5rem + env(safe-area-inset-bottom, 0));
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.15rem;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.1rem;
   padding: 0.35rem;
   background: rgba(251, 247, 238, 0.82);
   -webkit-backdrop-filter: saturate(1.4) blur(14px);
@@ -3637,4 +3637,416 @@ html.evening .eats-toast-act:hover { color: var(--pond-ink); background: rgba(12
   .pop-row .pop-score .big { font-size: 1.12rem; }
   .pop-row .pop-score .lbl { max-width: 5.4rem; }
   .range-btn { padding: 0.5rem 0.8rem; font-size: 0.7rem; }
+}
+
+/* ==========================================================================
+   FEED TAB — full-bleed vertical snap feed of watercolor food posts.
+
+   The panel is a fixed overlay so the post fills the viewport edge to edge
+   above the tab bar; the room's own heading and the page scroll step aside
+   while it is up (body.feed-on). Every post is one snap target the height of
+   the scroller, positioned absolutely at index * --post-h so only a handful
+   of them ever exist in the DOM at once (see feed.js).
+
+   Motion here is CSS only, over a canvas that was painted exactly once: a
+   very slow push on the art, one drifting warm wash, and — on the bowl and
+   table compositions — three faint plumes of steam. Under
+   prefers-reduced-motion all three are gone and the image is a still.
+   ========================================================================== */
+
+body.feed-on { overflow: hidden; }
+body.feed-on .room-label,
+body.feed-on .exhibit-title { display: none; }
+body.feed-on .corner-gear { z-index: 132; }
+
+/* the panel crossfades — never with a transform, which would break the
+   fixed positioning of everything inside it */
+#panel-feed { animation: panel-fade 0.24s ease; }
+
+.feed {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: #14181f;
+  overflow: hidden;
+}
+
+.feed-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.feed-scroll::-webkit-scrollbar { width: 0; height: 0; display: none; }
+.feed-scroll[hidden] { display: none; }
+.feed-rail { position: relative; width: 100%; }
+
+.feed-post {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--post-h, 100vh);
+  overflow: hidden;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  background: #14181f;
+}
+.feed-post:focus { outline: none; }
+.feed-post:focus-visible { outline: 3px solid var(--pond-ink); outline-offset: -3px; }
+
+/* ---------- the art ---------- */
+.feed-artwrap { position: absolute; inset: 0; overflow: hidden; }
+.feed-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transform: scale(1.05);
+  animation: feed-ken 30s ease-in-out infinite alternate;
+  animation-delay: calc(var(--art-seed, 0) * -22s);
+}
+@keyframes feed-ken {
+  from { transform: scale(1.04) translate3d(-0.8%, 0.9%, 0); }
+  to   { transform: scale(1.13) translate3d(0.9%, -1.4%, 0); }
+}
+
+/* one warm wash drifting across the paint — the "living" part of the still */
+.feed-wash {
+  position: absolute;
+  inset: -14%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(36% 26% at 32% 34%, rgba(255, 226, 176, 0.30) 0%, rgba(255, 226, 176, 0) 70%),
+    radial-gradient(30% 22% at 70% 58%, rgba(162, 146, 196, 0.20) 0%, rgba(162, 146, 196, 0) 72%);
+  animation: feed-drift 38s ease-in-out infinite alternate;
+  animation-delay: calc(var(--art-seed, 0) * -30s);
+}
+@keyframes feed-drift {
+  from { transform: translate3d(-3%, 2%, 0) scale(1); opacity: 0.75; }
+  to   { transform: translate3d(4%, -3%, 0) scale(1.12); opacity: 1; }
+}
+
+/* steam — bowls and table scenes only */
+.feed-steam { display: none; }
+.feed-artwrap.has-steam .feed-steam {
+  display: block;
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  width: 46%;
+  height: 26%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.feed-steam-p {
+  position: absolute;
+  bottom: 0;
+  width: 12px;
+  height: 100%;
+  border-radius: 50% 50% 42% 42%;
+  background: linear-gradient(to top, rgba(255, 246, 230, 0.24) 0%, rgba(255, 246, 230, 0) 92%);
+  filter: blur(8px);
+  opacity: 0;
+  animation: feed-steam 8s ease-in-out infinite;
+}
+.feed-steam-p:nth-child(1) { left: 14%; animation-delay: 0s; }
+.feed-steam-p:nth-child(2) { left: 46%; animation-delay: 2.6s; height: 116%; }
+.feed-steam-p:nth-child(3) { left: 76%; animation-delay: 5.1s; height: 88%; }
+@keyframes feed-steam {
+  0%   { opacity: 0; transform: translateY(14%) scaleX(0.8); }
+  22%  { opacity: 0.9; }
+  62%  { opacity: 0.55; transform: translateY(-24%) scaleX(1.25); }
+  100% { opacity: 0; transform: translateY(-52%) scaleX(1.5); }
+}
+
+/* ---------- the scrim that makes the text legible ---------- */
+.feed-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(10, 13, 18, 0.72) 0%, rgba(10, 13, 18, 0.34) 13%, rgba(10, 13, 18, 0) 27%),
+    linear-gradient(to top, rgba(8, 11, 16, 0.94) 0%, rgba(8, 11, 16, 0.86) 20%, rgba(8, 11, 16, 0.58) 38%, rgba(8, 11, 16, 0) 60%);
+}
+html.evening .feed-scrim {
+  background:
+    linear-gradient(to bottom, rgba(6, 8, 12, 0.78) 0%, rgba(6, 8, 12, 0.38) 13%, rgba(6, 8, 12, 0) 27%),
+    linear-gradient(to top, rgba(5, 7, 11, 0.96) 0%, rgba(5, 7, 11, 0.9) 20%, rgba(5, 7, 11, 0.62) 38%, rgba(5, 7, 11, 0) 60%);
+}
+
+/* ---------- top chrome: wordmark + the honest banner ---------- */
+.feed-top {
+  position: absolute;
+  z-index: 4;
+  top: calc(0.75rem + env(safe-area-inset-top, 0));
+  left: 0.85rem;
+  right: 3.9rem;
+  pointer-events: none;
+}
+.feed-wordmark {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: #f6f1e7;
+  margin: 0 0 0.45rem;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.65);
+}
+.feed-banner.social-banner {
+  margin: 0;
+  padding: 0.4rem 0.6rem;
+  background: rgba(10, 13, 18, 0.86);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border-color: rgba(246, 241, 231, 0.22);
+  color: #ece5d6;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+.feed-banner .social-banner-text { color: #ece5d6; }
+.feed-banner strong { color: #f6f1e7; }
+.feed-banner .v-demo-tag {
+  margin-top: 0;
+  color: #f0e4bd;
+  border-color: rgba(205, 184, 120, 0.6);
+  background: rgba(205, 184, 120, 0.22);
+  vertical-align: baseline;
+}
+
+/* ---------- "why you're seeing this" ---------- */
+.feed-why {
+  position: absolute;
+  z-index: 4;
+  left: 0.85rem;
+  right: 4.6rem;
+  top: calc(var(--feed-top-h, 5.4rem) + 0.5rem);
+  margin: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.34rem;
+  width: fit-content;
+  max-width: calc(100% - 0.4rem);
+  padding: 0.2rem 0.62rem;
+  border-radius: 999px;
+  background: rgba(10, 13, 18, 0.86);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(246, 241, 231, 0.22);
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #f1ead9;
+}
+.feed-why[hidden] { display: none; }
+.feed-why-glyph { font-size: 0.85em; opacity: 0.9; }
+
+/* ---------- the post body ---------- */
+.feed-body {
+  position: absolute;
+  z-index: 3;
+  left: 0.95rem;
+  right: 4.9rem;
+  bottom: calc(5.7rem + env(safe-area-inset-bottom, 0));
+  color: #f6f1e7;
+}
+.feed-creator {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  margin-bottom: 0.42rem;
+}
+.feed-avatar {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 0.94rem;
+  color: #1f2733;
+  background: var(--wisteria);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+}
+.feed-avatar--rose { background: var(--rose); }
+.feed-avatar--pond { background: var(--pond); }
+.feed-avatar--wisteria { background: var(--wisteria); }
+.feed-avatar--sage { background: var(--sage); }
+.feed-avatar--gold { background: var(--gold); }
+.feed-handle {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.84rem;
+  color: #f6f1e7;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+.v-demo-tag.feed-sample {
+  margin-top: 0;
+  color: #f2e7c4;
+  border-color: rgba(205, 184, 120, 0.62);
+  background: rgba(205, 184, 120, 0.2);
+  text-shadow: none;
+}
+.feed-place {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.7rem, 7.4vw, 2.15rem);
+  line-height: 1.08;
+  margin: 0 0 0.34rem;
+  color: #fdfaf2;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.62);
+}
+.feed-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.34rem 0.5rem;
+  margin-bottom: 0.42rem;
+}
+.feed-metatext {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  color: #eee7d7;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+.feed-followers {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: #d8d0be;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+.feed-caption {
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  line-height: 1.42;
+  margin: 0;
+  color: #f1ead9;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.62);
+}
+.feed-reasonhold { margin-top: 0.5rem; }
+
+/* reason chips, restated for a dark ground — same pigment vocabulary as
+   .ov-reason, light text instead of dark so they hold AA over the art */
+.feed-reasons { display: flex; flex-wrap: wrap; gap: 0.3rem 0.34rem; }
+.feed-reason {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.26rem;
+  max-width: 100%;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.68rem;
+  line-height: 1.32;
+  color: #f2ecdd;
+  background: rgba(10, 13, 18, 0.74);
+  border: 1px solid rgba(246, 241, 231, 0.24);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+.feed-reason-glyph { font-size: 0.86em; line-height: 1; flex: 0 0 auto; }
+.feed-reason-text { min-width: 0; overflow-wrap: anywhere; }
+.feed-reason--pref { color: #d7ecd0; border-color: rgba(147, 180, 139, 0.6); }
+.feed-reason--rating { color: #f2e6bd; border-color: rgba(205, 184, 120, 0.62); }
+.feed-reason--near,
+.feed-reason--time { color: #d5e7f5; border-color: rgba(127, 168, 201, 0.62); }
+.feed-reason--mine { color: #f6d9e1; border-color: rgba(217, 139, 160, 0.62); }
+.feed-reason--friend { color: #e0d8f2; border-color: rgba(162, 146, 196, 0.62); }
+
+/* ---------- the action rail ---------- */
+.feed-acts {
+  position: absolute;
+  z-index: 4;
+  right: 0.55rem;
+  bottom: calc(5.7rem + env(safe-area-inset-bottom, 0));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+.feed-act {
+  appearance: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.12rem;
+  min-width: 56px;
+  min-height: 56px;
+  padding: 0.3rem 0.2rem;
+  border-radius: 18px;
+  border: 1px solid rgba(246, 241, 231, 0.26);
+  background: rgba(10, 13, 18, 0.74);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #f4eee0;
+  font-family: var(--font-body);
+  transition: background-color 0.22s ease, border-color 0.22s ease, transform 0.22s ease;
+}
+.feed-act:hover { background: rgba(10, 13, 18, 0.86); border-color: rgba(246, 241, 231, 0.44); }
+.feed-act:active { transform: scale(0.95); }
+.feed-act-glyph { font-size: 1.16rem; line-height: 1; }
+.feed-act-label {
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.feed-act--heart.is-on { color: #ffd3de; border-color: rgba(217, 139, 160, 0.8); background: rgba(122, 42, 62, 0.6); }
+.feed-act--follow.is-on { color: #ded4f4; border-color: rgba(162, 146, 196, 0.8); background: rgba(60, 48, 96, 0.62); }
+.feed-act--go { color: #dcecd6; border-color: rgba(147, 180, 139, 0.62); background: rgba(30, 58, 40, 0.58); }
+.feed-act--go:hover { background: rgba(40, 76, 52, 0.72); }
+
+.feed-scroll:focus-visible,
+.feed-act:focus-visible {
+  outline: 2px solid var(--pond-ink);
+  outline-offset: 3px;
+}
+
+/* ---------- empty state (only when there is genuinely nothing) ---------- */
+.feed-empty {
+  position: absolute;
+  inset: auto 1.6rem 40%;
+  text-align: center;
+  color: #f1ead9;
+}
+.feed-empty[hidden] { display: none; }
+.feed-empty-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.5rem;
+  margin: 0 0 0.4rem;
+}
+.feed-empty-sub { font-family: var(--font-body); font-size: 0.86rem; margin: 0; opacity: 0.85; }
+
+/* ---------- reduced motion: a still image, and instant jumps ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .feed-art {
+    animation: none;
+    transform: none;
+  }
+  .feed-wash { animation: none; opacity: 0.8; transform: none; }
+  .feed-steam,
+  .feed-artwrap.has-steam .feed-steam { display: none; }
+  .feed-scroll { scroll-behavior: auto; }
+  #panel-feed { animation: none; }
+}
+
+/* wider screens: the feed stays a phone-shaped column, centred */
+@media (min-width: 620px) {
+  .feed-scroll { max-width: 27rem; margin: 0 auto; left: 0; right: 0; }
+  .feed { background: #0d1016; }
 }
