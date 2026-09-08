@@ -14,7 +14,7 @@
 > icon *art* changed.
 >
 > Single source of truth so we can pick up exactly where we left off.
-> Last updated: **2026-09-07**.
+> Last updated: **2026-09-08**.
 
 ---
 
@@ -121,6 +121,91 @@ where the scrim and the text live. `crop` was pulled from the cuisines whose
 field reads muddy (café, japanese, vietnamese, mediterranean, vegetarian,
 burgers, bbq) after looking at the screenshots — it stayed only where it reads
 as a topped flatbread.
+
+**1b. Cuisine kits — the subject, not just the tint (2026-09-08)**
+The five painters used to take `(ctx, rnd, f)` where `f` was *only* the palette,
+so every cuisine got the identical composition in a different colour: `drawPlate`
+laid down the same sauce pool, mound and fanned discs whether the place sold
+pasta or oysters. **Pier 9 Oyster Co. painted what read as a tomato-sauce pasta
+dish.** The fix is not more colours, it is different *food*.
+
+*How the cuisine is threaded.* No painter signature changed. `palFor()` now
+returns the palette **plus** the cuisine key and its kit — `f.cuisine`, `f.kit` —
+so every helper that already takes `f` can reach the kit, and a painter simply
+asks the kit for its subject:
+
+```
+(f.kit.plate || plateGeneric)(ctx, rnd, f, cx, cy, r)   // what is on the plate
+(f.kit.bowl  || bowlGeneric )(ctx, rnd, f, cx, cy, r)   // what is in the bowl
+(f.kit.stack || stackGeneric)(ctx, rnd, f, cx, base, w, slab, dome)
+(K.field / K.crust / K.over) for crop
+```
+
+A kit is a bag of *optional* painters (`plate`, `bowl`, `stack`, `crop`,
+`utensil`); anything a cuisine does not define falls back to the generic
+composition, which is the old code moved intact into `plateGeneric` /
+`bowlGeneric` / `stackGeneric` / `cropOver`. The painters keep everything they
+already owned — framing, ground, ceramic, cast shadows, catch-lights, vignette,
+the subject in the top ~60%, the seeded RNG, the LRU cache, the `warmOf()` guard.
+
+*One kit, two viewpoints.* `stagePlate()` runs a plate kit inside a scaled
+context (`sq` squashes the vertical axis), so the same kit paints flat from above
+for `plate` (sq 1) and in perspective on the table for `table` (sq 0.45). The
+bowl does the same, clipped to the broth ellipse. Kits are therefore written once,
+flat, and never duplicated per archetype.
+
+*The vocabulary.* ~22 small components built from the **existing** primitives
+(`pool` / `blobPath` / `shadowEllipse` / `sheen` / `stroke` / `leaf` / `dots`), so
+a shell is lit exactly like the plate under it: `piece`, `mound`, `grainBed`,
+`citrusHalf`, `wedge`, `shellFan`, `oyster`, `prawn`, `fillet`, `nigiri`,
+`flatbread`, `fold`, `meatSlice`, `pickle`, `olive`, `cube`, `friedEgg`,
+`noodles`, `herbs`, `smear`, `drizzleArc`, `chillis`, `dipDish`, `sticks`,
+`riceRoll`.
+
+*What each cuisine now paints* (counts and positions still come from the seed, so
+two places of one cuisine never line up):
+
+| Cuisine | Subject |
+|---|---|
+| seafood | oysters on the half shell, a flaked fillet, a prawn, a scallop shell, half a lemon — **no red mound anywhere** |
+| japanese | a composed set: nigiri, two maki, a soy dish, wasabi, pink ginger |
+| italian | a nest of pasta under a spooned sauce, meatballs, basil, parmesan |
+| mexican | folded tortillas with the filling showing along the open edge, lime, crema, a bean smear |
+| indian | a curry pool with rice beside it, a folded flatbread, a cream swirl, coriander |
+| mediterranean | a couscous bed, olives, feta, roasted pieces, a lemon wedge, herb oil |
+| bbq | sliced meat with a bark edge and smoke ring, slaw, pickle chips, a sauce smear |
+| korean | a rice mound, five banchan piles, a fried egg, chilli, sesame |
+| vietnamese | translucent rice-paper rolls, a herb pile, nuoc cham, lime, crushed peanut |
+| thai | rice and a coconut curry with peppers, chilli, basil, lime |
+| burgers | the burger from above: sesame bun, lettuce frill, patty edge, fries, ketchup |
+| cafe | toast, a fried egg, an avocado fan, berries (plate); a pancake stack with butter and syrup (stack) |
+| pizza | the whole pie: crust ring, sauce, cheese patches, pepperoni, basil |
+| vegetarian | a grain bed, roasted veg, avocado, feta, tahini |
+| american | a seared slab with bark, mash with gravy, green beans (plate); the diner burger (stack) |
+
+*Archetypes narrowed again.* `crop` (a field of pigment with a bread edge sweeping
+the lower third) only reads as food when the cuisine's dish genuinely is "topping
+on bread": it survives for **pizza, italian, indian** and was pulled from
+**korean, thai and mexican** — a Mexican crop painted a muddy red field with
+white loops of crema, which reads as anything but Mexican. Korean and thai moved
+to `['bowl','plate','table']`; mexican to `['plate','table','bowl']` with a new
+rice-and-beans bowl kit, which is a reading the crop could never carry.
+
+*Utensil follows the kit*: chopsticks over the far rim for japanese, korean and
+vietnamese; a spoon resting in the bowl for indian, thai, seafood, mediterranean,
+vegetarian and mexican.
+
+*Verified 2026-09-08* (Playwright, chromium, 390×844): one screenshot read per
+cuisine; determinism — the same place paints a **byte-identical** canvas across a
+fresh reload (20/20 sha1 matches); variation — **54/54 unique canvases** across
+the 18 demo places × 3 variants; contrast floor **11.4:1 day / 12.5:1 evening**
+(worst-pixel-under-the-text sampling, versus 11.9 / 12.7 before the change — no
+meaningful regression, far above the 8:1 bar); paint cost **unchanged within
+noise** — the rAF frame that paints one canvas averages 74 ms with the kits vs
+73 ms before (3 runs each, 13 cold paints per run; an idle frame is 16.7 ms and
+the measurement is quantised to it, so read it as "a paint costs ~4 frames,
+either way"). Art is still painted exactly once per place+variant and cached, so
+this cost is paid once per post and never per frame.
 
 Canvases are painted **exactly once** and held in a small LRU (`CAP = 12`, and a
 canvas that is currently on screen is never evicted); a mounted post takes the
