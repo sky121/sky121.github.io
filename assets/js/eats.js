@@ -836,38 +836,8 @@
       blobPath(ctx, rnd, cx, cy, R * 0.82, R * 0.82, 0.014, 1.1, 28); ctx.stroke();
       ctx.restore();
 
-      // the dish itself, big enough to be the subject
-      var fr = R * 0.68;
-      shadowEllipse(ctx, cx + 4, cy + fr * 0.30, fr * 0.95, fr * 0.7, 0.28, 12);
-      pool(ctx, rnd, cx + fr * 0.04, cy + fr * 0.06, fr * 1.02, fr * 0.94, f.main, 0.62, 3, 0.17, true, 'over');
-      pool(ctx, rnd, cx, cy - fr * 0.04, fr * 0.72, fr * 0.64, f.deep, 0.9, 3, 0.14, true, 'over');
-      pool(ctx, rnd, cx - fr * 0.20, cy - fr * 0.20, fr * 0.38, fr * 0.32, shade(f.main, 0.22), 0.7, 2, 0.18, true, 'over');
-
-      // components fanned around the mound
-      var pieces = 5 + Math.floor(rnd() * 2);
-      for (var i = 0; i < pieces; i++) {
-        var a = -2.1 + (i / (pieces - 1)) * 4.9 + (rnd() - 0.5) * 0.26;
-        var d = fr * (0.66 + rnd() * 0.14);
-        var px = cx + Math.cos(a) * d, py = cy + Math.sin(a) * d * 0.94;
-        var pc = i % 2 ? f.deep : shade(f.main, -0.16);
-        shadowEllipse(ctx, px + 2, py + 5, fr * 0.30, fr * 0.20, 0.3, 8);
-        pool(ctx, rnd, px, py, fr * 0.30, fr * 0.21, pc, 0.95, 2, 0.14, true, 'over');
-        sheen(ctx, px - fr * 0.07, py - fr * 0.06, fr * 0.17, fr * 0.07, -0.35, 0.5);
-      }
-
-      // greens, seeds, a bright drizzle
-      for (var g2 = 0; g2 < 14; g2++) {
-        var ga = rnd() * 6.283, gd = fr * (0.28 + rnd() * 0.78);
-        leaf(ctx, rnd, cx + Math.cos(ga) * gd, cy + Math.sin(ga) * gd * 0.9,
-             fr * (0.15 + rnd() * 0.16), fr * (0.045 + rnd() * 0.045), rnd() * 3.14,
-             mix(f.fresh, '#4e6a3c', rnd() * 0.55), 0.88);
-      }
-      stroke(ctx, [[cx - fr * 0.92, cy + fr * 0.34], [cx - fr * 0.2, cy + fr * 0.62],
-                   [cx + fr * 0.4, cy + fr * 0.26], [cx + fr * 0.95, cy + fr * 0.52]],
-             shade(warmOf(f.accent), 0.12), 3.5, 0.55, 'round', 'over');
-      dots(ctx, rnd, cx, cy, fr * 0.85, 26, 2.6, shade(f.deep, -0.25), 0.75);
-      dots(ctx, rnd, cx - fr * 0.1, cy - fr * 0.18, fr * 0.55, 12, 2.4, '#fff6e2', 0.7);
-      sheen(ctx, cx - fr * 0.35, cy - fr * 0.42, fr * 0.5, fr * 0.2, -0.5, 0.34);
+      // WHAT is on the plate is the cuisine's business, not the painter's
+      stagePlate(ctx, rnd, f, cx, cy, R * 0.68, 1);
       vignette(ctx, 0.5);
     }
 
@@ -907,46 +877,29 @@
       pool(ctx, rnd, cx - rx * 0.22, cy - ry * 0.12, rx * 0.55, ry * 0.55, shade(f.main, -0.26), 0.4, 2, 0.16, false);
       shadowEllipse(ctx, cx, cy + ry * 0.1, rx * 0.9, ry * 0.85, 0.22, 14);
 
-      // noodles combed through the surface
-      for (var n = 0; n < 8; n++) {
-        var y0 = cy - ry * 0.58 + n * (ry * 0.18) + (rnd() - 0.5) * ry * 0.1;
-        var x0 = cx - rx * (0.5 + rnd() * 0.3), x1 = cx + rx * (0.3 + rnd() * 0.42);
-        stroke(ctx, [[x0, y0], [x0 + (x1 - x0) * 0.35, y0 - 7 + rnd() * 14],
-                     [x0 + (x1 - x0) * 0.7, y0 + 6 - rnd() * 12], [x1, y0 + (rnd() - 0.5) * 6]],
-               shade(f.cream, 0.06 + rnd() * 0.16), 4 + rnd() * 2.5, 0.8, 'round', 'over');
-      }
-      // protein rounds
-      var protein = [[-0.36, -0.16, 0.30], [-0.04, 0.24, 0.26]];
-      for (var pi = 0; pi < protein.length; pi++) {
-        var px = cx + rx * protein[pi][0], py = cy + ry * protein[pi][1], pr = rx * protein[pi][2];
-        shadowEllipse(ctx, px + 2, py + 4, pr, pr * 0.55, 0.3, 8);
-        pool(ctx, rnd, px, py, pr, pr * 0.55, pi ? shade(f.deep, 0.12) : f.deep, 0.96, 2, 0.1, true, 'over');
-        sheen(ctx, px - pr * 0.25, py - pr * 0.16, pr * 0.5, pr * 0.16, -0.3, 0.5);
-      }
-      // a halved egg
-      var ex = cx + rx * 0.44, ey = cy - ry * 0.1;
-      shadowEllipse(ctx, ex + 2, ey + 4, rx * 0.21, ry * 0.62, 0.3, 8);
-      pool(ctx, rnd, ex, ey, rx * 0.21, ry * 0.66, '#fbf3e0', 0.98, 2, 0.05, true, 'over');
-      pool(ctx, rnd, ex, ey + ry * 0.05, rx * 0.11, ry * 0.34, '#e8a733', 0.96, 2, 0.07, true, 'over');
-      sheen(ctx, ex - rx * 0.05, ey - ry * 0.22, rx * 0.09, ry * 0.1, -0.2, 0.55);
-      // nori
+      // what is IN the bowl — the kit paints it, clipped to the broth and
+      // squashed into the bowl's ellipse so kits stay written flat
       ctx.save();
-      ctx.globalAlpha = 0.94;
-      ctx.fillStyle = mix(f.fresh, '#141c1e', 0.7);
-      ctx.translate(cx + rx * 0.1, cy - ry * 0.5); ctx.rotate(-0.26);
-      blobPath(ctx, rnd, 0, 0, rx * 0.17, ry * 0.8, 0.06, 0.2, 10); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(cx, cy, rx * 0.95, ry * 0.95, 0, 0, 6.283); ctx.clip();
+      ctx.translate(cx, cy); ctx.scale(1, ry / rx); ctx.translate(-cx, -cy);
+      (f.kit.bowl || bowlGeneric)(ctx, rnd, f, cx, cy, rx * 0.94);
       ctx.restore();
-      // greens + chilli oil
-      for (var g3 = 0; g3 < 12; g3++) {
-        leaf(ctx, rnd, cx + (rnd() - 0.5) * rx * 1.4, cy + (rnd() - 0.5) * ry * 1.3,
-             rx * (0.09 + rnd() * 0.07), ry * (0.09 + rnd() * 0.07), rnd() * 3.14,
-             mix(f.fresh, '#4e6a3c', rnd() * 0.55), 0.9);
-      }
-      dots(ctx, rnd, cx + rx * 0.05, cy + ry * 0.1, rx * 0.65, 16, 3, shade(warmOf(f.accent), -0.05), 0.8);
 
-      // chopsticks over the far rim
-      stroke(ctx, [[cx + rx * 0.18, cy - ry * 2.5], [cx + rx * 1.3, cy + ry * 0.8]], '#8d6f4e', 6, 0.9, 'round', 'over');
-      stroke(ctx, [[cx + rx * 0.03, cy - ry * 2.35], [cx + rx * 1.15, cy + ry * 0.95]], '#a08055', 6, 0.9, 'round', 'over');
+      // what you eat it with: chopsticks over the far rim, or a spoon in it
+      var ut = f.kit.utensil || 'chop';
+      if (ut === 'chop') {
+        stroke(ctx, [[cx + rx * 0.18, cy - ry * 2.5], [cx + rx * 1.3, cy + ry * 0.8]], '#8d6f4e', 6, 0.9, 'round', 'over');
+        stroke(ctx, [[cx + rx * 0.03, cy - ry * 2.35], [cx + rx * 1.15, cy + ry * 0.95]], '#a08055', 6, 0.9, 'round', 'over');
+      } else if (ut === 'spoon') {
+        shadowEllipse(ctx, cx + rx * 0.46, cy + ry * 0.5, rx * 0.2, ry * 0.34, 0.3, 8);
+        stroke(ctx, [[cx + rx * 0.44, cy + ry * 0.1], [cx + rx * 1.04, cy - ry * 1.6]], '#e6d9c0', 5, 0.9, 'round', 'over');
+        ctx.save();
+        ctx.fillStyle = '#efe4cd';
+        ctx.beginPath(); ctx.ellipse(cx + rx * 0.4, cy + ry * 0.3, rx * 0.12, ry * 0.4, -0.5, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 0.45; ctx.strokeStyle = '#ada084'; ctx.lineWidth = 1.6; ctx.stroke();
+        ctx.restore();
+        sheen(ctx, cx + rx * 0.36, cy + ry * 0.2, rx * 0.1, ry * 0.18, -0.5, 0.5);
+      }
 
       // steam: painted soft and still (the CSS layer adds the drift)
       ctx.save();
@@ -1010,44 +963,33 @@
         sheen(ctx, cx - hw * 0.42, cy2 - hh * 0.5, hw * 0.42, hh * 0.34, -0.06, 0.4);
       }
 
-      var y = base;
-      y -= wdt * 0.14; slab(y, wdt * 1.00, wdt * 0.15, mix(f.cream, '#c98b3f', 0.38), false); // bottom bun
-      y -= wdt * 0.22; slab(y, wdt * 1.08, wdt * 0.19, f.deep, false);                  // the patty
-      dots(ctx, rnd, cx, y + wdt * 0.06, wdt * 0.8, 16, 2.4, shade(f.deep, -0.4), 0.7); // char
-      y -= wdt * 0.21; slab(y, wdt * 1.12, wdt * 0.11, shade(warmOf(f.accent), 0.06), true); // melted something
-      y -= wdt * 0.14; slab(y, wdt * 1.18, wdt * 0.10, f.fresh, true);                  // greens
-      y -= wdt * 0.15; slab(y, wdt * 1.02, wdt * 0.11, f.main, false);                  // tomato / sauce
-
-      // domed top
-      y -= wdt * 0.30;
-      shadowEllipse(ctx, cx + 3, y + wdt * 0.2, wdt * 0.96, wdt * 0.2, 0.25, 10);
-      ctx.save();
-      var bun = mix(f.cream, '#c98b3f', 0.5);
-      var dg = ctx.createRadialGradient(cx - wdt * 0.4, y - wdt * 0.24, wdt * 0.05, cx, y, wdt * 1.2);
-      dg.addColorStop(0, shade(bun, 0.26));
-      dg.addColorStop(0.55, bun);
-      dg.addColorStop(1, shade(bun, -0.36));
-      ctx.fillStyle = dg;
-      ctx.beginPath();
-      ctx.moveTo(cx - wdt * 0.98, y + wdt * 0.20);
-      ctx.bezierCurveTo(cx - wdt * 1.02, y - wdt * 0.44, cx + wdt * 1.02, y - wdt * 0.44, cx + wdt * 0.98, y + wdt * 0.20);
-      ctx.quadraticCurveTo(cx, y + wdt * 0.34, cx - wdt * 0.98, y + wdt * 0.20);
-      ctx.closePath(); ctx.fill();
-      ctx.restore();
-      dots(ctx, rnd, cx, y - wdt * 0.04, wdt * 0.62, 22, 1.8, shade(bun, 0.34), 0.7);
-      sheen(ctx, cx - wdt * 0.3, y - wdt * 0.22, wdt * 0.3, wdt * 0.08, -0.2, 0.34);
-
-      // sides on the plate
-      for (var s = 0; s < 6; s++) {
-        var sx = cx + wdt * (0.9 + rnd() * 0.42), sy = base + 6 - rnd() * 16;
-        stroke(ctx, [[sx, sy], [sx + 10 - rnd() * 20, sy - 22 - rnd() * 22]],
-               shade(warmOf(f.accent), -0.02), 10, 0.92, 'round', 'over');
+      /* the domed top of a build: a bun, the last pancake off the pan */
+      function dome(y2, hw, color, seeds) {
+        shadowEllipse(ctx, cx + 3, y2 + hw * 0.2, hw * 0.96, hw * 0.2, 0.25, 10);
+        ctx.save();
+        var dg = ctx.createRadialGradient(cx - hw * 0.4, y2 - hw * 0.24, hw * 0.05, cx, y2, hw * 1.2);
+        dg.addColorStop(0, shade(color, 0.26));
+        dg.addColorStop(0.55, color);
+        dg.addColorStop(1, shade(color, -0.36));
+        ctx.fillStyle = dg;
+        ctx.beginPath();
+        ctx.moveTo(cx - hw * 0.98, y2 + hw * 0.20);
+        ctx.bezierCurveTo(cx - hw * 1.02, y2 - hw * 0.44, cx + hw * 1.02, y2 - hw * 0.44, cx + hw * 0.98, y2 + hw * 0.20);
+        ctx.quadraticCurveTo(cx, y2 + hw * 0.34, cx - hw * 0.98, y2 + hw * 0.20);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+        if (seeds) dots(ctx, rnd, cx, y2 - hw * 0.04, hw * 0.62, 22, 1.8, shade(color, 0.34), 0.7);
+        sheen(ctx, cx - hw * 0.3, y2 - hw * 0.22, hw * 0.3, hw * 0.08, -0.2, 0.34);
       }
+
+      // WHAT is stacked is the cuisine's business
+      (f.kit.stack || stackGeneric)(ctx, rnd, f, cx, base, wdt, slab, dome);
       vignette(ctx, 0.48);
     }
 
     /* ---- ARCHETYPE 4: a close crop of a dish edge ---- */
     function drawCrop(ctx, rnd, f) {
+      var K = f.kit.crop || NO_KIT;
       var board = mix('#5a4632', f.table, 0.28);   // wood, always warm
       // the field: layered pigment across the whole frame
       ctx.save();
@@ -1068,11 +1010,12 @@
         stroke(ctx, [[-10, sy0 + 20], [W * 0.3, sy0 - 14], [W * 0.68, sy0 + 22], [W + 10, sy0 - 8]],
                shade(f.deep, 0.1), 9 + rnd() * 8, 0.28);
       }
+      if (K.field) K.field(ctx, rnd, f);   // the cuisine's own field notes
 
       // the crust: a scalloped, blistered edge sweeping across the lower
       // third. This is the whole trick — an EDGE is what tells you the frame
       // is a crop of a dish and not a swatch of colour.
-      var crust = mix(f.cream, '#c8873a', 0.55);
+      var crust = K.crust || mix(f.cream, '#c8873a', 0.55);   // whose bread this is
       var crestY = H * 0.60, i;
       ctx.save();
       var cg = ctx.createLinearGradient(0, crestY - H * 0.03, 0, H * 0.84);
@@ -1123,21 +1066,8 @@
       ctx.closePath(); ctx.fill();
       ctx.restore();
 
-      // toppings: flat discs, dark rim, one crescent of light
-      var n = 9 + Math.floor(rnd() * 4);
-      for (i = 0; i < n; i++) {
-        var tx = W * (0.1 + rnd() * 0.8), ty = H * (0.06 + rnd() * 0.44);
-        var rr = W * (0.06 + rnd() * 0.045);
-        shadowEllipse(ctx, tx + 3, ty + 6, rr * 0.95, rr * 0.8, 0.4, 8);
-        pool(ctx, rnd, tx, ty, rr, rr * 0.86, f.deep, 0.94, 2, 0.11, true, 'over');
-        sheen(ctx, tx - rr * 0.26, ty - rr * 0.32, rr * 0.46, rr * 0.16, -0.5, 0.4);
-      }
-      for (var g4 = 0; g4 < 15; g4++) {
-        leaf(ctx, rnd, W * (0.05 + rnd() * 0.9), H * (0.04 + rnd() * 0.5),
-             W * (0.032 + rnd() * 0.036), W * (0.012 + rnd() * 0.012), rnd() * 3.14,
-             mix(f.fresh, '#4e6a3c', rnd() * 0.55), 0.85);
-      }
-      dots(ctx, rnd, W * 0.5, H * 0.3, W * 0.55, 34, 2.4, shade(f.deep, -0.35), 0.45);
+      // what is ON it
+      (K.over || cropOver)(ctx, rnd, f);
       // one broad specular sweep, fading out at both ends
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
@@ -1188,23 +1118,9 @@
       blobPath(ctx, rnd, px, py, pr * 0.82, pr * 0.33, 0.02, 1.0, 26); ctx.stroke();
       ctx.restore();
 
-      var fr2 = pr * 0.56;
-      shadowEllipse(ctx, px + 4, py + fr2 * 0.28, fr2 * 1.0, fr2 * 0.4, 0.35, 10);
-      pool(ctx, rnd, px, py - fr2 * 0.06, fr2 * 1.02, fr2 * 0.46, f.main, 0.75, 3, 0.18, true, 'over');
-      pool(ctx, rnd, px - fr2 * 0.1, py - fr2 * 0.12, fr2 * 0.66, fr2 * 0.32, f.deep, 0.92, 2, 0.16, true, 'over');
-      for (var q = 0; q < 4; q++) {
-        var qa = -2.4 + q * 1.4 + (rnd() - 0.5) * 0.3;
-        var qx = px + Math.cos(qa) * fr2 * 0.72, qy = py + Math.sin(qa) * fr2 * 0.30;
-        pool(ctx, rnd, qx, qy, fr2 * 0.28, fr2 * 0.14, q % 2 ? f.deep : shade(f.main, -0.16), 0.95, 2, 0.14, true, 'over');
-        sheen(ctx, qx - fr2 * 0.06, qy - fr2 * 0.05, fr2 * 0.16, fr2 * 0.05, -0.35, 0.45);
-      }
-      for (var i2 = 0; i2 < 8; i2++) {
-        leaf(ctx, rnd, px + (rnd() - 0.5) * fr2 * 2.0, py + (rnd() - 0.5) * fr2 * 0.8,
-             fr2 * (0.2 + rnd() * 0.16), fr2 * (0.06 + rnd() * 0.05), rnd() * 3.14,
-             mix(f.fresh, '#4e6a3c', rnd() * 0.55), 0.9);
-      }
-      dots(ctx, rnd, px, py - fr2 * 0.1, fr2 * 0.8, 14, 2.4, '#fff6e2', 0.6);
-      sheen(ctx, px - fr2 * 0.5, py - fr2 * 0.4, fr2 * 0.55, fr2 * 0.16, -0.35, 0.4);
+      // the same kit as the plate archetype, squashed into the table's
+      // perspective — one cuisine, one set of components, two viewpoints
+      stagePlate(ctx, rnd, f, px, py - pr * 0.02, pr * 0.62, 0.45);
       // fork resting on the cloth
       stroke(ctx, [[px - pr * 1.12, py + pr * 0.2], [px - pr * 1.02, py - pr * 0.28]], '#e2d6bd', 5, 0.75, 'round', 'over');
 
@@ -1250,6 +1166,1127 @@
       vignette(ctx, 0.55);
     }
 
+    /* ================================================================
+     * SUBJECT COMPONENTS — the food itself.
+     *
+     * The five painters above own FRAMING and LIGHT: the ground, the
+     * ceramic, the cast shadows, the catch-lights, the vignette. They do
+     * not own the SUBJECT. Everything below is the vocabulary a cuisine
+     * draws from, built out of the same primitives (pool / blobPath /
+     * shadowEllipse / sheen / stroke / leaf / dots) so a shell and a
+     * an oyster shell are lit exactly like the plate they sit on.
+     *
+     * Components are drawn FLAT (as if from straight above). A painter
+     * that needs perspective scales the context before calling in, so the
+     * same kit serves the overhead plate and the plate on the table.
+     * ================================================================ */
+
+    /* one solid piece resting on a surface */
+    function piece(ctx, rnd, x, y, rx, ry, color, wob) {
+      shadowEllipse(ctx, x + rx * 0.12, y + ry * 0.36, rx * 0.95, ry * 0.85, 0.32, 7);
+      pool(ctx, rnd, x, y, rx, ry, color, 0.96, 2, wob == null ? 0.12 : wob, true, 'over');
+      sheen(ctx, x - rx * 0.28, y - ry * 0.34, rx * 0.5, ry * 0.3, -0.4, 0.42);
+    }
+
+    /* a heap of grain — rice, couscous, mash */
+    function mound(ctx, rnd, x, y, rx, ry, color, grains) {
+      shadowEllipse(ctx, x + rx * 0.1, y + ry * 0.5, rx * 0.95, ry * 0.6, 0.34, 10);
+      pool(ctx, rnd, x, y, rx, ry, color, 0.97, 3, 0.1, true, 'over');
+      pool(ctx, rnd, x - rx * 0.18, y - ry * 0.2, rx * 0.55, ry * 0.5, shade(color, 0.2), 0.6, 2, 0.14, false, 'over');
+      if (grains !== false) {
+        dots(ctx, rnd, x, y, rx * 0.8, 24, Math.max(1.2, rx * 0.05), shade(color, -0.18), 0.45);
+        dots(ctx, rnd, x - rx * 0.1, y - ry * 0.15, rx * 0.6, 12, Math.max(1, rx * 0.04), '#fffaf0', 0.55);
+      }
+      sheen(ctx, x - rx * 0.3, y - ry * 0.42, rx * 0.5, ry * 0.28, -0.4, 0.4);
+    }
+
+    /* a flat bed of grain filling an area (a bowl base, couscous) */
+    function grainBed(ctx, rnd, x, y, rx, ry, color) {
+      pool(ctx, rnd, x, y, rx, ry, color, 0.95, 3, 0.12, true, 'over');
+      dots(ctx, rnd, x, y, rx * 0.9, 40, Math.max(1.1, rx * 0.035), shade(color, -0.16), 0.4);
+      dots(ctx, rnd, x, y, rx * 0.85, 22, Math.max(1, rx * 0.03), '#fffaf0', 0.45);
+    }
+
+    /* a citrus half — rind, pale flesh, radial segments */
+    function citrusHalf(ctx, rnd, x, y, r, rind) {
+      shadowEllipse(ctx, x + r * 0.12, y + r * 0.3, r, r * 0.9, 0.34, 7);
+      pool(ctx, rnd, x, y, r, r * 0.96, rind, 0.97, 2, 0.05, true, 'over');
+      pool(ctx, rnd, x, y, r * 0.8, r * 0.76, shade(rind, 0.36), 0.95, 2, 0.05, true, 'over');
+      ctx.save();
+      ctx.globalAlpha = 0.45; ctx.strokeStyle = shade(rind, -0.2); ctx.lineWidth = Math.max(1, r * 0.05);
+      for (var i = 0; i < 8; i++) {
+        var a = (i / 8) * 6.283 + rnd() * 0.12;
+        ctx.beginPath(); ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(a) * r * 0.74, y + Math.sin(a) * r * 0.7); ctx.stroke();
+      }
+      ctx.restore();
+      sheen(ctx, x - r * 0.24, y - r * 0.28, r * 0.45, r * 0.22, -0.4, 0.5);
+    }
+
+    /* a wedge — lime, lemon, a triangle of pita */
+    function wedge(ctx, rnd, x, y, r, ang, rind, flesh) {
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(ang);
+      shadowEllipse(ctx, 2, r * 0.3, r * 0.82, r * 0.24, 0.3, 6);
+      ctx.fillStyle = rind;
+      ctx.beginPath();
+      ctx.moveTo(-r, r * 0.3);
+      ctx.quadraticCurveTo(0, -r * 0.18, r, r * 0.3);
+      ctx.quadraticCurveTo(0, r * 0.62, -r, r * 0.3);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = flesh;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.82, r * 0.28);
+      ctx.quadraticCurveTo(0, -r * 0.02, r * 0.82, r * 0.28);
+      ctx.quadraticCurveTo(0, r * 0.5, -r * 0.82, r * 0.28);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 0.45; ctx.strokeStyle = shade(flesh, -0.4); ctx.lineWidth = 1;
+      for (var i = 1; i < 5; i++) {
+        var t = -0.8 + (i / 5) * 1.6;
+        ctx.beginPath(); ctx.moveTo(r * t, r * 0.28); ctx.lineTo(r * t * 0.45, r * 0.1); ctx.stroke();
+      }
+      ctx.restore();
+      sheen(ctx, x, y + r * 0.1, r * 0.5, r * 0.14, ang, 0.4);
+    }
+
+    /* a fan shell — scallop, clam, a cockle */
+    function shellFan(ctx, rnd, x, y, r, ang, color) {
+      shadowEllipse(ctx, x + r * 0.1, y + r * 0.3, r * 0.95, r * 0.5, 0.34, 8);
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(ang);
+      var g = ctx.createLinearGradient(0, -r * 0.6, 0, r * 0.6);
+      g.addColorStop(0, shade(color, 0.3)); g.addColorStop(1, shade(color, -0.24));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(0, r * 0.52);
+      ctx.quadraticCurveTo(-r * 0.5, r * 0.4, -r, -r * 0.28);
+      ctx.quadraticCurveTo(0, -r * 0.74, r, -r * 0.28);
+      ctx.quadraticCurveTo(r * 0.5, r * 0.4, 0, r * 0.52);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 0.4; ctx.strokeStyle = shade(color, -0.42);
+      ctx.lineWidth = Math.max(1, r * 0.045);
+      for (var i = -3; i <= 3; i++) {
+        ctx.beginPath(); ctx.moveTo(0, r * 0.46);
+        ctx.quadraticCurveTo(i * r * 0.16, 0, i * r * 0.3, -r * 0.4); ctx.stroke();
+      }
+      ctx.globalAlpha = 0.55; ctx.lineWidth = Math.max(1, r * 0.055);
+      ctx.beginPath();
+      ctx.moveTo(0, r * 0.52);
+      ctx.quadraticCurveTo(-r * 0.5, r * 0.4, -r, -r * 0.28);
+      ctx.quadraticCurveTo(0, -r * 0.74, r, -r * 0.28);
+      ctx.quadraticCurveTo(r * 0.5, r * 0.4, 0, r * 0.52);
+      ctx.stroke();
+      ctx.restore();
+      sheen(ctx, x, y - r * 0.15, r * 0.5, r * 0.2, ang, 0.4);
+    }
+
+    /* an oyster on the half shell — the pale meat sitting in its liquor */
+    function oyster(ctx, rnd, x, y, r, ang, shellCol, meatCol) {
+      shadowEllipse(ctx, x + r * 0.12, y + r * 0.34, r, r * 0.62, 0.36, 8);
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(ang);
+      var g = ctx.createLinearGradient(-r, -r * 0.5, r, r * 0.5);
+      g.addColorStop(0, shade(shellCol, 0.36));
+      g.addColorStop(0.5, shellCol);
+      g.addColorStop(1, shade(shellCol, -0.3));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.68, 0, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 0.45; ctx.strokeStyle = shade(shellCol, -0.45);
+      ctx.lineWidth = Math.max(1, r * 0.07); ctx.stroke();
+      ctx.globalAlpha = 0.3;
+      for (var i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.9, i * r * 0.2);
+        ctx.quadraticCurveTo(0, i * r * 0.26, r * 0.9, i * r * 0.18);
+        ctx.stroke();
+      }
+      ctx.restore();
+      pool(ctx, rnd, x + r * 0.04, y + r * 0.02, r * 0.68, r * 0.42, shade(meatCol, -0.04), 0.9, 2, 0.16, false, 'over');
+      pool(ctx, rnd, x - r * 0.06, y - r * 0.03, r * 0.42, r * 0.26, shade(meatCol, 0.26), 0.92, 2, 0.18, false, 'over');
+      sheen(ctx, x - r * 0.1, y - r * 0.1, r * 0.4, r * 0.16, ang - 0.3, 0.6);
+    }
+
+    /* a prawn: a fat segmented comma with a tail fan */
+    function prawn(ctx, rnd, x, y, r, ang, color) {
+      shadowEllipse(ctx, x + r * 0.1, y + r * 0.4, r * 0.8, r * 0.4, 0.3, 7);
+      var pts = [], i, a;
+      for (i = 0; i <= 5; i++) {
+        a = ang - 0.5 + (i / 5) * 3.4;
+        pts.push([x + Math.cos(a) * r * 0.62, y + Math.sin(a) * r * 0.62]);
+      }
+      stroke(ctx, pts, color, r * 0.42, 0.96, 'round', 'over');
+      stroke(ctx, pts, shade(color, 0.34), r * 0.14, 0.5, 'round', 'light');
+      ctx.save();
+      ctx.globalAlpha = 0.45; ctx.strokeStyle = shade(color, -0.34);
+      ctx.lineWidth = Math.max(1, r * 0.07);
+      for (i = 1; i < 5; i++) {
+        var b = ang - 0.5 + (i / 5) * 3.4;
+        var mx = x + Math.cos(b) * r * 0.62, my = y + Math.sin(b) * r * 0.62;
+        ctx.beginPath();
+        ctx.moveTo(mx - Math.cos(b + 1.57) * r * 0.2, my - Math.sin(b + 1.57) * r * 0.2);
+        ctx.lineTo(mx + Math.cos(b + 1.57) * r * 0.2, my + Math.sin(b + 1.57) * r * 0.2);
+        ctx.stroke();
+      }
+      ctx.restore();
+      var ta = ang + 2.9;
+      leaf(ctx, rnd, x + Math.cos(ta) * r * 0.78, y + Math.sin(ta) * r * 0.78,
+           r * 0.4, r * 0.2, ta, shade(color, -0.16), 0.9);
+    }
+
+    /* a flake of cooked fish — soft slab, pale striations */
+    function fillet(ctx, rnd, x, y, rx, ry, ang, color) {
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(ang); ctx.translate(-x, -y);
+      shadowEllipse(ctx, x + rx * 0.1, y + ry * 0.5, rx * 0.92, ry * 0.7, 0.34, 8);
+      pool(ctx, rnd, x, y, rx, ry, color, 0.97, 2, 0.09, true, 'over');
+      ctx.save();
+      ctx.globalAlpha = 0.45; ctx.strokeStyle = shade(color, 0.42);
+      ctx.lineWidth = Math.max(1.4, ry * 0.16);
+      for (var i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(x - rx * 0.78, y + i * ry * 0.34);
+        ctx.quadraticCurveTo(x, y + i * ry * 0.34 - ry * 0.14, x + rx * 0.78, y + i * ry * 0.3);
+        ctx.stroke();
+      }
+      ctx.restore();
+      sheen(ctx, x - rx * 0.2, y - ry * 0.3, rx * 0.5, ry * 0.3, 0, 0.45);
+      ctx.restore();
+    }
+
+    /* nigiri: a rice pillow under a slab of topping */
+    function nigiri(ctx, rnd, x, y, r, ang, top) {
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(ang); ctx.translate(-x, -y);
+      shadowEllipse(ctx, x + r * 0.1, y + r * 0.44, r * 0.95, r * 0.5, 0.34, 7);
+      pool(ctx, rnd, x, y + r * 0.12, r * 0.88, r * 0.52, '#f7efdc', 0.98, 2, 0.06, true, 'over');
+      dots(ctx, rnd, x, y + r * 0.14, r * 0.6, 12, Math.max(1, r * 0.05), '#e4d9c0', 0.45);
+      pool(ctx, rnd, x, y - r * 0.08, r * 0.92, r * 0.42, top, 0.97, 2, 0.07, true, 'over');
+      ctx.save();
+      ctx.globalAlpha = 0.38; ctx.strokeStyle = shade(top, 0.42);
+      ctx.lineWidth = Math.max(1.2, r * 0.07);
+      for (var i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(x - r * 0.7, y - r * 0.08 + i * r * 0.14);
+        ctx.quadraticCurveTo(x, y - r * 0.18 + i * r * 0.14, x + r * 0.7, y - r * 0.06 + i * r * 0.14);
+        ctx.stroke();
+      }
+      ctx.restore();
+      sheen(ctx, x - r * 0.2, y - r * 0.18, r * 0.5, r * 0.14, 0, 0.5);
+      ctx.restore();
+    }
+
+    /* flatbread — naan, pita, a warm tortilla: soft oval, char blisters */
+    function flatbread(ctx, rnd, x, y, rx, ry, ang, color, blisters) {
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(ang); ctx.translate(-x, -y);
+      shadowEllipse(ctx, x + rx * 0.08, y + ry * 0.44, rx * 0.95, ry * 0.8, 0.35, 9);
+      pool(ctx, rnd, x, y, rx, ry, color, 0.98, 3, 0.13, true, 'over');
+      pool(ctx, rnd, x - rx * 0.14, y - ry * 0.16, rx * 0.52, ry * 0.46, shade(color, 0.2), 0.55, 2, 0.2, false, 'over');
+      if (blisters !== false) {
+        for (var i = 0; i < 9; i++) {
+          dots(ctx, rnd, x + (rnd() - 0.5) * rx * 1.4, y + (rnd() - 0.5) * ry * 1.3,
+               rx * 0.05, 2, Math.max(1.6, rx * 0.05), '#4a3325', 0.36);
+        }
+      }
+      sheen(ctx, x - rx * 0.2, y - ry * 0.3, rx * 0.45, ry * 0.2, 0, 0.36);
+      ctx.restore();
+    }
+
+    /* a folded wrap — taco, enchilada, quesadilla. The filling showing
+       along the open edge is the whole tell. */
+    function fold(ctx, rnd, x, y, r, ang, shellCol, fill1, fill2) {
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(ang); ctx.translate(-x, -y);
+      shadowEllipse(ctx, x + r * 0.1, y + r * 0.48, r * 0.95, r * 0.3, 0.36, 8);
+      pool(ctx, rnd, x, y + r * 0.08, r * 0.84, r * 0.34, fill1, 0.96, 2, 0.2, false, 'over');
+      dots(ctx, rnd, x, y + r * 0.08, r * 0.6, 10, Math.max(1.4, r * 0.07), fill2, 0.85);
+      ctx.save();
+      var g = ctx.createLinearGradient(x, y - r * 0.6, x, y + r * 0.3);
+      g.addColorStop(0, shade(shellCol, 0.24));
+      g.addColorStop(1, shade(shellCol, -0.18));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(x - r, y + r * 0.12);
+      ctx.quadraticCurveTo(x - r * 0.62, y - r * 0.7, x, y - r * 0.64);
+      ctx.quadraticCurveTo(x + r * 0.62, y - r * 0.7, x + r, y + r * 0.12);
+      ctx.quadraticCurveTo(x + r * 0.5, y - r * 0.06, x, y - r * 0.07);
+      ctx.quadraticCurveTo(x - r * 0.5, y - r * 0.06, x - r, y + r * 0.12);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 0.35; ctx.strokeStyle = shade(shellCol, -0.42); ctx.lineWidth = 1.4;
+      ctx.stroke();
+      ctx.restore();
+      for (var i = 0; i < 5; i++) {
+        dots(ctx, rnd, x + (rnd() - 0.5) * r * 1.4, y - r * (0.18 + rnd() * 0.3),
+             r * 0.05, 1, Math.max(1.4, r * 0.05), shade(shellCol, -0.5), 0.3);
+      }
+      sheen(ctx, x - r * 0.25, y - r * 0.38, r * 0.4, r * 0.14, -0.2, 0.36);
+      ctx.restore();
+    }
+
+    /* a slice of smoked or roast meat: a dark bark edge and a smoke ring */
+    function meatSlice(ctx, rnd, x, y, rx, ry, ang, meat, bark) {
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(ang); ctx.translate(-x, -y);
+      shadowEllipse(ctx, x + rx * 0.14, y + ry * 0.5, rx * 0.95, ry * 0.8, 0.36, 8);
+      pool(ctx, rnd, x, y, rx, ry, meat, 0.97, 2, 0.1, true, 'over');
+      pool(ctx, rnd, x, y + ry * 0.08, rx * 0.86, ry * 0.76, mix(meat, '#c4553f', 0.45), 0.45, 2, 0.12, false, 'over');
+      ctx.save();
+      ctx.globalAlpha = 0.95; ctx.fillStyle = bark;
+      // the band follows the slice's own edge, so the bark never grows ears
+      ctx.beginPath();
+      ctx.moveTo(x - rx * 0.8, y - ry * 0.6);
+      ctx.quadraticCurveTo(x, y - ry * 1.18, x + rx * 0.8, y - ry * 0.6);
+      ctx.quadraticCurveTo(x, y - ry * 0.7, x - rx * 0.8, y - ry * 0.6);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      dots(ctx, rnd, x, y - ry * 0.8, rx * 0.44, 9, Math.max(1.2, ry * 0.1), shade(bark, 0.26), 0.42);
+      sheen(ctx, x - rx * 0.2, y + ry * 0.12, rx * 0.45, ry * 0.24, 0, 0.4);
+      ctx.restore();
+    }
+
+    /* a pickle chip: crinkle rim, pale heart */
+    function pickle(ctx, rnd, x, y, r, color) {
+      shadowEllipse(ctx, x + r * 0.12, y + r * 0.3, r * 0.9, r * 0.7, 0.3, 6);
+      ctx.save();
+      ctx.globalAlpha = 0.96; ctx.fillStyle = color;
+      ctx.beginPath();
+      for (var i = 0; i <= 16; i++) {
+        var a = (i / 16) * 6.283, k = 1 + (i % 2 ? 0.08 : -0.08);
+        var px2 = x + Math.cos(a) * r * k, py2 = y + Math.sin(a) * r * k * 0.92;
+        if (i === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 0.65; ctx.fillStyle = shade(color, 0.36);
+      ctx.beginPath(); ctx.ellipse(x, y, r * 0.54, r * 0.5, 0, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 0.45; ctx.fillStyle = shade(color, -0.14);
+      ctx.beginPath(); ctx.ellipse(x, y, r * 0.24, r * 0.22, 0, 0, 6.283); ctx.fill();
+      ctx.restore();
+      sheen(ctx, x - r * 0.2, y - r * 0.26, r * 0.4, r * 0.16, -0.3, 0.4);
+    }
+
+    function olive(ctx, rnd, x, y, r, color) {
+      shadowEllipse(ctx, x + r * 0.12, y + r * 0.34, r * 0.9, r * 0.7, 0.3, 5);
+      pool(ctx, rnd, x, y, r, r * 0.86, color, 0.97, 2, 0.07, true, 'over');
+      ctx.save();
+      ctx.globalAlpha = 0.5; ctx.fillStyle = shade(color, -0.45);
+      ctx.beginPath(); ctx.ellipse(x, y, r * 0.3, r * 0.26, 0, 0, 6.283); ctx.fill();
+      ctx.restore();
+      sheen(ctx, x - r * 0.26, y - r * 0.3, r * 0.34, r * 0.16, -0.4, 0.55);
+    }
+
+    /* a cube: feta, tofu, halloumi */
+    function cube(ctx, rnd, x, y, r, ang, color) {
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(ang);
+      shadowEllipse(ctx, r * 0.12, r * 0.52, r * 0.9, r * 0.4, 0.3, 6);
+      var g = ctx.createLinearGradient(-r, -r, r, r);
+      g.addColorStop(0, shade(color, 0.24)); g.addColorStop(1, shade(color, -0.22));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.9, -r * 0.72); ctx.lineTo(r * 0.92, -r * 0.8);
+      ctx.lineTo(r * 0.84, r * 0.78); ctx.lineTo(-r * 0.86, r * 0.7);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 0.32; ctx.strokeStyle = shade(color, -0.4); ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.restore();
+      sheen(ctx, x - r * 0.2, y - r * 0.3, r * 0.4, r * 0.2, 0, 0.4);
+    }
+
+    function friedEgg(ctx, rnd, x, y, r) {
+      shadowEllipse(ctx, x + r * 0.12, y + r * 0.34, r * 0.95, r * 0.7, 0.3, 8);
+      pool(ctx, rnd, x, y, r, r * 0.88, '#fbf3e0', 0.98, 3, 0.17, true, 'over');
+      pool(ctx, rnd, x + r * 0.06, y - r * 0.04, r * 0.4, r * 0.36, '#e8a733', 0.97, 2, 0.06, true, 'over');
+      sheen(ctx, x - r * 0.02, y - r * 0.16, r * 0.2, r * 0.1, -0.3, 0.62);
+    }
+
+    /* strands combed across a surface */
+    function noodles(ctx, rnd, x, y, rx, ry, color, n) {
+      for (var i = 0; i < n; i++) {
+        var y0 = y - ry * 0.7 + (i / (n - 1)) * ry * 1.4 + (rnd() - 0.5) * ry * 0.12;
+        var x0 = x - rx * (0.4 + rnd() * 0.5), x1 = x + rx * (0.3 + rnd() * 0.5);
+        stroke(ctx, [[x0, y0],
+                     [x0 + (x1 - x0) * 0.35, y0 - ry * 0.1 + rnd() * ry * 0.2],
+                     [x0 + (x1 - x0) * 0.7, y0 + ry * 0.09 - rnd() * ry * 0.18],
+                     [x1, y0 + (rnd() - 0.5) * ry * 0.1]],
+               shade(color, 0.04 + rnd() * 0.18), rx * (0.032 + rnd() * 0.018), 0.82, 'round', 'over');
+      }
+    }
+
+    function herbs(ctx, rnd, x, y, spread, n, size, f) {
+      for (var i = 0; i < n; i++) {
+        var a = rnd() * 6.283, d = Math.sqrt(rnd()) * spread;
+        leaf(ctx, rnd, x + Math.cos(a) * d, y + Math.sin(a) * d,
+             size * (0.8 + rnd() * 0.6), size * (0.28 + rnd() * 0.22), rnd() * 3.14,
+             mix(f.fresh, '#4e6a3c', rnd() * 0.55), 0.88);
+      }
+    }
+
+    /* a wiped smear of sauce — a plate note, never a mound */
+    function smear(ctx, rnd, x, y, rx, ry, color, alpha) {
+      ctx.save();
+      ctx.globalAlpha = alpha == null ? 0.7 : alpha;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(x - rx, y);
+      ctx.quadraticCurveTo(x - rx * 0.4, y - ry * 1.5, x + rx * 0.2, y - ry * 0.6);
+      ctx.quadraticCurveTo(x + rx * 0.9, y + ry * 0.1, x + rx, y + ry * 0.5);
+      ctx.quadraticCurveTo(x + rx * 0.2, y + ry * 1.15, x - rx, y);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      dots(ctx, rnd, x + rx * 0.5, y, rx * 0.4, 5, Math.max(1.2, ry * 0.2), shade(color, -0.2), 0.45);
+    }
+
+    /* a drizzle spooned over a dish: two short ribbons that break, not one
+       continuous rope looping the whole plate (which reads as string) */
+    function drizzleArc(ctx, rnd, x, y, r, color, w, alpha) {
+      var a0 = rnd() * 6.283, k, i;
+      for (k = 0; k < 2; k++) {
+        var pts = [], span = 1.5 + rnd() * 0.9, st = a0 + k * (2.5 + rnd() * 0.9);
+        for (i = 0; i <= 5; i++) {
+          var a = st + (i / 5) * span;
+          var rr = r * (0.7 + (i % 2 ? 0.13 : -0.09));
+          pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr * 0.94]);
+        }
+        stroke(ctx, pts, color, w * (0.75 + rnd() * 0.35),
+               (alpha == null ? 0.62 : alpha) * 0.85, 'round', 'over');
+      }
+    }
+
+    function chillis(ctx, rnd, x, y, spread, n, r, color) {
+      ctx.save();
+      for (var i = 0; i < n; i++) {
+        var a = rnd() * 6.283, d = Math.sqrt(rnd()) * spread;
+        var px2 = x + Math.cos(a) * d, py2 = y + Math.sin(a) * d;
+        ctx.globalAlpha = 0.9; ctx.fillStyle = color;
+        ctx.beginPath(); ctx.ellipse(px2, py2, r, r * 0.82, rnd() * 3, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 0.55; ctx.fillStyle = shade(color, 0.42);
+        ctx.beginPath(); ctx.ellipse(px2, py2, r * 0.44, r * 0.34, 0, 0, 6.283); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    /* a little dish of dipping sauce, seen from above */
+    function dipDish(ctx, rnd, x, y, r, sauce) {
+      shadowEllipse(ctx, x + r * 0.12, y + r * 0.3, r, r * 0.9, 0.34, 8);
+      ctx.save();
+      var g = ctx.createRadialGradient(x - r * 0.4, y - r * 0.4, r * 0.05, x, y, r * 1.1);
+      g.addColorStop(0, '#fffdf6'); g.addColorStop(1, '#d6cab2');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.96, 0, 0, 6.283); ctx.fill();
+      ctx.restore();
+      pool(ctx, rnd, x, y, r * 0.66, r * 0.62, sauce, 0.95, 2, 0.08, true, 'over');
+      sheen(ctx, x - r * 0.2, y - r * 0.24, r * 0.3, r * 0.12, -0.4, 0.5);
+    }
+
+    /* scattered batons: fries, pickled sticks, skewered things */
+    function sticks(ctx, rnd, x, y, spread, n, len, w, color) {
+      for (var i = 0; i < n; i++) {
+        var a = rnd() * 6.283, d = Math.sqrt(rnd()) * spread;
+        var px2 = x + Math.cos(a) * d, py2 = y + Math.sin(a) * d;
+        var ang = rnd() * 3.14;
+        var dx = Math.cos(ang) * len * 0.5, dy = Math.sin(ang) * len * 0.5;
+        shadowEllipse(ctx, px2 + 2, py2 + 5, len * 0.42, w * 0.7, 0.3, 6);
+        stroke(ctx, [[px2 - dx, py2 - dy], [px2 + dx, py2 + dy]],
+               shade(color, (rnd() - 0.4) * 0.3), w, 0.96, 'butt', 'over');
+        stroke(ctx, [[px2 - dx * 0.7, py2 - dy * 0.7], [px2 + dx * 0.6, py2 + dy * 0.6]],
+               shade(color, 0.32), w * 0.3, 0.5, 'butt', 'light');
+      }
+    }
+
+    /* a translucent rice-paper roll, filling glowing through it */
+    function riceRoll(ctx, rnd, x, y, rx, ry, ang, f) {
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(ang); ctx.translate(-x, -y);
+      shadowEllipse(ctx, x + rx * 0.3, y + ry * 0.2, rx * 0.95, ry * 0.9, 0.34, 9);
+      pool(ctx, rnd, x, y, rx, ry, '#f2ecdc', 0.94, 2, 0.05, true, 'over');
+      pool(ctx, rnd, x, y - ry * 0.24, rx * 0.62, ry * 0.34, mix(f.fresh, '#8ab45a', 0.35), 0.5, 2, 0.16, false, 'over');
+      pool(ctx, rnd, x, y + ry * 0.26, rx * 0.58, ry * 0.28, mix(f.deep, '#d4907a', 0.6), 0.55, 2, 0.16, false, 'over');
+      sheen(ctx, x - rx * 0.3, y - ry * 0.1, rx * 0.42, ry * 0.6, 0, 0.42);
+      ctx.restore();
+    }
+
+    /* ---- the stage: run a cuisine's plate kit -----------------------
+       `sq` squashes the vertical axis, so one kit reads flat from above
+       (sq 1, the plate archetype) and in perspective on a table (sq ~0.45,
+       the table archetype) without being written twice. */
+    function stagePlate(ctx, rnd, f, cx, cy, r, sq) {
+      ctx.save();
+      if (sq !== 1) { ctx.translate(cx, cy); ctx.scale(1, sq); ctx.translate(-cx, -cy); }
+      (f.kit.plate || plateGeneric)(ctx, rnd, f, cx, cy, r);
+      ctx.restore();
+    }
+
+    /* ---- generic fallbacks (a cuisine with no kit still eats) ---- */
+    function plateGeneric(ctx, rnd, f, cx, cy, fr) {
+      shadowEllipse(ctx, cx + 4, cy + fr * 0.30, fr * 0.95, fr * 0.7, 0.28, 12);
+      pool(ctx, rnd, cx + fr * 0.04, cy + fr * 0.06, fr * 1.02, fr * 0.94, f.main, 0.62, 3, 0.17, true, 'over');
+      pool(ctx, rnd, cx, cy - fr * 0.04, fr * 0.72, fr * 0.64, f.deep, 0.9, 3, 0.14, true, 'over');
+      pool(ctx, rnd, cx - fr * 0.20, cy - fr * 0.20, fr * 0.38, fr * 0.32, shade(f.main, 0.22), 0.7, 2, 0.18, true, 'over');
+      var pieces = 5 + Math.floor(rnd() * 2), i;
+      for (i = 0; i < pieces; i++) {
+        var a = -2.1 + (i / (pieces - 1)) * 4.9 + (rnd() - 0.5) * 0.26;
+        var d = fr * (0.66 + rnd() * 0.14);
+        var px = cx + Math.cos(a) * d, py = cy + Math.sin(a) * d * 0.94;
+        piece(ctx, rnd, px, py, fr * 0.30, fr * 0.21, i % 2 ? f.deep : shade(f.main, -0.16), 0.14);
+      }
+      herbs(ctx, rnd, cx, cy, fr * 0.9, 14, fr * 0.17, f);
+      stroke(ctx, [[cx - fr * 0.92, cy + fr * 0.34], [cx - fr * 0.2, cy + fr * 0.62],
+                   [cx + fr * 0.4, cy + fr * 0.26], [cx + fr * 0.95, cy + fr * 0.52]],
+             shade(warmOf(f.accent), 0.12), 3.5, 0.55, 'round', 'over');
+      dots(ctx, rnd, cx, cy, fr * 0.85, 26, 2.6, shade(f.deep, -0.25), 0.75);
+      dots(ctx, rnd, cx - fr * 0.1, cy - fr * 0.18, fr * 0.55, 12, 2.4, '#fff6e2', 0.7);
+      sheen(ctx, cx - fr * 0.35, cy - fr * 0.42, fr * 0.5, fr * 0.2, -0.5, 0.34);
+    }
+
+    function bowlGeneric(ctx, rnd, f, cx, cy, r) {
+      noodles(ctx, rnd, cx, cy, r * 0.8, r * 0.5, f.cream, 8);
+      piece(ctx, rnd, cx - r * 0.36, cy - r * 0.16, r * 0.3, r * 0.3, f.deep, 0.1);
+      piece(ctx, rnd, cx - r * 0.04, cy + r * 0.24, r * 0.26, r * 0.26, shade(f.deep, 0.12), 0.1);
+      var ex = cx + r * 0.44, ey = cy - r * 0.1;
+      shadowEllipse(ctx, ex + 2, ey + 4, r * 0.21, r * 0.24, 0.3, 8);
+      pool(ctx, rnd, ex, ey, r * 0.21, r * 0.25, '#fbf3e0', 0.98, 2, 0.05, true, 'over');
+      pool(ctx, rnd, ex, ey + r * 0.02, r * 0.11, r * 0.13, '#e8a733', 0.96, 2, 0.07, true, 'over');
+      sheen(ctx, ex - r * 0.05, ey - r * 0.08, r * 0.09, r * 0.04, -0.2, 0.55);
+      ctx.save();
+      ctx.globalAlpha = 0.94;
+      ctx.fillStyle = mix(f.fresh, '#141c1e', 0.7);
+      ctx.translate(cx + r * 0.1, cy - r * 0.5); ctx.rotate(-0.26);
+      blobPath(ctx, rnd, 0, 0, r * 0.17, r * 0.3, 0.06, 0.2, 10); ctx.fill();
+      ctx.restore();
+      herbs(ctx, rnd, cx, cy, r * 0.62, 12, r * 0.12, f);
+      dots(ctx, rnd, cx + r * 0.05, cy + r * 0.1, r * 0.65, 16, 3, shade(warmOf(f.accent), -0.05), 0.8);
+    }
+
+    function stackGeneric(ctx, rnd, f, cx, base, wdt, slab, dome) {
+      var y = base;
+      y -= wdt * 0.14; slab(y, wdt * 1.00, wdt * 0.15, mix(f.cream, '#c98b3f', 0.38), false);
+      y -= wdt * 0.22; slab(y, wdt * 1.08, wdt * 0.19, f.deep, false);
+      dots(ctx, rnd, cx, y + wdt * 0.06, wdt * 0.8, 16, 2.4, shade(f.deep, -0.4), 0.7);
+      y -= wdt * 0.21; slab(y, wdt * 1.12, wdt * 0.11, shade(warmOf(f.accent), 0.06), true);
+      y -= wdt * 0.14; slab(y, wdt * 1.18, wdt * 0.10, f.fresh, true);
+      y -= wdt * 0.15; slab(y, wdt * 1.02, wdt * 0.11, f.main, false);
+      y -= wdt * 0.30;
+      dome(y, wdt, mix(f.cream, '#c98b3f', 0.5), true);
+      for (var s = 0; s < 6; s++) {
+        var sx = cx + wdt * (0.9 + rnd() * 0.42), sy = base + 6 - rnd() * 16;
+        stroke(ctx, [[sx, sy], [sx + 10 - rnd() * 20, sy - 22 - rnd() * 22]],
+               shade(warmOf(f.accent), -0.02), 10, 0.92, 'round', 'over');
+      }
+    }
+
+    function cropOver(ctx, rnd, f) {
+      var n = 9 + Math.floor(rnd() * 4), i;
+      for (i = 0; i < n; i++) {
+        var tx = W * (0.1 + rnd() * 0.8), ty = H * (0.06 + rnd() * 0.44);
+        var rr = W * (0.06 + rnd() * 0.045);
+        piece(ctx, rnd, tx, ty, rr, rr * 0.86, f.deep, 0.11);
+      }
+      for (i = 0; i < 15; i++) {
+        leaf(ctx, rnd, W * (0.05 + rnd() * 0.9), H * (0.04 + rnd() * 0.5),
+             W * (0.032 + rnd() * 0.036), W * (0.012 + rnd() * 0.012), rnd() * 3.14,
+             mix(f.fresh, '#4e6a3c', rnd() * 0.55), 0.85);
+      }
+      dots(ctx, rnd, W * 0.5, H * 0.3, W * 0.55, 34, 2.4, shade(f.deep, -0.35), 0.45);
+    }
+
+    /* ---- shared food pigments (things that are that colour whatever
+       the cuisine's palette says: rice is not blue, lime is not gold) ---- */
+    var RICE = '#f6efdb', CREAMY = '#f7f0e0';
+    var LIME_R = '#9bb84e', LIME_F = '#d7e39a';
+    var LEM_R = '#dfc451', LEM_F = '#f2e8a8';
+    var CHARC = '#3a2a20';
+
+    /* ================================================================
+     * CUISINE KITS — what is actually on the plate / in the bowl.
+     * Each kit is a bag of optional painters; a missing one falls back to
+     * the generic composition above. Every position and count is drawn
+     * from the seeded rng, so a place always paints the same way and two
+     * places of one cuisine never line up identically.
+     * ================================================================ */
+
+    /* -- seafood: shells, a fillet, citrus. No red sauce, ever. -- */
+    function plateSeafood(ctx, rnd, f, cx, cy, r) {
+      var shellCol = mix(f.table, '#efe8d8', 0.74);
+      pool(ctx, rnd, cx, cy + r * 0.06, r * 1.0, r * 0.9, shade(f.cream, -0.05), 0.45, 3, 0.22, false, 'over');
+      var n = 3 + Math.floor(rnd() * 2), i;
+      for (i = 0; i < n; i++) {
+        var a = -2.55 + (i / (n - 1)) * 4.6 + (rnd() - 0.5) * 0.26;
+        var d = r * (0.6 + rnd() * 0.14);
+        oyster(ctx, rnd, cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.9, r * 0.29, a + 1.57, shellCol, f.main);
+      }
+      fillet(ctx, rnd, cx - r * 0.06, cy - r * 0.06, r * 0.44, r * 0.28, -0.22, f.main);
+      prawn(ctx, rnd, cx + r * 0.36, cy + r * 0.34, r * 0.3, 1.9 + rnd() * 0.6, shade(f.deep, 0.18));
+      shellFan(ctx, rnd, cx + r * 0.6, cy - r * 0.46, r * 0.26, 0.4 + rnd() * 0.4, shellCol);
+      citrusHalf(ctx, rnd, cx - r * 0.62, cy + r * 0.44, r * 0.21, LEM_R);
+      herbs(ctx, rnd, cx, cy, r * 0.8, 9, r * 0.14, f);
+      dots(ctx, rnd, cx, cy, r * 0.85, 12, 2.0, '#fff6e2', 0.6);
+    }
+
+    function bowlSeafood(ctx, rnd, f, cx, cy, r) {
+      var shellCol = mix(f.table, '#efe8d8', 0.72);
+      pool(ctx, rnd, cx, cy, r * 1.06, r * 1.06, shade(f.cream, -0.06), 0.82, 3, 0.1, false, 'over');
+      var n = 3 + Math.floor(rnd() * 2), i;
+      for (i = 0; i < n; i++) {
+        var a = -2.3 + (i / (n - 1)) * 4.2 + (rnd() - 0.5) * 0.3;
+        shellFan(ctx, rnd, cx + Math.cos(a) * r * 0.52, cy + Math.sin(a) * r * 0.48,
+                 r * 0.26, a + 1.4, mix(shellCol, CHARC, 0.35));
+      }
+      prawn(ctx, rnd, cx - r * 0.1, cy - r * 0.1, r * 0.32, 2.4, shade(f.deep, 0.2));
+      piece(ctx, rnd, cx + r * 0.3, cy + r * 0.22, r * 0.16, r * 0.14, mix(f.cream, '#e0c07a', 0.4), 0.2);
+      piece(ctx, rnd, cx - r * 0.36, cy + r * 0.3, r * 0.14, r * 0.13, mix(f.cream, '#e0c07a', 0.4), 0.2);
+      herbs(ctx, rnd, cx, cy, r * 0.62, 10, r * 0.12, f);
+      wedge(ctx, rnd, cx + r * 0.5, cy - r * 0.42, r * 0.2, -0.5, LEM_R, LEM_F);
+      dots(ctx, rnd, cx, cy, r * 0.7, 10, 2.2, '#fff6e2', 0.5);
+    }
+
+    /* -- japanese: a composed set, not a saucy heap -- */
+    function plateJapanese(ctx, rnd, f, cx, cy, r) {
+      var n = 3 + Math.floor(rnd() * 2), i;
+      for (i = 0; i < n; i++) {
+        var x = cx - r * 0.48 + (i / (n - 1)) * r * 0.96 + (rnd() - 0.5) * r * 0.06;
+        var y = cy - r * 0.16 + (i % 2 ? r * 0.12 : -r * 0.04) + (rnd() - 0.5) * r * 0.06;
+        nigiri(ctx, rnd, x, y, r * 0.29, -0.22 + rnd() * 0.44,
+               i % 2 ? mix(f.main, '#e2895a', 0.55) : mix(f.deep, '#d99a6a', 0.4));
+      }
+      for (i = 0; i < 2; i++) {
+        var mx = cx - r * 0.32 + i * r * 0.46, my = cy + r * 0.54;
+        piece(ctx, rnd, mx, my, r * 0.2, r * 0.19, '#f7efdc', 0.06);
+        ctx.save();
+        ctx.globalAlpha = 0.9; ctx.strokeStyle = mix(f.fresh, '#141c1e', 0.78);
+        ctx.lineWidth = Math.max(2, r * 0.055);
+        ctx.beginPath(); ctx.ellipse(mx, my, r * 0.18, r * 0.17, 0, 0, 6.283); ctx.stroke();
+        ctx.restore();
+        pool(ctx, rnd, mx, my, r * 0.085, r * 0.08, shade(f.main, -0.06), 0.9, 2, 0.12, false, 'over');
+      }
+      dipDish(ctx, rnd, cx + r * 0.64, cy + r * 0.5, r * 0.2, mix(f.deep, '#241812', 0.62));
+      pool(ctx, rnd, cx - r * 0.72, cy + r * 0.14, r * 0.1, r * 0.09, mix(f.fresh, '#a8c86a', 0.5), 0.95, 2, 0.24, true, 'over');
+      for (i = 0; i < 5; i++) {
+        leaf(ctx, rnd, cx - r * 0.68 + rnd() * r * 0.22, cy - r * 0.24 + rnd() * r * 0.18,
+             r * 0.2, r * 0.055, 0.3 + rnd(), mix(f.accent, '#f4d8de', 0.45), 0.9);
+      }
+      dots(ctx, rnd, cx, cy, r * 0.7, 12, 1.8, '#fff6e2', 0.55);
+    }
+
+    function bowlJapanese(ctx, rnd, f, cx, cy, r) { bowlGeneric(ctx, rnd, f, cx, cy, r); }
+
+    /* -- italian: a nest of pasta under sauce, cheese, basil -- */
+    function plateItalian(ctx, rnd, f, cx, cy, r) {
+      pool(ctx, rnd, cx, cy + r * 0.04, r * 0.98, r * 0.9, shade(f.main, -0.14), 0.55, 3, 0.2, true, 'over');
+      var i, k;
+      for (i = 0; i < 15; i++) {
+        var a = rnd() * 6.283, rr = r * (0.18 + rnd() * 0.55), pts = [];
+        for (k = 0; k <= 5; k++) {
+          var t = a + (k / 5) * (2.0 + rnd() * 1.4);
+          pts.push([cx + Math.cos(t) * rr * (0.9 + rnd() * 0.2),
+                    cy + Math.sin(t) * rr * (0.85 + rnd() * 0.2)]);
+        }
+        stroke(ctx, pts, shade(f.cream, -0.04 + rnd() * 0.22), r * 0.05, 0.9, 'round', 'over');
+      }
+      pool(ctx, rnd, cx + r * 0.04, cy - r * 0.02, r * 0.46, r * 0.4, f.deep, 0.88, 3, 0.24, true, 'over');
+      var n = 2 + Math.floor(rnd() * 2);
+      for (i = 0; i < n; i++) {
+        piece(ctx, rnd, cx + (rnd() - 0.5) * r * 0.9, cy + (rnd() - 0.4) * r * 0.7,
+              r * 0.17, r * 0.15, mix(f.deep, '#6a3a24', 0.4), 0.13);
+      }
+      herbs(ctx, rnd, cx, cy, r * 0.8, 9, r * 0.17, f);
+      dots(ctx, rnd, cx, cy, r * 0.8, 26, 2.2, '#fdf6e4', 0.72);
+      drizzleArc(ctx, rnd, cx, cy, r * 0.72, shade(warmOf(f.accent), 0.1), 3.2, 0.5);
+    }
+
+    /* -- mexican: folded tortillas, filling edge showing, lime, crema -- */
+    function plateMexican(ctx, rnd, f, cx, cy, r) {
+      smear(ctx, rnd, cx - r * 0.05, cy + r * 0.6, r * 0.72, r * 0.18, mix(f.deep, '#38200f', 0.45), 0.55);
+      var n = 2 + Math.floor(rnd() * 2), i;
+      for (i = 0; i < n; i++) {
+        var x = cx + (n === 1 ? 0 : (-r * 0.4 + (i / (n - 1)) * r * 0.8));
+        fold(ctx, rnd, x, cy - r * 0.04 + (rnd() - 0.5) * r * 0.12, r * 0.44,
+             -0.18 + rnd() * 0.36, mix(f.cream, '#e0bd7a', 0.45), shade(f.deep, 0.08), f.fresh);
+      }
+      wedge(ctx, rnd, cx + r * 0.66, cy + r * 0.46, r * 0.21, -0.5 + rnd() * 0.4, LIME_R, LIME_F);
+      drizzleArc(ctx, rnd, cx, cy + r * 0.08, r * 0.62, CREAMY, r * 0.042, 0.8);
+      dots(ctx, rnd, cx - r * 0.5, cy + r * 0.5, r * 0.3, 12, Math.max(1.6, r * 0.045), shade(f.main, -0.18), 0.8);
+      herbs(ctx, rnd, cx, cy - r * 0.1, r * 0.8, 10, r * 0.12, f);
+    }
+
+    /* -- indian: a curry pool, a rice mound, a folded flatbread -- */
+    function plateIndian(ctx, rnd, f, cx, cy, r) {
+      pool(ctx, rnd, cx + r * 0.34, cy - r * 0.02, r * 0.58, r * 0.52, f.main, 0.92, 3, 0.16, true, 'over');
+      pool(ctx, rnd, cx + r * 0.3, cy - r * 0.08, r * 0.36, r * 0.3, f.deep, 0.75, 2, 0.22, true, 'over');
+      var i;
+      for (i = 0; i < 3; i++) {
+        piece(ctx, rnd, cx + r * (0.16 + rnd() * 0.38), cy + r * (-0.16 + rnd() * 0.32),
+              r * 0.13, r * 0.11, shade(f.deep, 0.14), 0.18);
+      }
+      drizzleArc(ctx, rnd, cx + r * 0.34, cy - r * 0.02, r * 0.36, CREAMY, Math.max(2, r * 0.028), 0.7);
+      mound(ctx, rnd, cx - r * 0.44, cy - r * 0.06, r * 0.42, r * 0.36, RICE);
+      dots(ctx, rnd, cx - r * 0.44, cy - r * 0.06, r * 0.3, 8, Math.max(1.4, r * 0.035), shade(warmOf(f.accent), -0.1), 0.6);
+      flatbread(ctx, rnd, cx + r * 0.04, cy + r * 0.64, r * 0.5, r * 0.24, -0.14 + rnd() * 0.28,
+                mix(f.cream, '#d9a856', 0.48));
+      herbs(ctx, rnd, cx + r * 0.3, cy, r * 0.42, 7, r * 0.12, f);
+    }
+
+    function bowlIndian(ctx, rnd, f, cx, cy, r) {
+      pool(ctx, rnd, cx, cy, r * 0.92, r * 0.92, f.main, 0.9, 3, 0.1, false, 'over');
+      pool(ctx, rnd, cx - r * 0.14, cy - r * 0.1, r * 0.5, r * 0.44, f.deep, 0.6, 3, 0.2, false, 'over');
+      var i;
+      for (i = 0; i < 5; i++) {
+        piece(ctx, rnd, cx + (rnd() - 0.5) * r * 1.1, cy + (rnd() - 0.5) * r * 1.0,
+              r * 0.15, r * 0.13, i % 2 ? shade(f.deep, 0.16) : mix(f.cream, '#d8b45e', 0.4), 0.2);
+      }
+      drizzleArc(ctx, rnd, cx, cy, r * 0.56, CREAMY, Math.max(2.4, r * 0.032), 0.78);
+      mound(ctx, rnd, cx - r * 0.44, cy + r * 0.3, r * 0.3, r * 0.26, RICE);
+      herbs(ctx, rnd, cx, cy, r * 0.6, 9, r * 0.12, f);
+      dots(ctx, rnd, cx, cy, r * 0.6, 10, 2.2, shade(warmOf(f.accent), 0.1), 0.65);
+    }
+
+    /* -- mediterranean: grain, olives, feta, a wedge, herbed oil -- */
+    function plateMediterranean(ctx, rnd, f, cx, cy, r) {
+      grainBed(ctx, rnd, cx, cy + r * 0.04, r * 0.86, r * 0.74, mix(f.cream, '#dcc182', 0.45));
+      var i, n = 5 + Math.floor(rnd() * 3);
+      for (i = 0; i < n; i++) {
+        olive(ctx, rnd, cx + (rnd() - 0.5) * r * 1.3, cy + (rnd() - 0.5) * r * 1.1,
+              r * 0.1, mix(f.fresh, '#2a3326', 0.6));
+      }
+      for (i = 0; i < 3; i++) {
+        cube(ctx, rnd, cx + (rnd() - 0.5) * r * 1.1, cy + (rnd() - 0.5) * r * 0.9, r * 0.12, rnd() * 1.2, '#f0e8d6');
+      }
+      for (i = 0; i < 3; i++) {
+        piece(ctx, rnd, cx + (rnd() - 0.5) * r * 1.1, cy + (rnd() - 0.5) * r * 0.9,
+              r * 0.15, r * 0.12, mix(f.deep, '#c4713a', 0.45), 0.2);
+      }
+      wedge(ctx, rnd, cx - r * 0.6, cy + r * 0.5, r * 0.22, 0.3 + rnd() * 0.3, LEM_R, LEM_F);
+      drizzleArc(ctx, rnd, cx, cy, r * 0.74, mix(f.fresh, '#8aa84e', 0.45), Math.max(2.2, r * 0.028), 0.66);
+      herbs(ctx, rnd, cx, cy, r * 0.85, 11, r * 0.13, f);
+    }
+
+    function bowlMediterranean(ctx, rnd, f, cx, cy, r) {
+      grainBed(ctx, rnd, cx, cy, r * 0.92, r * 0.92, mix(f.cream, '#dcc182', 0.45));
+      var i;
+      for (i = 0; i < 6; i++) {
+        olive(ctx, rnd, cx + (rnd() - 0.5) * r * 1.3, cy + (rnd() - 0.5) * r * 1.2, r * 0.1,
+              mix(f.fresh, '#2a3326', 0.6));
+      }
+      for (i = 0; i < 3; i++) cube(ctx, rnd, cx + (rnd() - 0.5) * r * 1.2, cy + (rnd() - 0.5) * r * 1.0, r * 0.12, rnd() * 1.2, '#f0e8d6');
+      for (i = 0; i < 8; i++) {
+        piece(ctx, rnd, cx + (rnd() - 0.5) * r * 1.2, cy + (rnd() - 0.5) * r * 1.0,
+              r * 0.09, r * 0.085, mix(f.cream, '#d8b45e', 0.5), 0.2);
+      }
+      wedge(ctx, rnd, cx + r * 0.5, cy - r * 0.4, r * 0.2, -0.4, LEM_R, LEM_F);
+      drizzleArc(ctx, rnd, cx, cy, r * 0.6, mix(f.fresh, '#8aa84e', 0.45), Math.max(2.2, r * 0.028), 0.66);
+      herbs(ctx, rnd, cx, cy, r * 0.7, 12, r * 0.12, f);
+    }
+
+    /* -- bbq: sliced meat with a bark edge, pickles, slaw -- */
+    function plateBbq(ctx, rnd, f, cx, cy, r) {
+      smear(ctx, rnd, cx + r * 0.1, cy + r * 0.58, r * 0.66, r * 0.17, shade(warmOf(f.accent), -0.28), 0.6);
+      var n = 3 + Math.floor(rnd() * 2), i;
+      for (i = 0; i < n; i++) {
+        meatSlice(ctx, rnd, cx - r * 0.4 + (i / (n - 1)) * r * 0.78,
+                  cy - r * 0.06 + (rnd() - 0.5) * r * 0.12, r * 0.28, r * 0.46,
+                  -0.12 + rnd() * 0.24, f.main, mix(f.deep, '#221410', 0.55));
+      }
+      pool(ctx, rnd, cx - r * 0.62, cy + r * 0.5, r * 0.28, r * 0.2, '#f2ead6', 0.92, 2, 0.24, true, 'over');
+      for (i = 0; i < 9; i++) {
+        var sx = cx - r * 0.62 + (rnd() - 0.5) * r * 0.4, sy = cy + r * 0.5 + (rnd() - 0.5) * r * 0.28;
+        stroke(ctx, [[sx - r * 0.08, sy], [sx + r * 0.09, sy + (rnd() - 0.5) * r * 0.06]],
+               mix(f.fresh, '#c8d09a', rnd() * 0.6), Math.max(1.6, r * 0.025), 0.85, 'round', 'over');
+      }
+      pickle(ctx, rnd, cx + r * 0.6, cy + r * 0.4, r * 0.14, mix(f.fresh, '#7a9440', 0.5));
+      pickle(ctx, rnd, cx + r * 0.74, cy + r * 0.6, r * 0.12, mix(f.fresh, '#7a9440', 0.5));
+      dots(ctx, rnd, cx, cy - r * 0.1, r * 0.6, 12, 2.0, CHARC, 0.4);
+    }
+
+    function stackBbq(ctx, rnd, f, cx, base, wdt, slab, dome) {
+      var y = base;
+      y -= wdt * 0.12; slab(y, wdt * 1.06, wdt * 0.12, mix(f.cream, '#e0cba0', 0.5), false);  // white bread
+      var n = 4 + Math.floor(rnd() * 2), i;
+      for (i = 0; i < n; i++) {
+        y -= wdt * 0.16;
+        slab(y, wdt * (1.02 + rnd() * 0.12), wdt * 0.10, shade(f.main, -0.04 + rnd() * 0.16), false);
+        ctx.save();
+        ctx.globalAlpha = 0.8;
+        stroke(ctx, [[cx - wdt * 0.99, y - wdt * 0.08], [cx, y - wdt * 0.12], [cx + wdt * 0.99, y - wdt * 0.07]],
+               mix(f.deep, '#221410', 0.5), wdt * 0.09, 0.92, 'round', 'over');
+        ctx.restore();
+      }
+      // pickle chips laid on the top slice and spilling onto the plate
+      var pk = mix(f.fresh, '#7a9440', 0.5), s;
+      for (s = 0; s < 3; s++) {
+        pickle(ctx, rnd, cx + wdt * (-0.5 + s * 0.5 + (rnd() - 0.5) * 0.22),
+               y - wdt * (0.12 + rnd() * 0.06), wdt * 0.2, pk);
+      }
+      for (s = 0; s < 3; s++) {
+        pickle(ctx, rnd, cx + wdt * (0.95 + rnd() * 0.45), base - wdt * (0.02 + rnd() * 0.3), wdt * 0.17, pk);
+      }
+      stroke(ctx, [[cx - wdt * 1.2, base - wdt * 0.1], [cx - wdt * 0.7, base - wdt * 0.22]],
+             shade(warmOf(f.accent), -0.24), wdt * 0.1, 0.6, 'round', 'over');
+    }
+
+    /* -- korean: rice and banchan, an egg, chilli -- */
+    function plateKorean(ctx, rnd, f, cx, cy, r) {
+      mound(ctx, rnd, cx, cy, r * 0.44, r * 0.4, RICE);
+      var cols = [mix(f.main, '#d4453a', 0.35), mix(f.fresh, '#6a9440', 0.35), shade(f.deep, 0.12),
+                  mix(f.cream, '#d9c08a', 0.45), mix(warmOf(f.accent), '#e0a83a', 0.35)];
+      var n = 5, i, k;
+      for (i = 0; i < n; i++) {
+        var a = -1.95 + (i / (n - 1)) * 5.1 + (rnd() - 0.5) * 0.18;
+        var x = cx + Math.cos(a) * r * 0.68, y = cy + Math.sin(a) * r * 0.64;
+        var col = cols[i % cols.length];
+        shadowEllipse(ctx, x + 2, y + r * 0.06, r * 0.24, r * 0.18, 0.3, 8);
+        pool(ctx, rnd, x, y, r * 0.26, r * 0.2, col, 0.94, 2, 0.24, true, 'over');
+        if (i % 2) {
+          for (k = 0; k < 5; k++) {
+            stroke(ctx, [[x - r * 0.19, y - r * 0.07 + k * r * 0.035],
+                         [x + r * 0.19, y - r * 0.09 + k * r * 0.038]],
+                   shade(col, -0.22), Math.max(1.2, r * 0.02), 0.6, 'round', 'over');
+          }
+        }
+        sheen(ctx, x - r * 0.07, y - r * 0.06, r * 0.14, r * 0.05, -0.3, 0.4);
+      }
+      friedEgg(ctx, rnd, cx + r * 0.04, cy - r * 0.04, r * 0.24);
+      chillis(ctx, rnd, cx, cy, r * 0.72, 7, Math.max(2, r * 0.05), mix(f.main, '#d4453a', 0.4));
+      dots(ctx, rnd, cx, cy, r * 0.7, 16, 2.0, '#fff6e2', 0.6);
+    }
+
+    function bowlKorean(ctx, rnd, f, cx, cy, r) {
+      grainBed(ctx, rnd, cx, cy, r * 0.92, r * 0.92, RICE);
+      var cols = [mix(f.main, '#d4453a', 0.35), mix(f.fresh, '#6a9440', 0.35), shade(f.deep, 0.12),
+                  mix(f.cream, '#d9c08a', 0.45)];
+      var i;
+      for (i = 0; i < 5; i++) {
+        var a = -1.9 + (i / 4) * 5.0 + (rnd() - 0.5) * 0.2;
+        var x = cx + Math.cos(a) * r * 0.56, y = cy + Math.sin(a) * r * 0.54;
+        pool(ctx, rnd, x, y, r * 0.28, r * 0.22, cols[i % cols.length], 0.94, 2, 0.26, true, 'over');
+        sheen(ctx, x - r * 0.08, y - r * 0.07, r * 0.14, r * 0.06, -0.3, 0.4);
+      }
+      friedEgg(ctx, rnd, cx, cy - r * 0.02, r * 0.26);
+      chillis(ctx, rnd, cx, cy, r * 0.6, 6, Math.max(2, r * 0.05), mix(f.main, '#d4453a', 0.4));
+      herbs(ctx, rnd, cx, cy, r * 0.6, 6, r * 0.1, f);
+      dots(ctx, rnd, cx, cy, r * 0.6, 14, 2.0, '#fff6e2', 0.6);
+    }
+
+    /* a rice-and-beans bowl: the reading the crop archetype could not carry */
+    function bowlMexican(ctx, rnd, f, cx, cy, r) {
+      grainBed(ctx, rnd, cx, cy, r * 0.94, r * 0.94, RICE);
+      // beans, salsa and guacamole laid in wedges around the rice
+      pool(ctx, rnd, cx - r * 0.36, cy + r * 0.3, r * 0.4, r * 0.34, mix(f.deep, '#38200f', 0.45), 0.92, 2, 0.26, true, 'over');
+      pool(ctx, rnd, cx + r * 0.36, cy - r * 0.26, r * 0.38, r * 0.32, shade(f.main, -0.06), 0.92, 2, 0.28, true, 'over');
+      dots(ctx, rnd, cx + r * 0.36, cy - r * 0.26, r * 0.26, 10, Math.max(1.6, r * 0.04), shade(f.fresh, -0.08), 0.7);
+      pool(ctx, rnd, cx - r * 0.32, cy - r * 0.32, r * 0.34, r * 0.28, mix(f.fresh, '#5d8a42', 0.42), 0.92, 3, 0.3, true, 'over');
+      var i;
+      for (i = 0; i < 5; i++) {
+        piece(ctx, rnd, cx + r * (0.06 + rnd() * 0.5), cy + r * (0.08 + rnd() * 0.42),
+              r * 0.13, r * 0.11, shade(f.deep, 0.12), 0.24);
+      }
+      drizzleArc(ctx, rnd, cx, cy, r * 0.58, CREAMY, Math.max(2.6, r * 0.045), 0.85);
+      dots(ctx, rnd, cx, cy, r * 0.72, 16, Math.max(1.4, r * 0.03), mix(f.cream, '#e8c85a', 0.5), 0.75);
+      wedge(ctx, rnd, cx + r * 0.44, cy + r * 0.42, r * 0.2, -0.4, LIME_R, LIME_F);
+      herbs(ctx, rnd, cx, cy, r * 0.66, 10, r * 0.12, f);
+    }
+
+    /* -- vietnamese: rice-paper rolls, herbs, nuoc cham -- */
+    function plateVietnamese(ctx, rnd, f, cx, cy, r) {
+      var n = 3 + Math.floor(rnd() * 2), i;
+      for (i = 0; i < n; i++) {
+        var x = cx - r * 0.36 + (i / (n - 1)) * r * 0.72;
+        var y = cy - r * 0.04 + (rnd() - 0.5) * r * 0.14;
+        riceRoll(ctx, rnd, x, y, r * 0.17, r * 0.48, (rnd() - 0.5) * 0.3, f);
+      }
+      dipDish(ctx, rnd, cx + r * 0.64, cy + r * 0.44, r * 0.22, mix(warmOf(f.accent), '#b06a2a', 0.45));
+      wedge(ctx, rnd, cx - r * 0.66, cy + r * 0.48, r * 0.2, 0.3, LIME_R, LIME_F);
+      herbs(ctx, rnd, cx - r * 0.08, cy + r * 0.54, r * 0.42, 12, r * 0.15, f);
+      dots(ctx, rnd, cx, cy + r * 0.56, r * 0.4, 12, Math.max(1.4, r * 0.03), shade(f.deep, 0.32), 0.65);
+    }
+
+    function bowlVietnamese(ctx, rnd, f, cx, cy, r) {
+      pool(ctx, rnd, cx, cy, r * 0.92, r * 0.92, shade(f.main, -0.12), 0.5, 2, 0.1, false, 'over');
+      noodles(ctx, rnd, cx, cy, r * 0.78, r * 0.5, '#f4eddb', 9);
+      var i;
+      for (i = 0; i < 4; i++) {
+        var x = cx + (rnd() - 0.5) * r * 1.0, y = cy + (rnd() - 0.5) * r * 0.8;
+        shadowEllipse(ctx, x + 2, y + 4, r * 0.22, r * 0.1, 0.3, 7);
+        pool(ctx, rnd, x, y, r * 0.24, r * 0.11, mix(f.deep, '#b06a52', 0.4), 0.93, 2, 0.12, true, 'over');
+        sheen(ctx, x - r * 0.06, y - r * 0.03, r * 0.12, r * 0.03, -0.3, 0.45);
+      }
+      for (i = 0; i < 8; i++) {
+        var sx = cx + (rnd() - 0.5) * r * 1.3, sy = cy + (rnd() - 0.5) * r * 1.1;
+        stroke(ctx, [[sx, sy], [sx + r * (0.06 + rnd() * 0.1), sy - r * (0.04 + rnd() * 0.08)]],
+               '#f0ead4', Math.max(1.6, r * 0.024), 0.85, 'round', 'over');   // bean sprouts
+      }
+      herbs(ctx, rnd, cx, cy, r * 0.68, 14, r * 0.13, f);
+      wedge(ctx, rnd, cx + r * 0.5, cy - r * 0.4, r * 0.19, -0.5, LIME_R, LIME_F);
+      chillis(ctx, rnd, cx, cy, r * 0.6, 5, Math.max(1.8, r * 0.045), '#c4453a');
+    }
+
+    /* -- thai: rice, a curry with peppers and basil, lime -- */
+    function plateThai(ctx, rnd, f, cx, cy, r) {
+      mound(ctx, rnd, cx - r * 0.44, cy - r * 0.04, r * 0.4, r * 0.36, RICE);
+      pool(ctx, rnd, cx + r * 0.3, cy + r * 0.02, r * 0.6, r * 0.52, f.main, 0.9, 3, 0.2, true, 'over');
+      pool(ctx, rnd, cx + r * 0.28, cy - r * 0.02, r * 0.34, r * 0.28, mix(f.main, CREAMY, 0.42), 0.5, 2, 0.26, false, 'over');
+      var i;
+      for (i = 0; i < 5; i++) {
+        piece(ctx, rnd, cx + r * (0.02 + rnd() * 0.58), cy + r * (-0.22 + rnd() * 0.44),
+              r * 0.14, r * 0.1, i % 2 ? shade(f.deep, 0.12) : mix(f.fresh, '#6f9440', 0.35), 0.2);
+      }
+      for (i = 0; i < 4; i++) {
+        var px2 = cx + r * (0.05 + rnd() * 0.5), py2 = cy + r * (-0.2 + rnd() * 0.4);
+        stroke(ctx, [[px2, py2], [px2 + r * (0.1 + rnd() * 0.14), py2 - r * (0.02 + rnd() * 0.1)]],
+               mix(f.deep, '#c4453a', 0.5), Math.max(2, r * 0.045), 0.9, 'round', 'over');
+      }
+      chillis(ctx, rnd, cx + r * 0.3, cy, r * 0.5, 6, Math.max(2, r * 0.045), '#c4453a');
+      wedge(ctx, rnd, cx - r * 0.12, cy + r * 0.62, r * 0.19, 0.2, LIME_R, LIME_F);
+      herbs(ctx, rnd, cx + r * 0.28, cy, r * 0.5, 9, r * 0.15, f);
+      dots(ctx, rnd, cx + r * 0.3, cy + r * 0.08, r * 0.5, 12, Math.max(1.4, r * 0.035), shade(f.deep, 0.34), 0.7);
+    }
+
+    function bowlThai(ctx, rnd, f, cx, cy, r) {
+      pool(ctx, rnd, cx, cy, r * 0.92, r * 0.92, f.main, 0.85, 3, 0.1, false, 'over');
+      pool(ctx, rnd, cx - r * 0.16, cy - r * 0.12, r * 0.5, r * 0.44, mix(f.main, CREAMY, 0.45), 0.55, 3, 0.22, false, 'over');
+      var i;
+      for (i = 0; i < 5; i++) {
+        piece(ctx, rnd, cx + (rnd() - 0.5) * r * 1.1, cy + (rnd() - 0.5) * r * 0.95,
+              r * 0.15, r * 0.12, i % 2 ? shade(f.deep, 0.12) : mix(f.fresh, '#6f9440', 0.35), 0.2);
+      }
+      for (i = 0; i < 4; i++) {
+        var px2 = cx + (rnd() - 0.5) * r * 1.0, py2 = cy + (rnd() - 0.5) * r * 0.9;
+        stroke(ctx, [[px2, py2], [px2 + r * (0.1 + rnd() * 0.16), py2 - r * (0.02 + rnd() * 0.1)]],
+               mix(f.deep, '#c4453a', 0.5), Math.max(2, r * 0.045), 0.9, 'round', 'over');
+      }
+      mound(ctx, rnd, cx - r * 0.5, cy + r * 0.36, r * 0.24, r * 0.22, RICE);
+      chillis(ctx, rnd, cx, cy, r * 0.62, 6, Math.max(2, r * 0.045), '#c4453a');
+      herbs(ctx, rnd, cx, cy, r * 0.66, 11, r * 0.14, f);
+      dots(ctx, rnd, cx, cy, r * 0.6, 10, 2.2, shade(f.deep, 0.34), 0.7);
+    }
+
+    /* -- burgers: the burger from above, with fries -- */
+    function plateBurgers(ctx, rnd, f, cx, cy, r) {
+      var bun = mix(f.cream, '#c98b3f', 0.45), i;
+      sticks(ctx, rnd, cx + r * 0.62, cy + r * 0.3, r * 0.3, 9, r * 0.5, Math.max(3, r * 0.085),
+             mix(f.cream, '#d9a13d', 0.5));
+      for (i = 0; i < 13; i++) {
+        var la = (i / 13) * 6.283 + rnd() * 0.22;
+        leaf(ctx, rnd, cx - r * 0.24 + Math.cos(la) * r * 0.62, cy - r * 0.06 + Math.sin(la) * r * 0.6,
+             r * 0.26, r * 0.12, la + 1.57, mix(f.fresh, '#6f9a4e', rnd() * 0.5), 0.92);
+      }
+      // the patty edge and a slice of tomato peeking out under the bun
+      pool(ctx, rnd, cx - r * 0.24, cy + r * 0.36, r * 0.58, r * 0.18, shade(f.deep, -0.04), 0.9, 2, 0.1, true, 'over');
+      pool(ctx, rnd, cx - r * 0.5, cy + r * 0.4, r * 0.2, r * 0.1, f.main, 0.9, 2, 0.12, true, 'over');
+      shadowEllipse(ctx, cx - r * 0.18, cy + r * 0.24, r * 0.62, r * 0.56, 0.42, 12);
+      ctx.save();
+      var g = ctx.createRadialGradient(cx - r * 0.5, cy - r * 0.42, r * 0.06, cx - r * 0.24, cy - r * 0.06, r * 0.8);
+      g.addColorStop(0, shade(bun, 0.3)); g.addColorStop(0.6, bun); g.addColorStop(1, shade(bun, -0.3));
+      ctx.fillStyle = g;
+      blobPath(ctx, rnd, cx - r * 0.24, cy - r * 0.06, r * 0.58, r * 0.55, 0.03, 0.4, 22); ctx.fill();
+      ctx.restore();
+      dots(ctx, rnd, cx - r * 0.26, cy - r * 0.1, r * 0.42, 22, Math.max(1.4, r * 0.028), shade(bun, 0.38), 0.75);
+      sheen(ctx, cx - r * 0.4, cy - r * 0.3, r * 0.3, r * 0.14, -0.3, 0.36);
+      pool(ctx, rnd, cx + r * 0.68, cy - r * 0.5, r * 0.14, r * 0.13, mix(f.main, '#b8402c', 0.5), 0.9, 2, 0.2, true, 'over');
+    }
+
+    /* -- cafe: toast, a fried egg, avocado, greens -- */
+    function plateCafe(ctx, rnd, f, cx, cy, r) {
+      var i, toast = mix(f.cream, '#c98b3f', 0.42);
+      for (i = 0; i < 2; i++) {
+        var x = cx - r * 0.34 + i * r * 0.66, y = cy + r * 0.04 + (i ? r * 0.1 : 0);
+        ctx.save();
+        ctx.translate(x, y); ctx.rotate(-0.16 + i * 0.32); ctx.translate(-x, -y);
+        shadowEllipse(ctx, x + 4, y + r * 0.4, r * 0.42, r * 0.3, 0.34, 9);
+        pool(ctx, rnd, x, y, r * 0.4, r * 0.42, toast, 0.98, 2, 0.06, true, 'over');
+        pool(ctx, rnd, x, y, r * 0.32, r * 0.34, shade(toast, 0.18), 0.55, 2, 0.09, false, 'over');
+        ctx.restore();
+      }
+      for (i = 0; i < 5; i++) {
+        leaf(ctx, rnd, cx - r * 0.44 + i * r * 0.1, cy + r * 0.02 + (rnd() - 0.5) * r * 0.06,
+             r * 0.42, r * 0.1, 1.45, mix('#9dbf86', '#6f9a5e', rnd() * 0.7), 0.94);
+      }
+      friedEgg(ctx, rnd, cx + r * 0.36, cy + r * 0.02, r * 0.3);
+      for (i = 0; i < 4; i++) {
+        piece(ctx, rnd, cx + (rnd() - 0.2) * r * 0.7, cy + r * (0.42 + rnd() * 0.2),
+              r * 0.09, r * 0.08, mix(f.accent, '#c8506a', 0.45), 0.22);   // berries
+      }
+      herbs(ctx, rnd, cx, cy + r * 0.46, r * 0.42, 8, r * 0.12, f);
+      dots(ctx, rnd, cx - r * 0.36, cy, r * 0.32, 14, Math.max(1.2, r * 0.025), CHARC, 0.45);
+    }
+
+    function stackCafe(ctx, rnd, f, cx, base, wdt, slab, dome) {
+      var y = base, n = 3 + Math.floor(rnd() * 2), i;
+      for (i = 0; i < n; i++) {
+        y -= wdt * 0.17;
+        slab(y, wdt * (1.04 - i * 0.02), wdt * 0.11, shade(mix(f.cream, '#d59f4e', 0.42), -0.04 + rnd() * 0.14), false);
+      }
+      y -= wdt * 0.19;
+      dome(y, wdt * 0.98, mix(f.cream, '#d9a94e', 0.4), false);
+      cube(ctx, rnd, cx - wdt * 0.1, y - wdt * 0.26, wdt * 0.19, -0.2, '#f6e6a8');   // butter
+      var syrup = mix(shade(warmOf(f.accent), -0.28), '#8a5a1e', 0.4);
+      for (i = 0; i < 2; i++) {
+        var sxs = cx - wdt * (0.16 + i * 0.46 + rnd() * 0.12);
+        stroke(ctx, [[sxs, y - wdt * 0.24], [sxs - wdt * 0.18, y + wdt * 0.08],
+                     [sxs - wdt * 0.13, y + wdt * (0.42 + rnd() * 0.42)]],
+               syrup, wdt * 0.1, 0.72, 'round', 'over');   // syrup running down
+      }
+      for (i = 0; i < 5; i++) {
+        piece(ctx, rnd, cx + wdt * (0.6 + rnd() * 0.7), base - wdt * (0.05 + rnd() * 0.5),
+              wdt * 0.14, wdt * 0.13, mix(f.accent, '#b8425e', 0.5), 0.22);
+      }
+      dots(ctx, rnd, cx, y - wdt * 0.34, wdt * 0.5, 10, 2.2, '#fff6e2', 0.5);
+    }
+
+    /* -- pizza: the whole pie, crust to centre -- */
+    function platePizza(ctx, rnd, f, cx, cy, r) {
+      var crust = mix(f.cream, '#c8873a', 0.5), i;
+      ctx.save();
+      var g = ctx.createRadialGradient(cx - r * 0.4, cy - r * 0.4, r * 0.1, cx, cy, r * 1.25);
+      g.addColorStop(0, shade(crust, 0.26)); g.addColorStop(1, shade(crust, -0.3));
+      ctx.fillStyle = g;
+      blobPath(ctx, rnd, cx, cy, r * 1.1, r * 1.08, 0.035, 0.4, 26); ctx.fill();
+      ctx.restore();
+      dots(ctx, rnd, cx, cy, r * 1.02, 22, Math.max(2, r * 0.05), shade(crust, -0.5), 0.3);
+      pool(ctx, rnd, cx, cy, r * 0.92, r * 0.9, f.main, 0.9, 3, 0.07, true, 'over');
+      for (i = 0; i < 9; i++) {
+        pool(ctx, rnd, cx + (rnd() - 0.5) * r * 1.3, cy + (rnd() - 0.5) * r * 1.3,
+             r * (0.16 + rnd() * 0.14), r * (0.13 + rnd() * 0.12), shade(f.cream, -0.02), 0.68, 2, 0.26, false, 'over');
+      }
+      var n = 6 + Math.floor(rnd() * 3);
+      for (i = 0; i < n; i++) {
+        var a = rnd() * 6.283, d = Math.sqrt(rnd()) * r * 0.76;
+        piece(ctx, rnd, cx + Math.cos(a) * d, cy + Math.sin(a) * d,
+              r * 0.15, r * 0.13, mix(f.deep, '#a8402c', 0.45), 0.1);
+      }
+      herbs(ctx, rnd, cx, cy, r * 0.8, 9, r * 0.14, f);
+      dots(ctx, rnd, cx, cy, r * 0.8, 14, 2.0, '#fdf6e4', 0.6);
+    }
+
+    /* -- vegetarian: a grain bowl on a plate -- */
+    function plateVegetarian(ctx, rnd, f, cx, cy, r) {
+      grainBed(ctx, rnd, cx, cy + r * 0.04, r * 0.88, r * 0.76, mix(f.cream, '#d8cf94', 0.4));
+      var cols = [mix(f.deep, '#c4713a', 0.5), mix(f.main, '#d4a03a', 0.4), mix(f.fresh, '#5d8a42', 0.4),
+                  mix(f.accent, '#b4553a', 0.35)];
+      var n = 6 + Math.floor(rnd() * 3), i;
+      for (i = 0; i < n; i++) {
+        var a = rnd() * 6.283, d = Math.sqrt(rnd()) * r * 0.72;
+        piece(ctx, rnd, cx + Math.cos(a) * d, cy + Math.sin(a) * d,
+              r * (0.13 + rnd() * 0.06), r * (0.11 + rnd() * 0.05), cols[i % cols.length], 0.24);
+      }
+      for (i = 0; i < 5; i++) {
+        leaf(ctx, rnd, cx - r * 0.46 + i * r * 0.1, cy + r * 0.4, r * 0.36, r * 0.09, 1.45,
+             mix('#9dbf86', '#6f9a5e', rnd() * 0.7), 0.94);
+      }
+      cube(ctx, rnd, cx + r * 0.44, cy - r * 0.36, r * 0.11, rnd(), '#efe6d2');
+      drizzleArc(ctx, rnd, cx, cy, r * 0.7, CREAMY, Math.max(2.2, r * 0.03), 0.72);
+      herbs(ctx, rnd, cx, cy, r * 0.85, 12, r * 0.13, f);
+      dots(ctx, rnd, cx, cy, r * 0.8, 22, 2.0, shade(f.deep, 0.3), 0.6);
+    }
+
+    function bowlVegetarian(ctx, rnd, f, cx, cy, r) {
+      grainBed(ctx, rnd, cx, cy, r * 0.92, r * 0.92, mix(f.cream, '#d8cf94', 0.4));
+      var cols = [mix(f.deep, '#c4713a', 0.5), mix(f.main, '#d4a03a', 0.4), mix(f.fresh, '#5d8a42', 0.4)];
+      var i;
+      for (i = 0; i < 8; i++) {
+        var a = rnd() * 6.283, d = Math.sqrt(rnd()) * r * 0.72;
+        piece(ctx, rnd, cx + Math.cos(a) * d, cy + Math.sin(a) * d,
+              r * (0.13 + rnd() * 0.06), r * (0.11 + rnd() * 0.05), cols[i % cols.length], 0.24);
+      }
+      for (i = 0; i < 5; i++) {
+        leaf(ctx, rnd, cx - r * 0.4 + i * r * 0.1, cy + r * 0.34, r * 0.34, r * 0.09, 1.45,
+             mix('#9dbf86', '#6f9a5e', rnd() * 0.7), 0.94);
+      }
+      cube(ctx, rnd, cx + r * 0.42, cy - r * 0.34, r * 0.11, rnd(), '#efe6d2');
+      drizzleArc(ctx, rnd, cx, cy, r * 0.6, CREAMY, Math.max(2.2, r * 0.03), 0.72);
+      herbs(ctx, rnd, cx, cy, r * 0.7, 12, r * 0.12, f);
+      dots(ctx, rnd, cx, cy, r * 0.7, 20, 2.0, shade(f.deep, 0.3), 0.6);
+    }
+
+    /* -- american: a seared slab, mash, greens -- */
+    function plateAmerican(ctx, rnd, f, cx, cy, r) {
+      mound(ctx, rnd, cx - r * 0.46, cy + r * 0.06, r * 0.4, r * 0.34, '#f4ead0');
+      var gravy = mix(shade(warmOf(f.accent), -0.4), '#4a2f18', 0.45);
+      pool(ctx, rnd, cx - r * 0.54, cy + r * 0.04, r * 0.2, r * 0.13, gravy, 0.85, 2, 0.4, false, 'over');
+      stroke(ctx, [[cx - r * 0.42, cy + r * 0.1], [cx - r * 0.3, cy + r * 0.24], [cx - r * 0.24, cy + r * 0.34]],
+             gravy, Math.max(3, r * 0.05), 0.72, 'round', 'over');
+      meatSlice(ctx, rnd, cx + r * 0.26, cy - r * 0.04, r * 0.44, r * 0.32, 0.1 + (rnd() - 0.5) * 0.2,
+                mix(f.deep, '#8a4a28', 0.35), mix(f.deep, '#241610', 0.5));
+      var i;
+      for (i = 0; i < 6; i++) {
+        var bx = cx + r * (0.02 + rnd() * 0.6), by = cy + r * (0.36 + rnd() * 0.24);
+        stroke(ctx, [[bx, by], [bx + r * (0.14 + rnd() * 0.16), by - r * (0.02 + rnd() * 0.12)]],
+               mix(f.fresh, '#4e7a3c', rnd() * 0.55), Math.max(2.4, r * 0.055), 0.92, 'round', 'over');
+      }
+      herbs(ctx, rnd, cx, cy, r * 0.72, 6, r * 0.12, f);
+      dots(ctx, rnd, cx + r * 0.26, cy - r * 0.04, r * 0.4, 10, 2.0, CHARC, 0.4);
+    }
+
+    /* ---- crop kits: the close crop keeps its swept EDGE, but the edge
+       is a different bread and the field is a different dish ---- */
+    var CROP_ITALIAN = {
+      crust: '#d8a556',
+      field: function (ctx, rnd, f) {
+        var i;
+        for (i = 0; i < 6; i++) {
+          pool(ctx, rnd, W * rnd(), H * (0.05 + rnd() * 0.48), W * (0.13 + rnd() * 0.16), H * (0.05 + rnd() * 0.06),
+               shade(f.cream, 0.06), 0.4, 2, 0.28, false);
+        }
+      },
+      over: function (ctx, rnd, f) {
+        var i, n = 5 + Math.floor(rnd() * 3);
+        for (i = 0; i < n; i++) {
+          piece(ctx, rnd, W * (0.12 + rnd() * 0.76), H * (0.06 + rnd() * 0.42),
+                W * (0.07 + rnd() * 0.04), W * (0.06 + rnd() * 0.035), mix(f.deep, '#a8402c', 0.4), 0.12);
+        }
+        for (i = 0; i < 12; i++) {
+          leaf(ctx, rnd, W * (0.05 + rnd() * 0.9), H * (0.04 + rnd() * 0.5),
+               W * (0.05 + rnd() * 0.05), W * (0.02 + rnd() * 0.016), rnd() * 3.14,
+               mix(f.fresh, '#41633a', rnd() * 0.5), 0.9);
+        }
+        dots(ctx, rnd, W * 0.5, H * 0.28, W * 0.5, 26, 2.4, '#fdf6e4', 0.5);
+      }
+    };
+
+    var CROP_INDIAN = {
+      crust: '#e0bb78',
+      field: function (ctx, rnd, f) {
+        var i;
+        for (i = 0; i < 4; i++) {
+          pool(ctx, rnd, W * (0.1 + rnd() * 0.8), H * (0.06 + rnd() * 0.44), W * (0.2 + rnd() * 0.2), H * (0.07 + rnd() * 0.07),
+               shade(f.deep, 0.08), 0.42, 3, 0.26, false);
+        }
+        for (i = 0; i < 3; i++) {
+          drizzleArc(ctx, rnd, W * (0.2 + rnd() * 0.6), H * (0.1 + rnd() * 0.36), W * 0.2, CREAMY, 3.2, 0.6);
+        }
+      },
+      over: function (ctx, rnd, f) {
+        var i, n = 6 + Math.floor(rnd() * 3);
+        for (i = 0; i < n; i++) {
+          piece(ctx, rnd, W * (0.1 + rnd() * 0.8), H * (0.06 + rnd() * 0.44),
+                W * (0.06 + rnd() * 0.04), W * (0.05 + rnd() * 0.035), shade(f.deep, 0.16), 0.2);
+        }
+        dots(ctx, rnd, W * 0.5, H * 0.28, W * 0.52, 28, 2.2, shade(warmOf(f.accent), 0.12), 0.5);
+        for (i = 0; i < 14; i++) {
+          leaf(ctx, rnd, W * (0.05 + rnd() * 0.9), H * (0.04 + rnd() * 0.5),
+               W * (0.03 + rnd() * 0.03), W * (0.012 + rnd() * 0.012), rnd() * 3.14,
+               mix(f.fresh, '#4e6a3c', rnd() * 0.55), 0.85);
+        }
+      }
+    };
+
+    /* ---- the register: cuisine -> what it puts on the plate ---- */
+    var KITS = {
+      cafe:          { plate: plateCafe, stack: stackCafe },
+      japanese:      { plate: plateJapanese, bowl: bowlJapanese, utensil: 'chop' },
+      italian:       { plate: plateItalian, crop: CROP_ITALIAN },
+      mexican:       { plate: plateMexican, bowl: bowlMexican, utensil: 'spoon' },
+      indian:        { plate: plateIndian, bowl: bowlIndian, crop: CROP_INDIAN, utensil: 'spoon' },
+      mediterranean: { plate: plateMediterranean, bowl: bowlMediterranean, utensil: 'spoon' },
+      seafood:       { plate: plateSeafood, bowl: bowlSeafood, utensil: 'spoon' },
+      bbq:           { plate: plateBbq, stack: stackBbq },
+      korean:        { plate: plateKorean, bowl: bowlKorean, utensil: 'chop' },
+      vietnamese:    { plate: plateVietnamese, bowl: bowlVietnamese, utensil: 'chop' },
+      thai:          { plate: plateThai, bowl: bowlThai, utensil: 'spoon' },
+      burgers:       { plate: plateBurgers },
+      pizza:         { plate: platePizza },
+      vegetarian:    { plate: plateVegetarian, bowl: bowlVegetarian, utensil: 'spoon' },
+      american:      { plate: plateAmerican }
+    };
+    var NO_KIT = {};
+
     var DRAW = { plate: drawPlate, bowl: drawBowl, stack: drawStack, crop: drawCrop, table: drawTable };
     var WITH_STEAM = { bowl: 1, table: 1 };
 
@@ -1281,16 +2318,16 @@
        one archetype so a place with several posts does not repeat itself. */
     var CUISINE_ARCH = {
       japanese:      ['bowl', 'plate', 'table'],
-      korean:        ['bowl', 'crop', 'plate'],
+      korean:        ['bowl', 'plate', 'table'],
       vietnamese:    ['bowl', 'plate', 'table'],
-      thai:          ['bowl', 'plate', 'crop'],
+      thai:          ['bowl', 'plate', 'table'],
       cafe:          ['stack', 'plate', 'table'],
       burgers:       ['stack', 'plate', 'table'],
       pizza:         ['crop', 'plate', 'table'],
       italian:       ['plate', 'crop', 'table'],
       bbq:           ['plate', 'stack', 'table'],
       indian:        ['plate', 'bowl', 'crop'],
-      mexican:       ['plate', 'crop', 'table'],
+      mexican:       ['plate', 'table', 'bowl'],
       mediterranean: ['plate', 'table', 'bowl'],
       seafood:       ['plate', 'table', 'bowl'],
       vegetarian:    ['plate', 'bowl', 'table'],
@@ -1299,7 +2336,15 @@
     var ANY_ARCH = ['plate', 'bowl', 'stack', 'crop', 'table'];
 
     function cuisineOf(r) { return ((r && r.cuisines) || [])[0] || ''; }
-    function palFor(r) { return FOOD_PAL[cuisineOf(r)] || DEFAULT_PAL; }
+    /* A painter is handed ONE object: the cuisine's pigments plus its
+       subject kit. Threading the kit through the palette means no painter
+       signature had to change and every helper that already takes `f` can
+       reach the kit. */
+    function palFor(r) {
+      var c = cuisineOf(r), p = FOOD_PAL[c] || DEFAULT_PAL;
+      return { main: p.main, deep: p.deep, fresh: p.fresh, cream: p.cream,
+               table: p.table, accent: p.accent, cuisine: c, kit: KITS[c] || NO_KIT };
+    }
     function archFor(r, variant) {
       var list = CUISINE_ARCH[cuisineOf(r)] || ANY_ARCH;
       var h = hashStr((r && (r.name || r.id)) || 'x');
