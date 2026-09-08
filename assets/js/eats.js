@@ -40,6 +40,96 @@
   var prefersReducedMotion = false;
   try { prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
 
+  /* ------------------------------------------------------------------ *
+   * MODAL — one open/close choreography for every sheet.
+   * Both sheets (rate a place, live-data settings) hand their backdrop
+   * here, so all of them behave identically: focus moves into the sheet,
+   * Tab cycles inside it, Escape and a tap on the backdrop close it, and
+   * focus goes back to whatever opened it. While a sheet is up the rest of
+   * the page is sealed with `inert` + aria-hidden, so nothing behind it is
+   * reachable by Tab, by pointer or by a screen reader's own cursor.
+   * ------------------------------------------------------------------ */
+  var modal = (function () {
+    var current = null, lastFocused = null, onClosed = null;
+
+    /* Seal every top-level sibling of the open sheet. Nodes that are
+       already aria-hidden in the markup (the wash field) are left exactly
+       as they were — we only undo what we did. */
+    function seal(on, keep) {
+      var kids = document.body.children;
+      for (var i = 0; i < kids.length; i++) {
+        var n = kids[i];
+        if (n === keep || n.tagName === 'SCRIPT' || n.id === 'live-announce') continue;
+        if (on) {
+          n.setAttribute('inert', '');
+          if (!n.hasAttribute('aria-hidden')) {
+            n.setAttribute('aria-hidden', 'true');
+            n.setAttribute('data-modal-sealed', '');
+          }
+        } else {
+          n.removeAttribute('inert');
+          if (n.hasAttribute('data-modal-sealed')) {
+            n.removeAttribute('aria-hidden');
+            n.removeAttribute('data-modal-sealed');
+          }
+        }
+      }
+    }
+
+    function focusables() {
+      if (!current) return [];
+      var f = current.querySelectorAll('button, input, textarea, select, summary, a[href], [tabindex]:not([tabindex="-1"])');
+      return Array.prototype.filter.call(f, function (n) {
+        return !n.disabled && n.offsetParent !== null && n.tabIndex !== -1;
+      });
+    }
+
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (e.key !== 'Tab') return;
+      var list = focusables();
+      if (!list.length) return;
+      var first = list[0], last = list[list.length - 1];
+      // the trap also catches focus that has already wandered out
+      if (!current.contains(document.activeElement)) { e.preventDefault(); first.focus(); return; }
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+
+    function open(backdrop, first, closed) {
+      if (!backdrop) return;
+      if (current) close();
+      lastFocused = document.activeElement;
+      onClosed = closed || null;
+      current = backdrop;
+      backdrop.hidden = false;
+      document.body.style.overflow = 'hidden';
+      seal(true, backdrop);
+      document.addEventListener('keydown', onKey);
+      window.setTimeout(function () {
+        if (current !== backdrop) return;
+        var target = first || focusables()[0];
+        if (target && target.focus) target.focus();
+      }, 30);
+    }
+
+    function close() {
+      if (!current) return;
+      var bd = current, back = lastFocused, done = onClosed;
+      current = null; lastFocused = null; onClosed = null;
+      bd.hidden = true;
+      document.body.style.overflow = '';
+      seal(false, bd);
+      document.removeEventListener('keydown', onKey);
+      if (back && back.focus && document.contains(back)) back.focus();
+      if (done) done();
+    }
+
+    function isOpen(backdrop) { return backdrop ? current === backdrop : !!current; }
+
+    return { open: open, close: close, isOpen: isOpen };
+  })();
+
   /* Tiny haptic tap (Android Chrome etc.). Silent no-op where vibration is
      unsupported, and skipped under prefers-reduced-motion — a vibration is
      motion you can feel. Never throws. */
@@ -3040,7 +3130,9 @@
       var prefsBack = $('prefs-back');
       if (prefsBack) prefsBack.addEventListener('click', showLanding);
       var deckBack = $('deck-back');
-      if (deckBack) deckBack.addEventListener('click', function () { showPrefs(false); });
+      // the deck (and this button with it) disappears — focus has to travel
+      // to the wizard, like every other route into it
+      if (deckBack) deckBack.addEventListener('click', function () { showPrefs(true); });
 
       // "search a specific location" — reveal the input on demand (kept)
       var reveal = $('loc-reveal');
@@ -3669,6 +3761,9 @@
       renderStack(true); // deal the opening hand onto the table
       setControlsEnabled(true);
       announce(queue.length + ' places matched. Showing ' + queue[0].name + ', the nearest.');
+      // the wizard's Start button is gone with the wizard — land on the card
+      // itself, the same place "Back to swiping" returns you to
+      if (topCard) topCard.focus();
     }
 
     function append(matched) {
@@ -4742,6 +4837,11 @@
       if (at < 0) return;
       removeFromShortlist(r.id);
       renderShortlist(); // an emptied list falls back to the deck / end screen
+      // the Remove button went with the card — land back on the list's title
+      if (shortlistEl && !shortlistEl.hidden) {
+        var slTitle = shortlistEl.querySelector('.shortlist-title');
+        if (slTitle) { slTitle.setAttribute('tabindex', '-1'); slTitle.focus(); }
+      }
       announce(r.name + ' removed from shortlist. Undo is available.');
       toast('Removed ' + r.name, {
         label: 'Undo',
@@ -5741,7 +5841,6 @@
     var overallWrap = overallOut ? overallOut.parentNode : null;   // .overall-num-wrap
     var overallBlot = overallWrap ? overallWrap.querySelector('.overall-blot') : null;
     var titleEl = $('sheet-title');
-    var lastFocused = null;
 
     /* Watercolor score tint: low ~rose -> mid ~gold -> high ~sage.
        Pure linear pigment mix; the CSS side anchors text colors to ink
@@ -5805,34 +5904,24 @@
       syncAll();
     }
 
+    /* One settled "Overall N", ~700ms after the last slider move. */
+    var overallTimer = null;
+    function announceOverallSoon() {
+      if (overallTimer) window.clearTimeout(overallTimer);
+      overallTimer = window.setTimeout(function () {
+        overallTimer = null;
+        if (!modal.isOpen(backdrop)) return;
+        announce('Overall ' + overallOut.textContent);
+      }, 700);
+    }
+
     function show() {
-      backdrop.hidden = false;
-      document.body.style.overflow = 'hidden';
-      lastFocused = document.activeElement;
-      // focus first field
-      window.setTimeout(function () { nameInput.focus(); }, 30);
-      document.addEventListener('keydown', onKey);
+      modal.open(backdrop, nameInput, function () {
+        state.editingId = null;
+        state.pendingPlace = null;
+      });
     }
-    function hide() {
-      backdrop.hidden = true;
-      document.body.style.overflow = '';
-      document.removeEventListener('keydown', onKey);
-      if (lastFocused && lastFocused.focus) lastFocused.focus();
-      state.editingId = null;
-      state.pendingPlace = null;
-    }
-    function onKey(e) {
-      if (e.key === 'Escape') { hide(); return; }
-      if (e.key === 'Tab') trapFocus(e);
-    }
-    function trapFocus(e) {
-      var f = backdrop.querySelectorAll('button, input, textarea, [href], select');
-      var list = Array.prototype.filter.call(f, function (n) { return !n.disabled && n.offsetParent !== null; });
-      if (!list.length) return;
-      var first = list[0], last = list[list.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    }
+    function hide() { modal.close(); }
 
     function todayStr() {
       var d = new Date();
@@ -5929,6 +6018,10 @@
       if (!backdrop) return;
       [sFood, sVibe, sService].forEach(function (input) {
         input.addEventListener('input', scheduleSync);
+        // the readout used to be a live region, so every step of a drag
+        // spoke a number over the slider's own value. One settled figure,
+        // once the hand stops, says the same thing without the flood.
+        input.addEventListener('input', announceOverallSoon);
       });
       if (overallBlot) {
         overallBlot.addEventListener('animationend', function () {
@@ -6072,6 +6165,9 @@
           remove(e.id);
           render();
           announce('Deleted ' + e.name);
+          // the button that had focus was just thrown away with its card
+          var addBtn = $('add-place');
+          if (addBtn) addBtn.focus();
         }
       });
       actions.appendChild(editBtn);
@@ -6766,6 +6862,7 @@
       empty.appendChild(el('p', 'empty-title', 'Couldn’t load the feed'));
       empty.appendChild(el('p', 'empty-sub', 'Try switching tabs and back.'));
       listEl.appendChild(empty);
+      announce('Couldn’t load your friends’ feed. Try switching tabs and back.');
     }
 
     function render() {
@@ -7290,6 +7387,7 @@
       empty.appendChild(el('p', 'empty-sub', 'Try another time range.'));
       listEl.appendChild(empty);
       hideSection('taste');
+      announce('Couldn’t load the trends. Try another time range.');
     }
 
     function setRange(range) {
@@ -7965,18 +8063,12 @@
     var input = $('key-input');
     var msg = $('settings-msg');
     var navBtn = $('settings-open');
-    var settingsLabel = document.querySelector('.settings-label');
-    var demoHint = $('landing-demo-hint');
     var modeEl = $('settings-mode');
     var saveBtn = null;
-    var lastFocused = null;
 
     function refreshMode() {
       var has = !!store.getKey();
       if (navBtn) navBtn.classList.toggle('is-live', has);
-      if (settingsLabel) settingsLabel.textContent = has ? 'Live data on' : 'Use live data';
-      // The discreet demo hint sits on the calm landing; hide it when live.
-      if (demoHint) demoHint.hidden = has;
       if (modeEl) {
         modeEl.textContent = has
           ? 'Live data is on — results come from Google Places.'
@@ -8006,27 +8098,15 @@
 
     function open() {
       if (!backdrop) return;
-      backdrop.hidden = false;
-      document.body.style.overflow = 'hidden';
-      lastFocused = document.activeElement;
-      if (input) { input.value = store.getKey() || ''; window.setTimeout(function () { input.focus(); }, 30); }
+      if (input) input.value = store.getKey() || '';
       setMsg(store.getKey() ? 'A key is saved on this device.' : '', store.getKey() ? 'ok' : '');
-      document.addEventListener('keydown', onKey);
+      modal.open(backdrop, input);
     }
-    function close() {
-      if (!backdrop) return;
-      backdrop.hidden = true;
-      document.body.style.overflow = '';
-      document.removeEventListener('keydown', onKey);
-      if (lastFocused && lastFocused.focus) lastFocused.focus();
-    }
-    function onKey(e) { if (e.key === 'Escape') close(); }
+    function close() { modal.close(); }
 
     function init() {
       if (!backdrop) return;
       if (navBtn) navBtn.addEventListener('click', open);
-      var hintBtn = $('hint-add-key');
-      if (hintBtn) hintBtn.addEventListener('click', open);
       $('settings-close').addEventListener('click', close);
       backdrop.addEventListener('click', function (e) { if (e.target === backdrop) close(); });
 

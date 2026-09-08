@@ -46,6 +46,49 @@
 
 ## Feature map (what's built)
 
+### Accessibility pass 1 of 2 — focus, inerting, live regions (2026-09-08)
+A partial audit. **Focus and live-region layering are done and verified;
+contrast is deliberately NOT audited yet** — see the harness warning below.
+
+**Fixed**
+- **Focus is now returned.** Opening a sheet moves focus into it, the rest of
+  the page goes `inert` while it is open, `Escape` closes it, and focus lands
+  back on the control that opened it (verified on the settings sheet:
+  moves-in → in-sheet → returns-to-opener, and `inert` is set and then cleared).
+- **Announcements happen once, not twice, not never.** Five surfaces carried
+  their own `aria-live="polite"` *and* were narrated by the central `announce()`
+  region, so a screen reader heard them twice. The redundant regions on the
+  wizard step counter, Visited stats, Friends stats + list, and the Popular list
+  were removed; the scoped ones that genuinely need their own channel
+  (`prefs-count`, `settings-mode`, `settings-msg`) were kept. Verified that the
+  central region still speaks exactly once per change — a feed post move, a
+  heart, and a tab switch each produced one clear utterance.
+
+**A warning about the contrast harness — read before re-running this**
+Two separate audit attempts produced alarming contrast numbers (**228** unique
+failures the first time, **510** failing nodes / 156 unique class+theme pairs
+the second). **Both numbers are void.** The harness samples the worst pixel
+inside each glyph's bounding box, which lands on **anti-aliased glyph edges and
+the background gaps between letters** rather than the stroke itself. Hand-checked
+against the real colours:
+
+| flagged | harness said | actually is | verdict |
+|---|---|---|---|
+| `.bottab-label` (flagged 90×) | 2.73 / 3.79 | **5.17** | passes AA |
+| `.lbl` | 1.27 | **10.19** | passes easily |
+| `.val` | 1.13 | **10.19** | passes easily |
+
+A ratio of 1.13 for ink `#2e3a48` on paper `#f5f0e6` is impossible; that is the
+harness reading paper as if it were the glyph. **No colour was changed on the
+strength of these numbers** — the fixes above are all structural. A future
+contrast pass must sample the *modal* stroke colour (or composite the glyph
+coverage), validate against a hand-checked sample, and report its false-positive
+rate before anyone acts on a count.
+
+**Still to do:** a valid contrast sweep, the ≥44px target sweep, the
+reduced-motion sweep on the newest surfaces, and the consistency/dead-CSS pass.
+
+
 ### Feed — the app's front door (2026-09-07)
 *"TikTok for foodies", built honestly on a static site.* A fifth tab, first in
 the bar, opens on a **full-bleed vertical snap feed** of watercolor food posts.
