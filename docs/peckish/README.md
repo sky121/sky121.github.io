@@ -46,6 +46,64 @@
 
 ## Feature map (what's built)
 
+### Contrast pass — a valid harness, and one systemic cause (2026-09-09)
+The contrast half of the audit, done properly after two earlier attempts
+produced void numbers (see the harness warning in pass 1).
+
+**The harness that works — "blank the glyph."** Foreground is the computed CSS
+`color` (composited for alpha and inherited opacity). Background is obtained by
+setting the element's own `color: transparent` and `text-shadow: none`, then
+screenshotting *that element's exact rect* and reading the pixels — which
+composites everything genuinely behind it (gradients, scrims, the Feed's canvas
+art, ancestor washes) while never touching an anti-aliased glyph edge. Several
+points are sampled and the worst ground is kept. Thresholds 4.5:1, or 3:1 for
+large text computed from the real font size and weight.
+
+The tell that it is now honest: its failures are *marginal and plausible*
+(4.42 against a 4.5 threshold) rather than physically impossible (the old
+harness claimed 1.13 for ink on paper).
+
+**Counts, valid harness:** 1462 nodes swept, both themes.
+
+| stage | failing nodes | unique class+theme |
+|---|---|---|
+| before | **306** | 77 |
+| after the ground fix | 42 | 12 |
+| after the colour fixes | 7 | 4 |
+| final | **0** | 0 |
+
+**One systemic cause did most of the damage.** Three multiplying wash blobs
+stack behind the whole app. Where they overlap they dragged the light wall from
+`--paper` (246) down to ~186, and lifted the evening wall to ~87. Almost every
+"secondary text is a little low" finding traced back to that single ground, so
+it was fixed once (`.wash::before` opacity 0.55 → 0.36) instead of chasing the
+twenty colours standing on it. `--ink-soft` and `--pond-ink` were then deepened
+to clear AA against the ground they *actually* meet rather than against pure
+paper, which nothing in this app is painted on.
+
+**The pass caught its own regressions.** Two of the fixes leaked into evening
+(`.landing-loc-link` at 1.39, `.friend-avatar` at 1.24) — found by re-sweeping
+after fixing, and repaired before the final zero.
+
+**Orchestrator verification.** The wash change is the one that risked the
+aesthetic, so it was A/B'd against `HEAD`'s stylesheet: landing and Visited
+render essentially indistinguishable in both themes — the washes still read as
+soft pigment. Independent blank-glyph spot checks on the previously-failing
+nodes: `.bottab-label` 4.62, `.tab-count` 6.32, `.landing-loc-link` (evening)
+5.42 — all pass.
+
+*Caveat, stated rather than papered over:* the agent hit its session limit
+before recording a numeric false-positive rate for its validation sample. The
+sample (13 nodes, with paired blank/normal screenshots) exists; the rate does
+not. Confidence here rests instead on the plausibility of the numbers, the
+coherence of the root cause, and the independent spot checks above.
+
+*A caution learned the hard way:* measure **leaf text nodes**, not containers.
+An orchestrator check briefly flagged `.bottab.is-active` and `.friend-avatar`
+as failing at 1.42 and 1.00 — both false, because those rects include
+decorative fills (a pill background, an avatar circle) that are not
+text-on-ground. Looking at them settled it in seconds.
+
 ### Accessibility pass 1 of 2 — focus, inerting, live regions (2026-09-08)
 A partial audit. **Focus and live-region layering are done and verified;
 contrast is deliberately NOT audited yet** — see the harness warning below.
