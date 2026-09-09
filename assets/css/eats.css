@@ -166,7 +166,6 @@ html.evening .bottab.is-active .bottab-icon { color: #a9cdec; fill: rgba(159, 19
 .card-action:focus-visible,
 .btn-solid:focus-visible,
 .btn-ghost:focus-visible,
-.hint-link:focus-visible,
 .sheet-close:focus-visible {
   outline: 2px solid var(--pond-deep);
   outline-offset: 3px;
@@ -448,19 +447,6 @@ html.evening .find-cta-btn:hover {
   border-radius: 8px;
 }
 .landing-loc-link:hover { text-decoration-color: currentColor; }
-
-.hint-link, .badge-link {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  font-family: var(--font-body);
-  font-size: inherit;
-  color: var(--pond-ink);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  padding: 0.2rem 0.25rem;
-}
 
 .loc-form[hidden] { display: none; }
 .loc-form {
@@ -3571,7 +3557,7 @@ html.evening .eats-toast-act:hover { color: var(--pond-ink); background: rgba(12
 
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  .find-cta-btn, .bottab-icon,
+  .find-cta-btn, .bottab, .bottab-icon,
   .card, .ctl-switch::after, .card-action, .sheet,
   .pop-card, .friend-chip, .range-btn,
   .find-landing.is-leaving, .prefs-wrap.is-washing-in, .orb-drop,
@@ -4043,6 +4029,10 @@ html.evening .feed-scrim {
   .feed-artwrap.has-steam .feed-steam { display: none; }
   .feed-scroll { scroll-behavior: auto; }
   #panel-feed { animation: none; }
+  /* the action rail's press feedback: the state still changes instantly
+     (colour, the filled heart) — only the movement between states goes */
+  .feed-act { transition: none; }
+  .feed-act:active { transform: none; }
 }
 
 /* wider screens: the feed stays a phone-shaped column, centred */
@@ -4208,3 +4198,98 @@ html.evening .social-banner strong { color: #cfe2f2; }
 /* The "Surprise me" sparkle, in the same deepened wisteria as the sheet. */
 .surprise-spark { color: #695399; }
 html.evening .surprise-spark { color: #bcafd8; }
+
+/* ==========================================================================
+   TARGET SIZE PASS — 2026-09-09
+   Every interactive element on 35 app states x 2 themes (70 sweeps) was
+   measured by its EFFECTIVE hit box: probe elementFromPoint outward from the
+   control and see how far it keeps answering, so padding and stretched
+   overlays count and a neighbour that steals points correctly clips the box.
+   31 controls came back under 44px.
+
+   The rule below is the fix: nothing painted changes size. Controls that are
+   deliberately small keep their ink and get an invisible ::before stretched
+   past their edge, so the thumb finds 44px where the eye sees a small pill.
+   Native form controls (<input>, <select>) cannot carry a pseudo-element, so
+   those few grow their own box instead — by 4px, or, for the sliders, around
+   a negative margin that leaves the layout footprint untouched. Each pad is
+   sized to land at 46, not exactly 44, so integer-pixel hit testing still
+   clears the bar at either edge.
+   ========================================================================== */
+
+/* ---------- the invisible 44px pad ---------- */
+
+.corner-gear::before,
+.results-back::before,
+.card-action::before,
+.seg-btn::before,
+.friend-chip::before,
+.range-btn::before,
+.landing-loc-link::before,
+.friend-heart::before,
+.ctl-toggle::before,
+.shortlist-badge::before,
+.decision-keep::before,
+.settings-backlink a::before {
+  content: "";
+  position: absolute;
+  /* per-control insets below; nothing is painted here */
+  background: none;
+  border-radius: inherit;
+  pointer-events: auto;
+}
+
+/* the controls need a containing block for it; the gear is already fixed */
+.results-back,
+.card-action,
+.seg-btn,
+.friend-chip,
+.range-btn,
+.landing-loc-link,
+.friend-heart,
+.ctl-toggle,
+.shortlist-badge,
+.decision-keep,
+.settings-backlink a { position: relative; }
+
+/* 40x40 painted -> 46x46 tapped */
+.corner-gear::before { inset: -3px; }
+/* 42px tall painted -> 46 */
+.results-back::before,
+.range-btn::before { inset: -2px 0; }
+/* 40px tall painted -> 46 */
+.card-action::before,
+.seg-btn::before { inset: -3px 0; }
+/* 36px tall painted -> 46 */
+.friend-chip::before { inset: -5px 0; }
+/* 32.8px tall painted -> 46.8 (the landing's quiet second option) */
+.landing-loc-link::before { inset: -7px 0; }
+/* 24px tall painted -> 46 */
+.friend-heart::before,
+.ctl-toggle::before { inset: -11px 0; }
+/* 27.2px tall painted -> 47.2 */
+.shortlist-badge::before { inset: -10px 0; }
+/* 34px tall painted -> 46 */
+.decision-keep::before { inset: -6px 0; }
+/* a 15px line of text -> 47 */
+.settings-backlink a::before { inset: -16px 0; }
+
+/* ---------- native controls: grow the box, keep the look ---------- */
+
+/* The range input painted a 0.55rem track centred in a 1.5rem box. The box is
+   now 44px so a thumb can find it anywhere along the row; the negative block
+   margin gives the 20px back to the layout, and because the track and thumb
+   are centred in the box they stay exactly where they were. */
+.wc-range { height: 44px; margin: -10px 0; }
+
+/* The two sort selects and the Visited quick filter are the only controls a
+   pseudo-element cannot reach, so their own box grows 40 -> 44. The matching
+   negative block margin hands the 4px back, so the row they sit in keeps its
+   height and nothing below them moves: an A/B against the previous
+   stylesheet leaves every other box on Visited and Friends identical. */
+.sort-ctl select { min-height: 44px; margin-block: -2px; }
+/* The quick filter's wrapper is a plain block, so a negative margin on the
+   input would just collapse through it and the log below would still shift.
+   The 4px comes off the wrapper's own margins instead — same footprint. */
+.visited-filter-input { min-height: 44px; }
+.visited-filter { margin: calc(-0.4rem - 2px) 0 calc(1.1rem - 2px); }
