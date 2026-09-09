@@ -4050,3 +4050,161 @@ html.evening .feed-scrim {
   .feed-scroll { max-width: 27rem; margin: 0 auto; left: 0; right: 0; }
   .feed { background: #0d1016; }
 }
+
+/* ==========================================================================
+   CONTRAST PASS — 2026-09-08
+   Every value below was measured by blanking the glyph: the text's own ink is
+   made transparent, the element's rect is screenshotted, and the ground is
+   read at exactly the pixels the glyphs covered. Foreground is the computed
+   CSS color (composited for alpha and inherited opacity), so anti-aliased
+   glyph edges never enter the arithmetic. Ratios in the comments are the
+   measured worst case, not a swatch-vs-swatch guess.
+   ========================================================================== */
+
+/* ---------- the wall the text actually sits on ---------- */
+
+/* Three multiplying wash blobs stack. Where they overlap they dragged the
+   light wall from --paper (246) down to ~186, and — blending as screen after
+   hours — lifted the evening wall to ~87. Almost every "secondary text is a
+   bit low" finding traced back here, so the ground is fixed once rather than
+   the twenty colors standing on it. Softened for Tableau only (a dense app,
+   not a gallery wall); the blobs still read as watercolor, just less soaked. */
+.wash::before { opacity: 0.36; }
+
+/* ---------- secondary ink ---------- */
+
+/* --ink-soft's documented 4.94:1 is measured against pure --paper, and
+   nothing in this app is painted on pure paper: the body gradient, the grain
+   and the washes are always in between. Deepened (and lifted after hours)
+   until it clears AA on the ground it really meets — still clearly softer
+   than --ink, which is 10.3:1 on paper against these ~6.9:1. */
+:root {
+  --ink-soft: #475564;  /* was #5a6a79 — 3.04:1 on the washed wall */
+  --pond-ink: #365370;  /* was #456a8f — 2.62:1 on the washed wall */
+}
+html.evening {
+  --ink-soft: #c7c0af;  /* was #b3ac9a — 3.83:1 on the lit evening wall */
+}
+
+/* The active tab reads over the feed's art through the bar's glass, which
+   lands the label on ~206 rather than paper: 3.30:1 as --pond-deep. */
+.bottab.is-active { color: #3d5e7f; }
+.settings-steps summary { color: var(--pond-ink); }   /* was 4.25:1 */
+
+/* ---------- solid buttons: paper on the pond's light end ---------- */
+
+/* The gradient started at --pond, where --paper is only 2.34:1. Deepened to
+   the far end of the same pigment; the wash still reads as water, just
+   deeper water. The evening buttons carry dark ink on light pond, so they
+   move the other way. */
+.btn-solid,
+.range-btn.is-active {
+  background: radial-gradient(120% 140% at 30% 20%, #44688c 0%, #35577a 80%);
+}
+html.evening .btn-solid,
+html.evening .range-btn.is-active {
+  background: radial-gradient(120% 140% at 30% 20%, #8fb4d1 0%, #6e97ba 80%);
+}
+.loc-go,
+.add-place-btn,
+.friend-chip.is-active {
+  background: #44688c;                                /* was --pond-deep, 4.49:1 */
+}
+.friend-chip.is-active { border-color: #44688c; }
+
+/* "Open in Maps" carried --paper on --rose (2.47:1). Rose is a pale pigment;
+   rather than drown it, the wash goes paler still and the type goes to ink —
+   more watercolor, not less. */
+.decision-act--primary,
+.decision-act--primary:hover {
+  color: var(--ink);
+  background: radial-gradient(120% 140% at 30% 20%, #f0bfcc 0%, #e5a2b5 80%);
+  border-color: var(--rose);
+}
+html.evening .decision-act--primary,
+html.evening .decision-act--primary:hover {
+  color: #3a1620;
+  background: radial-gradient(120% 140% at 30% 20%, var(--rose) 0%, #c46e85 80%);
+}
+
+/* ---------- accents on the wrong ground ---------- */
+
+/* .ov-rating .ov-star (--gold) was declared after .trio-info .ov-star at the
+   same specificity, so the deck's over-the-art gold leaked onto the light
+   info card: 1.68:1. Gold stays where the ground is dark. */
+.trio-info .ov-rating .ov-star { color: #7a672d; }
+html.evening .trio-info .ov-rating .ov-star { color: #c49f31; }
+
+.trio-score { color: #7e661f; }                       /* was #b8952e, 2.42:1 */
+html.evening .trio-score { color: #c49f31; }          /* was 4.18:1 */
+
+.trio-info .ov-price { color: #55704e; }              /* was #5e7d57, 3.96:1 */
+html.evening .trio-info .ov-price { color: #8aa983; } /* same hue, 2.65:1 on the night card */
+
+.trio-info .ov-you { color: #6e6033; }                /* was #8a7940, 3.27:1 */
+html.evening .trio-info .ov-you { color: #d0c49a; }   /* was 1.91:1 on the night card */
+
+/* Separators and asides were dimmed by opacity, which the eye reads as
+   "quieter" and the contrast maths reads as "gone": 1.83:1. */
+.trio-info .ov-dot { opacity: 0.8; }
+.card-overlay .ov-dot { opacity: 0.85; }
+.field-opt { opacity: 1; }                            /* italic already says "optional" */
+
+/* The rating sheet's category labels wore the raw pigment; the numbers beside
+   them were already ink-anchored. Same treatment, hue kept. */
+.slider--food label { color: #b73c5d; }               /* was --rose, 2.21:1 */
+.slider--vibe label { color: #735ba6; }               /* was --wisteria, 2.40:1 */
+
+html.evening .decision-chip.is-opens { color: #c7dced; }  /* was #9fc2e0, 3.56:1 */
+
+/* The "SAMPLE" pill had a border but no ground of its own, so it inherited
+   the wash. Given the paper pill its comment always claimed. */
+.v-demo-tag { background: rgba(251, 247, 238, 0.72); }
+html.evening .v-demo-tag { background: rgba(28, 33, 44, 0.6); }
+
+/* The photo caption's scrim faded out before the type did, leaving white
+   italics on the light end of the picture at 4.07:1. */
+.trio-cap {
+  background: linear-gradient(180deg, rgba(20, 24, 33, 0) 0%, rgba(20, 24, 33, 0.78) 100%);
+}
+
+/* ---------- contrast pass, second round ---------- */
+
+/* The rating sheet's labels only needed deepening on paper; after hours the
+   raw pigment is already the readable one against the night sheet. */
+html.evening .slider--food label { color: var(--rose); }
+html.evening .slider--vibe label { color: var(--wisteria); }
+
+/* "search a specific location" sits inside the CTA's blue shadow, which puts
+   it on ~169 rather than the wall. After hours that shadow is dark, so the
+   link keeps the moonlit pond it always had. */
+.landing-loc-link { color: #2c445b; }                 /* was 3.72:1 there */
+html.evening .landing-loc-link { color: var(--pond-ink); }
+
+/* The tab bar's glass over the feed's art lands the active label on ~206. */
+.bottab.is-active { color: #3a5a79; }
+.tab-count { opacity: 1; }                            /* dimming took it to 3.67:1 */
+
+.trio-info .ov-dot { opacity: 0.9; }                  /* 0.8 still only made 4.09:1 */
+
+/* The friend-reason chip's wisteria was a hair under after hours. */
+html.evening .ov-reason--friend,
+html.evening .decision-reason--friend { color: #cbbde7; }
+
+/* The sample banner's pond emphasis on its own tinted ground. */
+html.evening .social-banner strong { color: #cfe2f2; }
+
+/* Friend initials: --paper on a pastel wash is 1.7:1. Ink on the wash reads
+   as watercolor should — dark pigment on colour — and the blobs lighten a
+   touch so the ink clears AA at the edge of each gradient too.
+   (Decorative/aria-hidden, but it is still text somebody has to read.) */
+.friend-avatar { color: #2e3a48; }   /* literal: the wash stays pale in both themes */
+.friend-avatar--rose { background: radial-gradient(circle at 32% 28%, #eab3c0 0%, #e09aad 72%); }
+.friend-avatar--pond { background: radial-gradient(circle at 32% 28%, #b7d5ef 0%, var(--pond) 78%); }
+.friend-avatar--wisteria { background: radial-gradient(circle at 32% 28%, #ccc1e5 0%, #b0a2cf 75%); }
+.friend-avatar--sage { background: radial-gradient(circle at 32% 28%, #bcd7b5 0%, var(--sage) 75%); }
+.friend-avatar--gold { background: radial-gradient(circle at 32% 28%, #e7d8a6 0%, var(--gold) 75%); }
+
+/* The "Surprise me" sparkle, in the same deepened wisteria as the sheet. */
+.surprise-spark { color: #695399; }
+html.evening .surprise-spark { color: #bcafd8; }
