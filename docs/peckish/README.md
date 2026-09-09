@@ -46,6 +46,186 @@
 
 ## Feature map (what's built)
 
+### Accessibility pass 3 — target size, reduced motion, dead CSS (2026-09-09)
+The last three dimensions of the audit. Contrast (above) was already done and
+was deliberately not touched.
+
+**1. Touch targets — 198 failing hit boxes down to 4**
+
+The measurement is the point. A control's *painted* box is not its target: a
+transparent stretched overlay makes it bigger, and a neighbour that steals
+points makes it smaller. So the harness probes `document.elementFromPoint`
+outward from the control (binary-searching each of the four directions) and
+keeps the run where the point still answers with that control — the real
+clickable rect, padding and overlays included, neighbours subtracted.
+
+Two harness bugs were found and fixed *before* any number was trusted, both of
+which had manufactured false failures:
+
+| harness bug | what it produced | fix |
+|---|---|---|
+| probing past the viewport edge | `.decision-act` "95 x 8", `.pop-row-hit` "97 x 8" | only measure a control whose whole painted box is on screen; measure the rest on a scrolled variant of the same surface |
+| aggregating min-w/min-h across instances but printing the *first* instance's painted size | mismatched rows nobody could act on | report the single worst instance, with its own painted size and the surface it was on |
+
+35 app states x 2 themes = **70 sweeps**, after the navigation itself was
+fixed twice (the shortlist compare screen, its constellation and the shortlist
+badge were never reached until the harness learned that "Save to shortlist ·
+keep swiping" — not `#decision-keep` — is what banks a place).
+
+| stage | failing instances | unique controls |
+|---|---|---|
+| before | **198** | 31 |
+| after the pads | 5 | 3 |
+| final | **4** | 2 |
+
+Worst offenders before (effective hit box, both themes):
+
+| control | was | now |
+|---|---|---|
+| `.settings-backlink a` ("Back to the Lab") | 97 x **16** | 97 x 47 |
+| `.wc-range` (the three rating sliders) | 97 x **25** | 97 x 45 |
+| `.ctl-toggle` (the Open-now switch) | 97 x **25** | 97 x 45 |
+| `.friend-heart` | 46 x **25** | 46 x 45 |
+| `.shortlist-badge` | 53 x **29** | 53 x 47 |
+| `.landing-loc-link` ("search a specific location") | 97 x **34** | 97 x 47 |
+| `.decision-keep` ("Keep looking") | 97 x **35** | 97 x 47 |
+| `.friend-chip` x6 | 52-87 x **37** | 52-87 x 45 |
+| `.corner-gear` | **41 x 41** | 45 x 45 |
+| `.seg-btn`, `.card-action` | 45-87 x **41** | 45-87 x 45 |
+| `#visited-sort`, `#friends-sort`, `.visited-filter-input` | 97 x **41** | 97 x 45 |
+| `.results-back` (Back / Preferences) | 90-97 x **43** | 90-97 x 45 |
+| `.range-btn` x3 (Today / Month / Year) | 70-97 x **43** | 70-97 x 45 |
+
+**Nothing painted got bigger.** Twelve controls keep their exact ink and gain
+an invisible `::before` stretched past their edge (sized to land at 46, so
+integer-pixel hit testing still clears 44 at either edge). Only native form
+controls, which cannot carry a pseudo-element, grow their own box — and each
+gives the extra space straight back:
+
+- the three sliders go from a 24px box to a 44px one with `margin: -10px 0`,
+  so the track and thumb stay centred in exactly the same place and the row
+  occupies the same 24px it always did;
+- the two sort `<select>`s go 40 -> 44 with `margin-block: -2px`, so the row
+  keeps its height;
+- the Visited quick filter needed the 4px taken off its *wrapper* instead —
+  a negative margin on the input just collapses through a plain block parent
+  and the log below still shifted.
+
+**A pad is worthless if it does not fire the control**, so each one was clicked
+2px above the painted top edge and the effect asserted: the Open-now checkbox
+flips, the friend chip filters, the range button switches, the gear opens
+settings, the badge opens the shortlist, the card action opens the rating
+sheet, the heart likes, "Keep looking" dismisses, and "Back to the Lab"
+navigates to `lab.html`. 12 of 12.
+
+**No visual regression, proved rather than eyeballed.** Every surface was
+rendered twice — once with `HEAD`'s stylesheet injected by route
+interception, once with the working one — with `Math.random` and `Date` pinned
+so the content is identical, and every element's box compared. Result: on 16
+states x 2 themes the *only* boxes that changed are the six controls that were
+supposed to change (2 selects, 1 filter + its wrapper, 3 sliders). Everything
+else is identical to the pixel; the residue in the diff is 1px jitter in the
+Feed's ken-burns canvas and the drifting washes, which are mid-animation.
+
+An earlier draft did *not* pass this: `min-height: 44px` on the sort select
+alone reflowed **305 boxes** on Friends and 175 on Visited by 4px. That is
+what the negative margins above are for.
+
+**Two controls are still under 44 and are reported, not papered over:**
+
+- `input#rate-date` reads 24px tall *at one scroll offset* because the rating
+  sheet's own scroll container clips it there. Its painted box is 44.4 and it
+  measures 45 the moment the sheet is scrolled so it is fully in view
+  (`rating-sheet-mid`, `rating-sheet-bottom`). Not a control defect.
+- **`.slc-const-dot` (the constellation dots) is a genuine miss at 47 x 28.**
+  The dot is already a 46px transparent button around a 10px pip, so no amount
+  of padding helps: the loss is to the *neighbouring dot*. `buildConstellation`
+  separates coincident dots to `MINSEP = 13` px, so two 46px boxes can overlap
+  by 33px. The only fix is more separation, and that is a layout/meaning
+  change this pass was scoped out of: the constellation's whole claim is that
+  bearing and distance are true, and the nudge loop shifts *bearing* to make
+  room — pushing to 44px separation would swing dots by ~17 degrees a pass and
+  make the little map lie about direction. **Recommended follow-up for the
+  orchestrator:** grow the plot (`.slc-constellation` is 11rem tall) rather
+  than raise `MINSEP`. Mitigating: every dot duplicates a full-size compare
+  card below it, and `.slc-choose` / `.slc-remove` both measure 45.
+
+**2. Reduced motion on the newest surfaces — clean, and now provably so**
+
+The first result was "0 animations running under `reduce`" on every surface,
+which is exactly the kind of number this project has learned to distrust. So
+the same probe was run with `reducedMotion: 'no-preference'` as a control: it
+finds 3-7 running animations per surface (`feed-ken`, `feed-drift`,
+`feed-steam`, the three `drift-*` wash blobs, `bloom-out`, `wash-drift`). The
+zero is real, not a broken probe.
+
+An idle sample cannot see a **transition**, though, because a transition only
+runs when something changes. A second probe drives the interaction and samples
+`getAnimations()` in the same tick. That found the one real gap:
+
+- **the Feed's action rail still animated.** `.feed-act` was never added to any
+  reduced-motion block, so hearting or following a post ran a 0.22s
+  background/border/transform transition plus a `:active` scale. Now
+  `transition: none` and `transform: none` under `reduce` — the state still
+  changes instantly, only the movement between states goes.
+- `.bottab`'s own 0.25s colour transition also survived (only `.bottab-icon`
+  was listed). Added.
+
+Everything the brief named was already correct and is now asserted: the Feed's
+ken-burns push, the drifting wash and the steam are all `animation: none`,
+keyboard/programmatic movement between posts is instant
+(`scroll-behavior: auto` plus `goTo`'s own `prefersReducedMotion` branch —
+measured arriving within 120ms and not moving after), the decision screen's
+reason chips are behind `@media (prefers-reduced-motion: no-preference)`, the
+constellation pips do not scale, the shortlist highlight is a static outline
+rather than a pulse, and the toast appears without its slide.
+
+Final: **0 running animations on all 35 states under `reduce`**, and 8 of 10
+interaction probes clean. The two that are not are pre-existing, deliberate,
+and written inside the existing reduce block by hand:
+
+- `.social-spinner` is *slowed* to 1.6s rather than stopped — a loading
+  indicator that stops moving stops indicating;
+- `.eats-panel` keeps an 0.18s opacity-only `panel-fade` on tab switch, the
+  block's own comment being "tab switch: fade only, no rise".
+
+Both are motion-free or nearly so and neither is on this pass's list, so they
+were left alone and are recorded here instead.
+
+**3. Dead CSS — almost nothing was left to remove**
+
+Every class selector and `@keyframes` name in `eats.css` was checked against
+`eats.html` and `eats.js`, including dynamically-built fragments (a class like
+`pop-top-1` counts as referenced if the string `'pop-top-'` appears). Every
+named candidate had **already been removed** by earlier passes: `.find-orb*`,
+`.orb-ink-bloom`, `orb-light-drift`, `orb-shadow-breathe`, `orb-ink-absorb`,
+`.pop-rank`, `.pop-body`, `.pop-reviews`, `.pop-cuisine`, `.pop-loc` and
+`rank-bloom` do not appear anywhere in the file. No keyframe is unreferenced.
+
+Three classes had no reference at all. Two were removed:
+
+| removed | proof |
+|---|---|
+| `.hint-link` (rule + its entry in the focus-ring list) | no `hint-link`, and no `hint-` fragment, in `eats.html` or `eats.js`; the only `hint` tokens are `.deck-hint` / `#deck-hint`, a different class |
+| `.badge-link` | no `badge-link`, and no `badge-` fragment; the only `badge` tokens are `.shortlist-badge` / `#shortlist-badge` and `'ov-badge'` |
+
+**`.pac-container` was left in place and is not dead.** It never appears in our
+source because Google's Places Autocomplete injects that element itself; the
+rule is what keeps the dropdown above the watercolor washes. `.orb-burst`,
+`.orb-drop` and `orb-drop-fly` were likewise left — `dropletBurst` still builds
+them for the rating-save celebration.
+
+Total dead CSS removed: **14 lines** (the 12-line rule, its blank line, and
+the one entry in the shared focus-ring selector list). It is a small number
+because the earlier passes were thorough, not because the check was shallow.
+
+**Verification.** `node --check` clean. 70 target sweeps, 35 reduced-motion
+sweeps, 10 interaction probes, 12 pad-functional clicks, 32 layout A/B
+comparisons against `HEAD`, 24 screenshots read in both themes, and the full
+regression (Feed scroll/heart/follow/go-here, Find -> wizard -> deck ->
+decision, shortlist + constellation, rating sheet save, Visited sort, Friends
+chips, Popular ranges, settings) — **zero page errors** throughout.
+
 ### Contrast pass — a valid harness, and one systemic cause (2026-09-09)
 The contrast half of the audit, done properly after two earlier attempts
 produced void numbers (see the harness warning in pass 1).
@@ -143,8 +323,9 @@ contrast pass must sample the *modal* stroke colour (or composite the glyph
 coverage), validate against a hand-checked sample, and report its false-positive
 rate before anyone acts on a count.
 
-**Still to do:** a valid contrast sweep, the ≥44px target sweep, the
-reduced-motion sweep on the newest surfaces, and the consistency/dead-CSS pass.
+**Still to do:** *(all cleared)* — the valid contrast sweep landed in the
+Contrast pass above, and the ≥44px target sweep, the reduced-motion sweep on
+the newest surfaces and the dead-CSS pass landed in Accessibility pass 3.
 
 
 ### Feed — the app's front door (2026-09-07)
