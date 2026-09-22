@@ -1768,77 +1768,6 @@ footer#contact {
    13. Annex — studies & sketches grid
    -------------------------------------------------------------------------- */
 
-/* Eleven studies on the wall: a tighter minimum and gap let rows fill out
-   3–4 across instead of orphaning a wide straggler on the last row. */
-.studies-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
-  gap: clamp(1.5rem, 3vw, 2rem);
-  align-items: stretch;
-}
-
-.study {
-  display: flex;
-  flex-direction: column;
-}
-
-.frame--small {
-  padding: 0.85rem;
-}
-
-.frame--small::before {
-  inset: 5px;
-}
-
-/* Study thumbnails arrive at varying ratios; the watercolor treatment bakes
-   ragged edges into the images, so cover-cropping to 4:3 evens the wall. */
-.frame--small img {
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-}
-
-.study:nth-child(odd) .frame--small {
-  transform: rotate(-0.45deg);
-}
-
-.study:nth-child(even) .frame--small {
-  transform: rotate(0.45deg);
-}
-
-.frame--small,
-.study .frame--small img {
-  transition: transform 0.35s ease, box-shadow 0.35s ease;
-}
-
-.study:hover .frame--small {
-  transform: rotate(0deg) translateY(-3px);
-}
-
-/* On hover the small frame deepens its hung shadow and picks up a faint warm
-   (gold) ring — kept low-alpha so it reads as catalogue light, not a glow. */
-.study:hover .frame--small,
-.study .frame--small:focus-within {
-  box-shadow:
-    0 1px 2px rgba(46, 58, 72, 0.1),
-    0 16px 30px -16px rgba(46, 58, 72, 0.34),
-    inset 0 0 0 1px rgba(205, 184, 120, 0.35);
-}
-
-.study-placard {
-  flex: 1;
-  margin-top: 1.1rem;
-  padding: 1.1rem 1.2rem 1.25rem;
-  text-align: center;
-}
-
-.study-placard .placard-title {
-  font-size: 1.25rem;
-}
-
-.study-placard .placard-desc {
-  font-size: 0.9rem;
-}
-
 /* --------------------------------------------------------------------------
    14. The last room — correspondence
    -------------------------------------------------------------------------- */
@@ -2184,8 +2113,6 @@ html.js .reveal.is-visible {
   .pigment::before,
   .nav-links a::after,
   .contact-link::after,
-  .frame--small,
-  .study .frame--small img,
   .frame[data-tilt]::after,
   .skip-link,
   .theme-toggle,
@@ -2203,10 +2130,6 @@ html.js .reveal.is-visible {
      keep the non-motion color/shadow/brightness responses. */
   .pigment:hover {
     transform: none;
-  }
-
-  .study:hover .frame--small {
-    transform: rotate(0deg);
   }
 }
 
