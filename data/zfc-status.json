@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "checkerVersion": "1.0.0",
+  "product": "Nikon Z fc",
+  "checkedAt": null,
+  "variants": [],
+  "note": "No readings yet. The watcher writes here on its first GitHub Actions run; see docs/zfc/README.md."
+}

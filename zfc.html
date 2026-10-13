@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Z fc Watch — Skylar Hoffman</title>
+    <meta
+      name="description"
+      content="A patient watcher for the coloured Nikon Z fc bodies: a scheduled job checks every variant, commits what it finds, and this page reports it honestly — in stock, out of stock, or (when the page cannot be read) unknown."
+    />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="canonical" href="https://sky121.github.io/zfc.html" />
+    <meta name="theme-color" content="#f6f1e7" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sky121.github.io/zfc.html" />
+    <meta property="og:image" content="https://sky121.github.io/images/og-card.png" />
+    <meta property="og:title" content="The Z fc Watch — Skylar Hoffman" />
+    <meta
+      property="og:description"
+      content="A stock and price watcher for the coloured Nikon Z fc bodies, checked by a scheduled job and reported honestly."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Karla:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script>document.documentElement.classList.add('js');(function(){try{var t=localStorage.getItem('sh-theme');if(t==='evening'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('evening');}catch(e){}})();</script>
+    <link rel="stylesheet" href="assets/css/exhibit-page.css" />
+    <link rel="stylesheet" href="assets/css/zfc.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#room">Skip to content</a>
+
+    <div class="wash-field" aria-hidden="true">
+      <div class="wash wash--pond"></div>
+      <div class="wash wash--wisteria"></div>
+      <div class="wash wash--sage"></div>
+    </div>
+
+    <header>
+      <nav class="exhibit-nav" aria-label="Primary">
+        <a class="monogram" href="index.html" aria-label="Skylar Hoffman — back to home">S.H.</a>
+        <a class="back-link" href="lab.html">&larr; Back to the Lab</a>
+      </nav>
+    </header>
+
+    <main id="room" class="exhibit-room zfc-room">
+      <p class="room-label">Stock watch &middot; checked every 15 minutes</p>
+      <h1 class="exhibit-title">The Z fc Watch</h1>
+      <p class="exhibit-subtitle">
+        A patient eye on every coloured Nikon Z fc &mdash; so the moment one
+        comes back, or quietly drops in price, I hear about it.
+      </p>
+
+      <!-- The honesty bar. Never says "live" unless the data really is
+           fresh; goes gold past two hours and says so in words. -->
+      <div class="zfc-pulse" id="pulse" data-freshness="loading" role="status" aria-live="polite">
+        <span class="zfc-pulse-dot" aria-hidden="true"></span>
+        <span class="zfc-pulse-main" id="pulse-main">Reading the latest check&hellip;</span>
+        <span class="zfc-pulse-sub" id="pulse-sub"></span>
+      </div>
+
+      <!-- Shown instead of the grid when there is nothing to show yet, or
+           when the data file itself cannot be loaded. -->
+      <section class="zfc-note" id="note" hidden aria-labelledby="note-title">
+        <h2 class="zfc-note-title" id="note-title">No readings yet</h2>
+        <p id="note-body">
+          The watcher runs every 15 minutes. As soon as it has looked once,
+          every colour will appear here.
+        </p>
+      </section>
+
+      <section aria-labelledby="colours-heading">
+        <h2 class="zfc-h2" id="colours-heading">The colours</h2>
+        <p class="zfc-h2-note">
+          One card per body. <strong>Unknown</strong> is its own answer and
+          never a polite way of saying &ldquo;out of stock&rdquo; &mdash; it
+          means the watcher could not read the page, which is the one failure
+          worth shouting about.
+        </p>
+        <ul class="zfc-grid" id="grid" aria-busy="true"></ul>
+      </section>
+
+      <section aria-labelledby="log-heading">
+        <h2 class="zfc-h2" id="log-heading">What has changed</h2>
+        <p class="zfc-h2-note" id="log-note">
+          Every status, price and parsing change the watcher has ever recorded,
+          newest first.
+        </p>
+        <ol class="zfc-log" id="log"></ol>
+      </section>
+
+      <hr class="brushstroke-rule" />
+
+      <div class="exhibit-intro">
+        <h2 class="zfc-h2">How it works</h2>
+        <p>
+          This page cannot watch anything by itself. A browser on
+          <em>sky121.github.io</em> is not allowed to fetch a retailer's
+          product page &mdash; there are no CORS headers on it, so the request
+          dies before it is even sent. So the watching happens somewhere with
+          open internet: a scheduled GitHub Actions job wakes up roughly every
+          quarter of an hour, fetches each configured product URL one at a
+          time with an honest user agent, obeys <code>robots.txt</code>, and
+          reads the result.
+        </p>
+        <p>
+          It reads in order of trust: schema.org <code>JSON-LD</code> first,
+          then Open&nbsp;Graph product meta tags, then the text of the actual
+          buy control &mdash; &ldquo;Add to cart&rdquo; against &ldquo;Notify
+          me when available&rdquo;. If none of those speak, it records
+          <strong>unknown</strong> rather than guessing, and says so loudly.
+          Each card shows which signal it used, so the verdict can always be
+          audited.
+        </p>
+        <p>
+          Readings are committed into the repository as JSON &mdash; only when
+          something actually changed, or every six hours as a heartbeat &mdash;
+          and this page simply reads that file. A real change also opens a
+          GitHub issue, which arrives as an email. No third-party service, no
+          API keys, nothing stored in your browser.
+        </p>
+        <p class="zfc-meta">
+          Source: <a href="https://github.com/sky121/sky121.github.io/tree/master/tools/zfc-watch">tools/zfc-watch</a>
+          &middot; data: <a href="data/zfc-status.json">zfc-status.json</a>
+        </p>
+      </div>
+    </main>
+
+    <footer class="exhibit-footer">
+      <p>
+        Skylar Hoffman<span class="sep">&middot;</span
+        ><a href="mailto:skylar.j.hoffman@gmail.com">skylar.j.hoffman@gmail.com</a
+        ><span class="sep">&middot;</span
+        ><a href="https://github.com/sky121">github.com/sky121</a>
+      </p>
+    </footer>
+
+    <script defer src="assets/js/gallery.js"></script>
+    <script defer src="assets/js/zfc.js"></script>
+  </body>
+</html>

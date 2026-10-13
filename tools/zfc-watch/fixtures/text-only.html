@@ -1,0 +1,22 @@
+<!-- SYNTHETIC FIXTURE: no JSON-LD, no product meta. The only cue is the buy
+     control's own label. The page is seeded with DECOYS — the phrases
+     "out of stock" and "sold out" appear in a review, a footer policy link
+     and a cross-sell blurb. A correct parser must not let those flip the
+     verdict, because they are not the label of a buy control. -->
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Camera Body — Natural Grey</title></head>
+  <body>
+    <nav><a href="/help">What happens if an item is out of stock?</a></nav>
+    <h1>Camera Body — Natural Grey</h1>
+    <p class="price">$1,096.95</p>
+    <form action="/cart" method="post">
+      <input type="submit" value="Add to Cart" />
+    </form>
+    <section class="reviews">
+      <p>&ldquo;I waited three months while this was sold out &mdash; worth it.&rdquo;</p>
+      <p>Related kits are currently unavailable in this colour.</p>
+    </section>
+    <footer><a href="/policy">Out of stock &amp; backorder policy</a></footer>
+  </body>
+</html>

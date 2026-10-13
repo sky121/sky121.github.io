@@ -1,0 +1,140 @@
+# ==========================================================================
+# Nikon Z fc stock & sale watcher
+#
+# WHY A WORKFLOW AND NOT THE PAGE ITSELF
+# A GitHub Pages page cannot poll nikonusa.com: there are no CORS headers on
+# the product pages, so the browser's fetch dies before it starts. Actions
+# runners have open internet, so the fetching happens here and the result is
+# committed into the repo as data/zfc-status.json, which zfc.html then reads
+# same-origin.
+#
+# ABOUT THE SCHEDULE
+# GitHub's scheduled workflows are BEST-EFFORT. Cron runs are queued on
+# shared infrastructure and are routinely delayed — often by several
+# minutes, occasionally much longer at the top of the hour, and runs can be
+# dropped entirely when the platform is busy. Treat '*/15' as "roughly every
+# quarter of an hour", never as a guarantee. zfc.html shows the real
+# checkedAt timestamp and warns when the data is stale precisely because
+# this cadence cannot be trusted to the minute. (Scheduled workflows are
+# also disabled automatically after 60 days of repository inactivity — a
+# commit or a manual run re-enables them.)
+#
+# SECRETS: none. GITHUB_TOKEN is the built-in, per-run token.
+# ==========================================================================
+
+name: Z fc stock watch
+
+on:
+  schedule:
+    # Best-effort, see the note above.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      force_commit:
+        description: "Commit the reading even if nothing changed"
+        type: boolean
+        default: false
+  push:
+    # Code changes run the tests only (the `watch` job is skipped below).
+    paths:
+      - "tools/zfc-watch/**"
+      - ".github/workflows/zfc-watch.yml"
+
+permissions:
+  contents: write
+  issues: write
+
+# Never let two watcher runs race each other to commit the same file.
+concurrency:
+  group: zfc-watch
+  cancel-in-progress: false
+
+jobs:
+  # ----------------------------------------------------------------------
+  # The parser is the whole product. If it breaks, the watcher goes blind,
+  # so its tests gate every run — a red X plus GitHub's "scheduled workflow
+  # failed" email is itself a useful alert.
+  # ----------------------------------------------------------------------
+  test:
+    name: Parser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Run the zfc-watch test suites
+        run: node tools/zfc-watch/test/run-tests.mjs
+
+  watch:
+    name: Check stock
+    needs: test
+    # Pushes only run the tests; the watcher itself runs on cron and on demand.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # The checker never fails the run because one variant 404s, is blocked
+      # by robots.txt, or has no URL configured yet: those are recorded
+      # per-variant in the status file and surfaced on the page. It exits
+      # non-zero only if it genuinely cannot do its job at all.
+      - name: Check every variant
+        id: check
+        run: |
+          node tools/zfc-watch/check.mjs \
+            --alerts-out "$RUNNER_TEMP/zfc-alerts.json"
+
+      # Alerts are GitHub issues (see tools/zfc-watch/notify.mjs for why one
+      # issue per event rather than comments on a tracker). Runs even if the
+      # checker reported problems, so a parse breakage still gets filed.
+      - name: File alerts as GitHub issues
+        if: always() && steps.check.outputs.alert_count != '0' && steps.check.outputs.alert_count != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node tools/zfc-watch/notify.mjs --alerts "$RUNNER_TEMP/zfc-alerts.json"
+
+      # Commit policy: only on a real change (status, price, or which signal
+      # matched), or when the last committed reading is older than the
+      # heartbeat window, so the page can honestly show it is still alive.
+      # Without this the repo would collect ~96 empty commits a day.
+      - name: Commit the reading
+        if: steps.check.outputs.should_commit == 'true' || inputs.force_commit
+        run: |
+          set -euo pipefail
+          git config user.name  "zfc-watch[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/zfc-status.json data/zfc-history.jsonl
+          if git diff --cached --quiet; then
+            echo "nothing staged after all — skipping commit"
+            exit 0
+          fi
+          git commit -m "Z fc watch: ${{ steps.check.outputs.summary }}" \
+                     -m "changed=${{ steps.check.outputs.changed }} alerts=${{ steps.check.outputs.alert_count }}"
+          # Another run may have landed while we were fetching.
+          for attempt in 1 2 3; do
+            if git push; then exit 0; fi
+            echo "push rejected, rebasing and retrying ($attempt/3)"
+            git pull --rebase --autostash
+            sleep 5
+          done
+          echo "::error::could not push the reading after 3 attempts"
+          exit 1
+
+      - name: Say what happened
+        if: always()
+        run: |
+          echo "changed=${{ steps.check.outputs.changed }}"
+          echo "should_commit=${{ steps.check.outputs.should_commit }}"
+          echo "alerts=${{ steps.check.outputs.alert_count }}"
+          echo "unconfigured variants=${{ steps.check.outputs.config_errors }}"
+          echo "${{ steps.check.outputs.summary }}"

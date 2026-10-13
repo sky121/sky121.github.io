@@ -1,0 +1,35 @@
+<!-- SYNTHETIC FIXTURE: a page whose ONLY machine-readable stock signal is a
+     schema.org @graph. No product meta tags, no buy-control text at all
+     (the buy UI is client-rendered, which is exactly why we prefer JSON-LD). -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Camera Body — Amber Brown</title>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "BreadcrumbList", "itemListElement": [] },
+        { "@type": "WebPage", "name": "Camera Body — Amber Brown" },
+        {
+          "@type": "Product",
+          "name": "Camera Body — Amber Brown",
+          "offers": {
+            "@type": "AggregateOffer",
+            "priceCurrency": "USD",
+            "lowPrice": "1096.95",
+            "offers": [
+              { "@type": "Offer", "price": "1296.95", "priceCurrency": "USD", "availability": "https://schema.org/OutOfStock" },
+              { "@type": "Offer", "price": "1096.95", "priceCurrency": "USD", "availability": "https://schema.org/InStock" }
+            ]
+          }
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>

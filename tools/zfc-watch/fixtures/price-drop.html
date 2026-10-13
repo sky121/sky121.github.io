@@ -1,0 +1,30 @@
+<!-- SYNTHETIC FIXTURE. Same product as instock-jsonld.html at a lower price,
+     used to exercise price-drop detection end to end. -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Camera Body — Mint Green | Example Store</title>
+    <meta property="product:availability" content="in stock" />
+    <meta property="product:price:amount" content="956.95" />
+    <meta property="product:price:currency" content="USD" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": "Camera Body — Mint Green",
+      "offers": {
+        "@type": "Offer",
+        "priceCurrency": "USD",
+        "price": 956.95,
+        "availability": "InStock"
+      }
+    }
+    </script>
+  </head>
+  <body>
+    <h1>Camera Body — Mint Green</h1>
+    <p class="price">Now $956.95 <s>$1,096.95</s></p>
+    <button type="button">Add to Cart</button>
+  </body>
+</html>

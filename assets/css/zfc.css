@@ -1,0 +1,554 @@
+/* ==========================================================================
+   zfc.css — "The Z fc Watch": a status board for the coloured Nikon Z fc
+   bodies. Loads AFTER exhibit-page.css and reuses its tokens, washes,
+   grain, nav, footer, focus rings and html.evening dark theme.
+
+   This sheet adds: the theme-toggle styling (exhibit-page.css never styles
+   the gallery.js-injected button), the freshness pulse, the colour cards
+   with their status pills, the change log, and dark-theme + reduced-motion
+   coverage for all of it.
+
+   STATUS COLOUR IS NEVER THE ONLY SIGNAL. Every pill carries a glyph and a
+   word as well as a hue, and "unknown" is deliberately built to look like
+   nothing else on the page — a dashed, gold, question-marked pill with a
+   plain-English line underneath — because a watcher that has gone blind
+   must never be mistaken for one calmly reporting "still out of stock".
+   ========================================================================== */
+
+:root {
+  --mat: #fbf7ee; /* exhibit-page.css only defines --mat in evening */
+  --hairline: rgba(46, 58, 72, 0.16);
+
+  /* Status pigments. Backgrounds are low-alpha tints so --ink stays the
+     text colour and clears AA comfortably in both themes. */
+  --in-ink: #3f6b57;
+  --in-wash: rgba(147, 180, 139, 0.3);
+  --in-edge: #93b48b;
+
+  --out-wash: rgba(46, 58, 72, 0.07);
+  --out-edge: rgba(46, 58, 72, 0.3);
+
+  --unk-ink: #7a6420;
+  --unk-wash: rgba(205, 184, 120, 0.32);
+  --unk-edge: #a8924f;
+
+  --setup-ink: #7c6aa6;
+  --setup-wash: rgba(162, 146, 196, 0.26);
+  --setup-edge: #a292c4;
+}
+
+html.evening {
+  --mat: #2b3140;
+  --in-ink: #b7d6ad;
+  --in-wash: rgba(147, 180, 139, 0.22);
+  --in-edge: #93b48b;
+
+  --out-wash: rgba(233, 227, 211, 0.07);
+  --out-edge: rgba(233, 227, 211, 0.26);
+
+  --unk-ink: #e3cd8d;
+  --unk-wash: rgba(205, 184, 120, 0.2);
+  --unk-edge: #cdb878;
+
+  --setup-ink: #cbbce6;
+  --setup-wash: rgba(162, 146, 196, 0.2);
+  --setup-edge: #a292c4;
+}
+
+/* ==========================================================================
+   Theme toggle — gallery.js injects it into .exhibit-nav (echoes lab.css).
+   ========================================================================== */
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-left: 1rem;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid rgba(46, 58, 72, 0.35);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.25s ease, background-color 0.25s ease, color 0.25s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--pond-ink);
+  background-color: rgba(127, 168, 201, 0.14);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--pond-deep);
+  outline-offset: 3px;
+}
+
+html.evening .theme-toggle {
+  border-color: rgba(233, 227, 211, 0.32);
+}
+
+html.evening .theme-toggle:hover {
+  border-color: var(--pond-ink);
+  background-color: rgba(159, 194, 224, 0.16);
+}
+
+html.evening .theme-toggle:focus-visible {
+  outline-color: var(--pond-ink);
+}
+
+/* The nav keeps the back-link legible when the toggle joins it on a phone */
+.exhibit-nav .back-link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ==========================================================================
+   Freshness pulse — the honesty bar. States: live / stale / never run.
+   ========================================================================== */
+
+.zfc-pulse {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.8rem;
+  margin: 0 0 2.2rem;
+  padding: 0.9rem 1.1rem;
+  border-left: 3px solid var(--pond);
+  border-radius: 2px 10px 10px 2px;
+  background: rgba(127, 168, 201, 0.1);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.zfc-pulse-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  flex: none;
+  border-radius: 50%;
+  background: var(--sage);
+  align-self: center;
+}
+
+.zfc-pulse-main {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.zfc-pulse-sub {
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+}
+
+.zfc-pulse[data-freshness="stale"] {
+  border-left-color: var(--gold);
+  background: rgba(205, 184, 120, 0.16);
+}
+
+.zfc-pulse[data-freshness="stale"] .zfc-pulse-dot {
+  background: var(--gold);
+  box-shadow: 0 0 0 3px rgba(205, 184, 120, 0.25);
+}
+
+.zfc-pulse[data-freshness="never"] {
+  border-left-color: var(--wisteria);
+  background: rgba(162, 146, 196, 0.14);
+}
+
+.zfc-pulse[data-freshness="never"] .zfc-pulse-dot,
+.zfc-pulse[data-freshness="error"] .zfc-pulse-dot {
+  background: var(--wisteria);
+}
+
+.zfc-pulse[data-freshness="error"] {
+  border-left-color: var(--rose);
+  background: rgba(217, 139, 160, 0.14);
+}
+
+/* ==========================================================================
+   Section headings
+   ========================================================================== */
+
+.zfc-h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.6rem, 4.5vw, 2.1rem);
+  line-height: 1.2;
+  color: var(--ink);
+  margin: 0 0 0.35rem;
+}
+
+.zfc-h2-note {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  margin: 0 0 1.4rem;
+  max-width: 40em;
+}
+
+/* ==========================================================================
+   The colour cards
+   ========================================================================== */
+
+.zfc-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin: 0 0 clamp(2.5rem, 6vw, 4rem);
+  padding: 0;
+}
+
+@media (min-width: 40rem) {
+  .zfc-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.zfc-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1.15rem 1.2rem 1.25rem;
+  border: 1px solid var(--hairline);
+  border-radius: 4px 16px 6px 14px / 14px 5px 16px 6px; /* a wet, uneven edge */
+  background: var(--mat);
+  box-shadow: 0 1px 0 rgba(46, 58, 72, 0.04);
+}
+
+.zfc-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+/* A dab of the body's own colour, painted rather than printed */
+.zfc-swatch {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+  border-radius: 54% 46% 58% 42% / 44% 56% 46% 54%;
+  background: var(--swatch, var(--pond));
+  box-shadow: inset 0 0 0 1px rgba(46, 58, 72, 0.18);
+}
+
+.zfc-name {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  color: var(--ink);
+  margin: 0;
+}
+
+/* ---------- Status pills ---------- */
+
+.zfc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  align-self: flex-start;
+  margin: 0;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--out-edge);
+  border-radius: 999px;
+  background: var(--out-wash);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.zfc-pill-glyph {
+  font-size: 0.95em;
+  line-height: 1;
+}
+
+.zfc-card[data-status="in_stock"] .zfc-pill {
+  border-color: var(--in-edge);
+  background: var(--in-wash);
+}
+
+.zfc-card[data-status="in_stock"] {
+  border-color: var(--in-edge);
+  box-shadow: 0 0 0 1px var(--in-edge), 0 6px 20px -16px rgba(63, 107, 87, 0.8);
+}
+
+/* UNKNOWN: dashed, gold, question-marked. Nothing else on the page is
+   dashed, so "the watcher cannot read this" never reads as "sold out". */
+.zfc-card[data-status="unknown"] .zfc-pill {
+  border-style: dashed;
+  border-width: 2px;
+  border-color: var(--unk-edge);
+  background: var(--unk-wash);
+}
+
+.zfc-card[data-status="unknown"] {
+  border-style: dashed;
+  border-color: var(--unk-edge);
+}
+
+.zfc-card[data-status="unconfigured"] .zfc-pill {
+  border-color: var(--setup-edge);
+  background: var(--setup-wash);
+}
+
+.zfc-card[data-status="unconfigured"] {
+  border-color: var(--setup-edge);
+}
+
+/* ---------- Card body ---------- */
+
+.zfc-price {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.zfc-price-none {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.1rem;
+  color: var(--ink-soft);
+}
+
+.zfc-was {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  text-decoration: line-through;
+  margin-left: 0.45rem;
+}
+
+.zfc-meta {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.zfc-why {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.zfc-why code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+  background: rgba(46, 58, 72, 0.07);
+}
+
+html.evening .zfc-why code {
+  background: rgba(233, 227, 211, 0.1);
+}
+
+/* The plain-English line that keeps "unknown" from reading as "out of stock" */
+.zfc-caveat {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-left: 2px solid var(--unk-edge);
+  border-radius: 1px 7px 7px 1px;
+  background: var(--unk-wash);
+  color: var(--ink);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.zfc-card[data-status="unconfigured"] .zfc-caveat {
+  border-left-color: var(--setup-edge);
+  background: var(--setup-wash);
+}
+
+/* ---------- Sparkline ---------- */
+
+.zfc-spark {
+  display: block;
+  width: 100%;
+  max-width: 11rem;
+  height: 2.2rem;
+  overflow: visible;
+}
+
+.zfc-spark-line {
+  fill: none;
+  stroke: var(--pond-deep);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+html.evening .zfc-spark-line {
+  stroke: var(--pond-ink);
+}
+
+.zfc-spark-dot {
+  fill: var(--rose);
+}
+
+/* ---------- The link out ---------- */
+
+.zfc-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 44px;
+  margin-top: 0.15rem;
+  padding: 0.3rem 0;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--pond-ink);
+  border-bottom: 1px solid rgba(69, 106, 143, 0.4);
+  transition: color 0.25s ease, border-color 0.25s ease;
+}
+
+.zfc-link:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+html.evening .zfc-link {
+  border-bottom-color: rgba(159, 194, 224, 0.45);
+}
+
+/* ==========================================================================
+   Empty / error states
+   ========================================================================== */
+
+.zfc-note {
+  margin: 0 0 clamp(2.5rem, 6vw, 4rem);
+  padding: 1.4rem 1.5rem;
+  border: 1px dashed var(--hairline);
+  border-radius: 6px 18px 8px 16px / 16px 7px 18px 8px;
+  background: var(--mat);
+}
+
+.zfc-note-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.3rem;
+  color: var(--ink);
+  margin: 0 0 0.4rem;
+}
+
+.zfc-note p {
+  margin: 0 0 0.5rem;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.zfc-note p:last-child {
+  margin-bottom: 0;
+}
+
+/* ==========================================================================
+   Change log
+   ========================================================================== */
+
+.zfc-log {
+  list-style: none;
+  margin: 0 0 clamp(2.5rem, 6vw, 4rem);
+  padding: 0;
+  border-left: 1px solid var(--hairline);
+}
+
+.zfc-log-item {
+  position: relative;
+  padding: 0.55rem 0 0.55rem 1.35rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.zfc-log-item::before {
+  content: "";
+  position: absolute;
+  left: -0.3rem;
+  top: 1.1rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--ink-soft);
+}
+
+.zfc-log-item[data-kind="in_stock"]::before { background: var(--in-edge); }
+.zfc-log-item[data-kind="price"]::before { background: var(--rose); }
+.zfc-log-item[data-kind="unknown"]::before { background: var(--unk-edge); }
+
+.zfc-log-when {
+  display: block;
+  font-size: 0.76rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.zfc-log-what strong {
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Entrance — a soft bloom, skipped entirely under reduced motion.
+   (The shared .reveal class is NOT used on rendered-in nodes: gallery.js
+   only observes elements present at load, so a .reveal added later would
+   stay at opacity 0 forever.)
+   ========================================================================== */
+
+@keyframes zfc-bloom {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+html.js .zfc-card,
+html.js .zfc-log-item {
+  animation: zfc-bloom 0.55s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.js .zfc-card,
+  html.js .zfc-log-item {
+    animation: none;
+  }
+
+  .zfc-pulse-dot,
+  .zfc-link,
+  .theme-toggle {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   Narrow phones
+   ========================================================================== */
+
+@media (max-width: 24rem) {
+  .zfc-card {
+    padding: 1rem;
+  }
+
+  .zfc-name {
+    font-size: 1.2rem;
+  }
+
+  .zfc-pill {
+    font-size: 0.74rem;
+    letter-spacing: 0.06em;
+  }
+}

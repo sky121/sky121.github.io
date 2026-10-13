@@ -1,0 +1,35 @@
+<!-- SYNTHETIC FIXTURE. Hand-written for tools/zfc-watch tests. This is NOT a
+     capture of nikonusa.com (the build sandbox cannot reach it); it is a
+     generic schema.org product page of the shape most retailers emit. -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Camera Body — Mint Green | Example Store</title>
+    <meta property="og:title" content="Camera Body — Mint Green" />
+    <meta property="product:availability" content="in stock" />
+    <meta property="product:price:amount" content="1096.95" />
+    <meta property="product:price:currency" content="USD" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": "Camera Body — Mint Green",
+      "sku": "1694-MG",
+      "offers": {
+        "@type": "Offer",
+        "url": "https://example.test/p/mint-green",
+        "priceCurrency": "USD",
+        "price": "1096.95",
+        "availability": "https://schema.org/InStock"
+      }
+    }
+    </script>
+  </head>
+  <body>
+    <h1>Camera Body — Mint Green</h1>
+    <p class="price">$1,096.95</p>
+    <button type="button" class="js-atc">Add to Cart</button>
+    <p class="ship">Ships free. In stock and ready to ship.</p>
+  </body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "$comment": [
+    "Nikon Z fc stock & sale watcher — variant list.",
+    "EVERY url is null on purpose. This file was written in a sandbox that",
+    "cannot reach www.nikonusa.com, so no URL here could be verified and none",
+    "was invented. The checker refuses to guess: a null url is reported as a",
+    "loud configuration error, never as 'out of stock'.",
+    "TO FINISH SETUP: open each colour's product page on nikonusa.com, copy the",
+    "address bar, and paste it into the matching 'url' below. Remove any",
+    "variant Nikon no longer sells; add any this list is missing.",
+    "See docs/zfc/README.md for the full walkthrough."
+  ],
+  "product": "Nikon Z fc",
+  "pollNotes": "Scheduled every 15 minutes by .github/workflows/zfc-watch.yml. GitHub's cron is best-effort and runs late under load — treat the cadence as 'about every 15 minutes', not a guarantee. Requests are made one at a time with requestDelayMs between them, with an honest User-Agent, and robots.txt is fetched and obeyed before any product page is touched. A handful of requests per quarter-hour against a large retailer is a rounding error on their traffic; if that ever stops being true, raise the cron interval rather than adding parallelism.",
+  "userAgent": "zfc-watch/1.0 (personal Nikon Z fc stock checker, a few requests every 15 min; +https://github.com/sky121/sky121.github.io)",
+  "requestDelayMs": 2500,
+  "timeoutMs": 15000,
+  "heartbeatHours": 6,
+  "variants": [
+    { "name": "Z fc Black", "colour": "Black", "url": null, "sku": null, "note": "the standard body" },
+    { "name": "Z fc Amber Brown", "colour": "Amber Brown", "url": null, "sku": null },
+    { "name": "Z fc Coral Pink", "colour": "Coral Pink", "url": null, "sku": null },
+    { "name": "Z fc Mint Green", "colour": "Mint Green", "url": null, "sku": null },
+    { "name": "Z fc Natural Gray", "colour": "Natural Gray", "url": null, "sku": null },
+    { "name": "Z fc Sand Beige", "colour": "Sand Beige", "url": null, "sku": null },
+    { "name": "Z fc Sunset Orange", "colour": "Sunset Orange", "url": null, "sku": null },
+    { "name": "Z fc White", "colour": "White", "url": null, "sku": null }
+  ]
+}
