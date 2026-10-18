@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "checkerVersion": "1.0.0",
   "product": "Nikon Z fc",
-  "checkedAt": "2026-10-17T20:52:13.102Z",
-  "durationMs": 5,
+  "checkedAt": "2026-10-18T05:35:40.526Z",
+  "durationMs": 3,
   "pollNotes": "Scheduled every 15 minutes by .github/workflows/zfc-watch.yml. GitHub's cron is best-effort and runs late under load — treat the cadence as 'about every 15 minutes', not a guarantee. Requests are made one at a time with requestDelayMs between them, with an honest User-Agent, and robots.txt is fetched and obeyed before any product page is touched. A handful of requests per quarter-hour against a large retailer is a rounding error on their traffic; if that ever stops being true, raise the cron interval rather than adding parallelism.",
   "variants": [
     {
