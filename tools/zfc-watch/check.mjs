@@ -427,7 +427,14 @@ async function main() {
       heartbeatDue = prevAgeHours >= HEARTBEAT_HOURS;
     }
   }
-  const shouldCommit = anyChange || heartbeatDue;
+  /* The heartbeat exists so the page can honestly show it is still being
+     checked. But while NOTHING is configured there is nothing to be checked:
+     a heartbeat then just rewrites "8 unknown" every few hours and litters
+     history with commits that carry no information. Suppress it until at
+     least one URL exists; a real change still always commits. */
+  const anyConfigured = products.some((p) =>
+    (p.variants || []).some((v) => typeof v.url === 'string' && v.url));
+  const shouldCommit = anyChange || (heartbeatDue && anyConfigured);
 
   const summary = products.map((p) => {
     const rows = rowsByProduct.get(p.key) || [];
