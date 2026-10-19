@@ -1,5 +1,8 @@
 # ==========================================================================
-# Nikon Z fc stock & sale watcher
+# The Z Watch — Nikon Z fc / Z f stock & sale watcher
+#
+# The filename and every data path keep the legacy 'zfc' spelling: this
+# site does not break URLs over a rename (see docs/zfc/README.md).
 #
 # WHY A WORKFLOW AND NOT THE PAGE ITSELF
 # A GitHub Pages page cannot poll nikonusa.com: there are no CORS headers on
@@ -22,7 +25,7 @@
 # SECRETS: none. GITHUB_TOKEN is the built-in, per-run token.
 # ==========================================================================
 
-name: Z fc stock watch
+name: The Z Watch
 
 on:
   schedule:
@@ -87,6 +90,10 @@ jobs:
       # by robots.txt, or has no URL configured yet: those are recorded
       # per-variant in the status file and surfaced on the page. It exits
       # non-zero only if it genuinely cannot do its job at all.
+      #
+      # Every product in config.json is checked in one pass; each product's
+      # `alerts` intents decide what actually gets filed (parse breakage is
+      # filed for all of them regardless).
       - name: Check every variant
         id: check
         run: |
@@ -118,7 +125,7 @@ jobs:
             echo "nothing staged after all — skipping commit"
             exit 0
           fi
-          git commit -m "Z fc watch: ${{ steps.check.outputs.summary }}" \
+          git commit -m "Z watch: ${{ steps.check.outputs.summary }}" \
                      -m "changed=${{ steps.check.outputs.changed }} alerts=${{ steps.check.outputs.alert_count }}"
           # Another run may have landed while we were fetching.
           for attempt in 1 2 3; do

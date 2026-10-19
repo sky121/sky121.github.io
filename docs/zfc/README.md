@@ -1,23 +1,42 @@
-# The Z fc Watch — project handoff & design doc
+# The Z Watch — project handoff & design doc
 
-> A stock and price watcher for the **coloured Nikon Z fc** bodies. A
-> scheduled GitHub Actions job does the looking, commits what it finds as
+> A stock and price watcher for the **coloured Nikon Z fc and Z f** bodies.
+> A scheduled GitHub Actions job does the looking, commits what it finds as
 > JSON, opens a GitHub issue when something real happens, and a Lab page
 > reports the result honestly — including when it does not know.
 >
 > This document is the single source of truth for the project. Last
-> updated: **2026-10-13**.
+> updated: **2026-10-19**.
 
 ---
 
-## Status: v1 — BUILT, TESTED, **NOT YET CONFIGURED**
+## A note on the name and the filenames
+
+The project was **"The Z fc Watch"** and is now **"The Z Watch"**, because
+it watches the Z f too. **Every filename stayed exactly as it was** —
+`zfc.html`, `assets/js/zfc.js`, `assets/css/zfc.css`, `data/zfc-status.json`,
+`data/zfc-history.jsonl`, `tools/zfc-watch/`, `.github/workflows/zfc-watch.yml`,
+the `zfc-watch` issue label and the `zfc-watch` concurrency group.
+
+That is this repo's standing practice: **when a project is renamed, the
+files keep their old names** (Peckish → Tableau did the same) so published
+URLs, bookmarks, the committed data history and anything already linking in
+never break. A file called `zfc` is not a mistake; it is older than the
+title.
+
+---
+
+## Status: v2 — MULTI-PRODUCT, BUILT, TESTED, **NOT YET CONFIGURED**
 
 - **Page:** https://sky121.github.io/zfc.html
 - **Watcher:** `.github/workflows/zfc-watch.yml`, every 15 minutes
+- **Watching:** Nikon Z fc (restocks + price drops) and Nikon Z f (price
+  drops only — see **Alert intents** below)
 - **One thing is outstanding before it can watch anything:** every `url` in
   `tools/zfc-watch/config.json` is `null` and must be filled in by hand.
   See [Finishing setup](#finishing-setup). Until then the page shows every
   colour as **"Not watched yet"** — honestly, and never as "out of stock".
+- **And the Z f colour list is unverified** — see below.
 
 ### Known limitation, stated plainly
 
@@ -27,6 +46,13 @@ tested against a real Nikon page**. Every fixture under
 `tools/zfc-watch/fixtures/` is synthetic — hand-written to the shape that
 schema.org, Open Graph and ordinary retail markup take, and labelled as
 such at the top of each file.
+
+**The Z f colour list was also written blind.** The plain black body is
+safe. The premium-exterior colours in `config.json` — Indigo Blue, Sepia
+Brown, Stone Gray, Moss Green, Bordeaux Red, Sunset Orange — are a best
+recollection that **has not been checked against Nikon**. Verify them (and
+delete or add as needed) before pasting URLs. The config file says the same
+thing in a comment, at the top, where someone editing it will see it.
 
 That constraint is why the design is what it is:
 
@@ -39,6 +65,38 @@ That constraint is why the design is what it is:
 The first live run is therefore the real test. Expect to add one or two
 fixtures from the actual page source; `tools/zfc-watch/README.md` §3
 explains how.
+
+---
+
+## Alert intents — the core rule
+
+Each product in `config.json` declares what it wants to hear about:
+
+```json
+{ "key": "z-fc", "name": "Nikon Z fc", "alerts": ["restock", "price_drop"], … }
+{ "key": "z-f",  "name": "Nikon Z f",  "alerts": ["price_drop"],            … }
+```
+
+| product | intents | why |
+| --- | --- | --- |
+| **Z fc** | `restock` + `price_drop` | It is out of stock everywhere. The first in-stock reading *is* the news. |
+| **Z f** | `price_drop` only | It is normally on the shelf. With `restock` on, the very first run would file a "BACK IN STOCK" issue for every Z f colour at once, and another every time its page wobbled. That is not an alert, that is spam. |
+
+`parse_broken` is **not** an intent and cannot be switched off: it fires for
+every product, always. A watcher that can no longer read a page is blind,
+and a blind watcher is worth reporting no matter what you asked it to look
+for.
+
+**Watching is not alerting.** A product watched for price drops only is
+still fetched, parsed, recorded in `zfc-status.json`, logged in
+`zfc-history.jsonl` and shown on the page with its real stock status. The
+intent gates the issue, nothing else. The page says so out loud: the Z f
+section is headed with a **"Sales only"** badge and a sentence explaining
+that its stock is read but never pings.
+
+The rules live in `tools/zfc-watch/alerts.mjs` (pure, no I/O) and are
+unit-tested in `test/alerts.test.mjs`; the end-to-end suite proves the same
+thing against a real HTTP run.
 
 ---
 
@@ -136,15 +194,38 @@ One required step, one optional.
 ### Required — the URLs
 
 1. Open `tools/zfc-watch/config.json`.
-2. For each colour, open its nikonusa.com product page and paste the
-   address into `url`.
+2. For each colour, under the right product, open its nikonusa.com product
+   page and paste the address into `url`.
 3. Delete colours Nikon no longer sells; add any that are missing.
 4. Commit.
 
-The seeded list — Black, Amber Brown, Coral Pink, Mint Green, Natural Gray,
-Sand Beige, Sunset Orange, White — is a best recollection of the Z fc
-premium-exterior range and **has not been verified against Nikon**. Treat
-it as a starting point, not a fact.
+The seeded Z fc list — Black, Amber Brown, Coral Pink, Mint Green, Natural
+Gray, Sand Beige, Sunset Orange, White — is a best recollection of the Z fc
+premium-exterior range and **has not been verified against Nikon**. The
+seeded Z f list — Black plus Indigo Blue, Sepia Brown, Stone Gray, Moss
+Green, Bordeaux Red and Sunset Orange — is **less certain still**. Treat
+both as starting points, not facts.
+
+### Adding a product or a variant
+
+To add a **product**, append to `products`:
+
+```json
+{ "key": "z8", "name": "Nikon Z8", "alerts": ["price_drop"],
+  "variants": [ { "name": "Z8 Black", "colour": "Black", "url": null } ] }
+```
+
+To add a **variant**, append to that product's `variants`. Name variants
+with their camera in the name (`"Z f Black"`, not `"Black"`) — the variant
+key is slugged from the name and is what the status file and the
+append-only history are keyed on, and the page's headline reads those
+names. The page picks up a new product automatically: it renders one
+section per product, from the data file.
+
+The **old single-product config shape** (a top-level `product` string and a
+flat `variants` array) still loads. It is migrated in memory to one product
+with the default `restock` + `price_drop` intents, with a warning on every
+run, so an un-migrated checkout keeps watching instead of falling over.
 
 Verify locally with:
 
@@ -168,11 +249,11 @@ your early warning.
 
 ## Alerts — what fires and what does not
 
-| fires | when |
-| --- | --- |
-| **restock** | `out_of_stock`/`unknown` → `in_stock`, or a very first reading that is already `in_stock` |
-| **price drop** | strictly lower than the last recorded price |
-| **parse breakage** | a variant that previously read `in_stock`/`out_of_stock` now reads `unknown` |
+| fires | when | for which products |
+| --- | --- | --- |
+| **restock** | `out_of_stock`/`unknown` → `in_stock`, or a very first reading that is already `in_stock` | only those with `"restock"` in `alerts` (today: Z fc) |
+| **price drop** | strictly lower than the last recorded price | only those with `"price_drop"` in `alerts` (today: both) |
+| **parse breakage** | a variant that previously read `in_stock`/`out_of_stock` now reads `unknown` | **all of them, always** |
 
 | does **not** fire | why |
 | --- | --- |
@@ -182,6 +263,7 @@ your early warning.
 | a robots-blocked URL | the watcher's own choice, not a change |
 | a variant with no URL configured | a setup task, surfaced on the page and in the run log instead |
 | a first reading of `out_of_stock` or `unknown` | that is the baseline being established |
+| **a restock of any kind on the Z f** | it did not ask; it is in stock most of the time and the alert would be noise |
 
 **One new issue per event**, labelled `zfc-watch`, deduplicated against
 open issues with the same alert key from the last 12 hours (those get a
@@ -205,6 +287,11 @@ gallery.js-injected `.theme-toggle` (styled in `zfc.css`, since
   disabled or failing), *never run*, or *could not load*. When the data is
   stale the warning leads and the headline follows — "1 in stock" is
   worthless news if the reading is five hours old.
+- **One section per camera**, in document order from the status file: an
+  `h2` with the product name, a badge stating the watch intent
+  ("Restocks + sales" / "Sales only"), a sentence spelling the same thing
+  out in words, then that camera's grid of cards. Sections are separated by
+  a rule, so the grouping survives without colour.
 - **One card per colour**: a painted swatch, the status pill, price (with
   the previous price struck through when it just changed), a price
   sparkline when there are ≥2 recorded prices, when the status last
@@ -214,8 +301,12 @@ gallery.js-injected `.theme-toggle` (styled in `zfc.css`, since
   never the only signal: `● In stock` (sage), `○ Out of stock` (plain grey),
   `? Unknown` (gold, **dashed**, with an explanatory paragraph),
   `! Not watched yet` (wisteria, for an unconfigured URL).
-- **Change log** from `zfc-history.jsonl`, newest first.
-- **Empty state** before the first run.
+- **Change log** from `zfc-history.jsonl`, newest first, across all
+  products.
+- **Empty state** before the first run — it replaces the product sections
+  *and* the paragraph introducing them.
+- **Back-compatible** with a schemaVersion 1 status file: a flat `variants`
+  array renders as one product with the intents that shape implied.
 
 ### Accessibility
 
@@ -249,16 +340,18 @@ generated nodes.
 
 | file | role |
 | --- | --- |
-| `zfc.html` | the Lab page |
-| `assets/css/zfc.css` | page styles + theme toggle + dark theme + reduced motion |
-| `assets/js/zfc.js` | reads the two data files and renders |
-| `tools/zfc-watch/config.json` | **the variant list — fill in the URLs** |
+| `zfc.html` | the Lab page (legacy filename, kept deliberately) |
+| `assets/css/zfc.css` | page styles + product groups + theme toggle + dark theme + reduced motion |
+| `assets/js/zfc.js` | reads the two data files and renders one section per product |
+| `tools/zfc-watch/config.json` | **the product + variant list — fill in the URLs** |
+| `tools/zfc-watch/config.mjs` | config loader: multi-product shape, old-shape migration |
 | `tools/zfc-watch/parse.mjs` | the signal-based parser (pure) |
+| `tools/zfc-watch/alerts.mjs` | diffing + **the per-product alert intents** (pure) |
 | `tools/zfc-watch/robots.mjs` | robots.txt client |
 | `tools/zfc-watch/check.mjs` | the checker |
 | `tools/zfc-watch/notify.mjs` | alerts → GitHub issues |
 | `tools/zfc-watch/fixtures/*.html` | 11 synthetic test pages |
-| `tools/zfc-watch/test/*.mjs` | parser units, robots units, offline e2e |
+| `tools/zfc-watch/test/*.mjs` | parser units, robots units, alert-intent units, offline e2e |
 | `.github/workflows/zfc-watch.yml` | the schedule, the tests, the commit, the alerts |
 | `data/zfc-status.json` | latest reading (seeded empty) |
 | `data/zfc-history.jsonl` | append-only change log (seeded empty) |
@@ -271,22 +364,32 @@ Not touched by this project: `lab.html` (the tile is the orchestrator's),
 ## Testing
 
 ```bash
-node tools/zfc-watch/test/run-tests.mjs     # 3 suites, ~120 assertions
+node tools/zfc-watch/test/run-tests.mjs     # 4 suites, 169 assertions
 python3 -m http.server 8000                 # then open /zfc.html
 ```
 
+| suite | assertions | what it covers |
+| --- | --- | --- |
+| `parse.test.mjs` | 64 | every fixture: status, signal, price, and the "never out_of_stock without evidence" invariant |
+| `robots.test.mjs` | 19 | group selection, longest-match, `*`, `$`, fail-open |
+| `alerts.test.mjs` | 32 | config shapes (new **and** legacy) and the alert intents |
+| `check.e2e.mjs` | 54 | the real checker over a local fixture server, two products, five runs |
+
 The e2e suite serves the fixtures over real HTTP and runs the real checker
-four times — first reading, a mutated page (restock + price drop + parse
-breakage), a quiet run, and `--strict` — asserting the status file, the
-history lines, the alert payload and the commit decision at each step. It
-needs no network.
+five times against a two-product config — first reading (a Z fc variant
+already in stock alerts; a Z f variant already in stock does **not**), a
+mutated page (Z fc restock + price drop + parse breakage, a Z f price drop,
+and a Z f variant coming back in stock that must stay silent), a quiet run,
+`--strict`, and a run against the legacy single-product config — asserting
+the status file, the history lines, the alert payload and the commit
+decision at each step. It needs no network.
 
 ---
 
 ## Roadmap, if it earns it
 
 - Feed the first real page source back in as fixtures and tighten the
-  parser against it.
+  parser against it, and **verify the Z f colour list**.
 - A `sku` per variant, so a page listing several bodies can be read for the
   right one.
 - Pull the history into a proper price chart once there are enough points
@@ -294,3 +397,6 @@ needs no network.
 - Widen beyond Nikon's own store (B&H, Adorama) — the parser is already
   retailer-agnostic; it would only need more config entries and a check
   that each store's `robots.txt` permits it.
+- A `target price` per product, so the Z f could alert only below a number
+  rather than on any drop. The intent machinery in `alerts.mjs` is the
+  place for it.

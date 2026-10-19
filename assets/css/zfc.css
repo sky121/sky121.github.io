@@ -1,6 +1,8 @@
 /* ==========================================================================
-   zfc.css — "The Z fc Watch": a status board for the coloured Nikon Z fc
-   bodies. Loads AFTER exhibit-page.css and reuses its tokens, washes,
+   zfc.css — "The Z Watch": a status board for the coloured Nikon Z fc and
+   Z f bodies. (The filename keeps the legacy "zfc" spelling on purpose —
+   this site never breaks a URL over a rename.)
+   Loads AFTER exhibit-page.css and reuses its tokens, washes,
    grain, nav, footer, focus rings and html.evening dark theme.
 
    This sheet adds: the theme-toggle styling (exhibit-page.css never styles
@@ -190,6 +192,81 @@ html.evening .theme-toggle:focus-visible {
   font-size: 0.92rem;
   margin: 0 0 1.4rem;
   max-width: 40em;
+}
+
+/* ==========================================================================
+   Product groups — one section per camera.
+
+   The grouping has to survive without colour: each section is separated by
+   a rule and a generous gap, its name is an <h2>, and the badge beside it
+   states the WATCH INTENT in words ("Sales only"), with a full sentence
+   underneath. Nobody should have to infer from a hue that the Z f will
+   never send a restock ping.
+   ========================================================================== */
+
+.zfc-lede {
+  margin-bottom: clamp(1.6rem, 4vw, 2.2rem);
+}
+
+.zfc-product {
+  margin: 0 0 clamp(2rem, 5vw, 3rem);
+}
+
+.zfc-product + .zfc-product {
+  padding-top: clamp(1.6rem, 4vw, 2.4rem);
+  border-top: 1px solid var(--hairline);
+}
+
+.zfc-product:last-child {
+  margin-bottom: clamp(2.5rem, 6vw, 4rem);
+}
+
+.zfc-product-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.75rem;
+  margin: 0 0 0.4rem;
+}
+
+.zfc-product-head .zfc-h2 {
+  margin: 0;
+}
+
+/* The watch-intent badge. Text carries the meaning; the tint only echoes it. */
+.zfc-intent {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.24rem 0.62rem;
+  border: 1px solid var(--pond-deep);
+  border-radius: 999px;
+  background: rgba(127, 168, 201, 0.18);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.zfc-intent[data-intent="price"] {
+  border-color: var(--setup-edge);
+  background: var(--setup-wash);
+}
+
+html.evening .zfc-intent {
+  border-color: var(--pond-ink);
+  background: rgba(159, 194, 224, 0.16);
+}
+
+html.evening .zfc-intent[data-intent="price"] {
+  border-color: var(--setup-edge);
+  background: var(--setup-wash);
+}
+
+.zfc-product .zfc-grid {
+  margin-bottom: 0;
 }
 
 /* ==========================================================================

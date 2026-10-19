@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* ==========================================================================
-   check.mjs — the Nikon Z fc stock & sale watcher.
+   check.mjs — The Z Watch: the Nikon Z fc / Z f stock & sale watcher.
 
    Runs on a GitHub Actions runner (open internet), not in the browser:
    nikonusa.com sends no CORS headers, so a GitHub Pages page can never
@@ -38,10 +38,12 @@ import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { parseProductPage, STATUS } from './parse.mjs';
 import { fetchRobots, isAllowed } from './robots.mjs';
+import { normaliseConfig, slug } from './config.mjs';
+import { diffVariant, buildAlerts } from './alerts.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '..', '..');
-const CHECKER_VERSION = '1.0.0';
+const CHECKER_VERSION = '1.1.0';
 
 /* ------------------------------------------------------------------ *
  * Args
@@ -100,10 +102,19 @@ const HEARTBEAT_HOURS = Number(
   flags['heartbeat-hours'] != null ? flags['heartbeat-hours'] : config.heartbeatHours
 ) || 6;
 
-const variants = Array.isArray(config.variants) ? config.variants : [];
-if (!variants.length) {
-  ghError('config has no variants — nothing to watch');
+/* One shape in, one shape out: the old single-product config (a top-level
+   `variants` array) is migrated in memory with a warning, so an existing
+   checkout keeps working. See config.mjs. */
+const normalised = normaliseConfig(config);
+for (const w of normalised.warnings) ghWarning('config: ' + w);
+if (normalised.errors.length) {
+  for (const e of normalised.errors) ghError(e);
   process.exit(1);
+}
+const products = normalised.products;
+const allVariants = [];
+for (const product of products) {
+  for (const variant of product.variants) allVariants.push({ product, variant });
 }
 
 /* ------------------------------------------------------------------ *
@@ -119,15 +130,17 @@ function readPrevious() {
   try {
     const prev = JSON.parse(readFileSync(STATUS_PATH, 'utf8'));
     const byKey = new Map();
+    /* schemaVersion 2 groups variants under products; version 1 had one
+       flat array. Both are read, so an upgrade keeps its baseline and does
+       not re-announce every variant as a first reading. */
+    for (const p of (prev.products || [])) {
+      for (const v of (p.variants || [])) byKey.set(v.key || slug(v.name), v);
+    }
     for (const v of (prev.variants || [])) byKey.set(v.key || slug(v.name), v);
     return { doc: prev, byKey };
   } catch (e) {
     return { doc: null, byKey: new Map() };
   }
-}
-
-function slug(s) {
-  return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
 /* ------------------------------------------------------------------ *
@@ -193,11 +206,13 @@ async function robotsVerdict(url) {
   };
 }
 
-async function checkVariant(variant, previous) {
-  const key = slug(variant.name || variant.colour);
+async function checkVariant(variant, product) {
+  const key = variant.key || slug(variant.name || variant.colour);
   const base = {
     key,
     name: variant.name || variant.colour || key,
+    productKey: product.key,
+    productName: product.name,
     colour: variant.colour || null,
     sku: variant.sku || null,
     url: variant.url || null,
@@ -284,107 +299,41 @@ async function checkVariant(variant, previous) {
 }
 
 /* ------------------------------------------------------------------ *
- * Change detection, history, alerts
- * ------------------------------------------------------------------ */
-function diffVariant(now, prev) {
-  const changes = [];
-  if (!prev) {
-    changes.push({ kind: 'first-reading', from: null, to: now.status });
-    return changes;
-  }
-  if (prev.status !== now.status) {
-    changes.push({ kind: 'status', from: prev.status, to: now.status });
-  }
-  const prevPrice = typeof prev.price === 'number' ? prev.price : null;
-  const nowPrice = typeof now.price === 'number' ? now.price : null;
-  if (prevPrice !== nowPrice && (prevPrice != null || nowPrice != null)) {
-    changes.push({ kind: 'price', from: prevPrice, to: nowPrice });
-  }
-  if (prev.signal !== now.signal) {
-    changes.push({ kind: 'signal', from: prev.signal, to: now.signal });
-  }
-  return changes;
-}
-
-function buildAlerts(now, prev, changes) {
-  const alerts = [];
-  const common = {
-    key: now.key, variant: now.name, colour: now.colour, url: now.url,
-    signal: now.signal, detail: now.detail, price: now.price, currency: now.currency
-  };
-
-  const statusChange = changes.find((c) => c.kind === 'status');
-  const priceChange = changes.find((c) => c.kind === 'price');
-  const firstReading = changes.find((c) => c.kind === 'first-reading');
-
-  /* 0. The very first reading of a variant alerts only if it is already in
-        stock — that is news worth an email. A first reading of out_of_stock
-        or unknown is just the baseline being established, and stays quiet. */
-  if (firstReading && firstReading.to === STATUS.IN) {
-    alerts.push(Object.assign({}, common, {
-      kind: 'restock', from: null, to: STATUS.IN, firstReading: true
-    }));
-  }
-
-  /* 1. Back in stock — the whole reason this thing exists. */
-  if (statusChange && statusChange.to === STATUS.IN && statusChange.from !== STATUS.IN) {
-    alerts.push(Object.assign({}, common, {
-      kind: 'restock',
-      from: statusChange.from,
-      to: statusChange.to
-    }));
-  }
-
-  /* 2. Price drop — strictly lower than the last recorded price. */
-  if (priceChange && typeof priceChange.from === 'number' && typeof priceChange.to === 'number' &&
-      priceChange.to < priceChange.from) {
-    alerts.push(Object.assign({}, common, {
-      kind: 'price_drop',
-      from: priceChange.from,
-      to: priceChange.to
-    }));
-  }
-
-  /* 3. Parse breakage — it used to read cleanly and now it does not.
-        Silent breakage is how this app fails its one job, so it alerts.
-        A variant that has NEVER parsed cleanly (e.g. no URL configured
-        yet) does not alert: that is a setup state, not a regression. */
-  if (statusChange && statusChange.to === STATUS.UNKNOWN &&
-      (statusChange.from === STATUS.IN || statusChange.from === STATUS.OUT)) {
-    alerts.push(Object.assign({}, common, {
-      kind: 'parse_broken',
-      from: statusChange.from,
-      to: statusChange.to,
-      error: now.error || null
-    }));
-  }
-
-  return alerts;
-}
-
-/* ------------------------------------------------------------------ *
  * Main
  * ------------------------------------------------------------------ */
 async function main() {
   const startedAt = new Date();
   const { doc: prevDoc, byKey: prevByKey } = readPrevious();
 
-  log('zfc-watch ' + CHECKER_VERSION + ' — checking ' + variants.length + ' variant(s)');
+  log('zfc-watch ' + CHECKER_VERSION + ' — checking ' + allVariants.length +
+    ' variant(s) across ' + products.length + ' product(s)');
   log('  config:  ' + CONFIG_PATH);
   log('  output:  ' + STATUS_PATH);
   log('  agent:   ' + USER_AGENT);
   log('');
 
+  const rowsByProduct = new Map();
+  for (const product of products) rowsByProduct.set(product.key, []);
   const results = [];
   const historyLines = [];
   const alerts = [];
   let configErrors = 0;
   let anyChange = false;
+  let currentProductKey = null;
 
-  for (let i = 0; i < variants.length; i++) {
-    const variant = variants[i];
-    const prev = prevByKey.get(slug(variant.name || variant.colour)) || null;
-    const row = await checkVariant(variant, prev);
+  for (let i = 0; i < allVariants.length; i++) {
+    const product = allVariants[i].product;
+    const variant = allVariants[i].variant;
+
+    if (product.key !== currentProductKey) {
+      currentProductKey = product.key;
+      log('  ' + product.name + '  — watching for: ' +
+        (product.alerts.length ? product.alerts.join(' + ') : 'nothing but parse breakage') +
+        ' (parse breakage always)');
+    }
+
+    const prev = prevByKey.get(variant.key) || null;
+    const row = await checkVariant(variant, product);
     if (row.errorKind === 'config') configErrors++;
 
     const changes = diffVariant(row, prev);
@@ -409,6 +358,8 @@ async function main() {
         at: startedAt.toISOString(),
         variant: row.name,
         key: row.key,
+        product: product.name,
+        productKey: product.key,
         kind: c.kind,
         from: c.from,
         to: c.to,
@@ -418,28 +369,37 @@ async function main() {
       }));
     }
 
-    for (const a of buildAlerts(row, prev, changes)) alerts.push(a);
+    /* The alert intent gate lives in alerts.mjs — a product only hears
+       about what it asked for, except parse breakage, which is always
+       reported. */
+    for (const a of buildAlerts(row, prev, changes, product)) alerts.push(a);
 
     const money = row.price != null ? ' ' + (row.currency || '') + ' ' + row.price.toFixed(2) : '';
-    log('  ' + String(i + 1).padStart(2) + '. ' + row.name.padEnd(22) +
+    log('    ' + String(i + 1).padStart(2) + '. ' + row.name.padEnd(22) +
       row.status.padEnd(14) + '[' + row.signal + ']' + money +
-      (row.error ? '\n      ' + row.error : ''));
+      (row.error ? '\n        ' + row.error : ''));
 
     results.push(row);
+    rowsByProduct.get(product.key).push(row);
 
-    const isLast = i === variants.length - 1;
+    const isLast = i === allVariants.length - 1;
     if (!isLast && variant.url) await sleep(DELAY_MS);
   }
 
   /* ---- write the status snapshot ---- */
   const doc = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     checkerVersion: CHECKER_VERSION,
-    product: config.product || 'Nikon Z fc',
     checkedAt: startedAt.toISOString(),
     durationMs: Date.now() - startedAt.getTime(),
     pollNotes: config.pollNotes || null,
-    variants: results
+    products: products.map((p) => ({
+      key: p.key,
+      name: p.name,
+      alerts: p.alerts,
+      note: p.note || null,
+      variants: rowsByProduct.get(p.key) || []
+    }))
   };
 
   if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });
@@ -467,13 +427,23 @@ async function main() {
       heartbeatDue = prevAgeHours >= HEARTBEAT_HOURS;
     }
   }
-  const shouldCommit = anyChange || heartbeatDue;
+  /* The heartbeat exists so the page can honestly show it is still being
+     checked. But while NOTHING is configured there is nothing to be checked:
+     a heartbeat then just rewrites "8 unknown" every few hours and litters
+     history with commits that carry no information. Suppress it until at
+     least one URL exists; a real change still always commits. */
+  const anyConfigured = products.some((p) =>
+    (p.variants || []).some((v) => typeof v.url === 'string' && v.url));
+  const shouldCommit = anyChange || (heartbeatDue && anyConfigured);
 
-  const inStock = results.filter((r) => r.status === STATUS.IN);
-  const unknown = results.filter((r) => r.status === STATUS.UNKNOWN);
-  const summary = inStock.length
-    ? inStock.length + ' in stock: ' + inStock.map((r) => r.name).join(', ')
-    : 'nothing in stock' + (unknown.length ? ' (' + unknown.length + ' unknown)' : '');
+  const summary = products.map((p) => {
+    const rows = rowsByProduct.get(p.key) || [];
+    const pin = rows.filter((r) => r.status === STATUS.IN);
+    const punk = rows.filter((r) => r.status === STATUS.UNKNOWN);
+    return p.name + ': ' + (pin.length
+      ? pin.length + ' in stock: ' + pin.map((r) => r.name).join(', ')
+      : 'nothing in stock' + (punk.length ? ' (' + punk.length + ' unknown)' : ''));
+  }).join(' · ');
 
   log('');
   log('  change:      ' + (anyChange ? 'yes' : 'no'));
@@ -497,26 +467,34 @@ async function main() {
     appendFileSync(process.env.GITHUB_OUTPUT, lines.join('\n') + '\n', 'utf8');
   }
   if (process.env.GITHUB_STEP_SUMMARY) {
-    const rows = results.map((r) =>
-      '| ' + r.name + ' | ' + r.status + ' | `' + r.signal + '` | ' +
-      (r.price != null ? (r.currency || '') + ' ' + r.price.toFixed(2) : '—') + ' | ' +
-      (r.httpStatus || '—') + ' | ' + (r.error ? r.error.replace(/\|/g, '\\|') : '') + ' |');
+    const blocks = [];
+    for (const p of products) {
+      const rows = (rowsByProduct.get(p.key) || []).map((r) =>
+        '| ' + r.name + ' | ' + r.status + ' | `' + r.signal + '` | ' +
+        (r.price != null ? (r.currency || '') + ' ' + r.price.toFixed(2) : '—') + ' | ' +
+        (r.httpStatus || '—') + ' | ' + (r.error ? r.error.replace(/\|/g, '\\|') : '') + ' |');
+      blocks.push('#### ' + p.name + ' — alerts on: ' +
+        (p.alerts.length ? p.alerts.join(', ') : 'parse breakage only') +
+        (p.alerts.indexOf('parse_broken') === -1 ? ' (+ parse breakage, always)' : ''));
+      blocks.push('');
+      blocks.push('| variant | status | signal | price | http | note |');
+      blocks.push('| --- | --- | --- | --- | --- | --- |');
+      for (const row of rows) blocks.push(row);
+      blocks.push('');
+    }
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, [
-      '### Z fc watch — ' + startedAt.toISOString(),
+      '### The Z Watch — ' + startedAt.toISOString(),
       '',
       summary,
       '',
-      '| variant | status | signal | price | http | note |',
-      '| --- | --- | --- | --- | --- | --- |',
-      ...rows,
-      '',
+      ...blocks,
       (shouldCommit ? '_committing this reading_' : '_no change — not committing_'),
       ''
     ].join('\n'), 'utf8');
   }
 
   if (configErrors) {
-    ghError(configErrors + ' of ' + variants.length + ' variants have no URL configured. ' +
+    ghError(configErrors + ' of ' + allVariants.length + ' variants have no URL configured. ' +
       'The watcher cannot see those colours at all until you paste their product URLs ' +
       'into tools/zfc-watch/config.json.');
     if (flags.strict) {

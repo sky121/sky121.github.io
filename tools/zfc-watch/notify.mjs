@@ -2,6 +2,11 @@
 /* ==========================================================================
    notify.mjs — turn the checker's alert file into GitHub issues.
 
+   The checker has already applied each product's alert intents (see
+   alerts.mjs): a product watched for price drops only never reaches this
+   file with a restock alert. This script does not second-guess that — it
+   files what it is given.
+
    WHY ISSUES, AND WHY ONE PER EVENT
    ---------------------------------
    The brief forbids third-party services, so the notification channel is
@@ -82,7 +87,7 @@ function titleFor(a) {
   if (a.kind === 'price_drop') {
     return a.variant + ' price DROPPED — ' + money(a, a.from) + ' → ' + money(a, a.to);
   }
-  return 'Z fc watch: ' + a.variant + ' can no longer be read (parser may be broken)';
+  return 'The Z Watch: ' + a.variant + ' can no longer be read (parser may be broken)';
 }
 
 function bodyFor(a) {
@@ -115,6 +120,7 @@ function bodyFor(a) {
       '`tools/zfc-watch/fixtures/` that reproduces it, then teach `parse.mjs` the new signal.');
   }
 
+  if (a.product) lines.push('- Product: ' + a.product);
   lines.push('- Signal: `' + (a.signal || 'none') + '`');
   if (a.detail) lines.push('- Why the checker believes that: ' + a.detail);
   if (a.url) lines.push('- Product page: ' + a.url);
@@ -168,7 +174,7 @@ async function ensureLabel() {
         body: JSON.stringify({
           name: LABEL,
           color: '7fa8c9',
-          description: 'Automated Nikon Z fc stock & price alerts'
+          description: 'Automated Nikon Z fc / Z f stock & price alerts'
         })
       });
     } catch (e) { /* label is a nicety, never a reason to drop an alert */ }

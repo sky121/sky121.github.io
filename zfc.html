@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>The Z fc Watch — Skylar Hoffman</title>
+    <title>The Z Watch — Skylar Hoffman</title>
     <meta
       name="description"
-      content="A patient watcher for the coloured Nikon Z fc bodies: a scheduled job checks every variant, commits what it finds, and this page reports it honestly — in stock, out of stock, or (when the page cannot be read) unknown."
+      content="A patient watcher for the Nikon Z fc and Z f: a scheduled job checks every colour, commits what it finds, and this page reports it honestly — in stock, out of stock, or (when the page cannot be read) unknown. The Z fc is watched for restocks and sales; the Z f for sales only."
     />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -15,10 +15,10 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://sky121.github.io/zfc.html" />
     <meta property="og:image" content="https://sky121.github.io/images/og-card.png" />
-    <meta property="og:title" content="The Z fc Watch — Skylar Hoffman" />
+    <meta property="og:title" content="The Z Watch — Skylar Hoffman" />
     <meta
       property="og:description"
-      content="A stock and price watcher for the coloured Nikon Z fc bodies, checked by a scheduled job and reported honestly."
+      content="A stock and price watcher for the Nikon Z fc and Z f, checked by a scheduled job and reported honestly — including when it does not know."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -48,10 +48,10 @@
 
     <main id="room" class="exhibit-room zfc-room">
       <p class="room-label">Stock watch &middot; checked every 15 minutes</p>
-      <h1 class="exhibit-title">The Z fc Watch</h1>
+      <h1 class="exhibit-title">The Z Watch</h1>
       <p class="exhibit-subtitle">
-        A patient eye on every coloured Nikon Z fc &mdash; so the moment one
-        comes back, or quietly drops in price, I hear about it.
+        A patient eye on every coloured Nikon Z fc and Z f &mdash; so the
+        moment one comes back, or quietly drops in price, I hear about it.
       </p>
 
       <!-- The honesty bar. Never says "live" unless the data really is
@@ -72,16 +72,17 @@
         </p>
       </section>
 
-      <section aria-labelledby="colours-heading">
-        <h2 class="zfc-h2" id="colours-heading">The colours</h2>
-        <p class="zfc-h2-note">
-          One card per body. <strong>Unknown</strong> is its own answer and
-          never a polite way of saying &ldquo;out of stock&rdquo; &mdash; it
-          means the watcher could not read the page, which is the one failure
-          worth shouting about.
-        </p>
-        <ul class="zfc-grid" id="grid" aria-busy="true"></ul>
-      </section>
+      <!-- One section per product, rendered by zfc.js from the status
+           file. Each says in words what it is watched FOR, so nobody waits
+           on a restock ping from a camera that is only watched for sales. -->
+      <p class="zfc-h2-note zfc-lede" id="lede">
+        One card per body, grouped by camera. Each heading says what that
+        camera is watched <em>for</em>. <strong>Unknown</strong> is its own
+        answer and never a polite way of saying &ldquo;out of stock&rdquo;
+        &mdash; it means the watcher could not read the page, which is the
+        one failure worth shouting about.
+      </p>
+      <div class="zfc-products" id="products" aria-busy="true"></div>
 
       <section aria-labelledby="log-heading">
         <h2 class="zfc-h2" id="log-heading">What has changed</h2>
@@ -121,6 +122,18 @@
           and this page simply reads that file. A real change also opens a
           GitHub issue, which arrives as an email. No third-party service, no
           API keys, nothing stored in your browser.
+        </p>
+        <p>
+          Each camera declares what it wants to be told about. The
+          <strong>Z fc</strong> is out of stock everywhere, so its first
+          in-stock reading is the whole point: it is watched for
+          <em>restocks and price drops</em>. The <strong>Z f</strong> is
+          normally on the shelf, so a restock alert would be noise &mdash; it
+          is watched for <em>price drops only</em>. Its stock is still
+          fetched, still recorded and still shown above; it simply never
+          pings. One alert ignores the setting entirely: if a page that used
+          to parse cleanly stops making sense, that is reported for every
+          camera, because a blind watcher is always worth knowing about.
         </p>
         <p class="zfc-meta">
           Source: <a href="https://github.com/sky121/sky121.github.io/tree/master/tools/zfc-watch">tools/zfc-watch</a>

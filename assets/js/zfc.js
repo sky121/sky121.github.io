@@ -1,8 +1,13 @@
 /* ==========================================================================
-   zfc.js — "The Z fc Watch" status board.
+   zfc.js — "The Z Watch" status board (Nikon Z fc + Z f).
+
+   The filenames all still say "zfc". That is deliberate: the project was
+   renamed when the Z f joined it, and this site keeps legacy filenames on
+   rename so old URLs and bookmarks never break (Peckish → Tableau did the
+   same). Nothing is mis-named; it is just older than its title.
 
    Reads two files committed by the scheduled watcher:
-     data/zfc-status.json    the latest reading per colour variant
+     data/zfc-status.json    the latest reading, grouped by product
      data/zfc-history.jsonl  append-only log, one JSON object per line
 
    Both are same-origin, so a plain fetch works. This page NEVER contacts
@@ -18,6 +23,9 @@
         flagged rather than dressed up as live.
      3. Nothing is invented. Missing price, missing URL and missing
         readings each say so in plain words.
+     4. Each product states what it is watched FOR. A camera watched only
+        for price drops says so, so nobody sits waiting for a restock
+        ping that was never going to come.
    ========================================================================== */
 (function () {
   'use strict';
@@ -32,6 +40,13 @@
      wrong colour presented as fact. */
   var SWATCHES = {
     'black': '#3a3a3c',
+    /* Z f premium exteriors — the colour list itself is UNVERIFIED (see
+       tools/zfc-watch/config.json); an unrecognised colour falls back to
+       the paper tone rather than showing a wrong colour as fact. */
+    'indigo blue': '#4a5f87',
+    'sepia brown': '#7b5d46',
+    'moss green': '#6f7a52',
+    'bordeaux red': '#7a3340',
     'amber brown': '#9a6b43',
     'coral pink': '#e4a0a0',
     'mint green': '#a8ccb6',
@@ -141,6 +156,75 @@
         return 'The watcher could not establish this one either way. Treat it as ' +
           '"not known", not as "out of stock".';
     }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Products
+   *
+   * schemaVersion 2 groups variants under `products`, each carrying the
+   * alert intents the watcher is actually honouring. A schemaVersion 1
+   * file (one flat `variants` array) still renders, as one product with
+   * the intents that shape implied.
+   * ------------------------------------------------------------------ */
+  function productsFrom(doc) {
+    if (!doc) return [];
+    if (Array.isArray(doc.products) && doc.products.length) {
+      var out = [];
+      for (var i = 0; i < doc.products.length; i++) {
+        var p = doc.products[i] || {};
+        out.push({
+          key: p.key || ('product-' + (i + 1)),
+          name: p.name || 'Unnamed camera',
+          alerts: Array.isArray(p.alerts) ? p.alerts : [],
+          variants: Array.isArray(p.variants) ? p.variants : []
+        });
+      }
+      return out;
+    }
+    if (Array.isArray(doc.variants) && doc.variants.length) {
+      return [{
+        key: 'legacy',
+        name: doc.product || 'Nikon Z fc',
+        alerts: ['restock', 'price_drop'],
+        variants: doc.variants
+      }];
+    }
+    return [];
+  }
+
+  function wants(product, kind) {
+    return product.alerts.indexOf(kind) !== -1;
+  }
+
+  /** The short badge beside the product name. */
+  function intentChip(product) {
+    var restock = wants(product, 'restock');
+    var drop = wants(product, 'price_drop');
+    if (restock && drop) return 'Restocks + sales';
+    if (restock) return 'Restocks only';
+    if (drop) return 'Sales only';
+    return 'No alerts';
+  }
+
+  /** The same thing in a sentence, because a badge alone is not an answer. */
+  function intentSentence(product) {
+    var restock = wants(product, 'restock');
+    var drop = wants(product, 'price_drop');
+    var lead;
+    if (restock && drop) {
+      lead = 'Watched for restocks and price drops — both raise an alert.';
+    } else if (restock) {
+      lead = 'Watched for restocks only. A price change here is recorded but ' +
+        'never announced.';
+    } else if (drop) {
+      lead = 'Watched for price drops only. This one is normally in stock, so a ' +
+        'restock alert would be noise — its stock is still read and still shown ' +
+        'on every card below, it simply never pings.';
+    } else {
+      lead = 'Watched quietly: no restock or price alerts were asked for. ' +
+        'Everything below is still read and recorded.';
+    }
+    return lead + ' A page that stops making sense is reported either way.';
   }
 
   /* ------------------------------------------------------------------ *
@@ -441,8 +525,13 @@
     return map;
   }
 
+  /* The empty / could-not-load state replaces the product sections, so the
+     paragraph introducing them goes with them — a lede about cards that
+     are not there reads like a bug. */
   function showNote(title, body) {
     var note = $('note');
+    var lede = $('lede');
+    if (lede) lede.hidden = true;
     if (!note) return;
     $('note-title').textContent = title;
     $('note-body').textContent = body;
@@ -451,25 +540,81 @@
 
   function hideNote() {
     var note = $('note');
+    var lede = $('lede');
     if (note) note.hidden = true;
+    if (lede) lede.hidden = false;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * One section per product
+   * ------------------------------------------------------------------ */
+  function renderProducts(products, prices) {
+    var host = $('products');
+    if (!host) return;
+    clear(host);
+    host.setAttribute('aria-busy', 'false');
+
+    for (var i = 0; i < products.length; i++) {
+      var product = products[i];
+      var headingId = 'product-' + (product.key || i);
+
+      var section = el('section', 'zfc-product');
+      section.setAttribute('aria-labelledby', headingId);
+      section.setAttribute('data-product', product.key || '');
+
+      var head = el('div', 'zfc-product-head');
+      var h2 = el('h2', 'zfc-h2', product.name);
+      h2.id = headingId;
+      head.appendChild(h2);
+
+      var chip = el('span', 'zfc-intent', intentChip(product));
+      chip.setAttribute('data-intent', wants(product, 'restock') ? 'restock' : 'price');
+      head.appendChild(chip);
+      section.appendChild(head);
+
+      section.appendChild(el('p', 'zfc-h2-note', intentSentence(product)));
+
+      if (!product.variants.length) {
+        section.appendChild(el('p', 'zfc-caveat',
+          'No colours are configured for this camera yet, so nothing is being ' +
+          'checked for it.'));
+        host.appendChild(section);
+        continue;
+      }
+
+      var ul = el('ul', 'zfc-grid');
+      for (var j = 0; j < product.variants.length; j++) {
+        var v = product.variants[j];
+        ul.appendChild(renderCard(v, prices[v.key || v.name]));
+      }
+      section.appendChild(ul);
+      host.appendChild(section);
+    }
   }
 
   function render(doc, entries) {
-    var grid = $('grid');
     renderPulse(doc, entries.length);
     renderLog(entries);
 
-    clear(grid);
-    grid.setAttribute('aria-busy', 'false');
+    var products = productsFrom(doc);
+    var variants = [];
+    for (var i = 0; i < products.length; i++) {
+      variants = variants.concat(products[i].variants);
+    }
 
-    var variants = (doc && Array.isArray(doc.variants)) ? doc.variants : [];
     if (!variants.length) {
+      var host = $('products');
+      if (host) {
+        clear(host);
+        host.setAttribute('aria-busy', 'false');
+      }
       showNote(
         doc ? 'No readings yet' : 'The readings could not be loaded',
         doc
           ? 'The watcher runs about every 15 minutes and has not recorded a ' +
             'single colour yet. Nothing is being guessed in the meantime — ' +
-            'as soon as it has looked once, every colour appears here.'
+            'as soon as it has looked once, every colour appears here, ' +
+            'grouped by camera.'
           : 'data/zfc-status.json could not be fetched, so this page has nothing ' +
             'honest to show. If you are running the site locally, serve it over ' +
             'HTTP rather than opening the file directly.'
@@ -478,13 +623,11 @@
     }
 
     hideNote();
-    var prices = pricesByKey(entries);
-    for (var i = 0; i < variants.length; i++) {
-      var v = variants[i];
-      grid.appendChild(renderCard(v, prices[v.key || v.name]));
-    }
+    renderProducts(products, pricesByKey(entries));
 
     /* Announce the headline once, for anyone not reading the cards.
+       Variant names carry their camera ("Z f Black"), which matters now
+       that "Black" alone is ambiguous across two products.
        When the data is stale the WARNING leads and the headline follows:
        "1 in stock" is worthless news if the reading is five hours old. */
     var inStock = variants.filter(function (v) { return v.status === 'in_stock'; });
@@ -492,13 +635,15 @@
     var fresh = $('pulse').getAttribute('data-freshness') === 'live';
     var pulseMain = $('pulse-main');
     if (pulseMain) {
-      var head = inStock.length
-        ? inStock.length + ' in stock: ' + inStock.map(function (v) { return v.colour || v.name; }).join(', ')
+      var headline = inStock.length
+        ? inStock.length + ' in stock: ' + inStock.map(function (v) {
+            return v.name || v.colour;
+          }).join(', ')
         : 'Nothing in stock';
       pulseMain.textContent = fresh
-        ? head + '. ' + pulseMain.textContent
-        : pulseMain.textContent + ' It said ' + head.charAt(0).toLowerCase() + head.slice(1) +
-          ' — but that was then, not now.';
+        ? headline + '. ' + pulseMain.textContent
+        : pulseMain.textContent + ' It said ' + headline.charAt(0).toLowerCase() +
+          headline.slice(1) + ' — but that was then, not now.';
     }
     if (unknown.length) {
       var sub = $('pulse-sub');
