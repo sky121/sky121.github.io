@@ -1,29 +1,70 @@
 {
   "$comment": [
-    "Nikon Z fc stock & sale watcher — variant list.",
+    "The Z Watch — multi-product stock & sale watcher (files keep the legacy",
+    "'zfc' names on purpose; see docs/zfc/README.md).",
+    "",
     "EVERY url is null on purpose. This file was written in a sandbox that",
     "cannot reach www.nikonusa.com, so no URL here could be verified and none",
     "was invented. The checker refuses to guess: a null url is reported as a",
     "loud configuration error, never as 'out of stock'.",
-    "TO FINISH SETUP: open each colour's product page on nikonusa.com, copy the",
-    "address bar, and paste it into the matching 'url' below. Remove any",
+    "",
+    "THE Z f COLOUR LIST IS UNVERIFIED. The plain black body is safe; the",
+    "premium-exterior colours below are a best recollection and were never",
+    "checked against Nikon. Delete the ones that do not exist, add the ones",
+    "that do, and only then paste URLs.",
+    "",
+    "ALERT INTENTS: each product declares what it wants to be told about.",
+    "  restock     -> fire when a variant becomes in_stock (and when its very",
+    "                 first reading is already in_stock)",
+    "  price_drop  -> fire when the price is strictly lower than last time",
+    "  parse_broken is NOT listed anywhere: it fires for every product,",
+    "                 always, because a blind watcher is always news.",
+    "The Z f is watched for price drops only. It is normally in stock, so a",
+    "restock intent would fire a pointless alert on the very first run and",
+    "every time it blinks in and out of stock. Its stock is still recorded",
+    "and still shown on the page — it just never pings.",
+    "",
+    "TO FINISH SETUP: open each colour's product page on nikonusa.com, copy",
+    "the address bar, and paste it into the matching 'url' below. Remove any",
     "variant Nikon no longer sells; add any this list is missing.",
     "See docs/zfc/README.md for the full walkthrough."
   ],
-  "product": "Nikon Z fc",
   "pollNotes": "Scheduled every 15 minutes by .github/workflows/zfc-watch.yml. GitHub's cron is best-effort and runs late under load — treat the cadence as 'about every 15 minutes', not a guarantee. Requests are made one at a time with requestDelayMs between them, with an honest User-Agent, and robots.txt is fetched and obeyed before any product page is touched. A handful of requests per quarter-hour against a large retailer is a rounding error on their traffic; if that ever stops being true, raise the cron interval rather than adding parallelism.",
-  "userAgent": "zfc-watch/1.0 (personal Nikon Z fc stock checker, a few requests every 15 min; +https://github.com/sky121/sky121.github.io)",
+  "userAgent": "zfc-watch/1.0 (personal Nikon Z fc / Z f stock checker, a few requests every 15 min; +https://github.com/sky121/sky121.github.io)",
   "requestDelayMs": 2500,
   "timeoutMs": 15000,
   "heartbeatHours": 6,
-  "variants": [
-    { "name": "Z fc Black", "colour": "Black", "url": null, "sku": null, "note": "the standard body" },
-    { "name": "Z fc Amber Brown", "colour": "Amber Brown", "url": null, "sku": null },
-    { "name": "Z fc Coral Pink", "colour": "Coral Pink", "url": null, "sku": null },
-    { "name": "Z fc Mint Green", "colour": "Mint Green", "url": null, "sku": null },
-    { "name": "Z fc Natural Gray", "colour": "Natural Gray", "url": null, "sku": null },
-    { "name": "Z fc Sand Beige", "colour": "Sand Beige", "url": null, "sku": null },
-    { "name": "Z fc Sunset Orange", "colour": "Sunset Orange", "url": null, "sku": null },
-    { "name": "Z fc White", "colour": "White", "url": null, "sku": null }
+  "products": [
+    {
+      "key": "z-fc",
+      "name": "Nikon Z fc",
+      "alerts": ["restock", "price_drop"],
+      "note": "Out of stock everywhere, so the first in-stock reading IS the news.",
+      "variants": [
+        { "name": "Z fc Black", "colour": "Black", "url": null, "sku": null, "note": "the standard body" },
+        { "name": "Z fc Amber Brown", "colour": "Amber Brown", "url": null, "sku": null },
+        { "name": "Z fc Coral Pink", "colour": "Coral Pink", "url": null, "sku": null },
+        { "name": "Z fc Mint Green", "colour": "Mint Green", "url": null, "sku": null },
+        { "name": "Z fc Natural Gray", "colour": "Natural Gray", "url": null, "sku": null },
+        { "name": "Z fc Sand Beige", "colour": "Sand Beige", "url": null, "sku": null },
+        { "name": "Z fc Sunset Orange", "colour": "Sunset Orange", "url": null, "sku": null },
+        { "name": "Z fc White", "colour": "White", "url": null, "sku": null }
+      ]
+    },
+    {
+      "key": "z-f",
+      "name": "Nikon Z f",
+      "alerts": ["price_drop"],
+      "note": "Generally in stock — watched for sales only. UNVERIFIED COLOUR LIST: the black body is certain, the premium exteriors below are not.",
+      "variants": [
+        { "name": "Z f Black", "colour": "Black", "url": null, "sku": null, "note": "the standard body" },
+        { "name": "Z f Indigo Blue", "colour": "Indigo Blue", "url": null, "sku": null, "note": "premium exterior — unverified" },
+        { "name": "Z f Sepia Brown", "colour": "Sepia Brown", "url": null, "sku": null, "note": "premium exterior — unverified" },
+        { "name": "Z f Stone Gray", "colour": "Stone Gray", "url": null, "sku": null, "note": "premium exterior — unverified" },
+        { "name": "Z f Moss Green", "colour": "Moss Green", "url": null, "sku": null, "note": "premium exterior — unverified" },
+        { "name": "Z f Bordeaux Red", "colour": "Bordeaux Red", "url": null, "sku": null, "note": "premium exterior — unverified" },
+        { "name": "Z f Sunset Orange", "colour": "Sunset Orange", "url": null, "sku": null, "note": "premium exterior — unverified" }
+      ]
+    }
   ]
 }

@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SUITES = ['parse.test.mjs', 'robots.test.mjs', 'check.e2e.mjs'];
+const SUITES = ['parse.test.mjs', 'robots.test.mjs', 'alerts.test.mjs', 'check.e2e.mjs'];
 
 let failed = 0;
 for (const suite of SUITES) {
