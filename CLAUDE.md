@@ -1,14 +1,22 @@
 # Development guidelines — sky121.github.io
 
 Skylar's portfolio site (GitHub Pages, static — no build step). The **Lab**
-(`lab.html`) hosts two live projects, each with its own handoff doc that is
-the single source of truth for its state and roadmap:
+(`lab.html`) hosts **one live project**. Each project has its own handoff
+doc that is the single source of truth for its state and roadmap:
 
-- **Dragoose** (watercolor flying roguelike): `dragoose.html`,
-  `assets/js/dragoose.js`, `assets/css/dragoose.css` → docs in
+- **Tableau** (restaurant picker, formerly Peckish): `eats.html`,
+  `assets/js/eats.js`, `assets/css/eats.css` → docs in
+  `docs/peckish/README.md`
+
+**Archived** — kept and still working, but unlinked from the Lab and the
+sitemap, and `noindex`ed. Do not revive one without being asked:
+
+- **Dragoose** (watercolor flying roguelike), archived 2026-11-22:
+  `dragoose.html`, `assets/js/dragoose.js`, `assets/css/dragoose.css` →
   `docs/dragoose/README.md`
-- **Peckish** (restaurant picker): `eats.html`, `assets/js/eats.js`,
-  `assets/css/eats.css` → docs in `docs/peckish/README.md`
+- **The Z Watch** (Nikon stock/sale watcher), archived 2026-11-22:
+  `zfc.html`, `assets/js/zfc.js`, `assets/css/zfc.css`,
+  `tools/zfc-watch/`, workflow schedule removed → `docs/zfc/README.md`
 
 ## Orchestration model (how work gets done)
 
@@ -53,8 +61,8 @@ For every task (planned or user-requested):
   bar (the Google Fonts connection error is sandbox noise).
 - **Run locally:** `python3 -m http.server 8000` from repo root; pages must
   be served over HTTP, not file://.
-- **Parallel workstreams stay in their lanes:** Dragoose work touches only
-  dragoose.* + its docs; Peckish only eats.* + its docs. Shared files
+- **Parallel workstreams stay in their lanes:** Tableau work touches only
+  eats.* + its docs (and Dragoose only dragoose.* if ever unarchived). Shared files
   (lab.html, index.html, gallery.js, exhibit-page.css, sitemap.xml) are
   edited by the orchestrator only.
 - **Design language is non-negotiable:** watercolor aesthetic; Cormorant

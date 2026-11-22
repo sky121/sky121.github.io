@@ -81,6 +81,49 @@
     if (dabs.length === 0) return;
     var statusEl = document.querySelector('.filter-status');
 
+    /* Drop any pigment with nothing behind it.
+     *
+     * A dab that filters to an empty field is a promise the page cannot
+     * keep: you click Games, the games do not appear, and nothing explains
+     * why. That used to be true of Experiments (there has never been one)
+     * and became true of Games when Dragoose was archived. Rather than
+     * hand-editing the palette every time the field changes, the dabs are
+     * derived from the pools actually on the page, so a pigment returns by
+     * itself the moment a project of that type ships. 'all' always stays.
+     */
+    (function pruneEmptyDabs() {
+      var present = {};
+      for (var i = 0; i < pools.length; i++) {
+        present[pools[i].getAttribute('data-type')] = true;
+      }
+      var kept = [];
+      for (var d = 0; d < dabs.length; d++) {
+        var f = dabs[d].getAttribute('data-filter');
+        if (f === 'all' || present[f]) {
+          kept.push(dabs[d]);
+        } else if (dabs[d].parentNode) {
+          dabs[d].parentNode.removeChild(dabs[d]);
+        }
+      }
+      dabs = kept;
+      /* Hide the palette unless there are at least TWO categories to choose
+         between. With one, 'All' and that single pigment select exactly the
+         same pools, so the palette is a control that cannot change anything. */
+      var categories = 0;
+      for (var k = 0; k < kept.length; k++) {
+        if (kept[k].getAttribute('data-filter') !== 'all') categories++;
+      }
+      var palette = document.querySelector('.palette');
+      if (categories < 2) {
+        if (palette) palette.setAttribute('hidden', '');
+        /* The intro tile tells the reader to pick a pigment from the palette.
+           With no palette that is an instruction to use a control that is not
+           there, so the sentence goes with it. Both come back together. */
+        var hint = document.querySelector('.intro-hint');
+        if (hint) hint.setAttribute('hidden', '');
+      }
+    })();
+
     // The intro pool is always present regardless of filter.
     function poolMatches(pool, filter) {
       if (filter === 'all') return true;
