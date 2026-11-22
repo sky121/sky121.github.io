@@ -28,20 +28,29 @@
 name: The Z Watch
 
 on:
-  schedule:
-    # Best-effort, see the note above.
-    - cron: "*/15 * * * *"
+  # ARCHIVED 2026-11-22 — the schedule is GONE, deliberately.
+  #
+  # The watch is retired: the cameras are no longer wanted. While this ran
+  # unconfigured it was waking every 15 minutes to read nothing, and the
+  # commits it left behind went on to collide with real work. A disabled
+  # workflow in the Actions UI can be re-enabled by a stray click and starts
+  # polling again, so the trigger itself is removed rather than switched off.
+  #
+  # TO BRING IT BACK: add the product URLs in tools/zfc-watch/config.json,
+  # then restore the schedule here:
+  #   schedule:
+  #     - cron: "*/15 * * * *"
+  # The tests and the checker are untouched and still pass, so a revival is
+  # a one-line change plus the URLs. See docs/zfc/README.md.
+  #
+  # workflow_dispatch stays so the suite can still be run by hand, and so a
+  # one-off reading is possible without reinstating the polling.
   workflow_dispatch:
     inputs:
       force_commit:
         description: "Commit the reading even if nothing changed"
         type: boolean
         default: false
-  push:
-    # Code changes run the tests only (the `watch` job is skipped below).
-    paths:
-      - "tools/zfc-watch/**"
-      - ".github/workflows/zfc-watch.yml"
 
 permissions:
   contents: write
@@ -74,6 +83,9 @@ jobs:
     name: Check stock
     needs: test
     # Pushes only run the tests; the watcher itself runs on cron and on demand.
+    # 'schedule' is intentionally still listed though no schedule fires any
+    # more (see the note on `on:` above): leaving it means reviving the watch
+    # is the one-line cron restore and nothing else.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
