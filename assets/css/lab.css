@@ -105,6 +105,15 @@ html.evening .theme-toggle:hover {
    Palette filter — a row of paint dabs (wet blots), not chrome buttons.
    ========================================================================== */
 
+/* `display: flex` below beats the user-agent's `[hidden] { display: none }`,
+   so the attribute alone would not hide the palette. State it explicitly.
+   lab.js sets [hidden] when there are fewer than two categories to choose
+   between. */
+.palette[hidden],
+.intro-hint[hidden] {
+  display: none;
+}
+
 .palette {
   display: flex;
   flex-wrap: wrap;

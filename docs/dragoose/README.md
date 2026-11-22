@@ -5,7 +5,53 @@
 > until a goose is named **Dragoose**, ruler of the skies.
 >
 > This document is the single source of truth so we can pick up exactly where we
-> left off. Last updated: **2026-08-03**.
+> left off. Last updated: **2026-11-22**.
+
+---
+
+## STATUS: ARCHIVED (2026-11-22)
+
+**Dragoose is retired from public view.** Development was paused earlier;
+it is now unlinked entirely. Nothing was deleted — the game is whole and
+still plays — but nothing points at it.
+
+| Change | File | Why |
+| --- | --- | --- |
+| Both tiles removed | `lab.html` | The live tile and the "Sixth Realm" roadmap teaser. Nothing links to the game now. |
+| Sitemap entry removed | `sitemap.xml` | Not offered to crawlers. |
+| `noindex, nofollow` added | `dragoose.html` | Keeps a retired page out of search results. The URL still resolves — this site does not break URLs. |
+| Empty filter pigments pruned | `assets/js/lab.js` | See below. |
+
+The game is **unlisted, not secret**: `https://sky121.github.io/dragoose.html`
+still loads and plays in full for anyone with the address. If it should be
+genuinely unreachable, delete `dragoose.html`, `assets/js/dragoose.js` and
+`assets/css/dragoose.css` — but note that `assets/js/dragoose.js` is
+**305 KB of hand-written game code**, by a wide margin the largest single
+piece of work in this repository. Deleting it is not the same kind of act
+as deleting a tile.
+
+### A knock-on the archive forced
+
+Removing the two game tiles left the Lab's **Games** pigment filtering to an
+empty field — a chip that promises projects and delivers none. The same was
+already quietly true of **Experiments**, which has never had a single tile.
+Rather than hand-edit the palette, `initFilter()` in `assets/js/lab.js` now
+derives the pigments from the pools actually on the page and removes any
+with nothing behind them (`all` always survives; if fewer than two remain
+the palette hides altogether). So the Lab currently shows **no filter
+palette at all** — one project, nothing to filter — and **Games returns by
+itself the moment this project is unarchived.** No edit required to revive.
+
+### To bring it back
+
+1. Restore the two `<li class="pool reveal">` blocks in `lab.html` (git
+   history has them; the commit is "Archive Dragoose").
+2. Re-add the `<url>` entry to `sitemap.xml`.
+3. Drop the `robots` meta from `dragoose.html`.
+4. The Games pigment reappears on its own — it is derived, not hard-coded.
+
+Everything below this line describes the game as it stood when it was
+archived, and is unchanged.
 
 ---
 
