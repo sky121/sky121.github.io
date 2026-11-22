@@ -6,7 +6,55 @@
 > reports the result honestly — including when it does not know.
 >
 > This document is the single source of truth for the project. Last
-> updated: **2026-10-19**.
+> updated: **2026-11-22**.
+
+---
+
+## STATUS: ARCHIVED (2026-11-22)
+
+**The watch is retired.** The cameras are no longer wanted, so the project
+has been taken out of public view. Nothing was deleted — every file still
+works and every test still passes — but it no longer runs and it is no
+longer linked from anywhere.
+
+What was changed to archive it:
+
+| Change | File | Why |
+| --- | --- | --- |
+| Schedule removed from the workflow | `.github/workflows/zfc-watch.yml` | The job no longer wakes. The trigger is *deleted*, not disabled in the Actions UI, because a disabled workflow can be re-enabled by a stray click and would start polling again. `workflow_dispatch` is kept so the suite and a one-off reading are still available by hand. |
+| Lab tile removed | `lab.html` | Nothing links to the page any more. |
+| Sitemap entry removed | `sitemap.xml` | Not offered to crawlers. |
+| `noindex, nofollow` added | `zfc.html` | Keeps a retired page out of search results. The URL still resolves, so no link anyone already has is broken — this site does not break URLs. |
+
+The page is **unlisted, not secret**: `https://sky121.github.io/zfc.html`
+still loads for anyone who has the address, and will show its last reading
+with the stale-data warning it was built to show. That is the intended
+outcome of "hide it", not an oversight. If it needs to be genuinely
+unreachable, delete `zfc.html`, `assets/js/zfc.js` and `assets/css/zfc.css`
+— the tooling under `tools/zfc-watch/` is independent of the page and would
+keep working.
+
+### To bring it back
+
+1. Put the product URLs in `tools/zfc-watch/config.json` — **all 15 are
+   still `null`**, so this was never pointed at a live page (see the
+   unfinished-business section below).
+2. Restore the schedule in the workflow's `on:` block:
+   `schedule:` / `- cron: "*/15 * * * *"`. The `watch` job's condition still
+   names `schedule`, so that one line is the whole revival.
+3. Run the suite: `node tools/zfc-watch/test/run-tests.mjs`.
+
+### One honest note about what was never finished
+
+This project **never made a single successful reading of a real Nikon page.**
+`www.nikonusa.com` was never reachable from the build environment and the
+product URLs were never supplied, so the parser was only ever exercised
+against the 11 synthetic fixtures in `tools/zfc-watch/fixtures/`. Those
+fixtures are hand-written from the shape Nikon's pages were *expected* to
+have. The checker is honest about this at runtime — an unreadable page reads
+as `unknown`, never as out-of-stock — but anyone reviving this should treat
+the parser as **unverified against production HTML** and check it against a
+real page first.
 
 ---
 
