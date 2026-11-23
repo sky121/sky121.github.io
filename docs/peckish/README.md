@@ -46,6 +46,29 @@
 
 ## Feature map (what's built)
 
+### Find landing: time-aware hero + quiet memory strip (2026-11-23)
+The empty watercolor band between the headline and the CTA now holds, when
+there is something true to say, a quiet two-line "memory strip" (plain muted
+Karla text, **not** buttons or cards, nothing tappable).
+- **Hero by local hour** (computed once each time the landing comes on, via
+  `find.refreshLanding()`; no timer): <11 "Where to, for breakfast?", 11-15
+  "...for lunch?", 16-20 "Where to, tonight?", 21+ "Somewhere still open?",
+  each with a one-line subtitle. `#find-hero-title` / `#find-hero-sub`.
+- **Strip (`#find-memory`)**, real local state only, no invented data:
+  "Last time: <place> · <overall>" from the most recent **real** Visited entry
+  (by `date`, ties by `ts`); built-in SAMPLE entries (`demo`) are **skipped**,
+  never shown; "<n> on your shortlist" from `deck.shortlistCount()`.
+- **Degrades to the old layout**: no real visit and empty shortlist leaves the
+  strip `hidden`; it is absolutely positioned inside `.find-landing`, so it
+  never moves the hero or CTA in any state (CTA centre 67.4% in all states).
+- One gentle fade/rise (`find-memory-in`); skipped under reduced motion.
+- Verified (Playwright 390x844 @2x, fixed clock): fresh / visited / shortlist
+  / both; all four bands and the 10:59/11:00/15:59/16:00/20:59/21:00 edges;
+  dark; reduced motion (`animation-name: none`); CTA still opens the wizard;
+  zero page errors. Contrast measured on leaf text with the text made
+  transparent to read the painted background: light 5.0-5.1:1 (strip), 7.9:1
+  title; dark 5.5-5.6:1 (strip), 8.0:1 title.
+
 ### Accessibility pass 3 — target size, reduced motion, dead CSS (2026-09-09)
 The last three dimensions of the audit. Contrast (above) was already done and
 was deliberately not touched.

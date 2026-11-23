@@ -286,6 +286,7 @@ html.evening :focus-visible {
      behind the tab bar (the room's 7rem bottom padding keeps clearance). */
   min-height: min(66vh, 34rem);
   padding: 1.5rem 0 0.5rem;
+  position: relative; /* anchors the absolutely placed memory strip */
 }
 
 /* When the calm Find landing is showing, retire the shared page header
@@ -319,6 +320,43 @@ html.evening :focus-visible {
   line-height: 1.5;
   color: var(--ink-soft);
   margin: 0.7rem 0 0;
+}
+
+/* ----- quiet memory strip: 0-2 muted lines in the optical middle.
+   Absolutely placed so it never moves the hero or the CTA; [hidden] (no
+   real data) removes it entirely = the plain landing. Plain text, not UI. ----- */
+.find-memory[hidden], .find-memory-line[hidden] { display: none; }
+.find-memory {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 58%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 1rem;
+  pointer-events: none;
+}
+.find-memory-line {
+  margin: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.find-memory.is-in { animation: find-memory-in 0.7s ease 0.15s both; }
+@keyframes find-memory-in {
+  from { opacity: 0; transform: translateY(calc(-50% + 6px)); }
+  to   { opacity: 1; transform: translateY(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .find-memory.is-in { animation: none; }
 }
 
 /* ----- the CTA cluster, pushed low into the thumb zone ----- */
