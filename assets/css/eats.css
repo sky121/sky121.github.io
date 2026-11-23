@@ -4331,3 +4331,139 @@ html.evening .surprise-spark { color: #bcafd8; }
    The 4px comes off the wrapper's own margins instead — same footprint. */
 .visited-filter-input { min-height: 44px; }
 .visited-filter { margin: calc(-0.4rem - 2px) 0 calc(1.1rem - 2px); }
+
+/* ==========================================================================
+   FIRST PUBLIC BETA (2026-11-23)
+   - beta flag: Find + Visited only (see assets/js/eats-config.js)
+   - shipped-key "live on" state, privacy note, first-run sheet,
+   - demo-mode note on the Find landing
+   ========================================================================== */
+
+/* beta: sealed sample-data panels can never paint, whatever else toggles */
+.eats-panel[data-beta-hidden] { display: none !important; }
+/* beta: two tabs, so the bar narrows instead of leaving three empty columns */
+.bottom-bar-inner[data-beta] {
+  grid-template-columns: repeat(2, 1fr);
+  max-width: 19rem;
+}
+
+/* demo mode, said plainly on the front door. In the flow under the hero
+   subtitle; the CTA is pushed low by margin-top:auto so nothing moves. */
+.find-demo-note[hidden] { display: none; }
+.find-demo-note {
+  margin: 0.9rem auto 0;
+  max-width: 22rem;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.find-demo-note .v-demo-tag { margin: 0 0.35rem 0 0; vertical-align: baseline; }
+
+/* settings: shipped-key "live is on" state + own-key disclosure */
+.settings-liveon[hidden], .settings-own-toggle[hidden], .settings-own[hidden] { display: none; }
+.settings-liveon {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.settings-liveon strong { font-weight: 600; }
+.settings-own { display: flex; flex-direction: column; gap: 1rem; }
+.settings-own-toggle {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0.5rem 0.2rem;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--pond-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.settings-own-toggle:focus-visible,
+.welcome-privacy-link:focus-visible,
+.welcome-go:focus-visible,
+.privacy-note:focus-visible {
+  outline: 2px solid var(--pond-deep);
+  outline-offset: 3px;
+}
+html.evening .settings-own-toggle:focus-visible,
+html.evening .welcome-privacy-link:focus-visible,
+html.evening .welcome-go:focus-visible,
+html.evening .privacy-note:focus-visible { outline-color: var(--pond-ink); }
+
+/* privacy note (settings sheet) */
+.privacy-note {
+  border-top: 1px solid var(--card-line);
+  padding-top: 0.9rem;
+  margin-top: 0.3rem;
+  border-radius: 8px;
+}
+.privacy-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.25rem;
+  color: var(--ink);
+  margin: 0 0 0.4rem;
+}
+.privacy-text {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
+/* first-run sheet */
+.welcome-lead {
+  margin: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.25rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.welcome-list {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.welcome-mode {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ink);
+  border: 1px solid var(--card-line);
+  border-left: 3px solid var(--gold);
+  background: var(--chip-bg);
+  border-radius: 12px;
+  padding: 0.6rem 0.8rem;
+}
+.welcome-mode.is-live { border-left-color: var(--sage); }
+.welcome-mode .v-demo-tag { margin: 0 0.2rem 0 0; vertical-align: baseline; }
+.welcome-privacy-link {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0.5rem 0.2rem;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--pond-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+.welcome-go { flex: 1; min-height: 48px; }

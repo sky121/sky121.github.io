@@ -118,6 +118,7 @@
           <div class="find-hero">
             <h2 class="find-hero-title" id="find-hero-title">Where to, tonight?</h2>
             <p class="find-hero-sub" id="find-hero-sub">A quiet nudge toward dinner.</p>
+            <p class="find-demo-note" id="find-demo-note" hidden><span class="v-demo-tag">Sample</span> Demo mode &mdash; the places shown are samples, not real restaurants.</p>
           </div>
 
           <!-- quiet memory strip: filled from real local state only (JS);
@@ -572,6 +573,16 @@
         <div class="sheet-body">
           <p class="settings-mode" id="settings-mode" role="status" aria-live="polite"></p>
 
+          <p class="settings-liveon" id="settings-liveon" hidden>
+            <strong>Live restaurants are on.</strong> Tableau looks up real places near you
+            &mdash; there is nothing to set up.
+          </p>
+
+          <button type="button" class="settings-own-toggle" id="own-key-toggle" aria-expanded="false" aria-controls="own-key-body" hidden>
+            Use my own Google Maps key instead
+          </button>
+
+          <div class="settings-own" id="own-key-body">
           <p class="settings-intro">
             Tableau runs on <strong>sample data</strong> by default &mdash; nothing to set up.
             Add your own <strong>Google Maps API key</strong> and the deck fills with real
@@ -581,7 +592,7 @@
           <p class="settings-privacy">
             Your key is written to <strong>this browser&rsquo;s localStorage</strong> and nowhere else.
             It is never sent to this site&rsquo;s author, never logged, and never leaves your device
-            except in your own requests to Google. &ldquo;Use sample data&rdquo; deletes it.
+            except in your own requests to Google. &ldquo;<span id="key-clear-name">Use sample data</span>&rdquo; deletes it.
           </p>
 
           <details class="settings-steps">
@@ -605,6 +616,23 @@
             <button type="button" class="btn-ghost" id="key-clear">Use sample data</button>
             <button type="button" class="btn-solid" id="key-save">Save &amp; check key</button>
           </div>
+          </div>
+
+          <section class="privacy-note" id="privacy-note" tabindex="-1" aria-labelledby="privacy-title">
+            <h3 class="privacy-title" id="privacy-title">Privacy</h3>
+            <p class="privacy-text">
+              Tableau has no accounts and no analytics or tracking of its own, and nothing you do here
+              is sent to this site&rsquo;s author. Your ratings, shortlist and preferences live only in
+              this browser&rsquo;s storage, on this device. When live results are on, tapping Find asks
+              your browser for your location and sends it &mdash; along with any place you type into
+              &ldquo;search a specific location&rdquo; &mdash; to Google, only to fetch nearby
+              restaurants; Google&rsquo;s own terms and privacy policy apply to that, and to the places
+              and photos it returns. Loading the page&rsquo;s fonts, and Google Maps when live results
+              are on, contacts Google&rsquo;s servers like any website that uses them. Sample mode never
+              asks for your location. The site is hosted on GitHub Pages, which may keep ordinary
+              server logs.
+            </p>
+          </section>
 
           <p class="settings-install">
             &#128242; Tip: <strong>add Tableau to your home screen</strong> (browser menu &rarr; Add to Home Screen)
@@ -616,9 +644,42 @@
       </div>
     </div>
 
+    <!-- ===================== FIRST-RUN SHEET ===================== -->
+    <div class="sheet-backdrop" id="welcome-backdrop" hidden>
+      <div
+        class="sheet welcome-sheet"
+        id="welcome-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="welcome-title"
+      >
+        <div class="sheet-grip" aria-hidden="true"></div>
+        <header class="sheet-head">
+          <h2 class="sheet-title" id="welcome-title">Welcome to Tableau</h2>
+          <button class="sheet-close" id="welcome-close" type="button" aria-label="Close">&times;</button>
+        </header>
+
+        <div class="sheet-body">
+          <p class="welcome-lead">
+            Tableau helps you stop dithering: tell it your mood, swipe through places nearby, and land on one.
+          </p>
+          <ul class="welcome-list">
+            <li id="welcome-loc"></li>
+            <li>Your ratings and shortlist stay on this device.</li>
+          </ul>
+          <p class="welcome-mode" id="welcome-mode"></p>
+          <button type="button" class="welcome-privacy-link" id="welcome-privacy">Read the privacy note</button>
+          <div class="sheet-actions">
+            <button type="button" class="btn-solid welcome-go" id="welcome-go">Got it</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- live region for transient announcements -->
     <p class="visually-hidden" id="live-announce" role="status" aria-live="polite"></p>
 
+    <script src="assets/js/eats-config.js"></script>
     <script defer src="assets/js/gallery.js"></script>
     <script defer src="assets/js/eats.js"></script>
   </body>
