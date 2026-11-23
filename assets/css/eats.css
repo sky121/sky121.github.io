@@ -296,12 +296,14 @@ html.evening :focus-visible {
   display: none;
 }
 .eats-room.find-landing-on .find-landing {
-  min-height: min(76vh, 42rem);
+  min-height: max(min(76vh, 42rem), 33rem);
 }
 
 /* ----- warm hero: a heading + a one-line subtitle ----- */
 .find-hero {
-  margin-top: clamp(2.25rem, 12vh, 6rem);
+  /* the cluster (hero + still life) sits closer to the button now; the old
+     12vh pushed the heading to the top and left a large dead band */
+  margin-top: clamp(1rem, 5vh, 4rem);
 }
 .find-hero-title {
   font-family: var(--font-display);
@@ -327,11 +329,12 @@ html.evening :focus-visible {
    real data) removes it entirely = the plain landing. Plain text, not UI. ----- */
 .find-memory[hidden], .find-memory-line[hidden] { display: none; }
 .find-memory {
+  /* hovers just above the button (the cluster is position:relative), out of
+     flow, so it can never move the hero, the still life or the CTA */
   position: absolute;
   left: 0;
   right: 0;
-  top: 58%;
-  transform: translateY(-50%);
+  bottom: calc(100% + 0.9rem);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -352,8 +355,8 @@ html.evening :focus-visible {
 }
 .find-memory.is-in { animation: find-memory-in 0.7s ease 0.15s both; }
 @keyframes find-memory-in {
-  from { opacity: 0; transform: translateY(calc(-50% + 6px)); }
-  to   { opacity: 1; transform: translateY(-50%); }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .find-memory.is-in { animation: none; }
@@ -361,6 +364,7 @@ html.evening :focus-visible {
 
 /* ----- the CTA cluster, pushed low into the thumb zone ----- */
 .find-cta {
+  position: relative;
   margin-top: auto;
   display: flex;
   flex-direction: column;
@@ -2106,7 +2110,12 @@ html.evening .slc.is-winner { background: rgba(205, 184, 120, 0.12); }
 /* --- shortlist constellation (JS-built in buildConstellation) --- */
 .slc-constellation {
   position: relative;
-  height: 11rem;
+  /* a square, as wide as the column (up to 22rem): at 11rem two 45px hit
+     boxes could not both fit unless the map lied about bearing */
+  width: 100%;
+  max-width: 22rem;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
   border-radius: 18px;
   border: 1px solid var(--card-line);
   overflow: hidden;
@@ -2127,12 +2136,7 @@ html.evening .slc-constellation {
    0..100 coordinate maps isotropically (bearing + distance stay true) */
 .slc-const-plot {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  aspect-ratio: 1 / 1;
-  height: 100%;
+  inset: 0;
 }
 .slc-const-web {
   position: absolute;
@@ -2183,20 +2187,26 @@ html.evening .slc-const-ray { stroke: var(--pond); opacity: 0.5; }
 
 /* each shortlisted place — a real button with a generous transparent hit area */
 .slc-const-dot {
+  /* the hit box is the pip's point (--x,--y) +/- per-side extents
+     (--hl/--hr/--ht/--hb, default 22.5px = a 45px box). JS (settle) shrinks
+     a side only where a neighbour's box would overlap, splitting the gap, so
+     targets never overlap; the pip itself never moves. */
   position: absolute;
-  transform: translate(-50%, -50%);
-  width: 46px;
-  height: 46px;
+  left: calc(var(--x, 50%) - var(--hl, 22.5px));
+  top: calc(var(--y, 50%) - var(--ht, 22.5px));
+  width: calc(var(--hl, 22.5px) + var(--hr, 22.5px));
+  height: calc(var(--ht, 22.5px) + var(--hb, 22.5px));
   padding: 0;
   border: 0;
   background: none;
   cursor: pointer;
   z-index: 3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 .slc-const-pip {
+  position: absolute;
+  left: var(--hl, 22.5px);
+  top: var(--ht, 22.5px);
+  margin: -0.31rem 0 0 -0.31rem;
   width: 0.62rem;
   height: 0.62rem;
   border-radius: 50%;
@@ -2206,8 +2216,8 @@ html.evening .slc-const-ray { stroke: var(--pond); opacity: 0.5; }
 html.evening .slc-const-pip { box-shadow: 0 0 0 2px rgba(43, 49, 64, 0.7), 0 2px 5px -2px rgba(0, 0, 0, 0.6); }
 .slc-const-tag {
   position: absolute;
-  top: calc(50% + 0.5rem);
-  left: 50%;
+  top: calc(var(--ht, 22.5px) + 0.5rem);
+  left: var(--hl, 22.5px);
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -4467,3 +4477,172 @@ html.evening .privacy-note:focus-visible { outline-color: var(--pond-ink); }
   text-decoration-thickness: 1px;
 }
 .welcome-go { flex: 1; min-height: 48px; }
+
+/* ==========================================================================
+   BETA WAVE 2 (2026-11-23) — swipe screen fits above the tab bar
+   JS (deck.layout) measures the bar's real top edge and sets --deck-avail on
+   .deck-wrap, adds .deck-fit, and puts .deck-on on the room. Without JS none
+   of this applies and the older flow layout stands.
+   ========================================================================== */
+
+/* while swiping, the big "Tableau" header steps aside (the h1 stays in the
+   accessibility tree) and the room starts just below the status bar */
+.eats-room.deck-on > .room-label { display: none; }
+.eats-room.deck-on > .exhibit-title {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.eats-room.deck-on {
+  padding-top: calc(0.9rem + env(safe-area-inset-top, 0px));
+}
+/* only the swipe stage itself is sized to the viewport (nothing to scroll);
+   the decision / end / shortlist screens keep the 7rem that clears the bar */
+.eats-room.deck-on.deck-swiping { padding-bottom: 0; }
+
+/* the Preferences row shares the top edge with the fixed gear: keep the
+   shortlist badge to the gear's left on phones */
+@media (max-width: 36rem) {
+  .deck-wrap .deck-bar { padding-right: 3.2rem; }
+}
+.deck-wrap .deck-bar { margin-bottom: 0.3rem; flex-wrap: nowrap; }
+.deck-wrap .deck-origin { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+.deck-wrap.deck-fit {
+  height: var(--deck-avail);
+}
+.deck-wrap.deck-fit > .deck-bar,
+.deck-wrap.deck-fit > .deck-hint,
+.deck-wrap.deck-fit > .peek-strip,
+.deck-wrap.deck-fit > .deck-controls { flex: none; }
+.deck-wrap.deck-fit > .deck-hint { margin: 0 0 0.35rem; font-size: clamp(0.8rem, 3.8vw, 0.95rem); }
+.deck-wrap.deck-fit > .deck {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+}
+.deck-wrap.deck-fit > .deck-controls { margin-top: 0.45rem; padding-bottom: 0.15rem; }
+/* safety net: if the scatter is still taller than its stage, JS sets --fit */
+.trio { transform: scale(var(--fit, 1)); transform-origin: 50% 50%; }
+@media (max-height: 700px) {
+  .trio { padding-top: 1.2rem; gap: 0.5rem 0.55rem; }
+  .trio-info { padding: 0.45rem 0.7rem 0.5rem; }
+}
+
+/* ----- Visited: empty state actions, backup section, reminder ----- */
+.empty--visited .empty-primary { min-width: 12rem; }
+.empty-secondary,
+.empty-restore {
+  appearance: none;
+  display: block;
+  margin: 0.55rem auto 0;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: var(--font-body);
+  color: var(--pond-ink);
+  text-underline-offset: 3px;
+}
+.empty-secondary { font-size: 0.92rem; font-weight: 500; text-decoration: underline; text-decoration-thickness: 1px; }
+.empty-restore { font-size: 0.8rem; color: var(--ink-soft); margin-top: 0; }
+.empty-restore:hover, .empty-secondary:hover { color: var(--ink); }
+.empty-secondary:focus-visible, .empty-restore:focus-visible,
+.vd-btn:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 3px; border-radius: 10px; }
+html.evening .empty-secondary:focus-visible, html.evening .empty-restore:focus-visible,
+html.evening .vd-btn:focus-visible { outline-color: var(--pond-ink); }
+
+.visited-data {
+  margin: 1.6rem auto 0;
+  max-width: 30rem;
+  padding: 1rem 1.1rem 0.9rem;
+  border: 1px dashed var(--card-line);
+  border-radius: 16px;
+  background: var(--card-bg);
+}
+.visited-data-title {
+  margin: 0 0 0.2rem;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.2rem;
+  color: var(--ink);
+}
+.visited-data-note { margin: 0 0 0.8rem; font-size: 0.86rem; line-height: 1.5; color: var(--ink-soft); }
+.visited-data-actions, .visited-nudge-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.vd-btn {
+  appearance: none;
+  cursor: pointer;
+  flex: 1 1 8rem;
+  min-height: 46px;
+  padding: 0.55rem 1rem;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+}
+.vd-btn:hover:not([disabled]) { border-color: var(--ink-soft); }
+.vd-btn[disabled] { opacity: 0.5; cursor: default; }
+.vd-btn--solid { color: var(--paper); background: #44688c; border-color: transparent; }
+html.evening .vd-btn--solid { color: #1c212c; background: var(--pond); }
+.visited-data-msg {
+  margin: 0.7rem 0 0;
+  min-height: 1.2em;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.visited-data-msg:empty { display: none; }
+.visited-data-msg.is-err { color: #8a3a52; }
+html.evening .visited-data-msg.is-err { color: #f0a9bb; }
+.vd-file { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+
+.visited-nudge[hidden] { display: none; }
+.visited-nudge {
+  margin: 0 0 1.2rem;
+  padding: 0.85rem 1rem 0.9rem;
+  border: 1px solid var(--card-line);
+  border-left: 3px solid var(--gold);
+  border-radius: 14px;
+  background: var(--chip-bg);
+}
+.visited-nudge-text { margin: 0 0 0.7rem; font-size: 0.9rem; line-height: 1.5; color: var(--ink); }
+.visited-head[hidden] { display: none; }
+
+/* ----- Find landing still life: a quiet painted table in the empty band.
+   Decorative only (aria-hidden, no handlers, no motion): foodArt's
+   deterministic painter, faded into the paper by a soft mask and held at low
+   opacity so it never competes with the button. It reads as paint, not as a
+   photo of a real restaurant. When the memory strip has something to say,
+   .has-memory reserves room for it above the button. ----- */
+.find-still {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  margin: 0.6rem 0 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.find-still-art {
+  display: block;
+  height: 100%;
+  max-height: 11.5rem;
+  aspect-ratio: 1 / 1;
+  max-width: 78%;
+  object-fit: cover;
+  object-position: 50% 40%;
+  opacity: 0.66;
+  -webkit-mask-image: radial-gradient(closest-side, #000 46%, rgba(0, 0, 0, 0) 98%);
+  mask-image: radial-gradient(closest-side, #000 46%, rgba(0, 0, 0, 0) 98%);
+}
+/* room for the memory strip, only when there is one to show */
+.find-landing.has-memory .find-still { margin-bottom: 4.6rem; }
+html.evening .find-still-art { opacity: 0.42; filter: saturate(0.85); }

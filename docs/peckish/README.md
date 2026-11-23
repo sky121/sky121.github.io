@@ -47,6 +47,57 @@
 
 ## Feature map (what's built)
 
+### Beta wave 2: deck fits the screen, no sample data as yours, backup, landing, constellation (2026-11-23)
+**1. Swipe deck fits above the tab bar.** Before: at 390x844 the controls sat at
+y 779-837 under the bar (top 771), the info scrap overflowed the stage, and at 375x667
+the page scrolled and the scrap covered the controls. Now `deck.layout()` (deck closure;
+also called from `find.syncHeaderChrome`, `setMode`, `renderStack`, window/visualViewport
+resize) measures the real top of `.bottom-bar-inner` (so `env(safe-area-inset-bottom)`
+is respected by construction) and sets `--deck-avail` on `.deck-wrap` + class
+`deck-fit` (flex column; `.deck` flexes). While the deck/decision/shortlist is up the
+room gets `.deck-on`: the big "Tableau" header steps aside (h1 stays, visually hidden) and
+the Preferences row shares the top edge with the gear (badge kept left of it).
+`.deck-swiping` zeroes the room's bottom padding only while the stage is fit (decision/
+end/shortlist keep their 7rem so "Keep looking" etc. scroll clear of the bar).
+`fitTrio()` scales the scatter (`--fit`, floor 0.7) only if it would overflow the stage
+(375x667 uses 0.964). Landscape / <380px of room: `.deck-clamped`, normal page scroll.
+Peek strip untouched (still hidden <=780px tall).
+**2. No sample data as yours (beta only).** `visited.load()` in beta never seeds and
+filters `e.demo` entries out of `state.visited` (so count, average, tab badge, card
+"You rated this" pill, memory strip, cuisine-affinity chips all agree); real entries are
+never removed (storage is rewritten only on the next real change, which drops stale
+demo rows). `beta:false` is unchanged (seeds 3 samples). Demo review cards credit
+**"Sample review"** instead of invented first names (all modes). Visited empty state:
+place-setting art, "Your table is set", calm copy, primary "+ Add a place", secondary
+"Or find somewhere to eat", quiet "Have a backup file? Import it"; the sort/add row hides
+when empty.
+**3. Export / import** (Visited, "Your data" section + dismissible reminder).
+Format: `{app:'tableau', version:1, exportedAt:ISO, visited:[{id,name,loc,food,vibe,service,note,date,ts?,cuisines?}]}`
+file `tableau-visited-YYYY-MM-DD.json` (local date). Real entries only; no demo, key,
+location, placeId or coords. Import: <=1 MB file, valid JSON, `app==='tableau'`,
+`version===1`, `visited` an array of <=2000 (else rejected); each entry sanitised
+(name<=120, loc<=160, note<=600 - same caps now as `maxlength` on the add form; control
+chars stripped; scores must be finite numbers, clamped/rounded to 0-100 else the entry is
+skipped; date must be a real YYYY-MM-DD else blank; ts/cuisines/id validated or dropped,
+ids regenerated on collision). Merge de-dupes on name+date+scores, total log capped 3000.
+Never throws; result in a `role=status` line; everything rendered via textContent.
+Download = Blob + anchor `download`; if `download` is unsupported, `navigator.canShare({files})`
+share sheet. Reminder: shown once ever (`eats-backup.nudgeShown`) when >=5 real entries and
+never exported/imported; "Not now" is permanent. Storage key `eats-backup`.
+**4. Find landing.** Hero moved closer (margin 5vh), a painted bowl still life
+(`foodArt.still('bowl')`, deterministic, aria-hidden, masked, ~0.66 opacity, 0.42 dark, no
+motion) fills the band; memory strip moved into `.find-cta` (absolute, above the button;
+`.has-memory` reserves room). CTA y unchanged at 844 (539); at 667 it drops 21px (landing
+min-height 33rem) for more band.
+**5. Constellation.** Plot is now a square up to 22rem (was 11rem). Dots keep true bearing
+and radius; `panel._settle()` (run after insertion + on resize) nudges along the circle
+only where 45px boxes would collide (Chebyshev gap in px, <=9 deg observed with 8 dots),
+and a Voronoi-style per-side clamp (`--hl/--hr/--ht/--hb`) is wired as a guard but was not
+needed in tests. `data-nudge-deg` shows each dot's shift. Measured 45x45, 0 overlaps.
+**Verify:** serve, then Playwright at 390x844/375x667/360x740/430x932: deck controls
+bottom < bar top and >=44px; fresh beta Visited empty, tab "Visited"; export, clear
+storage, import restores identical entries; hostile files rejected/sanitised.
+
 ### First public beta: Find + Visited, shipped-key plumbing, first-run, privacy (2026-11-23)
 Wave 1 of the beta. Everything below is driven by one new plain script,
 **`assets/js/eats-config.js`** (loaded before `eats.js`; sets
@@ -126,9 +177,7 @@ constellation tag now also draw in demo mode under beta (`sampleTagsOn()`), so
 every sample card, decision screen and shortlist card carries **Sample**; the Find
 landing carries a quiet "Sample - Demo mode - the places shown are samples, not
 real restaurants" line (`#find-demo-note`, hidden whenever live data is on, in
-either beta state). Known and left alone: the seeded Visited entries are already
-tagged Sample, but the Visited header still counts them ("You've logged 3
-places"), and the "You rated this 82" chips on cards derive from them.
+either beta state). (The seeded-Visited counting issue noted here was fixed in wave 2.)
 
 **Verified** (Playwright 390x844 @2x, fresh profiles): first-run shows once, not
 after reload; focus in / trapped / Escape / restored; beta = exactly two tabs in the

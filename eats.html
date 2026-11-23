@@ -121,14 +121,17 @@
             <p class="find-demo-note" id="find-demo-note" hidden><span class="v-demo-tag">Sample</span> Demo mode &mdash; the places shown are samples, not real restaurants.</p>
           </div>
 
-          <!-- quiet memory strip: filled from real local state only (JS);
-               stays hidden (and out of layout) when there is nothing to say -->
-          <div class="find-memory" id="find-memory" hidden>
-            <p class="find-memory-line" id="find-memory-last" hidden></p>
-            <p class="find-memory-line" id="find-memory-list" hidden></p>
-          </div>
+          <!-- decorative painted still life (foodArt, deterministic, no data) —
+               fills the quiet band between the hero and the button. aria-hidden. -->
+          <div class="find-still" id="find-still" aria-hidden="true"></div>
 
           <div class="find-cta">
+            <!-- quiet memory strip: real local state only (JS); hovers just above
+                 the button without ever moving it; hidden when nothing to say -->
+            <div class="find-memory" id="find-memory" hidden>
+              <p class="find-memory-line" id="find-memory-last" hidden></p>
+              <p class="find-memory-line" id="find-memory-list" hidden></p>
+            </div>
             <button class="find-cta-btn" id="find-near-me" type="button" aria-label="Find a place to eat near me">
               <svg class="find-cta-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 21s-6.5-5.3-6.5-10.2A6.5 6.5 0 0 1 12 4.3a6.5 6.5 0 0 1 6.5 6.5C18.5 15.7 12 21 12 21z"></path>
@@ -354,6 +357,15 @@
           </div>
         </div>
 
+        <!-- one gentle, dismissible backup reminder (5+ places, never exported) -->
+        <div class="visited-nudge" id="visited-nudge" role="group" aria-label="Backup reminder" hidden>
+          <p class="visited-nudge-text" id="visited-nudge-text"></p>
+          <div class="visited-nudge-actions">
+            <button type="button" class="vd-btn vd-btn--solid" id="visited-nudge-export">Export now</button>
+            <button type="button" class="vd-btn" id="visited-nudge-dismiss">Not now</button>
+          </div>
+        </div>
+
         <!-- quick filter — only shown once the log outgrows a glance (>5 entries) -->
         <div class="visited-filter" id="visited-filter" hidden>
           <input
@@ -366,6 +378,19 @@
         </div>
 
         <div class="visited-list" id="visited-list"></div>
+
+        <!-- backup: Visited lives only in this browser, so it can be exported
+             to a file and imported back (JS: visited.exportData / importFile) -->
+        <section class="visited-data" id="visited-data" aria-labelledby="visited-data-title">
+          <h3 class="visited-data-title" id="visited-data-title">Your data</h3>
+          <p class="visited-data-note">Your data stays in this browser. Export a backup now and then.</p>
+          <div class="visited-data-actions">
+            <button type="button" class="vd-btn" id="visited-export">Export backup</button>
+            <button type="button" class="vd-btn" id="visited-import">Import backup</button>
+          </div>
+          <input type="file" class="vd-file" id="visited-import-file" accept="application/json,.json" tabindex="-1" aria-hidden="true" />
+          <p class="visited-data-msg" id="visited-data-msg" role="status" aria-live="polite"></p>
+        </section>
       </section>
 
       <!-- ===================== FRIENDS PANEL ===================== -->
@@ -494,13 +519,13 @@
         <form id="rating-form" class="sheet-body">
           <label class="field">
             <span class="field-label">Place</span>
-            <input type="text" id="rate-name" class="field-input" placeholder="Restaurant name" required />
+            <input type="text" id="rate-name" class="field-input" placeholder="Restaurant name" maxlength="120" required />
           </label>
           <p class="field-sub" id="rate-place-sub" hidden></p>
 
           <label class="field" id="rate-loc-field" hidden>
             <span class="field-label">Location <span class="field-opt">(optional)</span></span>
-            <input type="text" id="rate-loc" class="field-input" placeholder="neighborhood or address" />
+            <input type="text" id="rate-loc" class="field-input" placeholder="neighborhood or address" maxlength="160" />
           </label>
 
           <div class="sliders">
@@ -539,7 +564,7 @@
 
           <label class="field">
             <span class="field-label">Note <span class="field-opt">(optional)</span></span>
-            <textarea id="rate-note" class="field-input field-area" rows="3" placeholder="What did you have? How was it?"></textarea>
+            <textarea id="rate-note" class="field-input field-area" rows="3" maxlength="600" placeholder="What did you have? How was it?"></textarea>
           </label>
 
           <label class="field">
