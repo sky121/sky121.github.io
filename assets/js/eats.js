@@ -2498,8 +2498,8 @@
     }
 
     /* paint(place, variant) -> a finished <canvas>, painted once and reused. */
-    function paint(r, variant) {
-      var key = ((r && (r.id || r.name)) || 'x') + '|' + variant;
+    function paint(r, variant, forceArch) {
+      var key = ((r && (r.id || r.name)) || 'x') + '|' + variant + (forceArch ? '|' + forceArch : '');
       if (cache[key]) {
         var at = order.indexOf(key);
         if (at !== -1) order.splice(at, 1);
@@ -2509,7 +2509,7 @@
       var cv = document.createElement('canvas');
       cv.width = W; cv.height = H;
       var ctx = cv.getContext('2d');
-      var arch = archFor(r, variant);
+      var arch = forceArch || archFor(r, variant);
       var rnd = rngFrom(hashStr(((r && (r.name || r.id)) || 'x') + '|feed|' + variant));
       (DRAW[arch] || drawPlate)(ctx, rnd, palFor(r));
       // paper grain over the finished paint
@@ -2529,6 +2529,9 @@
 
     return {
       paint: paint,
+      /* a place-less, data-less still life for decorative use (Find landing):
+         fixed seed, neutral pigments, so it always paints the same way */
+      still: function (arch) { return paint({ id: 'tableau-still', name: 'Tableau still life', cuisines: ['mediterranean'] }, 0, arch); },
       archOf: archFor,
       hasSteam: function (r, variant) { return !!WITH_STEAM[archFor(r, variant)]; },
       palOf: palFor
@@ -2564,7 +2567,11 @@
         segments: {
           vibe: { kind: 'vibe', glyph: DEMO_VIBE_GLYPH, caption: r.vibe || '' },
           food: { kind: 'food', glyph: DEMO_FOOD_GLYPH, caption: r.food || '' },
-          reviews: { kind: 'reviews', quotes: (r.reviews_q || []).slice(0, 3) }
+          reviews: { kind: 'reviews', quotes: (r.reviews_q || []).slice(0, 3).map(function (q) {
+            // sample quotes carry invented first names; a name reads as a real
+            // person, so demo reviews are credited to "Sample review" instead
+            return { by: 'Sample review', score: q.score, text: q.text };
+          }) }
         },
         location: { lat: r.lat, lng: r.lng },
         distance: haversineMiles(DEMO_ORIGIN, { lat: r.lat, lng: r.lng }),
@@ -2885,6 +2892,8 @@
       // refresh the hero + memory strip once each time the landing comes on
       if (landingOn && !landingWasOn) refreshLanding();
       landingWasOn = !!landingOn;
+      // the swipe screen sizes itself to the room above the tab bar
+      if (typeof deck !== 'undefined' && deck && deck.layout) deck.layout();
     }
 
     /* ---- time-aware hero + quiet memory strip ----
@@ -2892,6 +2901,7 @@
        real local facts: your most recent REAL Visited entry (built-in SAMPLE
        entries are skipped, never shown) and your shortlist size. With nothing
        to say it stays hidden and the landing is exactly the plain layout. */
+    var STILL_ARCH = 'bowl';   // a bowl of broth: calm, cuisine-neutral, reads as paint
     var landingWasOn = false;
     function heroCopy(h) {
       if (h < 11) return ['Where to, for breakfast?', 'A quiet nudge toward a slow morning.'];
@@ -2916,8 +2926,20 @@
       var n = $('find-demo-note');
       if (n) n.hidden = liveMode();
     }
+    var stillPainted = false;
+    function paintStill() {
+      var host = $('find-still');
+      if (!host || stillPainted) return;
+      stillPainted = true;
+      try {
+        var cv = foodArt.still(STILL_ARCH);
+        cv.className = 'find-still-art';   // not the Feed's animated class
+        host.appendChild(cv);
+      } catch (e) { /* decorative only: no still life is fine */ }
+    }
     function refreshLanding() {
       syncDemoNote();
+      paintStill();
       var copy = heroCopy(new Date().getHours());
       var t = $('find-hero-title'), sub = $('find-hero-sub');
       if (t) t.textContent = copy[0];
@@ -2933,6 +2955,7 @@
       if (n > 0) listEl.textContent = n + ' on your shortlist';
       var any = !!last || n > 0;
       wrap.hidden = !any;
+      if (landingEl) landingEl.classList.toggle('has-memory', any);
       wrap.classList.remove('is-in');
       if (any && !prefersReducedMotion) {
         void wrap.offsetWidth; // restart the one-shot fade/rise
@@ -3833,8 +3856,65 @@
     var DECISION_REASON_MAX = 3;
 
 
+    /* ---- fit the swipe screen to the viewport (beta wave 2) ----
+       The deck, its controls and the hint must ALL sit above the fixed tab
+       bar, at any phone size. layout() measures the bar's real top edge and
+       gives .deck-wrap exactly the room between its own top and that edge
+       (the deck stage flexes to fill it); the big page header steps aside
+       while swiping (.deck-on). fitTrio() then scales the card scatter down,
+       only if it would otherwise spill out of the stage. Re-run on resize,
+       rotation, tab switch and every re-render. */
+    var fitMode = false;
+    var layoutQueued = false;
+    function fitTrio() {
+      var trio = topCard && topCard.querySelector('.trio');
+      if (!trio || !deckEl) return;
+      trio.style.setProperty('--fit', '1');
+      var kids = trio.children, lo = Infinity, hi = -Infinity;
+      for (var i = 0; i < kids.length; i++) {
+        lo = Math.min(lo, kids[i].offsetTop);
+        hi = Math.max(hi, kids[i].offsetTop + kids[i].offsetHeight);
+      }
+      if (!isFinite(lo)) return;
+      var need = (hi - lo) + 24 + 8;     // the scatter + the bars' top gutter
+      var have = deckEl.clientHeight;
+      var k = have > 0 && need > have ? Math.max(0.7, have / need) : 1;
+      trio.style.setProperty('--fit', k.toFixed(3));
+    }
+    function layout() {
+      var wrap = $('deck-wrap'), room = $('room');
+      var bar = document.querySelector('.bottom-bar-inner');
+      if (!wrap || !room) return;
+      var shown = !wrap.hidden && wrap.offsetParent !== null;
+      room.classList.toggle('deck-on', shown);
+      if (!shown || !fitMode || !bar) {
+        wrap.classList.remove('deck-fit');
+        wrap.style.removeProperty('--deck-avail');
+        room.classList.remove('deck-clamped', 'deck-swiping');
+        return;
+      }
+      var top = wrap.getBoundingClientRect().top + (window.pageYOffset || 0);
+      var avail = Math.floor(bar.getBoundingClientRect().top - top - 10);
+      var clamped = avail < 380;          // landscape / tiny: let the page scroll instead
+      if (clamped) avail = 380;
+      room.classList.toggle('deck-clamped', clamped);
+      room.classList.toggle('deck-swiping', !clamped);   // the page itself does not scroll while swiping
+      wrap.style.setProperty('--deck-avail', avail + 'px');
+      wrap.classList.add('deck-fit');
+      fitTrio();
+    }
+    function queueLayout() {
+      if (layoutQueued) return;
+      layoutQueued = true;
+      window.requestAnimationFrame(function () { layoutQueued = false; layout(); });
+    }
+    window.addEventListener('resize', queueLayout);
+    window.addEventListener('orientationchange', queueLayout);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', queueLayout);
+
     function setMode(mode) {
       var onDeck = mode === 'deck';
+      fitMode = onDeck;
       if (deckEl) deckEl.style.display = onDeck ? '' : 'none';
       if (hintEl) hintEl.style.display = onDeck ? '' : 'none';
       if (controlsEl) controlsEl.style.display = onDeck ? '' : 'none';
@@ -3843,6 +3923,7 @@
       if (endEl) endEl.hidden = mode !== 'end';
       if (shortlistEl) shortlistEl.hidden = mode !== 'shortlist';
       if (rouletteEl) rouletteEl.hidden = mode !== 'roulette';
+      layout();
     }
 
     function showLoading() {
@@ -3906,6 +3987,7 @@
       topCard = deckEl.querySelector('.swipe-card[data-depth="0"]');
       if (topCard) prefetchUpcoming();
       renderPeek(deal);
+      layout();
     }
 
     function onDealEnd(e) {
@@ -4827,25 +4909,13 @@
         p.radius = CONST_MINR + (p.dist / maxDist) * (CONST_MAXR - CONST_MINR);
         constPlace(p);
       });
-      // Nudge coincident dots apart along their circle (distance/radius held
-      // fixed, so the geometric ordering survives — only bearing shifts).
-      var MINSEP = 13;
-      for (var pass = 0; pass < 8; pass++) {
-        var moved = false;
-        for (var a = 0; a < pts.length; a++) {
-          for (var b = a + 1; b < pts.length; b++) {
-            var dx = pts[a].x - pts[b].x, dy = pts[a].y - pts[b].y;
-            var d = Math.sqrt(dx * dx + dy * dy);
-            if (d < MINSEP) {
-              var push = (MINSEP - d) / 60 + 0.05;
-              pts[a].ang += push; pts[b].ang -= push;
-              constPlace(pts[a]); constPlace(pts[b]);
-              moved = true;
-            }
-          }
-        }
-        if (!moved) break;
-      }
+      // Bearing + distance stay true: each dot keeps its real angle (ang0) and
+      // its distance-true radius. Only when two hit boxes would collide does
+      // settle() (below, run once the panel has a real size) nudge a dot along
+      // its own circle, and it measures that in PIXELS (a 45px box needs a
+      // 45px Chebyshev gap), not in plot units, so a bigger plot means fewer
+      // and smaller nudges rather than a falsified map.
+      pts.forEach(function (p) { p.ang0 = p.ang; });
 
       var panel = el('div', 'slc-constellation');
       panel.setAttribute('role', 'group');
@@ -4863,6 +4933,7 @@
         ln.setAttribute('x1', CONST_C); ln.setAttribute('y1', CONST_C);
         ln.setAttribute('x2', p.x.toFixed(2)); ln.setAttribute('y2', p.y.toFixed(2));
         ln.setAttribute('class', 'slc-const-ray');
+        p.ray = ln;
         svg.appendChild(ln);
       });
       plot.appendChild(svg);
@@ -4877,8 +4948,9 @@
       pts.forEach(function (p, i) {
         var dot = el('button', 'slc-const-dot');
         dot.type = 'button';
-        dot.style.left = p.x.toFixed(2) + '%';
-        dot.style.top = p.y.toFixed(2) + '%';
+        dot.style.setProperty('--x', p.x.toFixed(2) + '%');
+        dot.style.setProperty('--y', p.y.toFixed(2) + '%');
+        p.dot = dot;
         dot.setAttribute('aria-label', 'Highlight ' + p.r.name);
         var pip = el('span', 'slc-const-pip');
         pip.style.background = constTint(p.r, i);
@@ -4894,6 +4966,61 @@
       });
 
       panel.appendChild(plot);
+
+      /* settle(): called once the panel is in the DOM (and on resize). */
+      var HALF = 22.5;   // default hit half-extent, px  (a 45px box)
+      function wrapAng(x) { while (x > Math.PI) x -= 2 * Math.PI; while (x < -Math.PI) x += 2 * Math.PI; return x; }
+      panel._settle = function () {
+        var W = plot.clientWidth;
+        if (!W) return;
+        var SEP = HALF * 2 * 100 / W;           // 45px, in plot units
+        pts.forEach(function (p) { p.ang = p.ang0; constPlace(p); });
+        for (var pass = 0; pass < 160; pass++) {
+          var moved = false;
+          for (var a = 0; a < pts.length; a++) {
+            for (var b = a + 1; b < pts.length; b++) {
+              var dx = pts[a].x - pts[b].x, dy = pts[a].y - pts[b].y;
+              var cheb = Math.max(Math.abs(dx), Math.abs(dy));
+              if (cheb >= SEP) continue;
+              var rr = Math.max(8, (pts[a].radius + pts[b].radius) / 2);
+              var push = ((SEP - cheb) / (2 * rr)) * 0.6 + 0.002;
+              var dir = wrapAng(pts[a].ang - pts[b].ang) >= 0 ? 1 : -1;
+              pts[a].ang += dir * push; pts[b].ang -= dir * push;
+              constPlace(pts[a]); constPlace(pts[b]);
+              moved = true;
+            }
+          }
+          if (!moved) break;
+        }
+        // positions, rays, and non-overlapping (Voronoi-style) hit extents
+        var px = W / 100;
+        pts.forEach(function (p) { p.ext = { l: HALF, r: HALF, t: HALF, b: HALF }; });
+        for (var i = 0; i < pts.length; i++) {
+          for (var j = i + 1; j < pts.length; j++) {
+            var ddx = (pts[j].x - pts[i].x) * px, ddy = (pts[j].y - pts[i].y) * px;
+            if (Math.abs(ddx) >= HALF * 2 || Math.abs(ddy) >= HALF * 2) continue;   // boxes already clear
+            if (Math.abs(ddx) >= Math.abs(ddy)) {                // split the gap on x
+              var hx = Math.abs(ddx) / 2;
+              if (ddx >= 0) { pts[i].ext.r = Math.min(pts[i].ext.r, hx); pts[j].ext.l = Math.min(pts[j].ext.l, hx); }
+              else { pts[i].ext.l = Math.min(pts[i].ext.l, hx); pts[j].ext.r = Math.min(pts[j].ext.r, hx); }
+            } else {                                             // split the gap on y
+              var hy = Math.abs(ddy) / 2;
+              if (ddy >= 0) { pts[i].ext.b = Math.min(pts[i].ext.b, hy); pts[j].ext.t = Math.min(pts[j].ext.t, hy); }
+              else { pts[i].ext.t = Math.min(pts[i].ext.t, hy); pts[j].ext.b = Math.min(pts[j].ext.b, hy); }
+            }
+          }
+        }
+        pts.forEach(function (p) {
+          p.dot.style.setProperty('--x', p.x.toFixed(2) + '%');
+          p.dot.style.setProperty('--y', p.y.toFixed(2) + '%');
+          p.dot.setAttribute('data-nudge-deg', String(Math.round(Math.abs(wrapAng(p.ang - p.ang0)) * 180 / Math.PI)));
+          p.dot.style.setProperty('--hl', p.ext.l.toFixed(1) + 'px');
+          p.dot.style.setProperty('--hr', p.ext.r.toFixed(1) + 'px');
+          p.dot.style.setProperty('--ht', p.ext.t.toFixed(1) + 'px');
+          p.dot.style.setProperty('--hb', p.ext.b.toFixed(1) + 'px');
+          p.ray.setAttribute('x2', p.x.toFixed(2)); p.ray.setAttribute('y2', p.y.toFixed(2));
+        });
+      };
       // the map is only as real as the places on it
       var allSample = pts.every(function (q) { return isSampleResult(q.r); });
       if (sampleTagsOn() && allSample) {
@@ -4931,13 +5058,18 @@
       }, prefersReducedMotion ? 1400 : 1250);
     }
 
+    window.addEventListener('resize', function () {
+      var c = shortlistEl && !shortlistEl.hidden && shortlistEl.querySelector('.slc-constellation');
+      if (c && c._settle) c._settle();
+    });
+
     function renderShortlist() {
       var listEl = shortlistEl && shortlistEl.querySelector('.shortlist-list');
       if (!listEl) return;
       clear(listEl);
       if (!shortlist.length) { backFromShortlist(); return; }
       var con = buildConstellation();
-      if (con) listEl.appendChild(con); // above the compare cards
+      if (con) { listEl.appendChild(con); con._settle(); } // above the compare cards; settle needs its real size
       shortlist.forEach(function (r) { listEl.appendChild(buildCompareCard(r)); });
     }
 
@@ -5271,7 +5403,7 @@
       onLike(r);
     }
 
-    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown, surprise: surprise, shortlistCount: shortlistCount, shareShortlist: shareShortlist, pickFrom: pickFrom, addToShortlist: addToShortlist, removeFromShortlist: removeFromShortlist, inShortlist: inShortlist, hydrateHearts: hydrateHearts };
+    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown, surprise: surprise, shortlistCount: shortlistCount, shareShortlist: shareShortlist, pickFrom: pickFrom, addToShortlist: addToShortlist, removeFromShortlist: removeFromShortlist, inShortlist: inShortlist, hydrateHearts: hydrateHearts, layout: layout };
   })();
 
   /* paint a wc-range fill % (shared) */
@@ -6186,6 +6318,15 @@
 
     function load() {
       var v = store.getVisited();
+      if (BETA) {
+        // Beta: a new user has rated nothing, so nothing is seeded, and any
+        // built-in SAMPLE entries from an older install (e.demo) are filtered
+        // out of state, which every count, average, card pill, tab badge,
+        // memory strip and cuisine-affinity chip reads. Real entries are
+        // never touched. (Storage is only rewritten when the log changes.)
+        state.visited = (v || []).filter(function (e) { return e && typeof e === 'object' && !e.demo; });
+        return;
+      }
       if (v === null) {
         // never written -> seed demo entries (clearly labeled)
         state.visited = demoVisited();
@@ -6298,7 +6439,7 @@
           render();
           announce('Deleted ' + e.name);
           // the button that had focus was just thrown away with its card
-          var addBtn = $('add-place');
+          var addBtn = listEl.querySelector('.empty-primary') || $('add-place');
           if (addBtn) addBtn.focus();
         }
       });
@@ -6524,6 +6665,11 @@
       // tab count + stats
       var n = state.visited.length;
       if (tabCount) tabCount.textContent = n ? '(' + n + ')' : '';
+      // with nothing logged the empty state carries the one action; the
+      // sort + add row would only repeat it
+      var headEl = statsEl && statsEl.parentNode;
+      if (headEl) headEl.hidden = n === 0;
+      syncDataUi();
 
       // passive recap above the log (describes the whole log, never filtered)
       renderInsights();
@@ -6552,7 +6698,9 @@
       if (!arr.length) {
         statsEl.textContent = '';
         // painterly empty state — a CSS-drawn place setting waiting for its
-        // first meal (steam wisps pause under prefers-reduced-motion)
+        // first meal (steam wisps pause under prefers-reduced-motion).
+        // One clear primary action (add a place), one gentle way to go and
+        // find somewhere, and a quiet door for people bringing a backup.
         var empty = el('div', 'empty empty--visited');
         var art = el('div', 'empty-table');
         art.setAttribute('aria-hidden', 'true');
@@ -6564,11 +6712,19 @@
         art.appendChild(el('span', 'empty-spoon'));
         empty.appendChild(art);
         empty.appendChild(el('p', 'empty-title', 'Your table is set'));
-        empty.appendChild(el('p', 'empty-sub', 'Rate the first place you eat and it will live here, watercolor bars and all.'));
-        var addBtn = el('button', 'add-place-btn', '+ Add a place');
+        empty.appendChild(el('p', 'empty-sub', 'Nothing here yet. After a meal, rate it on food, vibe and service and it settles in here, just for you.'));
+        var addBtn = el('button', 'add-place-btn empty-primary', '+ Add a place');
         addBtn.type = 'button';
         addBtn.addEventListener('click', function () { sheet.openBlank(); });
         empty.appendChild(addBtn);
+        var findBtn = el('button', 'empty-secondary', 'Or find somewhere to eat');
+        findBtn.type = 'button';
+        findBtn.addEventListener('click', function () { tabs.activate('find'); });
+        empty.appendChild(findBtn);
+        var restoreBtn = el('button', 'empty-restore', 'Have a backup file? Import it');
+        restoreBtn.type = 'button';
+        restoreBtn.addEventListener('click', function () { pickImport(); });
+        empty.appendChild(restoreBtn);
         listEl.appendChild(empty);
         return;
       }
@@ -6577,6 +6733,235 @@
       renderStats(n, avg);
 
       arr.forEach(function (e) { listEl.appendChild(buildCard(e)); });
+    }
+
+
+    /* -------------------------------------------------------------- *
+     * Backup — export / import (Visited lives only in this browser)
+     * Envelope: { app:'tableau', version:1, exportedAt:ISO, visited:[...] }
+     * Export = real entries only (never demo), whitelisted fields only:
+     * no API key, no location, no place ids/coordinates. Import validates
+     * strictly, sanitises every field, merges (never overwrites) and never
+     * throws. Every string is written with textContent, never innerHTML.
+     * -------------------------------------------------------------- */
+    var KEY_BACKUP = 'eats-backup';     // {exportedAt, nudged}
+    var BK_APP = 'tableau', BK_VERSION = 1;
+    var LIM = { name: 120, loc: 160, note: 600 };   // same caps as the add-place form
+    var MAX_FILE_BYTES = 1024 * 1024;   // 1 MB
+    var MAX_IMPORT = 2000;              // entries in one file
+    var MAX_TOTAL = 3000;               // entries in the log after merge
+    var dataMsgEl = $('visited-data-msg');
+    var exportBtn = $('visited-export');
+    var importBtn = $('visited-import');
+    var importFile = $('visited-import-file');
+    var nudgeEl = $('visited-nudge');
+    var nudgeLive = false;
+
+    function backupMeta() {
+      try {
+        var o = JSON.parse(localStorage.getItem(KEY_BACKUP) || 'null');
+        return (o && typeof o === 'object') ? o : {};
+      } catch (e) { return {}; }
+    }
+    function setBackupMeta(patch) {
+      var o = backupMeta();
+      for (var k in patch) o[k] = patch[k];
+      try { localStorage.setItem(KEY_BACKUP, JSON.stringify(o)); } catch (e) {}
+    }
+    function say(msg, isErr) {
+      if (!dataMsgEl) return;
+      dataMsgEl.classList.toggle('is-err', !!isErr);
+      dataMsgEl.textContent = '';
+      // clear-then-set on the next frame so a repeated message is re-announced
+      window.requestAnimationFrame(function () { dataMsgEl.textContent = msg; });
+    }
+    function realEntries() { return state.visited.filter(function (e) { return !e.demo; }); }
+    function pad2(n) { return (n < 10 ? '0' : '') + n; }
+    function localDay() { var d = new Date(); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+
+    function exportEntry(e) {
+      var o = {
+        id: String(e.id || ''), name: String(e.name || ''), loc: String(e.loc || ''),
+        food: Number(e.food), vibe: Number(e.vibe), service: Number(e.service),
+        note: String(e.note || ''), date: String(e.date || '')
+      };
+      if (isFinite(e.ts)) o.ts = Number(e.ts);
+      if (Array.isArray(e.cuisines)) o.cuisines = e.cuisines.filter(function (c) { return typeof c === 'string'; }).slice(0, 6);
+      return o;
+    }
+    function buildExport() {
+      return { app: BK_APP, version: BK_VERSION, exportedAt: new Date().toISOString(), visited: realEntries().map(exportEntry) };
+    }
+
+    function exportData() {
+      var real = realEntries();
+      if (!real.length) { say('Nothing to export yet. Add a place first.', true); return; }
+      var name = 'tableau-visited-' + localDay() + '.json';
+      var json = JSON.stringify(buildExport(), null, 2);
+      var blob, file = null;
+      try { blob = new Blob([json], { type: 'application/json' }); } catch (e) { say('Could not prepare the backup on this browser.', true); return; }
+      try { file = new File([blob], name, { type: 'application/json' }); } catch (e) { file = null; }
+      var a = document.createElement('a');
+      var done = function () {
+        setBackupMeta({ exportedAt: new Date().toISOString() });
+        say('Backup saved: ' + real.length + ' place' + (real.length === 1 ? '' : 's') + ' in ' + name + '.');
+        nudgeLive = false;
+        syncDataUi();
+      };
+      try {
+        if ('download' in a && window.URL && URL.createObjectURL) {
+          var url = URL.createObjectURL(blob);
+          a.href = url; a.download = name; a.rel = 'noopener';
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          window.setTimeout(function () { try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (e) {} }, 4000);
+          done();
+        } else if (file && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+          navigator.share({ files: [file], title: 'Tableau backup' }).then(done, function (err) {
+            if (!err || err.name !== 'AbortError') say('Could not share the backup file.', true);
+          });
+        } else {
+          say('This browser cannot save files from here. Try another browser to export.', true);
+        }
+      } catch (e) { say('Could not save the backup file.', true); }
+    }
+
+    /* ---- sanitising (every limit the add-place form uses) ---- */
+    function cleanText(v, max, oneLine) {
+      if (typeof v !== 'string') return '';
+      if (oneLine) v = v.replace(/\s+/g, ' ');
+      // drop control characters, collapse whitespace runs, cap the length
+      return v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u2028\u2029]/g, '').replace(/[ \t]+/g, ' ').trim().slice(0, max);
+    }
+    function cleanScore(v) {
+      if (typeof v !== 'number' || !isFinite(v)) return null;
+      return Math.max(0, Math.min(100, Math.round(v)));
+    }
+    function cleanDate(v) {
+      if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return '';
+      var p = v.split('-'), y = +p[0], m = +p[1], d = +p[2];
+      if (y < 1970 || y > 2100) return '';
+      var t = new Date(y, m - 1, d);
+      return (t.getFullYear() === y && t.getMonth() === m - 1 && t.getDate() === d) ? v : '';
+    }
+    function cleanEntry(raw) {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+      var name = cleanText(raw.name, LIM.name, true);
+      var food = cleanScore(raw.food), vibe = cleanScore(raw.vibe), service = cleanScore(raw.service);
+      if (!name || food === null || vibe === null || service === null) return null;
+      var o = {
+        name: name, loc: cleanText(raw.loc, LIM.loc, true),
+        food: food, vibe: vibe, service: service,
+        note: cleanText(raw.note, LIM.note), date: cleanDate(raw.date), demo: false
+      };
+      if (typeof raw.ts === 'number' && isFinite(raw.ts) && raw.ts > 0 && raw.ts < Date.now() + 864e5) o.ts = Math.floor(raw.ts);
+      if (Array.isArray(raw.cuisines)) {
+        var cu = raw.cuisines.filter(function (c) { return typeof c === 'string' && /^[a-z]{2,20}$/.test(c); }).slice(0, 6);
+        if (cu.length) o.cuisines = cu;
+      }
+      if (typeof raw.id === 'string' && /^v-\d{6,15}-\d{1,5}$/.test(raw.id)) o.id = raw.id;
+      return o;
+    }
+    function dedupeKey(e) {
+      return String(e.name || '').toLowerCase() + '|' + (e.date || '') + '|' + Math.round(e.food) + '/' + Math.round(e.vibe) + '/' + Math.round(e.service);
+    }
+
+    /* Pure: text -> {ok, error} | {ok, entries, bad}. Never throws. */
+    function parseBackup(text) {
+      var env;
+      try { env = JSON.parse(text); } catch (e) { return { ok: false, error: 'That file is not valid JSON, so it is not a Tableau backup.' }; }
+      if (!env || typeof env !== 'object' || Array.isArray(env)) return { ok: false, error: 'That file is not a Tableau backup.' };
+      if (env.app !== BK_APP) return { ok: false, error: 'That file is not a Tableau backup.' };
+      if (env.version !== BK_VERSION) return { ok: false, error: 'That backup is from a version of Tableau this page cannot read.' };
+      if (!Array.isArray(env.visited)) return { ok: false, error: 'That backup has no list of places in it.' };
+      if (env.visited.length > MAX_IMPORT) return { ok: false, error: 'That backup is too big (over ' + MAX_IMPORT + ' places), so it was not imported.' };
+      var entries = [], bad = 0;
+      env.visited.forEach(function (raw) {
+        var c = cleanEntry(raw);
+        if (c) entries.push(c); else bad++;
+      });
+      return { ok: true, entries: entries, bad: bad };
+    }
+
+    function mergeEntries(entries) {
+      var seen = {};
+      state.visited.forEach(function (e) { seen[dedupeKey(e)] = true; });
+      var usedIds = {};
+      state.visited.forEach(function (e) { usedIds[e.id] = true; });
+      var added = 0, dup = 0, capped = 0, fresh = [];
+      entries.forEach(function (e) {
+        var k = dedupeKey(e);
+        if (seen[k]) { dup++; return; }
+        if (state.visited.length + fresh.length >= MAX_TOTAL) { capped++; return; }
+        seen[k] = true;
+        if (!e.id || usedIds[e.id]) e.id = uid();
+        usedIds[e.id] = true;
+        fresh.push(e);
+        added++;
+      });
+      if (added) {
+        // same rule as add(): the first real entries replace any sample seeds
+        if (realCount() === 0) state.visited = state.visited.filter(function (e) { return !e.demo; });
+        state.visited = state.visited.concat(fresh);
+        persist();
+      }
+      return { added: added, dup: dup, capped: capped };
+    }
+
+    function importText(text) {
+      var res = parseBackup(text);
+      if (!res.ok) { say(res.error, true); return res; }
+      var m = mergeEntries(res.entries);
+      if (m.added) { setBackupMeta({ imported: true }); nudgeLive = false; }   // they clearly have a backup
+      var parts = [];
+      if (m.dup) parts.push(m.dup + ' already here');
+      if (res.bad) parts.push(res.bad + ' could not be read');
+      if (m.capped) parts.push(m.capped + ' over the size limit');
+      if (!m.added && !parts.length) say('That backup had no places in it.', false);
+      else if (!m.added) say('Nothing new to import (' + parts.join(', ') + ').', false);
+      else say('Imported ' + m.added + ' place' + (m.added === 1 ? '' : 's') + (parts.length ? ' (skipped: ' + parts.join(', ') + ')' : '') + '.', false);
+      render();
+      return { ok: true, added: m.added, dup: m.dup, bad: res.bad, capped: m.capped };
+    }
+
+    function importFromFile(file) {
+      if (!file) return;
+      if (file.size > MAX_FILE_BYTES) { say('That file is too big to be a Tableau backup (over 1 MB), so it was not imported.', true); return; }
+      try {
+        var fr = new FileReader();
+        fr.onload = function () { try { importText(String(fr.result || '')); } catch (e) { say('Could not import that file.', true); } };
+        fr.onerror = function () { say('Could not read that file.', true); };
+        fr.readAsText(file);
+      } catch (e) { say('Could not read that file.', true); }
+    }
+    function pickImport() {
+      if (!importFile) return;
+      try { importFile.value = ''; } catch (e) {}
+      importFile.click();
+    }
+
+    /* export button state + the one-time reminder */
+    function syncDataUi() {
+      var real = realCount();
+      if (exportBtn) exportBtn.disabled = real === 0;
+      if (!nudgeEl) return;
+      var meta = backupMeta();
+      var want = real >= 5 && !meta.exportedAt && !meta.imported && !meta.nudged && !meta.nudgeShown;
+      if (want && !nudgeLive) {          // first time it is ever shown: remember, so it never returns on its own
+        nudgeLive = true;
+        setBackupMeta({ nudgeShown: true });
+      }
+      var visible = nudgeLive && !meta.exportedAt && !meta.imported && !meta.nudged && real >= 5;
+      nudgeEl.hidden = !visible;
+      var t = $('visited-nudge-text');
+      if (visible && t) t.textContent = 'You have ' + real + ' places logged, and they live only in this browser. A quick backup keeps them safe if it is ever cleared.';
+    }
+    function dismissNudge() {
+      setBackupMeta({ nudged: true });
+      nudgeLive = false;
+      if (nudgeEl) nudgeEl.hidden = true;
+      announce('Reminder dismissed');
     }
 
     function renderStats(n, avg) {
@@ -6606,12 +6991,23 @@
       }
       var addBtn = $('add-place');
       if (addBtn) addBtn.addEventListener('click', function () { sheet.openBlank(); });
+      if (exportBtn) exportBtn.addEventListener('click', exportData);
+      if (importBtn) importBtn.addEventListener('click', pickImport);
+      if (importFile) importFile.addEventListener('change', function () {
+        importFromFile(importFile.files && importFile.files[0]);
+        // let the same file be picked again later (change fires only on a new value)
+        window.setTimeout(function () { try { importFile.value = ''; } catch (e) {} }, 0);
+      });
+      var nx = $('visited-nudge-export'), nd = $('visited-nudge-dismiss');
+      if (nx) nx.addEventListener('click', exportData);
+      if (nd) nd.addEventListener('click', dismissNudge);
       // initialise tab count
       var n = state.visited.length;
       if (tabCount) tabCount.textContent = n ? '(' + n + ')' : '';
     }
 
-    return { init: init, render: render, add: add, update: update, remove: remove };
+    return { init: init, render: render, add: add, update: update, remove: remove,
+             exportData: exportData, importText: importText, parseBackup: parseBackup, buildExport: buildExport };
   })();
 
   /* ================================================================== *
