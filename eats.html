@@ -116,8 +116,15 @@
              sitting low in the thumb zone. Watercolor lives in the background. -->
         <div class="find-landing" id="find-landing">
           <div class="find-hero">
-            <h2 class="find-hero-title">Where to, tonight?</h2>
-            <p class="find-hero-sub">A quiet nudge toward dinner.</p>
+            <h2 class="find-hero-title" id="find-hero-title">Where to, tonight?</h2>
+            <p class="find-hero-sub" id="find-hero-sub">A quiet nudge toward dinner.</p>
+          </div>
+
+          <!-- quiet memory strip: filled from real local state only (JS);
+               stays hidden (and out of layout) when there is nothing to say -->
+          <div class="find-memory" id="find-memory" hidden>
+            <p class="find-memory-line" id="find-memory-last" hidden></p>
+            <p class="find-memory-line" id="find-memory-list" hidden></p>
           </div>
 
           <div class="find-cta">

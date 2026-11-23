@@ -2829,6 +2829,55 @@
       var findActive = findTab ? findTab.getAttribute('aria-selected') === 'true' : true;
       var landingOn = findActive && landingEl && !landingEl.hidden;
       room.classList.toggle('find-landing-on', !!landingOn);
+      // refresh the hero + memory strip once each time the landing comes on
+      if (landingOn && !landingWasOn) refreshLanding();
+      landingWasOn = !!landingOn;
+    }
+
+    /* ---- time-aware hero + quiet memory strip ----
+       Computed once per landing show (no timer). The strip only ever states
+       real local facts: your most recent REAL Visited entry (built-in SAMPLE
+       entries are skipped, never shown) and your shortlist size. With nothing
+       to say it stays hidden and the landing is exactly the plain layout. */
+    var landingWasOn = false;
+    function heroCopy(h) {
+      if (h < 11) return ['Where to, for breakfast?', 'A quiet nudge toward a slow morning.'];
+      if (h < 16) return ['Where to, for lunch?', 'A quiet nudge toward midday.'];
+      if (h < 21) return ['Where to, tonight?', 'A quiet nudge toward dinner.'];
+      return ['Somewhere still open?', 'A quiet nudge toward a late bite.'];
+    }
+    function lastRealVisit() {
+      var list = state.visited || [], best = null;
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        if (!e || e.demo || !e.name) continue;
+        if (!best) { best = e; continue; }
+        var da = e.date || '', db = best.date || '';
+        if (da > db || (da === db && (e.ts || 0) > (best.ts || 0))) best = e;
+      }
+      return best;
+    }
+    function refreshLanding() {
+      var copy = heroCopy(new Date().getHours());
+      var t = $('find-hero-title'), sub = $('find-hero-sub');
+      if (t) t.textContent = copy[0];
+      if (sub) sub.textContent = copy[1];
+
+      var wrap = $('find-memory'), lastEl = $('find-memory-last'), listEl = $('find-memory-list');
+      if (!wrap || !lastEl || !listEl) return;
+      var last = lastRealVisit();
+      var n = deck.shortlistCount();
+      lastEl.hidden = !last;
+      if (last) lastEl.textContent = 'Last time: ' + last.name + ' · ' + fmtScore(overallOf(last));
+      listEl.hidden = !(n > 0);
+      if (n > 0) listEl.textContent = n + ' on your shortlist';
+      var any = !!last || n > 0;
+      wrap.hidden = !any;
+      wrap.classList.remove('is-in');
+      if (any && !prefersReducedMotion) {
+        void wrap.offsetWidth; // restart the one-shot fade/rise
+        wrap.classList.add('is-in');
+      }
     }
 
     /* ---- live fallback note ----
@@ -3177,6 +3226,7 @@
       showPick: showPick,
       showSurprise: showSurprise,
       syncHeaderChrome: syncHeaderChrome,
+      refreshLanding: refreshLanding,
       startSearch: startSearch,
       showLiveNote: showLiveNote,
       hideLiveNote: hideLiveNote,
@@ -8187,6 +8237,7 @@
     offline.init();
     // places hearted in the Feed on an earlier visit go back on the shortlist
     deck.hydrateHearts();
+    find.refreshLanding();
     // the Feed is the front door: it is the tab that opens with the app
     tabs.activate('feed');
 
