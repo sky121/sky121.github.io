@@ -3000,6 +3000,7 @@
 
     /* ---- Screen switching ---- */
     function hideAll() {
+      liveSearchToken++;   // leaving a screen drops any live search still in flight
       if (landingEl) landingEl.hidden = true;
       if (prefsWrap) prefsWrap.hidden = true;
       if (deckWrap) deckWrap.hidden = true;
@@ -3082,11 +3083,18 @@
       deck.showLoading();
 
       if (store.getKey() && !offline.isOffline()) {
+        var searchToken = ++liveSearchToken;
         resolveOriginLive(function (origin, label) {
+          if (searchToken !== liveSearchToken) return;   // a newer search replaced this one
+          // No location and nothing typed: do NOT quietly search somewhere
+          // else (the demo origin is San Francisco). Say so and hand the
+          // person the location field.
+          if (!origin) { needLocation(); return; }
           if (label) state.originLabel = label;
           state.origin = origin;
           setOriginText($('deck-origin'));
           gmaps.searchNearby(origin, function (err, list, more) {
+            if (searchToken !== liveSearchToken) return;
             if (err) {
               // A live search that cannot finish falls back to the sample
               // places rather than an empty deck — and says so plainly, on
@@ -3115,18 +3123,37 @@
       }
     }
 
-    /* Live: figure out the search origin (typed location, or geolocation). */
+    var liveSearchToken = 0;
+
+    /* Live: figure out the search origin (typed location, or geolocation).
+       cb(null) means "no usable location" — the caller says so. */
     function resolveOriginLive(cb) {
       if (state.origin && state.originLabel && state.originLabel !== 'near you') {
         cb(state.origin, state.originLabel);
         return;
       }
-      if (!navigator.geolocation) { cb(DEMO_ORIGIN, 'near you'); return; }
+      if (!navigator.geolocation) { cb(null); return; }
+      var settled = false;
+      function once(o, l) { if (settled) return; settled = true; cb(o, l); }
       navigator.geolocation.getCurrentPosition(
-        function (pos) { cb({ lat: pos.coords.latitude, lng: pos.coords.longitude }, 'near you'); },
-        function () { cb(DEMO_ORIGIN, 'near you'); },
+        function (pos) { once({ lat: pos.coords.latitude, lng: pos.coords.longitude }, 'near you'); },
+        function () { once(null); },
         { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
       );
+    }
+
+    /* Live mode, no location: back to the landing with the location field
+       open and focused, and one calm line saying what to do. */
+    function needLocation() {
+      var msg = 'I couldn\u2019t get your location \u2014 type a place under \u201csearch a specific location\u201d.';
+      showLanding();
+      var form = $('loc-form'), reveal = $('loc-reveal'), inp = $('loc-input');
+      if (form) form.hidden = false;
+      if (reveal) reveal.setAttribute('aria-expanded', 'true');
+      showLiveNote(msg);
+      announce(msg);
+      try { window.scrollTo(0, 0); } catch (e) {}   // the note sits at the top; make sure it is in view
+      if (inp) { try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); } }
     }
 
     /* DEMO: all sample restaurants, re-based near the origin, nearest-first. */
@@ -3286,7 +3313,12 @@
           state.originLabel = q;
           if (store.getKey() && !offline.isOffline()) {
             gmaps.geocode(q, function (err, origin) {
-              if (err || !origin) { settings.showError(err || 'Could not find that place.'); return; }
+              if (err || !origin) {
+                settings.showError(err || 'Could not find that place.');
+                showLiveNote(err || 'Could not find that place \u2014 try a city or a fuller address.');
+                return;
+              }
+              hideLiveNote();
               state.origin = origin;
               showPrefs(true);
             });
@@ -5423,39 +5455,77 @@
    * Google's own words), or a code we raised ourselves — and names it.
    * Nothing here ever includes the key.
    * ================================================================== */
-  var LIVE_ERRORS = {
-    shape: 'That doesn\u2019t look like a Google Maps key \u2014 they begin with \u201cAIza\u201d and run about 39 characters. Paste the whole key.',
-    invalid: 'Google says that key isn\u2019t valid. Copy it again from the Cloud Console \u2014 keys are easy to truncate.',
-    restricted: 'Google won\u2019t accept that key from this address. In the Cloud Console add this site to the key\u2019s HTTP-referrer list, and enable the Maps JavaScript API and the Places API.',
-    quota: 'That key is over its Google quota just now. Nothing is wrong with the key \u2014 try again later, or raise the cap in the Cloud Console.',
-    network: 'Couldn\u2019t reach Google \u2014 the connection dropped. Your key is kept; try again when you\u2019re back online.',
-    rejected: 'Google turned that key away. It is one of two things: the key isn\u2019t valid, or this address isn\u2019t on its referrer list.',
-    reload: 'Key saved. Reload the page to switch Tableau over to it \u2014 Google Maps can only be keyed once per page.',
-    unknown: 'Google answered with something unexpected. Sample data will hold the fort.'
+  /* Where this page lives, as a Google referrer rule — so the sentence can
+     name the exact thing to paste into the key's referrer list. */
+  function referrerRule() {
+    try { return location.origin + '/*'; } catch (e) { return 'https://sky121.github.io/*'; }
+  }
+  /* LIVE_TEXT[code]() -> [sheet text, deck-slip text]. The sheet (room for the fix, and for the causes in
+     likelihood order where Google does not say which); the slip is the paper
+     slip on the deck. Both are built per call so the referrer rule is the
+     real one. Neither ever contains the key. */
+  var LIVE_TEXT = {
+    shape: function () { return [
+      'That doesn’t look like a Google Maps key — they begin with “AIza” and run about 39 characters. Paste the whole key.',
+      'That doesn’t look like a Google key.']; },
+    invalid: function () { return [
+      'Google says that key isn’t valid. Copy it again from the Cloud Console — keys are easy to truncate.',
+      'Google says that key isn’t valid — copy it again from the Cloud Console.']; },
+    notenabled: function () { return [
+      'Places API (New) isn’t enabled for this key’s Google Cloud project. In the Cloud Console open APIs & Services, enable “Places API (New)” (and “Maps JavaScript API”), then try again.',
+      'Places API (New) isn’t enabled for this key’s project — enable it in the Cloud Console.']; },
+    billing: function () { return [
+      'Billing isn’t attached to this key’s Google Cloud project. Places needs a billing account even inside the free monthly credit — link one in the Cloud Console, then try again.',
+      'Billing isn’t attached to this key’s Google Cloud project.']; },
+    restricted: function () { return [
+      'This key is restricted to other websites. In the Cloud Console, add ' + referrerRule() + ' to the key’s HTTP-referrer list.',
+      'This key is restricted to other websites — add ' + referrerRule() + ' to its referrer list.']; },
+    apiblocked: function () { return [
+      'This key’s API restrictions leave out Places API (New). In the Cloud Console add “Places API (New)” and “Maps JavaScript API” to the key’s allowed APIs.',
+      'This key’s API restrictions leave out Places API (New) — add it to the key.']; },
+    quota: function () { return [
+      'Google’s daily quota for this key is used up. Nothing is wrong with the key — try again tomorrow, or raise the cap in the Cloud Console.',
+      'Google’s daily quota for this key is used up.']; },
+    denied: function () { return [
+      'Google refused the request and didn’t say why. In likely order: Places API (New) isn’t enabled for the project, billing isn’t attached, or the key is restricted to other websites (it needs ' + referrerRule() + ').',
+      'Google refused the request without saying why — likely Places API (New) isn’t enabled, billing isn’t attached, or the key is restricted to other sites.']; },
+    rejected: function () { return [
+      'Google rejected the key and doesn’t say which way. In likely order: billing isn’t attached to the project, the key is restricted to other websites (it needs ' + referrerRule() + '), or it was mistyped.',
+      'Google rejected the key — likely billing isn’t attached, it’s restricted to other websites (needs ' + referrerRule() + '), or it was mistyped.']; },
+    network: function () { return [
+      'Couldn’t reach Google — the connection dropped. Your key is kept; try again when you’re back online.',
+      'Couldn’t reach Google — check your connection.']; },
+    timeout: function () { return [
+      'Google took too long to answer. Either the connection is poor, or Google is quietly refusing the key (Places API (New) not enabled, billing missing, or a referrer restriction). Try again; if it repeats, check those three in the Cloud Console.',
+      'Google took too long to answer — check your connection, or the key’s API, billing and referrer settings.']; },
+    timeoutload: function () { return [
+      'Google Maps didn’t finish loading. Either the connection is poor, or Google is quietly refusing the key (billing missing, a referrer restriction, or a mistyped key). Try again; if it repeats, check the key in the Cloud Console.',
+      'Google Maps didn’t load in time — check your connection, then the key’s billing and referrer settings.']; },
+    unavailable: function () { return [
+      'Live restaurants are unavailable right now.',
+      'Live restaurants are unavailable right now.']; },
+    reload: function () { return [
+      'Key saved. Reload the page to switch Tableau over to it — Google Maps can only be keyed once per page.',
+      'Reload the page to use the new key.']; },
+    unknown: function () { return [
+      'Google answered with something unexpected, so the cause isn’t clear. Try again in a minute; if it repeats, check the key in the Cloud Console (API enabled, billing, referrer list).',
+      'Live search failed and Google didn’t say why — try again in a minute.']; }
   };
-  /* The same failures, short enough for the paper slip on the deck. */
-  var LIVE_SHORT = {
-    shape: 'That key doesn\u2019t look like a Google key.',
-    invalid: 'Google says that key isn\u2019t valid.',
-    restricted: 'Google blocked that key from this site.',
-    quota: 'Google\u2019s quota for that key is used up.',
-    network: 'Couldn\u2019t reach Google.',
-    rejected: 'Google turned that key away.',
-    reload: 'Reload the page to use the new key.',
-    unknown: 'Live search hit a snag.'
-  };
-  function liveErrorText(code) { return LIVE_ERRORS[code] || LIVE_ERRORS.unknown; }
-  function liveShortText(code) { return LIVE_SHORT[code] || LIVE_SHORT.unknown; }
+  function liveErrorText(code) { return (LIVE_TEXT[code] || LIVE_TEXT.unknown)()[0]; }
+  function liveShortText(code) { return (LIVE_TEXT[code] || LIVE_TEXT.unknown)()[1]; }
 
   function classifyLive(x) {
     if (x == null) return 'unknown';
     var t = typeof x;
     var str = (t === 'string') ? x
       : [x.message, x.name, x.status, x.code, x.reason].join(' ');
-    if (/API key not valid|API_?KEY_?INVALID|InvalidKey|MissingKey|keyInvalid|malformed/i.test(str)) return 'invalid';
+    if (/API key not valid|API_?KEY_?INVALID|InvalidKey|MissingKey|keyInvalid|malformed|ExpiredKey/i.test(str)) return 'invalid';
     if (/quota|OVER_QUERY_LIMIT|RESOURCE_EXHAUSTED|OverQuota|rate.?limit|dailyLimit|429/i.test(str)) return 'quota';
-    if (/referer|referrer|RefererNotAllowed|PERMISSION_DENIED|SERVICE_DISABLED|ApiNotActivated|ApiTargetBlocked|has not been used in project|not authorized|forbidden|403/i.test(str)) return 'restricted';
-    if (/REQUEST_DENIED/i.test(str)) return 'rejected';  // legacy: cannot tell the two apart
+    if (/BillingNotEnabled|BILLING_DISABLED|requires billing|enable billing|billing (is not|must be|account)/i.test(str)) return 'billing';
+    if (/SERVICE_DISABLED|ApiNotActivated|has not been used in project|is disabled|not enabled|not been enabled|legacy API|not activated/i.test(str)) return 'notenabled';
+    if (/referer|referrer|RefererNotAllowed/i.test(str)) return 'restricted';
+    if (/ApiTargetBlocked|API_KEY_SERVICE_BLOCKED|API restrictions?|API target/i.test(str)) return 'apiblocked';
+    if (/REQUEST_DENIED|PERMISSION_DENIED|not authorized|forbidden|403/i.test(str)) return 'denied';  // cannot tell the causes apart
     if (/network|Failed to fetch|NetworkError|ERR_|timed? ?out|UNKNOWN_ERROR|offline/i.test(str)) return 'network';
     return 'unknown';
   }
@@ -5469,28 +5539,36 @@
    * Loaded ONLY when a key exists, via the documented async bootstrap
    * loader (loading=async).
    *
-   * NEAREST-FIRST, EXHAUSTIVE OUTWARD SEARCH:
-   *   We use the legacy PlacesService.nearbySearch with
-   *   rankBy = google.maps.places.RankBy.DISTANCE. Unlike the newer
-   *   Place.searchNearby (which caps at 20 results, can't paginate, and
-   *   has no true distance ranking), the legacy nearbySearch returns
-   *   results ordered NEAREST FIRST and exposes pagination via the
-   *   PlaceSearchPagination object (`pagination.hasNextPage` +
-   *   `pagination.nextPage()`), yielding up to ~60 places that fan
-   *   outward from the origin. That is exactly the "nearest-first,
-   *   extend outward exhaustively" behaviour we want, so we prefer it.
+   * WHICH PLACES API (2026-11-23): the NEW one first. Google's legacy Places
+   * API (PlacesService / Autocomplete) is not available to Cloud projects
+   * created recently, so a brand-new project that enables only "Places API
+   * (New)" would be refused by the legacy service. runSearch therefore calls
+   *   google.maps.places.Place.searchNearby({ fields, locationRestriction:
+   *   {center, radius}, includedTypes:['restaurant'], maxResultCount:20,
+   *   rankPreference: SearchNearbyRankPreference.DISTANCE })
+   * which DOES rank by distance (nearest first) — the old comment here that
+   * claimed otherwise was wrong. Its limits: at most 20 places per request
+   * and NO pagination, so `more` is null on this path and the deck hides
+   * "Search farther" (asking the same nearest-20 for a bigger radius would
+   * return the same 20). If the new API throws something that says "not
+   * available to you" (not enabled / denied / API-restricted key / an
+   * unrecognised error) the LEGACY nearbySearch(rankBy DISTANCE) path runs as
+   * a fallback for projects that still have it; that path keeps its ~60 place
+   * pagination and its `more` handle.
    *
-   *   Note: with rankBy=DISTANCE you must NOT pass a radius, and you must
-   *   pass either `keyword`, `type`, or `name` (we pass type:'restaurant').
+   * EVERY live search must finish: searchNearby() arms a 15 s watchdog that
+   * covers script load + permission + request. A real answer, an auth
+   * failure (gm_authFailure), a script error (onerror) or the watchdog —
+   * whichever comes first — settles the search exactly once; the rest are
+   * ignored. The caller always gets either places or a plain-language reason.
    *
    * searchNearby(origin, done) -> done(err, list, more)
-   *   `more` is null when there are no further pages, otherwise an object
-   *   { fetch: function(cb){...} } that loads the next page and itself
-   *   calls cb(err, list, more) — letting find.loadMore() keep going
-   *   outward until exhausted.
+   *   `err` is an already-humanised string (never contains the key).
+   *   `more` is null when there is no further page, otherwise
+   *   { fetch: function(cb){...} } (legacy path only).
    *
-   * NOTE: live calls cannot be exercised without a key + network; this
-   * code is written to the documented API and commented.
+   * NOTE: written to the documented API; the app's handling is exercised
+   * against a stub in tests, but real Google behaviour needs a real key.
    * ================================================================== */
   var gmaps = (function () {
     var readyCbs = [];
@@ -5501,6 +5579,21 @@
     var loadedKey = '';
     var authFailCb = null;   // set while a key is being validated
     var loadFailCb = null;
+    var SEARCH_TIMEOUT_MS = 15000;
+    var pendingSearches = [];   // settle-functions of live searches in flight
+
+    function shippedActive() {
+      return !!(CONFIG_KEY && loadedKey === CONFIG_KEY && !store.getUserKey());
+    }
+
+    /* Settle every search still waiting, with one humanised reason.
+       Returns true when at least one was waiting. */
+    function flushPending(code) {
+      var list = pendingSearches.slice(); pendingSearches.length = 0;
+      var text = liveShortText(code);
+      list.forEach(function (f) { try { f(text, null, null); } catch (e) {} });
+      return list.length > 0;
+    }
 
     /* The site's shipped key could not be used (script blocked, key refused,
        referrer not allowed). The visitor did nothing wrong and cannot fix it,
@@ -5509,12 +5602,12 @@
        callbacks fail inside their own try/catch and take the normal
        "sample places instead" path). Returns true when it handled it. */
     function shippedKeyFailed() {
-      if (!(CONFIG_KEY && loadedKey === CONFIG_KEY && !store.getUserKey())) return false;
+      if (!shippedActive()) return false;
       configKeyDead = true;
       var cbs = readyCbs.slice(); readyCbs.length = 0;
       cbs.forEach(function (cb) { try { cb(); } catch (e) {} });
       try { settings.refreshMode(); find.syncDemoNote(); } catch (e) {}
-      toast('Live restaurants are unavailable right now \u2014 showing sample places');
+      toast('Live restaurants are unavailable right now — showing sample places');
       announce('Live restaurants are unavailable right now. Showing sample places.');
       return true;
     }
@@ -5535,15 +5628,17 @@
         cbs.forEach(function (cb) { cb(); });
       };
 
-      // Catch auth failures (invalid key / referrer / over-quota). Google
-      // does not tell these apart here, so the message names both causes;
-      // the validation probe below is what separates them when it can.
+      // Catch auth failures (invalid key / referrer / billing). Google does
+      // not tell these apart here, so the message lists the likely causes in
+      // order; the validation probe below is what separates them when it can.
       window.gm_authFailure = function () {
         state.mapsLoading = false;
         if (authFailCb) { var f = authFailCb; authFailCb = null; f('rejected'); return; }
+        // a search is waiting: answer IT now (not after the watchdog)
+        var flushed = flushPending(shippedActive() ? 'unavailable' : 'rejected');
         if (shippedKeyFailed()) return;
         settings.showCode('rejected');
-        settings.open();
+        if (!flushed) settings.open();   // nothing on screen explains it yet
       };
 
       try {
@@ -5561,12 +5656,14 @@
         s.onerror = function () {
           state.mapsLoading = false;
           if (loadFailCb) { var g = loadFailCb; loadFailCb = null; g('network'); return; }
+          flushPending('network');
           if (shippedKeyFailed()) return;
           settings.showCode('network');
         };
         document.head.appendChild(s);
       } catch (e) {
         state.mapsLoading = false;
+        flushPending('network');
         settings.showCode('network');
       }
     }
@@ -5588,73 +5685,183 @@
       return placesService;
     }
 
-    /* searchNearby — legacy PlacesService.nearbySearch, rankBy DISTANCE.
-       Returns nearest-first results + a pagination handle for "load more". */
+    /* searchNearby — the public entry. Settles EXACTLY ONCE: first of a real
+       answer, an auth/script failure (flushPending) or the watchdog. */
     function searchNearby(origin, done) {
+      var finished = false, timer = null;
+      function finish(err, list, more) {
+        if (finished) return;            // a late answer after the watchdog is dropped
+        finished = true;
+        if (timer) { window.clearTimeout(timer); timer = null; }
+        var i = pendingSearches.indexOf(finish);
+        if (i !== -1) pendingSearches.splice(i, 1);
+        done(err, list, more);
+      }
+      pendingSearches.push(finish);
+      timer = window.setTimeout(function () {
+        timer = null;
+        // loaded-but-silent and never-loaded are different stories
+        finish(liveShortText(state.mapsLoaded ? 'timeout' : 'timeoutload'), null, null);
+      }, SEARCH_TIMEOUT_MS);
       whenReady(function () {
-        runSearch(origin, done);
+        if (finished) return;
+        runSearch(origin, finish);
       });
-      // if loading silently fails, the auth/onerror handlers report it.
     }
+
+    /* Errors that mean "the NEW Places API is not usable by this key/project"
+       — the legacy service is worth one try. Everything else (bad key, quota,
+       billing, referrer, network) would hit the legacy API identically. */
+    var LEGACY_RETRY = { notenabled: 1, denied: 1, apiblocked: 1, unknown: 1 };
+    // Set once the new API has said "not for you" and the legacy one worked:
+    // later calls (place details) go straight to the legacy service instead
+    // of paying a failing request per card first.
+    var newApiOff = false;
 
     function runSearch(origin, done) {
       try {
         google.maps.importLibrary('places').then(function (places) {
-          var service = getService(places);
-          var RankBy = places.RankBy;
-
-          var request = {
-            location: { lat: origin.lat, lng: origin.lng },
-            // rankBy DISTANCE => nearest-first, and NO radius allowed.
-            rankBy: RankBy ? RankBy.DISTANCE : undefined,
-            // rankBy=DISTANCE requires keyword/name/type; food places.
-            type: 'restaurant'
-          };
-
-          service.nearbySearch(request, function (results, status, pagination) {
-            handlePage(origin, results, status, pagination, done);
-          });
+          if (places && places.Place && typeof places.Place.searchNearby === 'function') {
+            searchNew(places, origin).then(function (list) {
+              done(null, list, null);
+            }, function (e) {
+              var code = classifyLive(e);
+              if (!LEGACY_RETRY[code]) { done(liveShortText(code), null, null); return; }
+              searchLegacy(places, origin, function (err, list, more) {
+                // both failed: the NEW api's reason is the useful one
+                if (err) { done(liveShortText(code), null, null); return; }
+                newApiOff = true;
+                done(null, list, more);
+              });
+            });
+          } else {
+            searchLegacy(places, origin, done);
+          }
         }).catch(function (e) {
-          done(humanizeError(e), null);
+          done(humanizeError(e), null, null);
         });
       } catch (e) {
-        done(humanizeError(e), null);
+        done(humanizeError(e), null, null);
       }
     }
 
-    // Shared handler for the first page and every subsequent page.
-    function handlePage(origin, results, status, pagination, done) {
-      var P = google.maps.places;
-      if (status !== P.PlacesServiceStatus.OK && status !== P.PlacesServiceStatus.ZERO_RESULTS) {
-        done(humanizeStatus(status), null);
-        return;
+    /* ---- NEW: Place.searchNearby, nearest first, up to 20 ---- */
+    // Fields requested: every one is used below. regularOpeningHours +
+    // utcOffsetMinutes feed the shared real-hours code; photos give a thumb.
+    var NEW_FIELDS = ['id', 'displayName', 'location', 'formattedAddress', 'rating',
+      'userRatingCount', 'priceLevel', 'regularOpeningHours', 'utcOffsetMinutes',
+      'types', 'primaryType', 'businessStatus', 'photos'];
+
+    function searchNew(places, origin) {
+      var rank = places.SearchNearbyRankPreference;
+      function ask(radius) {
+        return places.Place.searchNearby({
+          fields: NEW_FIELDS,
+          locationRestriction: { center: { lat: origin.lat, lng: origin.lng }, radius: radius },
+          includedTypes: ['restaurant'],
+          maxResultCount: 20,
+          rankPreference: rank ? rank.DISTANCE : 'DISTANCE'
+        });
       }
-      var list = (results || []).map(function (p) { return mapPlace(p, origin); });
-      // already nearest-first from the API, but enforce it defensively.
+      // 5 km first; a genuinely empty 5 km (rural) gets one 50 km retry.
+      return ask(5000).then(function (res) {
+        var arr = (res && res.places) || [];
+        return arr.length ? res : ask(50000);
+      }).then(function (res) {
+        var arr = ((res && res.places) || []).filter(function (p) {
+          return p && p.businessStatus !== 'CLOSED_PERMANENTLY';
+        });
+        return Promise.all(arr.map(openFlag)).then(function (flags) {
+          var list = arr.map(function (p, i) { return mapPlaceNew(p, origin, flags[i]); });
+          sortNearest(list);
+          return list;
+        });
+      });
+    }
+
+    // Place.isOpen() is computed locally from the fields we asked for (it
+    // returns undefined when it cannot tell) — never a request of its own.
+    function openFlag(p) {
+      try {
+        if (p && typeof p.isOpen === 'function') {
+          return Promise.resolve(p.isOpen()).then(
+            function (v) { return typeof v === 'boolean' ? v : null; },
+            function () { return null; });
+        }
+      } catch (e) {}
+      return Promise.resolve(null);
+    }
+
+    function sortNearest(list) {
       list.sort(function (a, b) {
         if (a.distance == null) return 1;
         if (b.distance == null) return -1;
         return a.distance - b.distance;
       });
+    }
+
+    /* ---- LEGACY: PlacesService.nearbySearch, rankBy DISTANCE (+ pages) ---- */
+    function searchLegacy(places, origin, done) {
+      try {
+        var service = getService(places);
+        var RankBy = places.RankBy;
+        var request = {
+          location: { lat: origin.lat, lng: origin.lng },
+          // rankBy DISTANCE => nearest-first, and NO radius allowed.
+          rankBy: RankBy ? RankBy.DISTANCE : undefined,
+          // rankBy=DISTANCE requires keyword/name/type; food places.
+          type: 'restaurant'
+        };
+        var first = true;
+        service.nearbySearch(request, function (results, status, pagination) {
+          var isFirst = first; first = false;
+          handlePage(places, origin, results, status, pagination, done, isFirst);
+        });
+      } catch (e) {
+        done(humanizeError(e), null, null);
+      }
+    }
+
+    // Shared handler for the first page and every subsequent page.
+    function handlePage(P, origin, results, status, pagination, done, isFirst) {
+      if (status !== P.PlacesServiceStatus.OK && status !== P.PlacesServiceStatus.ZERO_RESULTS) {
+        if (!isFirst && pendingMoreCb) { var ecb = pendingMoreCb; pendingMoreCb = null; ecb(humanizeStatus(status), null, null); return; }
+        done(humanizeStatus(status), null, null);
+        return;
+      }
+      var list = (results || []).map(function (p) { return mapPlace(p, origin); });
+      // already nearest-first from the API, but enforce it defensively.
+      sortNearest(list);
 
       // Build an outward-expanding "more" handle if another page exists.
       // pagination.nextPage() re-invokes the SAME nearbySearch callback
-      // (handlePage) with the next page of farther-out results, so we
-      // route that next page to the caller's cb via a one-shot.
+      // (handlePage, isFirst=false) with the next page of farther-out
+      // results, routed to the caller's cb via a one-shot (with a timeout:
+      // a page that never arrives must not freeze the button).
       var more = null;
       if (pagination && pagination.hasNextPage) {
         more = {
           fetch: function (cb) {
-            pendingMoreCb = cb;
+            var settled = false;
+            var t = window.setTimeout(function () {
+              if (settled) return;
+              settled = true; pendingMoreCb = null;
+              cb(liveShortText('timeout'), null, null);
+            }, 12000);
+            pendingMoreCb = function (e, l, m) {
+              if (settled) return;
+              settled = true; window.clearTimeout(t);
+              cb(e, l, m);
+            };
             pagination.nextPage();
           }
         };
       }
       // Deliver this page.
-      if (pendingMoreCb) {
+      if (!isFirst && pendingMoreCb) {
         var cb = pendingMoreCb; pendingMoreCb = null;
         cb(null, list, more);
-      } else {
+      } else if (isFirst) {
         done(null, list, more);
       }
     }
@@ -5793,42 +6000,35 @@
       if (typeof flag !== 'boolean') r.open = derivedOpen;
     }
 
-    // Map a legacy PlaceResult to our internal result shape.
-    function mapPlace(p, origin) {
-      var loc = null;
-      try {
-        if (p.geometry && p.geometry.location) {
-          loc = { lat: p.geometry.location.lat(), lng: p.geometry.location.lng() };
-        }
-      } catch (e) {}
-      // A thumb-sized photo URL. getUrl() only BUILDS a string — the image
-      // itself is not fetched until a surface actually paints it, so places
-      // that never render never cost a photo request.
-      var photoUrl = null;
-      try {
-        if (p.photos && p.photos.length && typeof p.photos[0].getUrl === 'function') {
-          photoUrl = p.photos[0].getUrl({ maxWidth: 400, maxHeight: 400 });
-        }
-      } catch (e) {}
-      var out = {
-        id: p.place_id,
-        placeId: p.place_id,
-        name: p.name || 'Unnamed place',
-        rating: p.rating || 0,
-        reviews: p.user_ratings_total || 0,
-        price: (typeof p.price_level === 'number' && p.price_level > 0) ? p.price_level : 0,
-        type: typeArr(p.types),
+    /* The ONE place a live result object is built, so the legacy and the new
+       Places surfaces cannot drift apart. `f` carries already-normalised
+       primitives; nothing here knows which API they came from. */
+    function buildResult(f, origin) {
+      var loc = f.loc || null;
+      return {
+        id: f.id,
+        placeId: f.id,
+        name: f.name || 'Unnamed place',
+        rating: f.rating || 0,
+        reviews: f.reviews || 0,
+        price: f.price || 0,
+        type: f.type || '',
         // Map Google `types` to our Preferences cuisine keys so prefs filter live results.
-        cuisines: cuisineKeys(p.types),
+        cuisines: f.cuisines || [],
         diet: [],     // Places doesn't expose dietary flags; left empty (no false filtering)
-        dining: [],   // Places doesn't expose dine-in/takeout/delivery reliably on nearbySearch
-        // nearbySearch carries at most a binary open_now — real periods
-        // arrive with the Details call (fetchDetails -> applyHours).
+        dining: [],   // not reliably exposed in search results
+        // A search result carries at most a binary open flag (plus, on the
+        // new API, periods) — applyHours fills these in below; no time is
+        // ever invented.
         open: null,
         openH: null,
         closeH: null,
-        phone: null, // not returned by nearbySearch; the Details call (fetchDetails) adds it
-        photoUrl: photoUrl,
+        phone: null, // the Details call (fetchDetails) adds it
+        // Thumb-sized URL, built (not fetched) here. It carries Google's own
+        // key parameter, so it lives in memory only: never logged, never
+        // stored, never exported.
+        photoUrl: f.photoUrl || null,
+        address: f.address || '',
         // story segments — populated lazily by fetchDetails (photos + reviews).
         // Until then they collapse to a labeled watercolor panel.
         segments: {
@@ -5838,12 +6038,89 @@
         },
         location: loc,
         distance: loc ? haversineMiles(origin, loc) : null,
-        mapsUri: p.place_id ? 'https://www.google.com/maps/place/?q=place_id:' + p.place_id : null,
+        mapsUri: f.id ? 'https://www.google.com/maps/place/?q=place_id:' + f.id : null,
         detailsLoaded: false
       };
-      // nearbySearch only ever carries open_now, so this sets the binary
-      // state and leaves openH/closeH null — no time is ever invented.
+    }
+
+    // Map a legacy PlaceResult to our internal result shape.
+    function mapPlace(p, origin) {
+      var loc = null;
+      try {
+        if (p.geometry && p.geometry.location) {
+          loc = { lat: p.geometry.location.lat(), lng: p.geometry.location.lng() };
+        }
+      } catch (e) {}
+      var photoUrl = null;
+      try {
+        if (p.photos && p.photos.length && typeof p.photos[0].getUrl === 'function') {
+          photoUrl = p.photos[0].getUrl({ maxWidth: 400, maxHeight: 400 });
+        }
+      } catch (e) {}
+      var out = buildResult({
+        id: p.place_id,
+        name: p.name,
+        rating: p.rating,
+        reviews: p.user_ratings_total,
+        price: (typeof p.price_level === 'number' && p.price_level > 0) ? p.price_level : 0,
+        type: typeArr(p.types),
+        cuisines: cuisineKeys(p.types),
+        photoUrl: photoUrl,
+        loc: loc
+      }, origin);
+      // legacy nearbySearch only ever carries open_now, so this sets the
+      // binary state and leaves openH/closeH null.
       applyHours(out, p.opening_hours, p.utc_offset_minutes);
+      return out;
+    }
+
+    // Place.priceLevel -> our 0-4. The JS enum is FREE / INEXPENSIVE /
+    // MODERATE / EXPENSIVE / VERY_EXPENSIVE (the REST spelling adds a
+    // PRICE_LEVEL_ prefix) — both read here, numbers too.
+    function priceFromNew(v) {
+      if (typeof v === 'number') return (v > 0 && v <= 4) ? v : 0;
+      var t = String(v == null ? '' : v).replace(/^PRICE_LEVEL_/i, '').toUpperCase();
+      return ({ INEXPENSIVE: 1, MODERATE: 2, EXPENSIVE: 3, VERY_EXPENSIVE: 4 })[t] || 0;
+    }
+    function latLngOf(l) {
+      if (!l) return null;
+      try {
+        var la = (typeof l.lat === 'function') ? l.lat() : l.lat;
+        var ln = (typeof l.lng === 'function') ? l.lng() : l.lng;
+        return (isFinite(la) && isFinite(ln)) ? { lat: +la, lng: +ln } : null;
+      } catch (e) { return null; }
+    }
+
+    // Map a NEW-API Place (fields per NEW_FIELDS) to the same result shape.
+    function mapPlaceNew(p, origin, openNow) {
+      var photoUrl = null;
+      try {
+        if (p.photos && p.photos.length && typeof p.photos[0].getURI === 'function') {
+          photoUrl = p.photos[0].getURI({ maxWidth: 400, maxHeight: 400 });
+        }
+      } catch (e) {}
+      // primaryType first ("italian_restaurant"), then the rest; a bare
+      // "restaurant" label is noise next to a specific one.
+      var all = [];
+      if (p.primaryType) all.push(p.primaryType);
+      (p.types || []).forEach(function (t) { if (all.indexOf(t) === -1) all.push(t); });
+      var labelTypes = all.length > 1 ? all.filter(function (t) { return t !== 'restaurant'; }) : all;
+      var out = buildResult({
+        id: p.id,
+        name: (typeof p.displayName === 'string') ? p.displayName : (p.displayName && p.displayName.text),
+        rating: (typeof p.rating === 'number') ? p.rating : 0,
+        reviews: (typeof p.userRatingCount === 'number') ? p.userRatingCount : 0,
+        price: priceFromNew(p.priceLevel),
+        type: typeArr(labelTypes),
+        cuisines: cuisineKeys(all),
+        photoUrl: photoUrl,
+        address: p.formattedAddress || '',
+        loc: latLngOf(p.location)
+      }, origin);
+      var rh = p.regularOpeningHours;
+      applyHours(out, (rh || openNow !== null)
+        ? { periods: rh && rh.periods, openNow: (typeof openNow === 'boolean') ? openNow : undefined }
+        : null, p.utcOffsetMinutes);
       return out;
     }
 
@@ -5922,6 +6199,22 @@
 
     function probeKey(finish) {
       var origin = state.origin || DEMO_ORIGIN;
+      function legacyProbe(places, newCode) {
+        try {
+          var service = getService(places);
+          service.nearbySearch({
+            location: { lat: origin.lat, lng: origin.lng },
+            rankBy: places.RankBy ? places.RankBy.DISTANCE : undefined,
+            type: 'restaurant'
+          }, function (results, status) {
+            var P = places;
+            if (status === P.PlacesServiceStatus.OK ||
+                status === P.PlacesServiceStatus.ZERO_RESULTS) { finish(null); return; }
+            // both failed: the new API's reason is the useful one
+            finish(newCode || classifyLive(status));
+          });
+        } catch (e) { finish(newCode || classifyLive(e)); }
+      }
       try {
         google.maps.importLibrary('places').then(function (places) {
           if (places.Place && typeof places.Place.searchNearby === 'function') {
@@ -5931,43 +6224,57 @@
                 center: { lat: origin.lat, lng: origin.lng },
                 radius: 500
               },
-              includedPrimaryTypes: ['restaurant'],
+              includedTypes: ['restaurant'],
               maxResultCount: 1
             }).then(function () { finish(null); },
-                    function (e) { finish(classifyLive(e)); });
+                    function (e) {
+                      var code = classifyLive(e);
+                      if (LEGACY_RETRY[code]) legacyProbe(places, code);
+                      else finish(code);
+                    });
             return;
           }
-          var service = getService(places);
-          service.nearbySearch({
-            location: { lat: origin.lat, lng: origin.lng },
-            rankBy: places.RankBy ? places.RankBy.DISTANCE : undefined,
-            type: 'restaurant'
-          }, function (results, status) {
-            var P = google.maps.places;
-            if (status === P.PlacesServiceStatus.OK ||
-                status === P.PlacesServiceStatus.ZERO_RESULTS) { finish(null); return; }
-            finish(classifyLive(status));
-          });
+          legacyProbe(places, null);
         }).catch(function (e) { finish(classifyLive(e)); });
       } catch (e) { finish(classifyLive(e)); }
     }
 
     /* geocode — turn a typed address into {lat,lng} (Geocoding library). */
     function geocode(query, done) {
+      var settled = false, timer = null;
+      function fin(err, o) {
+        if (settled) return;
+        settled = true;
+        if (timer) window.clearTimeout(timer);
+        var i = pendingSearches.indexOf(hook);
+        if (i !== -1) pendingSearches.splice(i, 1);
+        done(err, o);
+      }
+      function hook(err) { fin(err, null); }
+      // same promise as the search: a lookup must finish, one way or another
+      timer = window.setTimeout(function () {
+        fin(liveShortText(state.mapsLoaded ? 'timeout' : 'timeoutload'), null);
+      }, 12000);
+      pendingSearches.push(hook);   // auth/script failure answers it now
       whenReady(function () {
+        if (settled) return;
         try {
           google.maps.importLibrary('geocoding').then(function (geo) {
             var geocoder = new geo.Geocoder();
             geocoder.geocode({ address: query }, function (results, status) {
               if (status === 'OK' && results && results[0]) {
                 var l = results[0].geometry.location;
-                done(null, { lat: l.lat(), lng: l.lng() });
+                fin(null, { lat: l.lat(), lng: l.lng() });
+              } else if (status === 'REQUEST_DENIED') {
+                fin('Google refused the lookup \u2014 enable \u201cGeocoding API\u201d for this key\u2019s project, or use \u201cFind a place near me\u201d.', null);
+              } else if (status === 'OVER_QUERY_LIMIT') {
+                fin(liveShortText('quota'), null);
               } else {
-                done('Could not find "' + query + '".', null);
+                fin('Could not find \u201c' + query + '\u201d \u2014 try a city or a fuller address.', null);
               }
             });
-          }).catch(function (e) { done(humanizeError(e), null); });
-        } catch (e) { done(humanizeError(e), null); }
+          }).catch(function (e) { fin(humanizeError(e), null); });
+        } catch (e) { fin(humanizeError(e), null); }
       });
     }
 
@@ -6018,62 +6325,116 @@
       whenReady(function () {
         try {
           google.maps.importLibrary('places').then(function (places) {
-            var service = getService(places);
-            service.getDetails({
-              placeId: r.placeId,
-              // Minimal fields: photos, reviews, phone, hours, name.
-              // Minimal, and every field is used: opening_hours carries the
-              // real `periods` the status chip needs; utc_offset_minutes is
-              // how we know those hours belong on this browser's clock.
-              fields: ['photos', 'reviews', 'formatted_phone_number', 'international_phone_number',
-                'opening_hours', 'utc_offset_minutes', 'name']
-            }, function (place, status) {
-              var P = google.maps.places;
-              if (status !== P.PlacesServiceStatus.OK || !place) { done && done(humanizeStatus(status), null); return; }
-
-              // phone
-              r.phone = place.international_phone_number || place.formatted_phone_number || r.phone || null;
-
-              // REAL HOURS: Details is the only call that returns `periods`,
-              // so this is where a live place stops being a binary open/shut
-              // flag and starts saying "Closes at 9:30pm" like a demo place.
-              try {
-                applyHours(r, place.opening_hours,
-                  (place.utc_offset_minutes != null) ? place.utc_offset_minutes : place.utc_offset);
-              } catch (e) {}
-
-              // photos split across vibe + food segments
-              var urls = [];
-              try {
-                // four at most, card-sized: the trio only ever shows two of
-                // them, and a card face is ~330px wide on a phone.
-                (place.photos || []).slice(0, 4).forEach(function (ph) {
-                  if (typeof ph.getUrl === 'function') urls.push(ph.getUrl({ maxWidth: 640, maxHeight: 800 }));
+            if (!newApiOff && places && places.Place && typeof places.Place.prototype.fetchFields === 'function') {
+              detailsNew(places, r, function (err) {
+                if (!err) { done && done(null, r); return; }
+                var code = err.code;
+                if (!LEGACY_RETRY[code]) { done && done(liveShortText(code), null); return; }
+                detailsLegacy(places, r, function (e2) {
+                  if (e2) { done && done(liveShortText(code), null); return; }
+                  newApiOff = true;
+                  done && done(null, r);
                 });
-              } catch (e) {}
-              if (urls.length) {
-                var mid = Math.ceil(urls.length / 2);
-                r.segments.vibe.photoUrl = urls[0] || null;
-                r.segments.food.photoUrl = urls[mid] || urls[0] || null;
-                r.segments.vibe.caption = '';
-                r.segments.food.caption = '';
-              }
-
-              // reviews -> quotes (Google rating is 0-5 -> x20 for our scale)
-              try {
-                r.segments.reviews.quotes = (place.reviews || []).slice(0, 3).map(function (rv) {
-                  return {
-                    by: rv.author_name || 'A diner',
-                    score: Math.round((rv.rating || 0) * 20),
-                    text: (rv.text || '').slice(0, 180)
-                  };
-                });
-              } catch (e) {}
-
-              done && done(null, r);
-            });
+              });
+            } else {
+              detailsLegacy(places, r, function (e2) {
+                if (e2) done && done(e2, null); else done && done(null, r);
+              });
+            }
           }).catch(function (e) { done && done(humanizeError(e), null); });
         } catch (e) { done && done(humanizeError(e), null); }
+      });
+    }
+
+    // photos split across vibe + food segments, then reviews -> quotes.
+    function applySegments(r, urls, reviews) {
+      if (urls.length) {
+        var mid = Math.ceil(urls.length / 2);
+        r.segments.vibe.photoUrl = urls[0] || null;
+        r.segments.food.photoUrl = urls[mid] || urls[0] || null;
+        r.segments.vibe.caption = '';
+        r.segments.food.caption = '';
+      }
+      try {
+        r.segments.reviews.quotes = reviews.slice(0, 3).map(function (q) {
+          return { by: q.by || 'A diner', score: Math.round((q.rating || 0) * 20), text: (q.text || '').slice(0, 180) };
+        });
+      } catch (e) {}
+    }
+
+    /* NEW: new Place({id}).fetchFields — minimal fields, all used. cb(null)
+       on success, cb({code}) on failure. */
+    function detailsNew(places, r, cb) {
+      var place;
+      try { place = new places.Place({ id: r.placeId }); } catch (e) { cb({ code: classifyLive(e) }); return; }
+      place.fetchFields({
+        fields: ['photos', 'reviews', 'nationalPhoneNumber', 'internationalPhoneNumber',
+          'regularOpeningHours', 'utcOffsetMinutes']
+      }).then(function () {
+        r.phone = place.internationalPhoneNumber || place.nationalPhoneNumber || r.phone || null;
+        return openFlag(place);
+      }).then(function (flag) {
+        try {
+          var rh = place.regularOpeningHours;
+          applyHours(r, { periods: rh && rh.periods, openNow: (typeof flag === 'boolean') ? flag : undefined },
+            place.utcOffsetMinutes);
+        } catch (e) {}
+        var urls = [];
+        try {
+          // four at most, card-sized (the URL carries Google's key param;
+          // memory only — never persisted)
+          (place.photos || []).slice(0, 4).forEach(function (ph) {
+            if (typeof ph.getURI === 'function') urls.push(ph.getURI({ maxWidth: 640, maxHeight: 800 }));
+          });
+        } catch (e) {}
+        var revs = [];
+        try {
+          (place.reviews || []).forEach(function (rv) {
+            revs.push({
+              by: rv.authorAttribution && rv.authorAttribution.displayName,
+              rating: rv.rating,
+              text: (typeof rv.text === 'string') ? rv.text : (rv.text && rv.text.text) || ''
+            });
+          });
+        } catch (e) {}
+        applySegments(r, urls, revs);
+        cb(null);
+      }, function (e) { cb({ code: classifyLive(e) }); });
+    }
+
+    /* LEGACY: PlacesService.getDetails. cb(null) or cb(errorText). */
+    function detailsLegacy(places, r, cb) {
+      var service;
+      try { service = getService(places); } catch (e) { cb(humanizeError(e)); return; }
+      service.getDetails({
+        placeId: r.placeId,
+        // Minimal, and every field is used: opening_hours carries the
+        // real `periods` the status chip needs; utc_offset_minutes is
+        // how we know those hours belong on this browser's clock.
+        fields: ['photos', 'reviews', 'formatted_phone_number', 'international_phone_number',
+          'opening_hours', 'utc_offset_minutes', 'name']
+      }, function (place, status) {
+        var P = places;
+        if (status !== P.PlacesServiceStatus.OK || !place) { cb(humanizeStatus(status)); return; }
+        r.phone = place.international_phone_number || place.formatted_phone_number || r.phone || null;
+        // REAL HOURS: Details carries `periods`, so a live place stops being a
+        // binary open/shut flag and starts saying "Closes at 9:30pm".
+        try {
+          applyHours(r, place.opening_hours,
+            (place.utc_offset_minutes != null) ? place.utc_offset_minutes : place.utc_offset);
+        } catch (e) {}
+        var urls = [];
+        try {
+          (place.photos || []).slice(0, 4).forEach(function (ph) {
+            if (typeof ph.getUrl === 'function') urls.push(ph.getUrl({ maxWidth: 640, maxHeight: 800 }));
+          });
+        } catch (e) {}
+        var revs = [];
+        try {
+          (place.reviews || []).forEach(function (rv) { revs.push({ by: rv.author_name, rating: rv.rating, text: rv.text }); });
+        } catch (e) {}
+        applySegments(r, urls, revs);
+        cb(null);
       });
     }
 
@@ -8631,7 +8992,7 @@
       msg.className = 'settings-msg' + (kind ? ' is-' + kind : '');
     }
     function showError(text) {
-      setMsg(text || LIVE_ERRORS.unknown, 'error');
+      setMsg(text || liveErrorText('unknown'), 'error');
     }
     /* The whole app reports live failures by CODE, so every surface says the
        same sentence for the same failure — never one generic message. */
