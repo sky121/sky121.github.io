@@ -31,24 +31,35 @@ html.evening {
 
 .corner-gear {
   position: fixed;
-  top: calc(0.9rem + env(safe-area-inset-top, 0));
-  right: calc(0.9rem + env(safe-area-inset-right, 0));
+  top: calc(0.75rem + env(safe-area-inset-top, 0));
+  right: calc(0.75rem + env(safe-area-inset-right, 0));
   z-index: 40;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  gap: 0.4rem;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 0.95rem 0 0.8rem;
   appearance: none;
   cursor: pointer;
   background: var(--card-bg);
   border: 1px solid var(--card-line);
   border-radius: 999px;
   color: var(--ink-soft);
+  font-family: var(--font-body);
   box-shadow: var(--card-shadow);
-  transition: color 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+  transition: color 0.25s ease, border-color 0.25s ease;
 }
-.corner-gear:hover { color: var(--pond-ink); border-color: var(--pond-ink); transform: rotate(25deg); }
+.corner-gear-icon { flex: none; display: block; }
+.corner-gear-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--ink);
+}
+.corner-gear:hover { color: var(--pond-ink); border-color: var(--pond-ink); }
 .corner-gear.is-live { border-color: var(--sage); color: var(--pond-ink); }
 
 /* "Back to the Lab", tucked discreetly in the settings sheet */
@@ -262,6 +273,11 @@ html.evening :focus-visible {
 }
 @media (prefers-reduced-motion: reduce) {
   .live-note { animation: none; }
+}
+/* The fixed Settings pill lives top-right; on narrow screens a note that
+   spans the width would run underneath it, so the notes start below it. */
+@media (max-width: 760px) {
+  .live-note, .offline-note { margin-top: 3.4rem; }
 }
 
 /* ---------- Photo thumbs ----------
@@ -3821,7 +3837,8 @@ html.evening .feed-scrim {
   z-index: 4;
   top: calc(0.75rem + env(safe-area-inset-top, 0));
   left: 0.85rem;
-  right: 3.9rem;
+  /* clear of the fixed Settings pill (110px wide + its 12px inset) */
+  right: 8.4rem;
   pointer-events: none;
 }
 .feed-wordmark {
@@ -4300,8 +4317,8 @@ html.evening .surprise-spark { color: #bcafd8; }
 .decision-keep,
 .settings-backlink a { position: relative; }
 
-/* 40x40 painted -> 46x46 tapped */
-.corner-gear::before { inset: -3px; }
+/* 44px painted -> 46 tapped */
+.corner-gear::before { inset: -1px; }
 /* 42px tall painted -> 46 */
 .results-back::before,
 .range-btn::before { inset: -2px 0; }

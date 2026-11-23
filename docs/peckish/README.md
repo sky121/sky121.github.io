@@ -47,6 +47,88 @@
 
 ## Feature map (what's built)
 
+### Live data that works on a brand-new Google project (2026-11-23)
+**What broke.** A valid key + Find left the deck on *Finding places near you…*
+forever. Causes: (1) no watchdog — if Maps never called back (auth failure,
+script error, hang) the queued search callback never ran; (2) the search used the
+**legacy** `PlacesService.nearbySearch`, which new Cloud projects cannot use;
+(3) a denied/slow geolocation silently searched the demo origin (San Francisco);
+(4) the corner button was a sun-like glyph, so nobody found "the gear".
+
+**Which Google APIs must be enabled (precise).**
+- **Maps JavaScript API** — always (the loader).
+- **Places API (New)** — always (search + place details). This is the one a new
+  project gets; **legacy "Places API" is no longer required**. It is still used as a
+  *fallback*: if the new API says "not enabled / denied / API-restricted / unrecognised
+  error", the old `nearbySearch` / `getDetails` run once (so older projects keep working,
+  and keep the ~60-place pagination there). If both fail, the NEW API's reason is shown.
+- **Geocoding API** — only for typing a place under "search a specific location".
+- Billing must be attached to the project (Places refuses without it, free credit or not).
+- Key restrictions: HTTP referrer `https://sky121.github.io/*`; allowed APIs must
+  include Maps JavaScript API + Places API (New) (+ Geocoding if used).
+- Place **Autocomplete** on the location box is the legacy widget; on a new project it
+  quietly does nothing (typed text + Search still works through Geocoding).
+
+**New search.** `Place.searchNearby({ fields, locationRestriction:{center, radius:5000},
+includedTypes:['restaurant'], maxResultCount:20, rankPreference: DISTANCE })`; an empty
+5 km retries once at 50 km. `includedTypes` (not `includedPrimaryTypes`) on purpose:
+primary-type 'restaurant' would drop `italian_restaurant`-primary places. Fields:
+`id displayName location formattedAddress rating userRatingCount priceLevel
+regularOpeningHours utcOffsetMinutes types primaryType businessStatus photos` (rating /
+hours are the billed-higher "Enterprise" tier). `Place.isOpen()` supplies the open flag
+locally; periods go through the same `applyHours()` as before. `buildResult()` is now the
+one constructor for live results (legacy + new). **No pagination on the new API**, so
+`more` is `null` and the "Search farther" button hides (asking the same nearest-20 for a
+bigger radius would return the same 20). Place details use
+`new Place({id}).fetchFields(...)` (photos, reviews, phones, hours) with legacy
+`getDetails` as fallback; once the new API has been refused, later cards go straight to legacy.
+Photos use `photo.getURI({maxWidth})`; that URL carries Google's own `key=` parameter, so
+it lives in memory only (never stored, logged or exported; the Visited log never held it).
+
+**Watchdog.** `gmaps.searchNearby` settles exactly once: first of a real answer,
+`gm_authFailure` / script `onerror` (these now flush the waiting search immediately), or a
+**15 s** timer covering script load + request. Late answers are dropped. On failure the
+deck deals the SAMPLE places and shows the reason slip + announces it. Geocoding has the
+same guarantee (12 s). Legacy "load more" has a 12 s guard.
+
+**Errors (what the user sees; the key is never in any message).**
+| Cause | Message gist |
+|---|---|
+| key malformed / invalid | key isn't valid, copy it again |
+| Places API (New) disabled (`SERVICE_DISABLED`, "has not been used", "legacy API") | Places API (New) isn't enabled for this key's project |
+| billing off | Billing isn't attached to this key's Google Cloud project |
+| referrer block | key restricted to other websites — add `<this origin>/*` |
+| API restriction | key's API restrictions leave out Places API (New) |
+| quota | daily quota used up |
+| `REQUEST_DENIED` / `PERMISSION_DENIED` (cause not given) | refused, didn't say why — likely: API not enabled, billing, referrer |
+| `gm_authFailure` (Google never says which) | rejected — likely billing, referrer, or typo (in that order) |
+| script blocked / offline | couldn't reach Google |
+| watchdog, script never loaded | Maps didn't load in time — connection, then billing/referrer |
+| watchdog, loaded but silent | Google took too long — connection, or API/billing/referrer |
+| anything else | failed, Google didn't say why — try again |
+Wording lives in `LIVE_TEXT` (sheet text + deck-slip text per code); `classifyLive()`
+matches Google's own error text. Settings-sheet validation uses the same codes.
+
+**Location honesty.** In live mode, if geolocation is denied / unavailable / times out
+(and nothing was typed), the app no longer searches San Francisco: it returns to the
+landing, opens and focuses "search a specific location", and says *I couldn't get your
+location — type a place under "search a specific location"*. Typed locations that fail
+to geocode now show their reason on the landing too (before it only reached the closed
+settings sheet). Demo mode is unchanged.
+
+**Settings button.** The rayed glyph is now a real gear inside a 44px pill with a
+visible "Settings" label (id/aria-label unchanged; hover rotation removed). The notes
+(live/offline) and the Feed's demo banner were shifted to clear the wider pill.
+
+**Desktop layout check (1280x800, 1440x900, 1744x1000).** Measured: the room, tab bar,
+landing, deck and Feed columns are all centred on the viewport (centre = vw/2), with no
+horizontal overflow — no off-centre bug reproduced in this repo's CSS. If a capture
+looked off-centre (centre ≈ x 1090 at 1744), suspect the capture itself (browser zoom /
+side panel / scrollbar) rather than this page.
+
+**Tested against a STUB of the Maps API only** (Playwright route-injected), never real
+Google — see "What needs YOU" for the real-key smoke test.
+
 ### Beta wave 2: deck fits the screen, no sample data as yours, backup, landing, constellation (2026-11-23)
 **1. Swipe deck fits above the tab bar.** Before: at 390x844 the controls sat at
 y 779-837 under the bar (top 771), the info scrap overflowed the stage, and at 375x667
@@ -1463,20 +1545,20 @@ Rate any place with **Food / Vibe / Service sliders (0–100)** → live Overall
 - Both read through a **promise-based mock `social` API** (loading/error states) — see the "MOCK SOCIAL API" comment in `eats.js`. Swapping in a real backend is a contained change to those resolvers, not a rewrite.
 
 ### Chrome
-Fixed **bottom tab bar** (Find / Visited / Friends / Popular, icons + labels, safe-area aware, keyboard-operable). A single **floating corner gear** holds the API-key setup and a discreet "← Back to the Lab" link. No top nav bar, no footer (intentionally minimal). Full light/dark theme, mobile-first, AA contrast, accessible.
+Fixed **bottom tab bar** (Find / Visited / Friends / Popular, icons + labels, safe-area aware, keyboard-operable). A single **floating Settings pill (gear icon + label)** holds the API-key setup and a discreet "← Back to the Lab" link. No top nav bar, no footer (intentionally minimal). Full light/dark theme, mobile-first, AA contrast, accessible.
 
 ---
 
 ## What needs YOU (to go from demo → real)
 
 0. **Beta launch checklist (2026-11-23):** (a) create the shipped Maps key and apply the *whole* restriction checklist in the 2026-11-23 Feature-map section (HTTP referrer `https://sky121.github.io/*`, Places API (New) + Maps JavaScript API only, quota cap, billing alert) **before** pasting it into `assets/js/eats-config.js` `mapsKey`; (b) decide when to flip `beta:false` (needs the Friends/Popular backend below to be real); (c) re-read the privacy note if any network call is added.
-1. **Live restaurants (Find):** create a free **Google Maps API key** — enable *Places API (New)* + *Maps JavaScript API*, restrict it to HTTP referrers `https://sky121.github.io/*`, paste it into the in-app **gear → settings** (stored only in your browser, never in the repo). The corner gear has the step-by-step.
+1. **Live restaurants (Find):** in the Google Cloud Console (a) create/pick a project and **attach billing**; (b) enable **Maps JavaScript API** and **Places API (New)** (plus **Geocoding API** if you want typed locations); (c) create an API key, restrict it to HTTP referrers `https://sky121.github.io/*` and to those APIs; (d) paste it into the in-app **Settings** pill (top-right). It is stored only in your browser, never in the repo. **Real-key smoke test (never done yet — everything so far ran against a stub):** Find near me with a real key and check places are nearest-first, photos/hours/phone appear, and the field list in `NEW_FIELDS` (esp. `regularOpeningHours`, `utcOffsetMinutes`, `photos`, `primaryType`) is accepted by Google.
 2. **Real Friends + Popular:** these are inherently multi-user, so they need a **shared backend + accounts** (Firebase or Supabase, both have free tiers and work from a static site). When you're ready, the swap is contained to the `social` resolvers. This also unlocks: friend connections, real cross-user trending (true day/month/year), and syncing your Visited log across devices.
 
 ### Live-data caveats (already handled in code, good to know)
 - Google **doesn't label photos** as "vibe" vs "food" — live mode splits a place's available photos across those segments and fills Reviews from Place reviews (demo shows the fullest 3-way split).
 - Photos/reviews/phone need a per-place **Place Details** call — the deck lazily fetches details only for the top card + next two (cached) to save quota.
-- `open now` in distance-ranked search is only a **binary** flag (that is all `nearbySearch` carries) — the real `periods` arrive with the per-place Details call, and until they do a live card shows *Open now* / *Closed* with **no invented time**. **phone/Call** isn't in nearby results either, so it appears only when details supply it.
+- (legacy path) `open now` in distance-ranked search is only a **binary** flag (that is all `nearbySearch` carries; the new search also carries `regularOpeningHours`) — the real `periods` arrive with the per-place Details call, and until they do a live card shows *Open now* / *Closed* with **no invented time**. **phone/Call** isn't in nearby results either, so it appears only when details supply it.
 - Hours are reasoned in the **browser's** timezone; a place whose `utc_offset_minutes` differs falls back to the binary state rather than printing another zone's clock.
 - Saving a key spends **one** cheapest-tier Places request to validate it, so a bad key fails in the sheet instead of silently on the deck.
 

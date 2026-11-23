@@ -46,12 +46,14 @@
       <div class="wash wash--sage"></div>
     </div>
 
-    <!-- Minimal floating settings gear (also holds Back to the Lab + key setup) -->
+    <!-- Settings pill: a real gear + an always-visible label (the bare glyph
+         used to read as a brightness toggle). Also holds Back to the Lab + key setup. -->
     <button class="corner-gear" id="settings-open" type="button" aria-haspopup="dialog" aria-label="Settings &mdash; live data &amp; menu">
-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+      <svg class="corner-gear-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"></circle>
-        <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"></path>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
       </svg>
+      <span class="corner-gear-label">Settings</span>
     </button>
 
     <main id="room" class="exhibit-room eats-room">
@@ -624,7 +626,8 @@
             <summary>How to get a key &mdash; about two minutes</summary>
             <ol class="settings-guide">
               <li>In the <strong>Google Cloud Console</strong>, create (or pick) a project.</li>
-              <li>Enable the <strong>Maps JavaScript API</strong> and the <strong>Places API</strong>.</li>
+              <li>Attach a <strong>billing account</strong> to it (Places needs one, even inside the free monthly credit).</li>
+              <li>Enable the <strong>Maps JavaScript API</strong> and <strong>Places API (New)</strong> &mdash; and the <strong>Geocoding API</strong> if you want to type a place instead of using your location.</li>
               <li>Create an <strong>API key</strong> &mdash; it looks like <code>AIza&hellip;</code>, 39 characters.</li>
               <li>Restrict it to HTTP referrers: <code>https://sky121.github.io/*</code></li>
             </ol>
