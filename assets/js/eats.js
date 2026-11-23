@@ -41,6 +41,43 @@
   try { prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
 
   /* ------------------------------------------------------------------ *
+   * SITE CONFIG (assets/js/eats-config.js) — BETA flag + shipped Maps key.
+   * BETA: only Find + Visited are real; Feed / Friends / Popular are
+   * sample-data surfaces and are taken out of the app (see applyBeta).
+   * CONFIG_KEY: a site-wide, referrer-restricted browser key ('' = none).
+   * ------------------------------------------------------------------ */
+  var CFG = (window.TABLEAU_CONFIG && typeof window.TABLEAU_CONFIG === 'object') ? window.TABLEAU_CONFIG : {};
+  var BETA = CFG.beta === true;
+  var CONFIG_KEY = (typeof CFG.mapsKey === 'string') ? CFG.mapsKey.trim() : '';
+  var configKeyDead = false;   // the shipped key was refused at runtime -> demo
+  var BETA_HIDDEN = ['feed', 'friends', 'popular'];
+
+  /* Beta: drop the three sample-data tabs from the tab bar (so they are out
+     of the tab order AND the accessibility tree) and seal their panels
+     (hidden + inert + aria-hidden). The panels stay in the DOM so the
+     un-flagged code that holds references to them keeps working unchanged;
+     flipping beta:false in the config restores the whole five-tab app. */
+  (function applyBeta() {
+    if (!BETA) return;
+    BETA_HIDDEN.forEach(function (n) {
+      var t = document.getElementById('tab-' + n);
+      if (t && t.parentNode) t.parentNode.removeChild(t);
+      var pnl = document.getElementById('panel-' + n);
+      if (pnl) {
+        pnl.hidden = true;
+        pnl.classList.add('is-hidden');
+        pnl.setAttribute('inert', '');
+        pnl.setAttribute('aria-hidden', 'true');
+        pnl.removeAttribute('tabindex');
+        pnl.setAttribute('data-beta-hidden', '');
+      }
+    });
+    var bar = document.querySelector('.bottom-bar-inner');
+    if (bar) bar.setAttribute('data-beta', '');
+    try { document.documentElement.classList.add('beta'); } catch (e) {}
+  })();
+
+  /* ------------------------------------------------------------------ *
    * MODAL — one open/close choreography for every sheet.
    * Both sheets (rate a place, live-data settings) hand their backdrop
    * here, so all of them behave identically: focus moves into the sheet,
@@ -299,9 +336,17 @@
     setPrefs: function (p) {
       try { localStorage.setItem(KEY_PREFS, JSON.stringify(p)); return true; } catch (e) { return false; }
     },
-    getKey: function () {
+    /* The visitor's own saved key, if any. */
+    getUserKey: function () {
       try { return localStorage.getItem(KEY_GMAPS) || ''; } catch (e) { return ''; }
     },
+    /* The shipped site key, unless it was refused at runtime. */
+    getConfigKey: function () { return configKeyDead ? '' : CONFIG_KEY; },
+    /* The key actually in force. Resolution: the visitor's own key wins,
+       else the site's shipped key, else '' (demo mode). */
+    getKey: function () { return this.getUserKey() || this.getConfigKey(); },
+    /* True when live data is on only because of the shipped key. */
+    usingConfigKey: function () { return !this.getUserKey() && !!this.getConfigKey(); },
     setKey: function (k) {
       try { localStorage.setItem(KEY_GMAPS, k); return true; } catch (e) { return false; }
     },
@@ -402,7 +447,7 @@
       hearts: function () { return store.getFeed().hearts; },
       isHearted: function (name) { return has(store.getFeed().hearts, name); },
       setHeart: function (name, on) {
-        if (!name) return;
+        if (!name || BETA) return;   // no Feed in the beta -> no hearts to keep
         var f = store.getFeed();
         if (on && !has(f.hearts, name)) f.hearts.push(String(name));
         if (!on) f.hearts = drop(f.hearts, name);
@@ -2627,6 +2672,10 @@
     var tabEls = defs.map(function (d) { return d.tab; });
 
     function activate(which, focus) {
+      /* A tab that is not in the app (hidden by the beta flag) can never be
+         activated: fall back to Find instead of leaving every panel closed. */
+      var known = defs.some(function (d) { return d.name === which; });
+      if (!known) which = 'find';
       defs.forEach(function (d) {
         var on = d.name === which;
         d.tab.classList.toggle('is-active', on);
@@ -2753,8 +2802,12 @@
     if (r.demo === true) return true;
     return String(r.id || '').indexOf('demo-') === 0;
   }
+  /* Beta: a visitor must never mistake a sample place for a real one, so
+     the SAMPLE tag is drawn in demo mode too (it is the only mode where
+     every place is a sample). Outside beta the old convention holds. */
+  function sampleTagsOn() { return BETA || liveMode(); }
   function sampleTagFor(r, cls) {
-    if (!liveMode() || !isSampleResult(r)) return null;
+    if (!sampleTagsOn() || !isSampleResult(r)) return null;
     return el('span', 'v-demo-tag' + (cls ? ' ' + cls : ''), 'Sample');
   }
 
@@ -2857,7 +2910,14 @@
       }
       return best;
     }
+    /* Demo mode must be obvious on the front door: a quiet line under the
+       hero says the places are samples. Gone the moment live data is on. */
+    function syncDemoNote() {
+      var n = $('find-demo-note');
+      if (n) n.hidden = liveMode();
+    }
     function refreshLanding() {
+      syncDemoNote();
       var copy = heroCopy(new Date().getHours());
       var t = $('find-hero-title'), sub = $('find-hero-sub');
       if (t) t.textContent = copy[0];
@@ -3227,6 +3287,7 @@
       showSurprise: showSurprise,
       syncHeaderChrome: syncHeaderChrome,
       refreshLanding: refreshLanding,
+      syncDemoNote: syncDemoNote,
       startSearch: startSearch,
       showLiveNote: showLiveNote,
       hideLiveNote: hideLiveNote,
@@ -3549,6 +3610,7 @@
 
   /* The warmest thing a friend said about this place (highest overall). */
   function bestFriendRating(name) {
+    if (BETA) return null;   // friends' ratings are sample data: not in the beta
     var list = (social && social.ratingsFor) ? social.ratingsFor(name) : [];
     var best = null;
     for (var i = 0; i < list.length; i++) {
@@ -4069,7 +4131,7 @@
       if (ost) bits.push(ost.label.toLowerCase());
       var mine = myRatingFor(r.name);
       if (mine) bits.push('you rated it ' + fmtScore(overallOf(mine)) + ' before');
-      if (liveMode() && isSampleResult(r)) bits.push('sample data');
+      if (sampleTagsOn() && isSampleResult(r)) bits.push('sample data');
       // the strongest match reason rides along in the label so the "why"
       // lands the moment you enter the card, not only when you read on
       if (reasons && reasons.length) bits.push('why this one: ' + reasons[0].text);
@@ -4609,6 +4671,7 @@
        in the Feed are put back on the shortlist, so the badge, the compare
        screen and the constellation all agree with the Feed. */
     function hydrateHearts() {
+      if (BETA) return;   // the Feed is not in the beta; nothing was hearted
       var names = feedStore.hearts();
       if (!names.length) return;
       var pool = (state.results && state.results.length) ? state.results : demoResults();
@@ -4833,7 +4896,7 @@
       panel.appendChild(plot);
       // the map is only as real as the places on it
       var allSample = pts.every(function (q) { return isSampleResult(q.r); });
-      if (liveMode() && allSample) {
+      if (sampleTagsOn() && allSample) {
         panel.appendChild(el('span', 'v-demo-tag slc-const-sample', 'Sample'));
       }
       return panel;
@@ -5307,6 +5370,23 @@
     var authFailCb = null;   // set while a key is being validated
     var loadFailCb = null;
 
+    /* The site's shipped key could not be used (script blocked, key refused,
+       referrer not allowed). The visitor did nothing wrong and cannot fix it,
+       so no settings sheet pops open: Tableau quietly drops to sample data,
+       says so once, and releases any search that was waiting on Maps (those
+       callbacks fail inside their own try/catch and take the normal
+       "sample places instead" path). Returns true when it handled it. */
+    function shippedKeyFailed() {
+      if (!(CONFIG_KEY && loadedKey === CONFIG_KEY && !store.getUserKey())) return false;
+      configKeyDead = true;
+      var cbs = readyCbs.slice(); readyCbs.length = 0;
+      cbs.forEach(function (cb) { try { cb(); } catch (e) {} });
+      try { settings.refreshMode(); find.syncDemoNote(); } catch (e) {}
+      toast('Live restaurants are unavailable right now \u2014 showing sample places');
+      announce('Live restaurants are unavailable right now. Showing sample places.');
+      return true;
+    }
+
     // The async bootstrap loader (adapted from Google's documented snippet).
     // Exposes window.__eatsMapsReady as the loader callback.
     function loadOnce(key) {
@@ -5329,6 +5409,7 @@
       window.gm_authFailure = function () {
         state.mapsLoading = false;
         if (authFailCb) { var f = authFailCb; authFailCb = null; f('rejected'); return; }
+        if (shippedKeyFailed()) return;
         settings.showCode('rejected');
         settings.open();
       };
@@ -5348,6 +5429,7 @@
         s.onerror = function () {
           state.mapsLoading = false;
           if (loadFailCb) { var g = loadFailCb; loadFailCb = null; g('network'); return; }
+          if (shippedKeyFailed()) return;
           settings.showCode('network');
         };
         document.head.appendChild(s);
@@ -8115,16 +8197,36 @@
     var navBtn = $('settings-open');
     var modeEl = $('settings-mode');
     var saveBtn = null;
+    var ownOpen = false;   // the "use my own key" disclosure (shipped-key mode)
+    var introEl = null, introOrig = '';
+    var INTRO_SHIPPED = 'Optional: paste your own Google Maps API key and Tableau will use it instead of the shared one \u2014 your own Google quota, your own settings.';
 
     function refreshMode() {
       var has = !!store.getKey();
+      var shipped = !!CONFIG_KEY && !configKeyDead;      // a site key is on offer
+      var mine = !!store.getUserKey();
       if (navBtn) navBtn.classList.toggle('is-live', has);
       if (modeEl) {
-        modeEl.textContent = has
-          ? 'Live data is on — results come from Google Places.'
-          : 'Sample data is on — 18 hand-written places, no key needed.';
+        modeEl.textContent = !has
+          ? (configKeyDead ? 'Live restaurants are unavailable right now — showing sample data.'
+                           : 'Sample data is on — 18 hand-written places, no key needed.')
+          : (mine && shipped ? 'Live data is on — using your own key.'
+                             : 'Live data is on — results come from Google Places.');
         modeEl.className = 'settings-mode' + (has ? ' is-live' : '');
       }
+      // shipped-key mode: say "live is on", never ask for a key up front,
+      // and keep the own-key form behind a disclosure.
+      var liveOn = $('settings-liveon'), tog = $('own-key-toggle'), body = $('own-key-body');
+      var title = $('settings-title'), clr = $('key-clear');
+      if (liveOn) liveOn.hidden = !(shipped && !mine);
+      if (tog) tog.hidden = !(shipped && !mine);
+      if (body) body.hidden = shipped && !mine && !ownOpen;
+      if (tog) tog.setAttribute('aria-expanded', ownOpen ? 'true' : 'false');
+      if (title) title.textContent = shipped ? 'Settings' : 'Use live data';
+      if (clr) clr.textContent = shipped ? 'Remove my key' : 'Use sample data';
+      var hint = $('key-clear-name'); if (hint) hint.textContent = clr ? clr.textContent.replace(/^./, function (c) { return c.toUpperCase(); }) : '';
+      if (introEl) introEl.textContent = shipped ? INTRO_SHIPPED : introOrig;
+      if (find && find.syncDemoNote) find.syncDemoNote();
     }
 
     function setMsg(text, kind) {
@@ -8146,17 +8248,34 @@
       saveBtn.textContent = on ? 'Checking with Google…' : 'Save & check key';
     }
 
-    function open() {
+    function open(where) {
       if (!backdrop) return;
-      if (input) input.value = store.getKey() || '';
-      setMsg(store.getKey() ? 'A key is saved on this device.' : '', store.getKey() ? 'ok' : '');
-      modal.open(backdrop, input);
+      var mine = store.getUserKey();
+      if (input) input.value = mine || '';
+      setMsg(mine ? 'A key is saved on this device.' : '', mine ? 'ok' : '');
+      refreshMode();
+      var first = input;
+      if (CONFIG_KEY && !configKeyDead && !mine && !ownOpen) first = $('own-key-toggle');
+      var pn = $('privacy-note');
+      if (where === 'privacy' && pn) first = pn;
+      modal.open(backdrop, first);
+      if (where === 'privacy' && pn) {
+        window.setTimeout(function () { try { pn.scrollIntoView({ block: 'start' }); } catch (e) {} }, 40);
+      }
     }
     function close() { modal.close(); }
 
     function init() {
       if (!backdrop) return;
-      if (navBtn) navBtn.addEventListener('click', open);
+      if (navBtn) navBtn.addEventListener('click', function () { open(); });
+      introEl = backdrop.querySelector('.settings-intro');
+      introOrig = introEl ? introEl.textContent : '';
+      var ownTog = $('own-key-toggle');
+      if (ownTog) ownTog.addEventListener('click', function () {
+        ownOpen = !ownOpen;
+        refreshMode();
+        if (ownOpen && input) input.focus();
+      });
       $('settings-close').addEventListener('click', close);
       backdrop.addEventListener('click', function (e) { if (e.target === backdrop) close(); });
 
@@ -8202,8 +8321,12 @@
       $('key-clear').addEventListener('click', function () {
         store.clearKey();
         if (input) input.value = '';
-        setMsg('Back on sample data — your key has been removed from this browser.', 'ok');
-        announce('Sample data is on. Your key has been removed from this browser.');
+        var stillLive = !!store.getKey();   // the shipped key takes over
+        setMsg(stillLive ? 'Your key has been removed — Tableau is using its shared live key.'
+                         : 'Back on sample data — your key has been removed from this browser.', 'ok');
+        announce(stillLive ? 'Your key has been removed. Live data stays on.'
+                           : 'Sample data is on. Your key has been removed from this browser.');
+        ownOpen = false;
         refreshMode();
         find.hideLiveNote();
         find.showLanding();
@@ -8223,23 +8346,103 @@
   })();
 
   /* ================================================================== *
+   * WELCOME — the first-run sheet (once per browser, localStorage flag)
+   * Reuses the shared modal() choreography: focus moves in, Tab is
+   * trapped, Escape / the close button / a backdrop tap dismiss it, focus
+   * goes back. Says plainly what Tableau does, what it does with your
+   * location, and whether results are live or samples.
+   * ================================================================== */
+  var welcome = (function () {
+    var KEY_WELCOME = 'eats-welcomed';
+    var seenMem = false;     // storage blocked -> still only once per page load
+    var toSettings = false;
+    var backdrop = null;
+
+    function seen() {
+      if (seenMem) return true;
+      try { return localStorage.getItem(KEY_WELCOME) === '1'; } catch (e) { return false; }
+    }
+    function mark() {
+      seenMem = true;
+      try { localStorage.setItem(KEY_WELCOME, '1'); } catch (e) {}
+    }
+
+    function fill() {
+      var live = liveMode();
+      var loc = $('welcome-loc'), mode = $('welcome-mode');
+      if (loc) loc.textContent = live
+        ? 'It asks for your location only when you tap Find, and only to find places near you.'
+        : 'It only asks for your location when live results are on \u2014 in demo mode it never does.';
+      if (mode) {
+        clear(mode);
+        mode.className = 'welcome-mode ' + (live ? 'is-live' : 'is-demo');
+        if (live) {
+          mode.appendChild(el('strong', null, 'Live results are on.'));
+          mode.appendChild(document.createTextNode(' Places come from Google, near you.'));
+        } else {
+          mode.appendChild(el('span', 'v-demo-tag', 'Sample'));
+          mode.appendChild(document.createTextNode(' '));
+          mode.appendChild(el('strong', null, 'Demo mode.'));
+          mode.appendChild(document.createTextNode(' The places you\u2019ll see are samples, not real restaurants.'));
+        }
+      }
+    }
+
+    function closed() {
+      mark();
+      if (toSettings) { toSettings = false; return; }
+      // nothing to hand focus back to on a fresh load: land it on Find
+      var ae = document.activeElement;
+      if (!ae || ae === document.body || (backdrop && backdrop.contains(ae))) {
+        var cta = $('find-near-me');
+        if (cta && cta.offsetParent !== null) cta.focus();
+      }
+    }
+
+    function open() {
+      if (!backdrop) return;
+      fill();
+      modal.open(backdrop, $('welcome-go'), closed);
+    }
+
+    function init() {
+      backdrop = $('welcome-backdrop');
+      if (!backdrop) return;
+      $('welcome-go').addEventListener('click', function () { modal.close(); });
+      $('welcome-close').addEventListener('click', function () { modal.close(); });
+      backdrop.addEventListener('click', function (e) { if (e.target === backdrop) modal.close(); });
+      $('welcome-privacy').addEventListener('click', function () {
+        toSettings = true;
+        settings.open('privacy');   // modal.open closes this sheet first
+      });
+    }
+
+    function maybeShow() {
+      init();
+      if (!seen()) open();
+    }
+
+    return { maybeShow: maybeShow };
+  })();
+
+  /* ================================================================== *
    * BOOT
    * ================================================================== */
   function boot() {
     tabs.init();
     sheet.init();
-    feed.init();
+    if (!BETA) feed.init();
     visited.init();
-    friends.init();
-    popular.init();
+    if (!BETA) { friends.init(); popular.init(); }
     settings.init();
     find.init();
     offline.init();
     // places hearted in the Feed on an earlier visit go back on the shortlist
     deck.hydrateHearts();
     find.refreshLanding();
-    // the Feed is the front door: it is the tab that opens with the app
-    tabs.activate('feed');
+    // the Feed is the front door; in the beta there is no Feed, Find is
+    tabs.activate(BETA ? 'find' : 'feed');
+    welcome.maybeShow();
 
     // PWA: register the Tableau service worker (legacy filename
     // peckish-sw.js), scoped to '/eats' so it

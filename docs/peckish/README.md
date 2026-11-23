@@ -14,7 +14,7 @@
 > icon *art* changed.
 >
 > Single source of truth so we can pick up exactly where we left off.
-> Last updated: **2026-09-08**.
+> Last updated: **2026-11-23**.
 
 ---
 
@@ -29,6 +29,7 @@
 | `eats.html` | The app page (reuses site chrome: theme script, exhibit-page.css, gallery.js) |
 | `assets/css/eats.css` | All Peckish styling (bubble, swipe deck, prefs, cards, bottom tabs, sheets) |
 | `assets/js/eats.js` | The whole app — vanilla JS, one `'use strict'` IIFE, no deps |
+| `assets/js/eats-config.js` | Site switches: `beta` (Find + Visited only) and the shipped `mapsKey` (empty by default) |
 | `lab.html` | Holds the Live "Peckish" tile linking here |
 | `sitemap.xml` | Has the `eats.html` entry |
 
@@ -45,6 +46,99 @@
 ---
 
 ## Feature map (what's built)
+
+### First public beta: Find + Visited, shipped-key plumbing, first-run, privacy (2026-11-23)
+Wave 1 of the beta. Everything below is driven by one new plain script,
+**`assets/js/eats-config.js`** (loaded before `eats.js`; sets
+`window.TABLEAU_CONFIG = { beta, mapsKey }`; also in the service-worker precache,
+cache bumped to `peckish-v3`).
+
+**Beta flag (`beta: true`, the shipped default).** Find + Visited are the real
+product; Feed, Friends and Popular are sample-data surfaces and are **not
+presented to beta users**.
+- `applyBeta()` (top of `eats.js`) *removes* the three tab buttons from the DOM
+  (so they are out of the Tab order and the accessibility tree) and seals
+  their panels: `hidden` + `inert` + `aria-hidden` + `data-beta-hidden`
+  (CSS `display:none !important`). The panels stay in the DOM so un-flagged code
+  that holds references to them still works. The bar becomes two columns
+  (`.bottom-bar-inner[data-beta]`), `html.beta` is set.
+- Boot opens on **Find**; `feed.init / friends.init / popular.init` are skipped;
+  `tabs.activate(name)` falls back to `find` for any tab that is not in the app.
+  No URL/hash deep links exist in the app, and every in-app `tabs.activate` call
+  targets `find`, so nothing can reach a hidden tab.
+- Beta-suppressed because they surface sample social data inside Find: the
+  "<Friend> loved it / rated it well" reason chips (`bestFriendRating` returns
+  null), Feed-heart rehydration (`deck.hydrateHearts`) and Feed hearts/follows
+  writes (`feedStore.setHeart`).
+- **Flip it:** set `beta: false` in `assets/js/eats-config.js`; the old five-tab
+  app returns untouched (Feed opens first). Verified both ways. If the config
+  file ever 404s, `TABLEAU_CONFIG` is undefined and the app behaves as
+  `beta:false`, no key (full app, demo mode) - keep the file deployed.
+- **To restore the hidden tabs for good:** set `beta:false`; nothing was deleted.
+
+**Maps key resolution order:** the visitor's own key (gear > settings, localStorage
+`eats-gmaps-key`) **wins**, else `TABLEAU_CONFIG.mapsKey`, else demo mode.
+`store.getKey()` now returns that effective key (so every live/demo check in the
+app follows it); `store.getUserKey()` is the visitor's own; `store.usingConfigKey()`
+is "live only because of the shipped key". **The repo ships `mapsKey: ''`; no key
+is committed.**
+- With a shipped key the settings sheet is titled "Settings", says **"Live
+  restaurants are on"**, and tucks the own-key form behind a "Use my own Google
+  Maps key instead" disclosure (button, `aria-expanded`). Saving an own key works
+  exactly as before ("Remove my key" falls back to the shipped key). With no shipped
+  key the sheet is exactly as it was.
+- If the shipped key is refused at runtime (script blocked, `gm_authFailure`),
+  `shippedKeyFailed()` marks it dead for the page, releases any search waiting on
+  Maps (it takes the normal "Sample places instead" path), says so once in a toast
+  + live region, and drops to demo mode. It never opens the settings sheet at a
+  visitor who cannot fix it. Verified with a route-intercepted dummy key.
+- **Key-restriction checklist (do ALL of this before pasting a key into
+  `eats-config.js`).** A browser Maps key is public by design - anyone can read it.
+  Restriction is the only protection:
+  1. Application restriction: HTTP referrers = `https://sky121.github.io/*` (use a
+     *separate* key for `http://localhost:8000/*` dev).
+  2. API restriction: **Places API (New)** + **Maps JavaScript API** only.
+  3. Quotas: cap daily requests for those APIs at an amount you can afford.
+  4. Billing: set a budget with email alerts on the project.
+  5. Use a project with nothing else enabled.
+
+**First-run sheet.** Once per browser (`localStorage` `eats-welcomed`; if storage
+is blocked it still shows only once per page load), after boot, a calm
+`#welcome-sheet` built on the shared `modal` (focus moves in, Tab trapped,
+Escape / x / backdrop dismiss, focus restored or landed on the Find button,
+`aria-modal`, `inert` sealing). Two short lines on what Tableau does, the location
+statement, "ratings and shortlist stay on this device", an honest live/demo line
+(demo mode shows a **Sample** tag and says the places are samples, not real
+restaurants), a "Read the privacy note" button (opens settings scrolled to the
+note) and one primary **Got it** (48px). No new animation.
+
+**Privacy note** (`#privacy-note`, in the settings sheet, linked from the first-run
+sheet). Written only from what the code does (checked: no analytics, no `fetch`/XHR,
+no beacons anywhere in `eats.js` / `gallery.js`): no accounts or analytics of our
+own; ratings/shortlist/prefs live in browser storage; in live mode tapping Find asks
+the browser for location and sends it (and any typed "specific location") to Google
+only to fetch places; Google's terms apply; Google Fonts and (live mode) Google Maps
+are contacted like any site; demo mode never asks for location; GitHub Pages may
+keep ordinary server logs. Re-check it if any network call is ever added.
+
+**Demo-mode honesty.** `sampleTagFor()` / the a11y "sample data" bit / the
+constellation tag now also draw in demo mode under beta (`sampleTagsOn()`), so
+every sample card, decision screen and shortlist card carries **Sample**; the Find
+landing carries a quiet "Sample - Demo mode - the places shown are samples, not
+real restaurants" line (`#find-demo-note`, hidden whenever live data is on, in
+either beta state). Known and left alone: the seeded Visited entries are already
+tagged Sample, but the Visited header still counts them ("You've logged 3
+places"), and the "You rated this 82" chips on cards derive from them.
+
+**Verified** (Playwright 390x844 @2x, fresh profiles): first-run shows once, not
+after reload; focus in / trapped / Escape / restored; beta = exactly two tabs in the
+DOM and a11y tree, opens on Find, ArrowLeft/Right/Home/End cycle the two, Tab never
+reaches a hidden panel; Find > prefs > deck > shortlist > Visited add / edit /
+delete with zero page errors; `beta:false` = five tabs, Feed first, zero errors;
+dummy-key config: loader requests the key, abort/auth-fail falls back to demo and
+sample deck with no uncaught error; empty key = prior behaviour. Contrast
+(leaf text, glyph blanked, worst of bg extremes): new text 4.7-10.1:1 light and
+4.7-12.0:1 dark.
 
 ### Find landing: time-aware hero + quiet memory strip (2026-11-23)
 The empty watercolor band between the headline and the CTA now holds, when
@@ -1326,6 +1420,7 @@ Fixed **bottom tab bar** (Find / Visited / Friends / Popular, icons + labels, sa
 
 ## What needs YOU (to go from demo → real)
 
+0. **Beta launch checklist (2026-11-23):** (a) create the shipped Maps key and apply the *whole* restriction checklist in the 2026-11-23 Feature-map section (HTTP referrer `https://sky121.github.io/*`, Places API (New) + Maps JavaScript API only, quota cap, billing alert) **before** pasting it into `assets/js/eats-config.js` `mapsKey`; (b) decide when to flip `beta:false` (needs the Friends/Popular backend below to be real); (c) re-read the privacy note if any network call is added.
 1. **Live restaurants (Find):** create a free **Google Maps API key** — enable *Places API (New)* + *Maps JavaScript API*, restrict it to HTTP referrers `https://sky121.github.io/*`, paste it into the in-app **gear → settings** (stored only in your browser, never in the repo). The corner gear has the step-by-step.
 2. **Real Friends + Popular:** these are inherently multi-user, so they need a **shared backend + accounts** (Firebase or Supabase, both have free tiers and work from a static site). When you're ready, the swap is contained to the `social` resolvers. This also unlocks: friend connections, real cross-user trending (true day/month/year), and syncing your Visited log across devices.
 
