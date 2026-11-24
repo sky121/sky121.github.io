@@ -2595,6 +2595,12 @@ html.evening .v-bar .track { background: rgba(233,227,211,0.14); }
 html.evening .social-spinner { border-top-color: var(--pond-ink); }
 @keyframes social-spin { to { transform: rotate(360deg); } }
 
+/* sweep refill: "Finding more nearby…" at the end of the queue. Fades in after
+   a short beat so a fast refill never flashes it; a slower, softer spinner. */
+.deck-loading.is-more { animation: more-in 0.5s ease 0.35s both; }
+.deck-loading.is-more .social-spinner { animation-duration: 1.4s; border-top-color: var(--wisteria); }
+@keyframes more-in { from { opacity: 0; } to { opacity: 1; } }
+
 /* ---------- Friends tab ---------- */
 
 .friends-head {
@@ -3665,6 +3671,8 @@ html.evening .eats-toast-act:hover { color: var(--pond-ink); background: rgba(12
   /* tab switch: fade only, no rise */
   .eats-panel { animation: panel-fade 0.18s ease; }
   .social-spinner { animation-duration: 1.6s; }
+  .deck-loading.is-more { animation: none; }
+  .deck-loading.is-more .social-spinner { animation: none; }
 }
 
 /* ---------- Narrow phones ---------- */
@@ -4376,6 +4384,16 @@ html.evening .surprise-spark { color: #bcafd8; }
   max-width: 19rem;
 }
 
+/* visited:false (eats-config.js): copy that mentions ratings swaps out, and
+   with Find as the only tab the bar is hidden and the page reclaims its room */
+.v-off-only { display: none; }
+html.no-visited .v-only { display: none; }
+html.no-visited .v-off-only { display: list-item; }
+html.no-bar .bottom-bar { display: none; }
+html.no-bar .eats-room { padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px)); scroll-margin-bottom: 2.5rem; }
+html.no-bar .eats-room.deck-on.deck-swiping { padding-bottom: 0; }
+html.no-bar .eats-toast { bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)); }
+
 /* demo mode, said plainly on the front door. In the flow under the hero
    subtitle; the CTA is pushed low by margin-top:auto so nothing moves. */
 .find-demo-note[hidden] { display: none; }
@@ -4669,3 +4687,46 @@ html.evening .visited-data-msg.is-err { color: #f0a9bb; }
 /* room for the memory strip, only when there is one to show */
 .find-landing.has-memory .find-still { margin-bottom: 4.6rem; }
 html.evening .find-still-art { opacity: 0.42; filter: saturate(0.85); }
+
+/* ==========================================================================
+   OPEN IN GOOGLE MAPS (2026-11-24) — a real link on the swipe card's info
+   scrap and on shortlist cards; never drawn for sample places.
+   ========================================================================== */
+.maps-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  min-width: 44px;
+  margin-top: 0.2rem;
+  padding: 0 0.95rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--pond-ink);
+  background: rgba(127, 168, 201, 0.14);
+  border: 1px solid rgba(74, 114, 153, 0.5);
+  border-radius: 999px;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.maps-link:hover { background: rgba(127, 168, 201, 0.26); }
+.maps-link:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
+.maps-link-glyph { font-size: 0.95rem; line-height: 1; }
+.trio-info .maps-link { margin-top: 0.1rem; }
+.slc-acts { flex-wrap: wrap; }
+.slc-acts .slc-maps { flex: 1 1 100%; margin-top: 0; }
+html.evening .maps-link {
+  color: #9fc2e0;
+  background: rgba(127, 168, 201, 0.16);
+  border-color: rgba(159, 194, 224, 0.5);
+}
+html.evening .maps-link:hover { background: rgba(127, 168, 201, 0.28); }
+html.evening .maps-link:focus-visible { outline-color: #9fc2e0; }
+@media (max-height: 700px) {
+  .trio-info .maps-link { margin-top: 0; }
+}

@@ -6,7 +6,7 @@
     <title>Tableau — find where to eat</title>
     <meta
       name="description"
-      content="Tableau helps you decide where to eat: discover restaurants nearby, let it pick for you, and keep a personal log of places you've eaten with your own Food, Vibe, and Service ratings."
+      content="Tableau helps you decide where to eat: discover restaurants nearby, swipe through them, and let it help you land on one."
     />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="manifest" href="peckish.webmanifest" />
@@ -25,7 +25,7 @@
     <meta property="og:title" content="Tableau — find where to eat" />
     <meta
       property="og:description"
-      content="Discover where to eat nearby and keep a watercolor log of every place you've tasted."
+      content="Discover where to eat nearby, swipe through the places, and land on one."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -650,7 +650,7 @@
             <h3 class="privacy-title" id="privacy-title">Privacy</h3>
             <p class="privacy-text">
               Tableau has no accounts and no analytics or tracking of its own, and nothing you do here
-              is sent to this site&rsquo;s author. Your ratings, shortlist and preferences live only in
+              is sent to this site&rsquo;s author. Your <span class="v-only">ratings, </span>shortlist and preferences live only in
               this browser&rsquo;s storage, on this device. When live results are on, tapping Find asks
               your browser for your location and sends it &mdash; along with any place you type into
               &ldquo;search a specific location&rdquo; &mdash; to Google, only to fetch nearby
@@ -693,7 +693,8 @@
           </p>
           <ul class="welcome-list">
             <li id="welcome-loc"></li>
-            <li>Your ratings and shortlist stay on this device.</li>
+            <li class="v-only">Your ratings and shortlist stay on this device.</li>
+            <li class="v-off-only">Your shortlist stays on this device.</li>
           </ul>
           <p class="welcome-mode" id="welcome-mode"></p>
           <button type="button" class="welcome-privacy-link" id="welcome-privacy">Read the privacy note</button>
