@@ -3078,14 +3078,25 @@
       dot.setAttribute('aria-hidden', 'true');
       liveNote.appendChild(dot);
       liveNote.appendChild(el('span', 'live-note-text', ''));
+      var retry = el('button', 'live-note-retry', 'Try again');
+      retry.type = 'button';
+      retry.hidden = true;
+      liveNote.appendChild(retry);
       var off = $('offline-note');
       panel.insertBefore(liveNote, off ? off.nextSibling : panel.firstChild);
       return liveNote;
     }
-    function showLiveNote(text) {
+    /* retry (optional): a function — the note then carries a calm
+       "Try again" button that runs it. */
+    function showLiveNote(text, retry) {
       var n = ensureLiveNote();
       if (!n) return;
       n.querySelector('.live-note-text').textContent = text;
+      var b = n.querySelector('.live-note-retry');
+      if (b) {
+        b.hidden = !retry;
+        b.onclick = retry ? function () { hideLiveNote(); retry(); } : null;
+      }
       n.hidden = false;
     }
     function hideLiveNote() { if (liveNote) liveNote.hidden = true; }
@@ -3444,7 +3455,12 @@
 
     function init() {
       var cta = $('find-near-me');
-      if (cta) cta.addEventListener('click', popAndStart);
+      if (cta) cta.addEventListener('click', function () {
+        // "near me" means the device's location, never a place typed earlier
+        // (a failed or old typed lookup must not hijack it).
+        state.origin = null; state.originLabel = null;
+        popAndStart();
+      });
 
       var prefsBack = $('prefs-back');
       if (prefsBack) prefsBack.addEventListener('click', showLanding);
@@ -3457,6 +3473,14 @@
       var reveal = $('loc-reveal');
       var form = $('loc-form');
       var locInput = $('loc-input');
+      // a plain, well-labelled text field: Enter searches, the phone keyboard
+      // shows a Search key, nothing autofills or autocorrects a place name
+      if (locInput) {
+        locInput.setAttribute('enterkeyhint', 'search');
+        locInput.setAttribute('autocomplete', 'off');
+        locInput.setAttribute('autocorrect', 'off');
+        locInput.setAttribute('spellcheck', 'false');
+      }
       if (reveal && form) {
         reveal.addEventListener('click', function () {
           var open = !form.hidden;
@@ -3470,19 +3494,25 @@
           e.preventDefault();
           var q = locInput ? locInput.value.trim() : '';
           if (!q) { if (locInput) locInput.focus(); return; }
-          state.originLabel = q;
           if (store.getKey() && !offline.isOffline()) {
-            gmaps.geocode(q, function (err, origin) {
+            gmaps.locate(q, function (err, origin, label) {
               if (err || !origin) {
-                settings.showError(err || 'Could not find that place.');
-                showLiveNote(err || 'Could not find that place \u2014 try a city or a fuller address.');
+                // Calm and honest: say what happened once, keep the typed
+                // text, offer a retry. The key sheet is not touched — a failed
+                // lookup is not a key problem, and the other searches still work.
+                var msg = err || 'Couldn\u2019t find that place \u2014 try a street, neighbourhood or city.';
+                showLiveNote(msg, function () { if (form.requestSubmit) form.requestSubmit(); else form.dispatchEvent(new Event('submit', { cancelable: true })); });
+                announce(msg);
+                try { window.scrollTo(0, 0); } catch (x) {}
                 return;
               }
               hideLiveNote();
+              state.originLabel = label || q;
               state.origin = origin;
               showPrefs(true);
             });
           } else {
+            state.originLabel = q;
             showPrefs(true);
           }
         });
@@ -3639,6 +3669,11 @@
     function updateCount() {
       var countEl = $('prefs-count');
       if (!countEl) return;
+      // The count is measured against the built-in SAMPLE catalog, which says
+      // nothing about real places: with a usable key (live mode) it is hidden
+      // rather than shown as if it were a live number.
+      if (liveMode()) { countEl.textContent = ''; countEl.hidden = true; return; }
+      countEl.hidden = false;
       // Live preview against the demo catalog (instant, no network) so the
       // user sees prefs bite immediately. Live mode filters real results too.
       state.prefs = cur;
@@ -5933,6 +5968,115 @@
       return true;
     }
 
+    /* ---- auxiliary-API failures (Geocoding / legacy Autocomplete) ----
+       A key can be perfectly good for Places (New) while the project has not
+       enabled "Geocoding API" or the legacy "Places API". Google reports that
+       through the very same gm_authFailure as a dead key, so it is told apart
+       by ONE cheap probe (the same 1-result, id-only call a key save makes):
+       if Places answers, the key is fine and only the auxiliary API is off —
+       the typed-location lookup says so plainly, the autocomplete widget is
+       removed, and nothing else changes (live search keeps working). If the
+       probe fails too, it really is the key, and the normal path runs. */
+    var GEO_DENIED_MSG = 'Google refused the lookup \u2014 enable \u201cGeocoding API\u201d for this key\u2019s project, or use \u201cFind a place near me\u201d.';
+    var geoPending = 0;        // typed-location lookups in flight
+    var geoDeniedAt = 0;       // when a lookup last came back REQUEST_DENIED
+    var auxOk = false;         // the key has been proven good for Places
+    var auxProbing = false;
+    /* The legacy google.maps.places.Autocomplete widget is deprecated, closed
+       to new Cloud projects, and was measured to trigger gm_authFailure
+       (ApiNotActivatedMapError) on a perfectly good Places (New) key. The
+       typed field is a plain text input; Places text search resolves it.
+       Flip to true to restore the widget (attachAutocomplete honours it). */
+    var LEGACY_AUTOCOMPLETE = false;
+    /* True after ANY successful new-API Place call (searchNearby, fetchFields,
+       searchByText): the key demonstrably works, so a later gm_authFailure is
+       one more auxiliary refusal and can never kill it. */
+    var placesOk = false;
+    var acOff = false;         // legacy Autocomplete removed; never re-attached
+    var acTouched = false;     // it was attached at some point
+    var acInput = null;
+    var acObserver = null;
+
+    function geoDenied(x) {
+      if (x == null) return false;
+      var str = (typeof x === 'string') ? x : [x.message, x.name, x.status, x.code, x.reason].join(' ');
+      return /REQUEST_DENIED|ApiNotActivated|not activated|has not been used|SERVICE_DISABLED/i.test(str);
+    }
+    function scrubAcInput() {
+      if (!acInput) return;
+      try {
+        if (acInput.classList.contains('gm-err-autocomplete')) acInput.classList.remove('gm-err-autocomplete');
+        if (acInput.style && acInput.style.backgroundImage) acInput.style.backgroundImage = '';
+      } catch (e) {}
+    }
+    /* Take the legacy Autocomplete widget away cleanly: its listeners, its
+       dropdown, and the error icon Google paints on the input. */
+    function disableAutocomplete() {
+      acOff = true;
+      try {
+        var ev = window.google && google.maps && google.maps.event;
+        if (ev && ev.clearInstanceListeners) {
+          if (state.autocomplete) ev.clearInstanceListeners(state.autocomplete);
+          if (acInput) ev.clearInstanceListeners(acInput);
+        }
+      } catch (e) {}
+      state.autocomplete = null;
+      try {
+        document.documentElement.classList.add('eats-ac-off');
+        Array.prototype.slice.call(document.querySelectorAll('.pac-container')).forEach(function (n) {
+          if (n.parentNode) n.parentNode.removeChild(n);
+        });
+      } catch (e) {}
+      scrubAcInput();
+      if (acInput && !acObserver && window.MutationObserver) {
+        try {
+          acObserver = new MutationObserver(scrubAcInput);
+          acObserver.observe(acInput, { attributes: true, attributeFilter: ['class', 'style'] });
+        } catch (e) {}
+      }
+    }
+    var REJECT_CODES = { invalid: 1, billing: 1, notenabled: 1, restricted: 1, apiblocked: 1, denied: 1, rejected: 1 };
+    function rejectKey() {
+      // a search is waiting: answer IT now (not after the watchdog)
+      var flushed = flushPending(shippedActive() ? 'unavailable' : 'rejected');
+      if (shippedKeyFailed()) return;
+      // open() first: it writes its own "key saved" line, which would
+      // otherwise overwrite the reason showCode() just set.
+      if (!flushed) settings.open();   // nothing on screen explains it yet
+      settings.showCode('rejected');
+    }
+
+    /* Settle only the typed-location lookups still waiting. */
+    function settleGeo(text, geocoderOnly) {
+      pendingSearches.slice().forEach(function (f) { if (f.geo && (!geocoderOnly || f.geocoding)) { try { f(text, null, null); } catch (e) {} } });
+    }
+    /* Returns true when this gm_authFailure was handled as auxiliary. */
+    function auxAuthFailure() {
+      if (!state.mapsLoaded) return false;
+      if (auxOk) {   // key already proven good: this is one more auxiliary refusal
+        disableAutocomplete(); settleGeo(GEO_DENIED_MSG); return true;
+      }
+      var maybeAux = geoPending > 0 || acTouched || (Date.now() - geoDeniedAt < 20000);
+      if (!maybeAux) return false;
+      if (auxProbing) return true;
+      auxProbing = true;
+      var timer = window.setTimeout(function () { conclude('timeout'); }, 8000), done = false;
+      function conclude(code) {
+        if (done) return;
+        done = true; window.clearTimeout(timer); auxProbing = false;
+        if (!code) { auxOk = true; disableAutocomplete(); settleGeo(GEO_DENIED_MSG); return; }
+        // Only a classified auth / billing / referrer / not-enabled answer is
+        // proof of a dead key. An ambiguous failure (InvalidValueError right
+        // after the SDK's own auth hiccup, a hang, a network blip) is not:
+        // live mode stays ON and the next real search settles it, converting
+        // a real failure into a plain reason through its own paths.
+        if (REJECT_CODES[code]) rejectKey();
+        else disableAutocomplete();
+      }
+      probeKey(conclude);
+      return true;
+    }
+
     // The async bootstrap loader (adapted from Google's documented snippet).
     // Exposes window.__eatsMapsReady as the loader callback.
     function loadOnce(key) {
@@ -5954,16 +6098,18 @@
       // order; the validation probe below is what separates them when it can.
       window.gm_authFailure = function () {
         state.mapsLoading = false;
+        // A key that has already answered a Places (New) call is good: this is
+        // an auxiliary refusal (Geocoding, legacy widget). No banner, no demo
+        // fallback, no settings error. (A key save in progress is left to its
+        // own probe, which will succeed.)
+        if (placesOk) { disableAutocomplete(); settleGeo(GEO_DENIED_MSG, true); return; }
         if (authFailCb) { var f = authFailCb; authFailCb = null; f('rejected'); return; }
-        // a search is waiting: answer IT now (not after the watchdog)
-        var flushed = flushPending(shippedActive() ? 'unavailable' : 'rejected');
-        if (shippedKeyFailed()) return;
-        // open() first: it writes its own "key saved" line, which would
-        // otherwise overwrite the reason showCode() just set.
-        if (!flushed) settings.open();   // nothing on screen explains it yet
-        settings.showCode('rejected');
+        // The Maps SDK also fires this when ONE auxiliary API is not enabled
+        // for an otherwise good key (ApiNotActivatedMapError from Geocoding or
+        // from the legacy Autocomplete widget). Those must not kill Places.
+        if (auxAuthFailure()) return;
+        rejectKey();
       };
-
       try {
         var s = document.createElement('script');
         var params = [
@@ -6087,23 +6233,58 @@
     var STALL_LIMIT = 5;
     var M_PER_MI = 1609.344;
 
-    function nearbyRaw(places, center, radius) {
+    /* ---- cuisine-aware probing ----
+       Google type -> our cuisine key is the ONE table (TYPE_CUISINE, below,
+       shared with cuisineKeys). The Nearby request asks for the reverse of
+       it, so what Google is asked for and what the app filters on can never
+       disagree. No cuisine picked -> every restaurant. A picked cuisine with
+       no Google type (cannot happen with today's chips, but a future bucket
+       might) -> the whole request falls back to ['restaurant'] so nothing is
+       silently dropped. Several cuisines are OR'd by Google. The client-side
+       filter (filterByPrefs) stays the final authority. */
+    var TYPE_CUISINE = {
+      italian_restaurant: 'italian', japanese_restaurant: 'japanese', sushi_restaurant: 'japanese',
+      ramen_restaurant: 'japanese', mexican_restaurant: 'mexican', thai_restaurant: 'thai',
+      indian_restaurant: 'indian', chinese_restaurant: 'chinese', american_restaurant: 'american',
+      mediterranean_restaurant: 'mediterranean', korean_restaurant: 'korean',
+      vietnamese_restaurant: 'vietnamese', pizza_restaurant: 'pizza', hamburger_restaurant: 'burgers',
+      seafood_restaurant: 'seafood', cafe: 'cafe', bakery: 'cafe', coffee_shop: 'cafe',
+      barbecue_restaurant: 'bbq', vegetarian_restaurant: 'vegetarian'
+    };
+    var CUISINE_TYPES = {};
+    Object.keys(TYPE_CUISINE).forEach(function (t) {
+      var c = TYPE_CUISINE[t];
+      (CUISINE_TYPES[c] = CUISINE_TYPES[c] || []).push(t);
+    });
+    function typesForPrefs(p) {
+      var keys = (p && p.cuisine) || [];
+      if (!keys.length) return ['restaurant'];
+      var out = [];
+      for (var i = 0; i < keys.length; i++) {
+        var ts = CUISINE_TYPES[keys[i]];
+        if (!ts) return ['restaurant'];
+        ts.forEach(function (t) { if (out.indexOf(t) === -1) out.push(t); });
+      }
+      return out;
+    }
+
+    function nearbyRaw(places, center, radius, types) {
       var rank = places.SearchNearbyRankPreference;
       return places.Place.searchNearby({
         fields: NEW_FIELDS,
         locationRestriction: { center: { lat: center.lat, lng: center.lng }, radius: radius },
-        includedTypes: ['restaurant'],
+        includedTypes: types,
         maxResultCount: NEARBY_MAX,
         rankPreference: rank ? rank.DISTANCE : 'DISTANCE'
-      }).then(function (res) { return (res && res.places) || []; });
+      }).then(function (res) { placesOk = true; return (res && res.places) || []; });
     }
 
     /* A sweep probe is a billed call that must never hang: same 15 s guard
        as the first search. The promise settles once by construction. */
-    function probeRaw(places, center, radius) {
+    function probeRaw(places, center, radius, types) {
       return new Promise(function (resolve, reject) {
         var t = window.setTimeout(function () { reject({ sweepTimeout: true }); }, SEARCH_TIMEOUT_MS);
-        nearbyRaw(places, center, radius).then(
+        nearbyRaw(places, center, radius, types).then(
           function (a) { window.clearTimeout(t); resolve(a); },
           function (e) { window.clearTimeout(t); reject(e); });
       });
@@ -6111,7 +6292,12 @@
 
     function searchNew(places, origin) {
       var calls = 0;
-      function ask(radius) { calls++; return nearbyRaw(places, origin, radius); }
+      /* Snapshot the type-set ONCE per search: the sweeper's covered discs are
+         only valid for the types they were measured with, and a new search
+         (any preference change goes through startSearch) builds a new sweeper
+         with empty discs / seen ids. */
+      var types = typesForPrefs(state.prefs);
+      function ask(radius) { calls++; return nearbyRaw(places, origin, radius, types); }
       // 5 km first; a genuinely empty 5 km (rural) gets one 50 km retry.
       var usedRadius = FIRST_RADIUS_M;
       return ask(FIRST_RADIUS_M).then(function (arr) {
@@ -6119,7 +6305,7 @@
         usedRadius = 50000;
         return ask(50000);
       }).then(function (raw) {
-        var sw = makeSweeper(places, origin, calls);
+        var sw = makeSweeper(places, origin, calls, types);
         return sw.seed(raw, usedRadius).then(function (list) {
           return { list: list, more: sw };
         });
@@ -6134,7 +6320,8 @@
      * centre, so a SATURATED response (20 results, farthest at d20) proves
      * the disc of radius d20 around that centre is COMPLETE; an UNSATURATED
      * one (<20) proves the whole query radius is. The sweeper keeps a list
-     * of such "covered discs" and a hex grid of sample points over the
+     * of such "covered discs" (valid for ONE includedTypes set: the sweeper
+     * is built per search with that set and never shared) and a hex grid of sample points over the
      * sweep radius around the USER. Each refill: pick the uncovered sample
      * nearest the user (nudged toward the candidate that would cover the
      * most uncovered samples, but only among samples within 0.75 x the last
@@ -6148,7 +6335,7 @@
      * Stops: complete | budget (SWEEP.maxCalls) | stalled (5 probes in a
      * row found no new place id) | error (a probe failed).
      * ================================================================== */
-    function makeSweeper(places, origin, callsUsed) {
+    function makeSweeper(places, origin, callsUsed, types) {
       var MLAT = 110574;
       var MLNG = 111320 * Math.cos(origin.lat * Math.PI / 180);
       var ceilR = Math.max(5000, SWEEP.radius);
@@ -6261,7 +6448,7 @@
           if (calls >= SWEEP.maxCalls) { state = 'budget'; out(null, []); return; }
           calls++; busy = true;
           var center = { lat: origin.lat + pr.y / MLAT, lng: origin.lng + pr.x / MLNG };
-          probeRaw(places, center, FIRST_RADIUS_M).then(function (raw) {
+          probeRaw(places, center, FIRST_RADIUS_M, types).then(function (raw) {
             addDisc(pr.x, pr.y, discFromRaw(center, raw, FIRST_RADIUS_M));
             return ingest(raw, false);
           }).then(function (o) {
@@ -6289,7 +6476,7 @@
           return rel;
         },
         info: function () {
-          return { state: state, radius: R, calls: calls, max: SWEEP.maxCalls, err: errText,
+          return { state: state, types: types.slice(), radius: R, calls: calls, max: SWEEP.maxCalls, err: errText,
                    discs: discs.length, canExtend: state === 'complete' && R < ceilR && calls < SWEEP.maxCalls };
         }
       };
@@ -6690,15 +6877,7 @@
        user picks a cuisine. */
     function cuisineKeys(types) {
       if (!types || !types.length) return [];
-      var MAP = {
-        italian_restaurant: 'italian', japanese_restaurant: 'japanese', sushi_restaurant: 'japanese',
-        ramen_restaurant: 'japanese', mexican_restaurant: 'mexican', thai_restaurant: 'thai',
-        indian_restaurant: 'indian', chinese_restaurant: 'chinese', american_restaurant: 'american',
-        mediterranean_restaurant: 'mediterranean', korean_restaurant: 'korean',
-        vietnamese_restaurant: 'vietnamese', pizza_restaurant: 'pizza', hamburger_restaurant: 'burgers',
-        seafood_restaurant: 'seafood', cafe: 'cafe', bakery: 'cafe', coffee_shop: 'cafe',
-        barbecue_restaurant: 'bbq', vegetarian_restaurant: 'vegetarian'
-      };
+      var MAP = TYPE_CUISINE;
       var out = [];
       types.forEach(function (t) { if (MAP[t] && out.indexOf(MAP[t]) === -1) out.push(MAP[t]); });
       return out;
@@ -6776,7 +6955,7 @@
               },
               includedTypes: ['restaurant'],
               maxResultCount: 1
-            }).then(function () { finish(null); },
+            }).then(function () { placesOk = true; finish(null); },
                     function (e) {
                       var code = classifyLive(e);
                       if (LEGACY_RETRY[code]) legacyProbe(places, code);
@@ -6789,53 +6968,117 @@
       } catch (e) { finish(classifyLive(e)); }
     }
 
-    /* geocode — turn a typed address into {lat,lng} (Geocoding library). */
-    function geocode(query, done) {
-      var settled = false, timer = null;
-      function fin(err, o) {
+    /* locate — turn a typed place into {lat,lng} + a label.
+       Places API (New) text search FIRST (the API the key already needs):
+         Place.searchByText({textQuery, fields, maxResultCount:1})
+       and only when that is unavailable, or fails for a reason that is NOT a
+       denial, the Geocoder (optional fallback; needs "Geocoding API").
+       done(err, origin, label). One billed call on the normal path; the whole
+       lookup is guarded by the same 15 s as a search and settles once. */
+    var TEXT_DENIED_MSG = 'Google refused the place lookup — enable “Places API (New)” (it powers text search) for this key’s project, or use “Find a place near me”.';
+    var NOT_FOUND_MSG = 'Couldn’t find that place — try a street, neighbourhood or city.';
+    var TEXT_DENIAL = { notenabled: 1, denied: 1, apiblocked: 1, billing: 1, restricted: 1, invalid: 1 };
+    function locate(query, done) {
+      var settled = false, timer = null, counted = true;
+      geoPending++;
+      function fin(err, o, label) {
         if (settled) return;
         settled = true;
+        if (counted) { counted = false; geoPending = Math.max(0, geoPending - 1); }
         if (timer) window.clearTimeout(timer);
         var i = pendingSearches.indexOf(hook);
         if (i !== -1) pendingSearches.splice(i, 1);
-        done(err, o);
+        done(err, o, label);
       }
-      function hook(err) { fin(err, null); }
-      // same promise as the search: a lookup must finish, one way or another
+      function hook(err) { fin(err, null, null); }
+      hook.geo = true;
       timer = window.setTimeout(function () {
-        fin(liveShortText(state.mapsLoaded ? 'timeout' : 'timeoutload'), null);
-      }, 12000);
+        fin(liveShortText(state.mapsLoaded ? 'timeout' : 'timeoutload'), null, null);
+      }, SEARCH_TIMEOUT_MS);
       pendingSearches.push(hook);   // auth/script failure answers it now
+
+      function viaGeocoder() {
+        if (settled) return;
+        hook.geocoding = true;   // a Geocoding-API refusal may now answer this lookup
+        try {
+          google.maps.importLibrary('geocoding').then(function (geo) {
+            if (settled) return;
+            var geocoder = new geo.Geocoder();
+            function denied() {
+              // the key is not dead: only this API is off. Nothing else changes.
+              geoDeniedAt = Date.now();
+              disableAutocomplete();
+              fin(GEO_DENIED_MSG, null, null);
+            }
+            var pr = geocoder.geocode({ address: query }, function (results, status) {
+              if (status === 'OK' && results && results[0]) {
+                var l = results[0].geometry.location;
+                fin(null, { lat: l.lat(), lng: l.lng() }, query);
+              } else if (status === 'REQUEST_DENIED') {
+                denied();
+              } else if (status === 'OVER_QUERY_LIMIT') {
+                fin(liveShortText('quota'), null, null);
+              } else {
+                fin(NOT_FOUND_MSG, null, null);
+              }
+            });
+            // newer SDKs also hand back a promise that rejects with the status
+            if (pr && typeof pr.then === 'function') {
+              pr.then(null, function (e) { if (geoDenied(e)) denied(); else fin(NOT_FOUND_MSG, null, null); });
+            }
+          }).catch(function () { fin(NOT_FOUND_MSG, null, null); });
+        } catch (e) { fin(NOT_FOUND_MSG, null, null); }
+      }
+
       whenReady(function () {
         if (settled) return;
         try {
-          google.maps.importLibrary('geocoding').then(function (geo) {
-            var geocoder = new geo.Geocoder();
-            geocoder.geocode({ address: query }, function (results, status) {
-              if (status === 'OK' && results && results[0]) {
-                var l = results[0].geometry.location;
-                fin(null, { lat: l.lat(), lng: l.lng() });
-              } else if (status === 'REQUEST_DENIED') {
-                fin('Google refused the lookup \u2014 enable \u201cGeocoding API\u201d for this key\u2019s project, or use \u201cFind a place near me\u201d.', null);
-              } else if (status === 'OVER_QUERY_LIMIT') {
-                fin(liveShortText('quota'), null);
-              } else {
-                fin('Could not find \u201c' + query + '\u201d \u2014 try a city or a fuller address.', null);
+          google.maps.importLibrary('places').then(function (places) {
+            if (settled) return;
+            if (!(places && places.Place && typeof places.Place.searchByText === 'function')) { viaGeocoder(); return; }
+            places.Place.searchByText({
+              textQuery: query,
+              fields: ['id', 'displayName', 'formattedAddress', 'location'],
+              maxResultCount: 1
+            }).then(function (res) {
+              placesOk = true;
+              var p = res && res.places && res.places[0];
+              var l = p && p.location;
+              var lat = l && (typeof l.lat === 'function' ? l.lat() : l.lat);
+              var lng = l && (typeof l.lng === 'function' ? l.lng() : l.lng);
+              if (typeof lat !== 'number' || typeof lng !== 'number' || !isFinite(lat) || !isFinite(lng)) {
+                fin(NOT_FOUND_MSG, null, null); return;
               }
+              fin(null, { lat: lat, lng: lng }, p.displayName || p.formattedAddress || query);
+            }, function (e) {
+              var code = classifyLive(e);
+              if (TEXT_DENIAL[code]) {
+                // Google reports this through gm_authFailure too, a moment
+                // LATER (after this lookup has settled): remember it, so that
+                // late event is read as auxiliary and the probe decides.
+                geoDeniedAt = Date.now();
+                // key-level problems keep their own plain reason; a plain
+                // "refused / not enabled" is the Places (New) story
+                fin((code === 'invalid' || code === 'billing' || code === 'restricted') ? liveShortText(code) : TEXT_DENIED_MSG, null, null);
+                return;
+              }
+              if (code === 'quota') { fin(liveShortText('quota'), null, null); return; }
+              viaGeocoder();   // not a denial: the Geocoder gets a go
             });
-          }).catch(function (e) { fin(humanizeError(e), null); });
-        } catch (e) { fin(humanizeError(e), null); }
+          }).catch(function () { viaGeocoder(); });
+        } catch (e) { viaGeocoder(); }
       });
     }
 
     /* Places Autocomplete on the location input (when API is ready). */
     function attachAutocomplete(input) {
-      if (!input || state.autocomplete) return;
+      if (!LEGACY_AUTOCOMPLETE || !input || state.autocomplete || acOff) return;
       whenReady(function () {
         try {
           google.maps.importLibrary('places').then(function (places) {
             // Legacy Autocomplete widget is still the simplest text-field binding.
-            if (!places.Autocomplete) return;
+            if (!places.Autocomplete || acOff || state.autocomplete) return;
+            acInput = input; acTouched = true;
             state.autocomplete = new places.Autocomplete(input, {
               fields: ['geometry', 'name'],
               types: ['geocode']
@@ -6849,8 +7092,8 @@
                 find.showPrefs(true);
               }
             });
-          }).catch(function () {});
-        } catch (e) {}
+          }).catch(function () { acInput = input; disableAutocomplete(); });
+        } catch (e) { acInput = input; disableAutocomplete(); }
       });
     }
 
@@ -6948,6 +7191,7 @@
         fields: ['photos', 'reviews', 'nationalPhoneNumber', 'internationalPhoneNumber',
           'regularOpeningHours', 'utcOffsetMinutes']
       }).then(function () {
+        placesOk = true;
         r.phone = place.internationalPhoneNumber || place.nationalPhoneNumber || r.phone || null;
         return openFlag(place);
       }).then(function (flag) {
@@ -7024,7 +7268,7 @@
       loadOnce: loadOnce,
       validateKey: validateKey,
       searchNearby: searchNearby,
-      geocode: geocode,
+      locate: locate,
       attachAutocomplete: attachAutocomplete,
       fetchDetails: fetchDetails
     };

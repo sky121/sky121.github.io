@@ -263,6 +263,24 @@ html.evening :focus-visible {
   animation: panel-fade 0.24s ease;
 }
 .live-note-text { line-height: 1.35; }
+.live-note-retry[hidden] { display: none; }
+.live-note-retry {
+  flex: none;
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--pond-deep);
+  background: transparent;
+  border: 1px solid var(--pond-deep);
+  border-radius: 999px;
+  padding: 0 0.9rem;
+  min-height: 44px;
+  min-width: 44px;
+}
+.live-note-retry:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
+html.evening .live-note-retry { color: var(--pond); border-color: var(--pond); }
 .live-note-dot {
   width: 0.6rem;
   height: 0.6rem;
@@ -553,6 +571,12 @@ html.evening .find-cta-btn:hover {
 }
 html.evening .loc-go { color: #1c212c; background: var(--pond); }
 .loc-go:hover { filter: brightness(1.06); }
+
+/* When the legacy Autocomplete widget has been removed (its API is not
+   enabled for the key), nothing of it may be drawn: no dropdown, no error
+   icon on the input. */
+html.eats-ac-off .pac-container { display: none !important; }
+.loc-input.gm-err-autocomplete { background-image: none !important; }
 
 /* Google autocomplete dropdown — keep above washes */
 .pac-container {
