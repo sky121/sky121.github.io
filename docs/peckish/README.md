@@ -150,12 +150,16 @@ script error, hang) the queued search callback never ran; (2) the search used th
   *fallback*: if the new API says "not enabled / denied / API-restricted / unrecognised
   error", the old `nearbySearch` / `getDetails` run once (so older projects keep working,
   and keep the ~60-place pagination there). If both fail, the NEW API's reason is shown.
-- **Geocoding API** — only for typing a place under "search a specific location".
+- **Geocoding API** — OPTIONAL. Typed locations resolve through Places API (New) text search
+  (`Place.searchByText`); the Geocoder is only a fallback when text search is unavailable or
+  fails for a non-denial reason.
 - Billing must be attached to the project (Places refuses without it, free credit or not).
 - Key restrictions: HTTP referrer `https://sky121.github.io/*`; allowed APIs must
-  include Maps JavaScript API + Places API (New) (+ Geocoding if used).
-- Place **Autocomplete** on the location box is the legacy widget; on a new project it
-  quietly does nothing (typed text + Search still works through Geocoding).
+  include Maps JavaScript API + Places API (New) (+ Geocoding only if you want the fallback).
+- The legacy Place **Autocomplete** widget on the location box is DISABLED
+  (`LEGACY_AUTOCOMPLETE = false` in the gmaps closure): it is deprecated, closed to new
+  projects, and fires `gm_authFailure` (ApiNotActivatedMapError) on a good Places (New) key.
+  The box is a plain text field (Enter searches, `enterkeyhint="search"`).
 
 **New search.** `Place.searchNearby({ fields, locationRestriction:{center, radius:5000},
 includedTypes:['restaurant'], maxResultCount:20, rankPreference: DISTANCE })`; an empty
@@ -340,28 +344,42 @@ swiping cannot reuse discs from another type-set.
 **Preferences count.** The "N sample places match" line is measured against the built-in
 sample catalog, so in live mode (a usable key) it is hidden (`#prefs-count` `hidden`, empty);
 demo mode shows it as before.
-**2. Typed-location (Geocoding) failure.** With a real key whose project has no Geocoding
-API, `Geocoder` answers REQUEST_DENIED and the Maps SDK also fires `gm_authFailure`
-(ApiNotActivatedMapError; the legacy Autocomplete widget triggers it too). Before, this
-showed the generic "Google rejected the key" banner and drew Google's broken '!' icons over
-the input. Now:
-- `gmaps.geocode` maps REQUEST_DENIED (status, callback or rejected promise) to the specific
-  message (enable "Geocoding API" for this key's project, or use "Find a place near me").
-  The key is NOT marked dead, nothing falls back to demo, settings do not open.
-- `gm_authFailure` is ambiguous when a lookup is in flight / the widget is attached / a
-  lookup was just denied: one cheap probe (the same 1-result id-only Nearby a key save makes)
-  decides. Places answers -> the key is fine (`auxOk`), the autocomplete widget is removed,
-  waiting lookups get the Geocoding message. Probe fails (or 8 s) -> the normal key-rejected
-  path (banner + demo fallback) runs unchanged.
-- `disableAutocomplete()` clears the widget's listeners, removes `.pac-container` nodes,
-  strips `gm-err-autocomplete` / the error `background-image` from `#loc-input` (observed by a
-  MutationObserver), sets `html.eats-ac-off` (CSS hides `.pac-container`), and the widget is
-  never re-attached this page session.
-- The failure copy is a calm `live-note` (not the key sheet) with a "Try again" button
-  (44 px, re-submits the form) and is also announced (`announce`). Typed text is kept.
-  `state.originLabel` is now set only after a successful lookup, and the "Find a place near
-  me" button clears any earlier typed origin, so a failed or old typed search can never
-  hijack "near me".
+**2. Typed-location lookup (rewritten 2026-11-24 after a real-key measurement).** The first
+attempt (Geocoder + probe) failed against real Google: the owner's project has Maps JS +
+Places API (New) but NOT Geocoding and NOT legacy Places. Typing a place fired
+`gm_authFailure` (the legacy Autocomplete widget), the key probe then failed with an
+InvalidValueError, and that was taken as a rejected key: banner, live mode killed, sample
+places. Now:
+- `gmaps.locate(query, done(err, origin, label))` uses **Places text search first**:
+  `Place.searchByText({textQuery, fields:['id','displayName','formattedAddress','location'],
+  maxResultCount:1})` (one billed call, 15 s guard). The first result's location becomes
+  `state.origin`; its displayName (else formattedAddress, else the typed text) is the "Near
+  <label>" line. Zero results -> "Couldn't find that place - try a street, neighbourhood or
+  city." with Try again (no Geocoder call: nothing to fall back to).
+- Denied / not enabled / API-restricted from text search -> a calm, specific message to enable
+  "Places API (New)" (text search), with Try again; the key is NOT marked dead and live mode
+  stays on ("Find a place near me" keeps making live calls). Invalid/billing/referrer codes
+  show their own plain reason. Quota shows the quota text.
+- Only if `searchByText` is missing or fails for a NON-denial reason does the Geocoder run
+  (optional "Geocoding API"). Its REQUEST_DENIED gives the Geocoding message; any other
+  failure gives the not-found line.
+- **Legacy Autocomplete is off** (`LEGACY_AUTOCOMPLETE = false`; `attachAutocomplete` is a
+  no-op). Flip the constant to restore it. `disableAutocomplete()` and the `eats-ac-off` CSS
+  stay as clean-up for the flag-on case.
+- **`placesOk` rule:** set true after ANY successful new-API Place call (searchNearby incl.
+  sweep probes, fetchFields, searchByText, the key-save probe). Once true, `gm_authFailure`
+  is an auxiliary refusal: widget removed, any in-flight Geocoder fallback answered with the
+  Geocoding message, and NO rejectKey / demo fallback / settings error. A key that has
+  worked once in a page session can never be killed by a stray authFailure.
+- **`probeKey` verdict** (used when `gm_authFailure` arrives before any success): only
+  classified `invalid / billing / notenabled / restricted / apiblocked / denied / rejected`
+  codes count as a dead key (`REJECT_CODES`). An ambiguous failure (InvalidValueError ->
+  'unknown', a hang, a network blip) leaves live mode ON; the next real search settles it
+  through its existing fallback paths. A genuinely bad key (authFailure + every Place call
+  denied) still gets the key-rejected banner and the demo fallback.
+- The failure copy is a calm `live-note` (not the key sheet) with a 44 px "Try again" button
+  and is announced. Typed text is kept. `state.originLabel` is set only after a successful
+  lookup, and "Find a place near me" clears any earlier typed origin.
 
 ### Beta wave 2: deck fits the screen, no sample data as yours, backup, landing, constellation (2026-11-23)
 **1. Swipe deck fits above the tab bar.** Before: at 390x844 the controls sat at
@@ -1786,7 +1804,7 @@ Fixed **bottom tab bar** (Find / Visited / Friends / Popular, icons + labels, sa
 ## What needs YOU (to go from demo → real)
 
 0. **Beta launch checklist (2026-11-23):** (a) create the shipped Maps key and apply the *whole* restriction checklist in the 2026-11-23 Feature-map section (HTTP referrer `https://sky121.github.io/*`, Places API (New) + Maps JavaScript API only, quota cap, billing alert) **before** pasting it into `assets/js/eats-config.js` `mapsKey`; (b) decide when to flip `beta:false` (needs the Friends/Popular backend below to be real); (c) re-read the privacy note if any network call is added.
-1. **Live restaurants (Find):** in the Google Cloud Console (a) create/pick a project and **attach billing**; (b) enable **Maps JavaScript API** and **Places API (New)** (plus **Geocoding API** if you want typed locations); (c) create an API key, restrict it to HTTP referrers `https://sky121.github.io/*` and to those APIs; (d) paste it into the in-app **Settings** pill (top-right). It is stored only in your browser, never in the repo. **Real-key smoke test (never done yet — everything so far ran against a stub):** Find near me with a real key and check places are nearest-first, photos/hours/phone appear, and the field list in `NEW_FIELDS` (esp. `regularOpeningHours`, `utcOffsetMinutes`, `photos`, `primaryType`) is accepted by Google.
+1. **Live restaurants (Find):** in the Google Cloud Console (a) create/pick a project and **attach billing**; (b) enable **Maps JavaScript API** and **Places API (New)** (Geocoding API is optional: typed locations use Places text search); (c) create an API key, restrict it to HTTP referrers `https://sky121.github.io/*` and to those APIs; (d) paste it into the in-app **Settings** pill (top-right). It is stored only in your browser, never in the repo. **Real-key smoke test (never done yet — everything so far ran against a stub):** Find near me with a real key and check places are nearest-first, photos/hours/phone appear, and the field list in `NEW_FIELDS` (esp. `regularOpeningHours`, `utcOffsetMinutes`, `photos`, `primaryType`) is accepted by Google.
 2. **Real Friends + Popular:** these are inherently multi-user, so they need a **shared backend + accounts** (Firebase or Supabase, both have free tiers and work from a static site). When you're ready, the swap is contained to the `social` resolvers. This also unlocks: friend connections, real cross-user trending (true day/month/year), and syncing your Visited log across devices.
 
 ### Live-data caveats (already handled in code, good to know)
