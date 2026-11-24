@@ -309,6 +309,60 @@ independently; 0 duplicates; none beyond R; cap 3 -> exactly 3 calls + budget co
 call rejected -> 20 shown, calm message, no hang; legacy two-page path and demo mode
 unchanged; zero page errors.
 
+### Cuisine-aware probing + typed-location failure handling (2026-11-24)
+**1. Cuisine-aware probing (new API path).** Measured on real Google: with Mexican selected
+the sweep burned all 30 billed calls and surfaced only 58 Mexican places, because every
+Nearby request asked for ALL restaurants and the app filtered by cuisine afterwards. Now
+`nearbyRaw` (the first call, the 50 km retry AND every sweep probe) sends
+`includedTypes` = the Google types for the selected cuisines (OR'd by Google). One table,
+`TYPE_CUISINE` (Google type -> our cuisine key), drives both `cuisineKeys()` (reading
+results) and `typesForPrefs()` (asking), the latter being its reverse, so they cannot
+disagree. No cuisine picked -> `['restaurant']`. A selected cuisine with no dedicated type
+(none exist today; a future bucket might) -> the WHOLE request falls back to
+`['restaurant']` so nothing is dropped. `filterByPrefs` stays the final client-side
+authority. Dietary, price, rating and open-now stay client-side (no matching Google type).
+Mapping used (all Places API (New) Table A types):
+italian = italian_restaurant; japanese = japanese_restaurant, sushi_restaurant,
+ramen_restaurant; mexican = mexican_restaurant; thai = thai_restaurant;
+indian = indian_restaurant; chinese = chinese_restaurant; american = american_restaurant;
+mediterranean = mediterranean_restaurant; korean = korean_restaurant;
+vietnamese = vietnamese_restaurant; pizza = pizza_restaurant; burgers = hamburger_restaurant;
+seafood = seafood_restaurant; cafe = cafe, bakery, coffee_shop; bbq = barbecue_restaurant;
+vegetarian = vegetarian_restaurant.
+`SAT_MIN = 15` is unchanged (19-of-20 saturation rule still applies per type-set).
+**Covered discs are per type-set.** The "saturated response => disc of radius d20 is
+complete" proof only holds for the types asked. The type list is snapshotted once in
+`searchNew` and handed to `makeSweeper` (also shown in `sweeper.info().types`); every search
+(Start swiping, Surprise me, restart, a changed preference) goes through `startSearch`,
+which drops `state.sweeper` and builds a new sweeper with empty discs, seen ids and a new
+budget. Discs are never shared between searches, so Preferences -> change cuisine -> Start
+swiping cannot reuse discs from another type-set.
+**Preferences count.** The "N sample places match" line is measured against the built-in
+sample catalog, so in live mode (a usable key) it is hidden (`#prefs-count` `hidden`, empty);
+demo mode shows it as before.
+**2. Typed-location (Geocoding) failure.** With a real key whose project has no Geocoding
+API, `Geocoder` answers REQUEST_DENIED and the Maps SDK also fires `gm_authFailure`
+(ApiNotActivatedMapError; the legacy Autocomplete widget triggers it too). Before, this
+showed the generic "Google rejected the key" banner and drew Google's broken '!' icons over
+the input. Now:
+- `gmaps.geocode` maps REQUEST_DENIED (status, callback or rejected promise) to the specific
+  message (enable "Geocoding API" for this key's project, or use "Find a place near me").
+  The key is NOT marked dead, nothing falls back to demo, settings do not open.
+- `gm_authFailure` is ambiguous when a lookup is in flight / the widget is attached / a
+  lookup was just denied: one cheap probe (the same 1-result id-only Nearby a key save makes)
+  decides. Places answers -> the key is fine (`auxOk`), the autocomplete widget is removed,
+  waiting lookups get the Geocoding message. Probe fails (or 8 s) -> the normal key-rejected
+  path (banner + demo fallback) runs unchanged.
+- `disableAutocomplete()` clears the widget's listeners, removes `.pac-container` nodes,
+  strips `gm-err-autocomplete` / the error `background-image` from `#loc-input` (observed by a
+  MutationObserver), sets `html.eats-ac-off` (CSS hides `.pac-container`), and the widget is
+  never re-attached this page session.
+- The failure copy is a calm `live-note` (not the key sheet) with a "Try again" button
+  (44 px, re-submits the form) and is also announced (`announce`). Typed text is kept.
+  `state.originLabel` is now set only after a successful lookup, and the "Find a place near
+  me" button clears any earlier typed origin, so a failed or old typed search can never
+  hijack "near me".
+
 ### Beta wave 2: deck fits the screen, no sample data as yours, backup, landing, constellation (2026-11-23)
 **1. Swipe deck fits above the tab bar.** Before: at 390x844 the controls sat at
 y 779-837 under the bar (top 771), the info scrap overflowed the stage, and at 375x667
