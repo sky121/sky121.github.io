@@ -696,6 +696,33 @@
     img.src = safe;
   }
 
+  /* Photo credit line ("Photo: Name"). Google's Places terms require the
+     photo author be shown. Text only; when `asLink` and the author uri is a
+     real https URL, the name becomes a safe external link. Never innerHTML. */
+  function photoCreditEl(credit, cls, asLink) {
+    if (!credit || !credit.by) return null;
+    var node = el('span', cls);
+    node.appendChild(document.createTextNode('Photo: '));
+    if (asLink && credit.uri && /^https:\/\//i.test(credit.uri)) {
+      var a = document.createElement('a');
+      a.href = credit.uri;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = credit.by;
+      node.appendChild(a);
+    } else {
+      node.appendChild(document.createTextNode(credit.by));
+    }
+    return node;
+  }
+  // which credit belongs to the photo painted at `url` (live places only)
+  function photoCreditFor(r, url) {
+    if (!r || !url) return null;
+    var list = r.photos || [];
+    for (var i = 0; i < list.length; i++) if (list[i].url === url && list[i].by) return list[i];
+    return (url === r.photoUrl && r.photoBy) ? { by: r.photoBy, uri: r.photoUri } : null;
+  }
+
 
   /* ================================================================== *
    * FOOD ART — procedural watercolor "living stills" for the Feed.
@@ -4320,9 +4347,24 @@
     function mediaPlaylist(r) {
       var segs = r.segments || {};
       var pools = { vibe: [], food: [], review: [] };
-      ['vibe', 'food'].forEach(function (k) {
+      var livePhotos = (!r.demo && r.photos && r.photos.length) ? r.photos : null;
+      ['vibe', 'food'].forEach(function (k, ki) {
         var seg = segs[k] || {};
-        if (seg.photoUrl) {
+        if (!r.demo) {
+          // LIVE place: Google gives no photo categories, so nothing here is
+          // called vibe or food. Photos alternate across the two pools (each
+          // distinct, never repeated), tagged neutrally; a missing photo is
+          // one honest painted tile, not two.
+          var got = 0;
+          if (livePhotos) {
+            for (var pi = ki; pi < livePhotos.length; pi += 2) {
+              pools[k].push({ kind: k, photoUrl: livePhotos[pi].url, by: livePhotos[pi].by, uri: livePhotos[pi].uri,
+                tag: pi === 0 ? 'Photo' : 'More photos' });
+              got++;
+            }
+          }
+          if (!got) pools[k].push({ kind: k, art: ki, tag: 'No photo' });
+        } else if (seg.photoUrl) {
           pools[k].push({ kind: k, photoUrl: seg.photoUrl, caption: seg.caption || '' });
         } else {
           // demo (or photo-less live place): two art variants per category
@@ -4506,11 +4548,14 @@
         b.className = 'trio-block trio-' + item.kind;
         if (item.kind === 'review') {
           var q = item.quote;
-          b.appendChild(el('p', 'trio-quote', q ? '“' + q.text + '”' : 'No reviews yet — be the first to rate it.'));
-          if (q) {
+          var qt = q && typeof q.text === 'string' ? q.text.trim() : '';
+          // never a quote mark pair around nothing: no words -> a plain line
+          if (qt) b.appendChild(el('p', 'trio-quote', '“' + qt + '”'));
+          else b.appendChild(el('p', 'trio-quote', q ? 'Rated, no written review.' : 'No reviews yet — be the first to rate it.'));
+          if (q && (q.score > 0 || q.by)) {
             var by = el('p', 'trio-by');
-            by.appendChild(el('span', 'trio-score', '★ ' + fmtScore(q.score)));
-            by.appendChild(document.createTextNode(' · ' + q.by));
+            if (q.score > 0) by.appendChild(el('span', 'trio-score', '★ ' + fmtScore(q.score)));
+            if (q.by) by.appendChild(document.createTextNode((q.score > 0 ? ' · ' : '') + q.by));
             b.appendChild(by);
           }
         } else {
@@ -4518,8 +4563,10 @@
           // only once it has loaded, and never if it fails.
           paintThumb(b, item.photoUrl, panelArt(r, item.kind, item.art || 0));
           if (item.caption) b.appendChild(el('span', 'trio-cap', item.caption));
+          var cr = item.by ? photoCreditEl(item, 'trio-attr', false) : null;
+          if (cr) b.appendChild(cr);
         }
-        b.appendChild(el('span', 'trio-tag', item.kind === 'review' ? 'Review' : item.kind === 'vibe' ? 'Vibe' : 'Food'));
+        b.appendChild(el('span', 'trio-tag', item.tag || (item.kind === 'review' ? 'Review' : item.kind === 'vibe' ? 'Vibe' : 'Food')));
         if (animate && !prefersReducedMotion) {
           b.classList.remove('is-turn');
           void b.offsetWidth;
@@ -5124,6 +5171,8 @@
 
       var mine = myRatingFor(r.name);
       if (mine) body.appendChild(el('p', 'slc-you', 'You rated it ' + fmtScore(overallOf(mine))));
+      var slCredit = photoCreditEl(photoCreditFor(r, foodSeg.photoUrl || r.photoUrl), 'slc-attr', true);
+      if (slCredit) body.appendChild(slCredit);
       main.appendChild(body);
       card.appendChild(main);
 
@@ -6468,6 +6517,30 @@
       if (typeof flag !== 'boolean') r.open = derivedOpen;
     }
 
+    /* Photo author credit. New API: photo.authorAttributions[] with
+       displayName + uri. Legacy: photo.html_attributions[] — an HTML string
+       like '<a href="https://maps.google.com/...">Name</a>', parsed in an
+       inert DOMParser document (nothing runs; only text + href are read).
+       Returns {by, uri} (uri only when https) or null — absent is fine. */
+    function httpsOnly(u) { return (typeof u === 'string' && /^https:\/\//i.test(u)) ? u : null; }
+    function creditNew(ph) {
+      try {
+        var a = ph && ph.authorAttributions && ph.authorAttributions[0];
+        var by = a && typeof a.displayName === 'string' ? a.displayName.trim() : '';
+        return by ? { by: by, uri: httpsOnly(a.uri) } : null;
+      } catch (e) { return null; }
+    }
+    function creditLegacy(ph) {
+      try {
+        var h = ph && ph.html_attributions && ph.html_attributions[0];
+        if (typeof h !== 'string' || !h) return null;
+        var doc = new DOMParser().parseFromString(h, 'text/html');
+        var link = doc.querySelector('a');
+        var by = ((link || doc.body).textContent || '').trim();
+        return by ? { by: by, uri: link ? httpsOnly(link.getAttribute('href')) : null } : null;
+      } catch (e) { return null; }
+    }
+
     /* The ONE place a live result object is built, so the legacy and the new
        Places surfaces cannot drift apart. `f` carries already-normalised
        primitives; nothing here knows which API they came from. */
@@ -6496,6 +6569,9 @@
         // key parameter, so it lives in memory only: never logged, never
         // stored, never exported.
         photoUrl: f.photoUrl || null,
+        photoBy: f.photoBy || null,   // author of photoUrl (Places terms)
+        photoUri: f.photoUri || null,
+        photos: [],                   // [{url, by, uri}] — filled by fetchDetails
         address: f.address || '',
         // story segments — populated lazily by fetchDetails (photos + reviews).
         // Until then they collapse to a labeled watercolor panel.
@@ -6519,10 +6595,11 @@
           loc = { lat: p.geometry.location.lat(), lng: p.geometry.location.lng() };
         }
       } catch (e) {}
-      var photoUrl = null;
+      var photoUrl = null, photoCr = null;
       try {
         if (p.photos && p.photos.length && typeof p.photos[0].getUrl === 'function') {
           photoUrl = p.photos[0].getUrl({ maxWidth: 400, maxHeight: 400 });
+          photoCr = creditLegacy(p.photos[0]);
         }
       } catch (e) {}
       var out = buildResult({
@@ -6534,6 +6611,8 @@
         type: typeArr(p.types),
         cuisines: cuisineKeys(p.types),
         photoUrl: photoUrl,
+        photoBy: photoCr && photoCr.by,
+        photoUri: photoCr && photoCr.uri,
         loc: loc
       }, origin);
       // legacy nearbySearch only ever carries open_now, so this sets the
@@ -6561,10 +6640,11 @@
 
     // Map a NEW-API Place (fields per NEW_FIELDS) to the same result shape.
     function mapPlaceNew(p, origin, openNow) {
-      var photoUrl = null;
+      var photoUrl = null, photoCr = null;
       try {
         if (p.photos && p.photos.length && typeof p.photos[0].getURI === 'function') {
           photoUrl = p.photos[0].getURI({ maxWidth: 400, maxHeight: 400 });
+          photoCr = creditNew(p.photos[0]);
         }
       } catch (e) {}
       // primaryType first ("italian_restaurant"), then the rest; a bare
@@ -6582,6 +6662,8 @@
         type: typeArr(labelTypes),
         cuisines: cuisineKeys(all),
         photoUrl: photoUrl,
+        photoBy: photoCr && photoCr.by,
+        photoUri: photoCr && photoCr.uri,
         address: p.formattedAddress || '',
         loc: latLngOf(p.location)
       }, origin);
@@ -6782,9 +6864,9 @@
        cards the user won't see. Minimal fields are requested. Cached per
        place via the result's `detailsLoaded` flag (set by the caller).
 
-       Google does NOT label photos as "vibe" vs "food" — so we split the
-       available Place photos across the two segments (first half -> vibe,
-       second half -> food, sharing if only one). Reviews fill the Reviews
+       Google does NOT label photos as "vibe" vs "food" (no categories exist),
+       so live photos are shown with neutral labels, de-duplicated, and
+       credited to their authors. Reviews fill the Reviews
        segment; any segment with no data collapses gracefully in the deck.
 
        NOTE: live-only; cannot be exercised here without a key + network. */
@@ -6814,19 +6896,46 @@
       });
     }
 
-    // photos split across vibe + food segments, then reviews -> quotes.
-    function applySegments(r, urls, reviews) {
-      if (urls.length) {
-        var mid = Math.ceil(urls.length / 2);
-        r.segments.vibe.photoUrl = urls[0] || null;
-        r.segments.food.photoUrl = urls[mid] || urls[0] || null;
+    // Clip at a word boundary with an ellipsis (never mid-word).
+    function clipWords(t, max) {
+      if (t.length <= max) return t;
+      var cut = t.slice(0, max);
+      var sp = cut.lastIndexOf(' ');
+      if (sp > max * 0.5) cut = cut.slice(0, sp);
+      return cut.replace(/[\s,;:.\-\u2013\u2014!?]+$/, '') + '\u2026';
+    }
+    // Google's review text: a string, {text}, or null (ratings-only reviews
+    // are common); originalText is the same shape in the author's language.
+    function reviewTextOf(rv) {
+      function pick(v) { return (typeof v === 'string') ? v : (v && typeof v.text === 'string' ? v.text : ''); }
+      var t = pick(rv && rv.text).trim() || pick(rv && rv.originalText).trim();
+      return t.replace(/\s+/g, ' ');
+    }
+
+    // photos -> distinct live photo list (Google gives no categories, so
+    // nothing is labelled vibe/food); reviews -> quotes that have words.
+    // photos: [{url, by, uri}]
+    function applySegments(r, photos, reviews) {
+      var seen = {}, uniq = [];
+      (photos || []).forEach(function (ph) {
+        if (ph && ph.url && !seen[ph.url] && uniq.length < 4) { seen[ph.url] = 1; uniq.push(ph); }
+      });
+      if (uniq.length) {
+        r.photos = uniq;
+        r.segments.vibe.photoUrl = uniq[0].url;
+        r.segments.food.photoUrl = uniq[1] ? uniq[1].url : null;   // never the same photo twice
         r.segments.vibe.caption = '';
         r.segments.food.caption = '';
       }
       try {
-        r.segments.reviews.quotes = reviews.slice(0, 3).map(function (q) {
-          return { by: q.by || 'A diner', score: Math.round((q.rating || 0) * 20), text: (q.text || '').slice(0, 180) };
+        var withText = [], rated = null;
+        reviews.forEach(function (q) {
+          var t = q.text;
+          if (t) withText.push({ by: q.by || 'A diner', score: Math.round((q.rating || 0) * 20), text: clipWords(t, 180) });
+          else if (!rated && q.rating > 0) rated = { by: q.by || 'A diner', score: Math.round(q.rating * 20), text: '' };
         });
+        // no review has words: one rating-only note (rendered without quotes)
+        r.segments.reviews.quotes = withText.length ? withText.slice(0, 3) : (rated ? [rated] : []);
       } catch (e) {}
     }
 
@@ -6851,8 +6960,11 @@
         try {
           // four at most, card-sized (the URL carries Google's key param;
           // memory only — never persisted)
-          (place.photos || []).slice(0, 4).forEach(function (ph) {
-            if (typeof ph.getURI === 'function') urls.push(ph.getURI({ maxWidth: 640, maxHeight: 800 }));
+          // (authorAttributions rides along with the 'photos' field)
+          (place.photos || []).slice(0, 6).forEach(function (ph) {
+            if (typeof ph.getURI !== 'function') return;
+            var cr = creditNew(ph);
+            urls.push({ url: ph.getURI({ maxWidth: 640, maxHeight: 800 }), by: cr && cr.by, uri: cr && cr.uri });
           });
         } catch (e) {}
         var revs = [];
@@ -6861,7 +6973,7 @@
             revs.push({
               by: rv.authorAttribution && rv.authorAttribution.displayName,
               rating: rv.rating,
-              text: (typeof rv.text === 'string') ? rv.text : (rv.text && rv.text.text) || ''
+              text: reviewTextOf(rv)
             });
           });
         } catch (e) {}
@@ -6893,13 +7005,15 @@
         } catch (e) {}
         var urls = [];
         try {
-          (place.photos || []).slice(0, 4).forEach(function (ph) {
-            if (typeof ph.getUrl === 'function') urls.push(ph.getUrl({ maxWidth: 640, maxHeight: 800 }));
+          (place.photos || []).slice(0, 6).forEach(function (ph) {
+            if (typeof ph.getUrl !== 'function') return;
+            var cr = creditLegacy(ph);
+            urls.push({ url: ph.getUrl({ maxWidth: 640, maxHeight: 800 }), by: cr && cr.by, uri: cr && cr.uri });
           });
         } catch (e) {}
         var revs = [];
         try {
-          (place.reviews || []).forEach(function (rv) { revs.push({ by: rv.author_name, rating: rv.rating, text: rv.text }); });
+          (place.reviews || []).forEach(function (rv) { revs.push({ by: rv.author_name, rating: rv.rating, text: reviewTextOf(rv) }); });
         } catch (e) {}
         applySegments(r, urls, revs);
         cb(null);

@@ -4730,3 +4730,34 @@ html.evening .maps-link:focus-visible { outline-color: #9fc2e0; }
 @media (max-height: 700px) {
   .trio-info .maps-link { margin-top: 0; }
 }
+/* ---------- live photo credit ("Photo: Name") ----------
+   Google's Places terms require showing photo authors. Quiet by design: a
+   tiny line on the photo's own scrim, and a plain caption on compare cards. */
+.trio-attr {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 1;
+  padding: 0.9rem 0.6rem 0.28rem;
+  background: linear-gradient(180deg, rgba(20, 24, 33, 0) 0%, rgba(20, 24, 33, 0.78) 100%);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  color: rgba(253, 251, 244, 0.95);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.slc-attr {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+}
+.slc-attr a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  display: inline-block;
+  padding: 0.7rem 0.1rem;   /* >=44px tap height without moving the line */
+  margin: -0.7rem 0;
+}
