@@ -49,8 +49,21 @@
   var CFG = (window.TABLEAU_CONFIG && typeof window.TABLEAU_CONFIG === 'object') ? window.TABLEAU_CONFIG : {};
   var BETA = CFG.beta === true;
   var CONFIG_KEY = (typeof CFG.mapsKey === 'string') ? CFG.mapsKey.trim() : '';
+  /* Live "sweep" knobs (see eats-config.js): clamped, safe defaults. */
+  function cfgNum(v, lo, hi, dflt) {
+    v = Number(v);
+    return (isFinite(v) && v >= lo) ? Math.min(hi, Math.round(v)) : dflt;
+  }
+  var SWEEP = {
+    radius: cfgNum(CFG.sweepRadiusM, 300, 20000, 1500),
+    maxCalls: cfgNum(CFG.sweepMaxCalls, 1, 200, 30),
+    refillAt: cfgNum(CFG.sweepRefillAt, 1, 50, 6)
+  };
   var configKeyDead = false;   // the shipped key was refused at runtime -> demo
   var BETA_HIDDEN = ['feed', 'friends', 'popular'];
+  /* VISITED flag (eats-config.js `visited`): false hides every Visited
+     surface; anything but an explicit false keeps the old behaviour. */
+  var VISITED_ON = CFG.visited !== false;
 
   /* Beta: drop the three sample-data tabs from the tab bar (so they are out
      of the tab order AND the accessibility tree) and seal their panels
@@ -75,6 +88,34 @@
     var bar = document.querySelector('.bottom-bar-inner');
     if (bar) bar.setAttribute('data-beta', '');
     try { document.documentElement.classList.add('beta'); } catch (e) {}
+  })();
+
+  /* Visited off: drop the tab, seal the panel (hidden + inert + aria-hidden,
+     like the beta-hidden panels) and flag <html class="no-visited"> so the
+     few static copy lines that mention ratings swap (.v-only / .v-off-only).
+     The Visited code stays intact; stored data is never touched. If that
+     leaves a single tab (beta), the bar is pointless: <html class="no-bar">
+     hides it and gives the page its bottom room back. visited:true restores. */
+  (function applyVisitedFlag() {
+    if (VISITED_ON) return;
+    var t = document.getElementById('tab-visited');
+    if (t && t.parentNode) t.parentNode.removeChild(t);
+    var pnl = document.getElementById('panel-visited');
+    if (pnl) {
+      pnl.hidden = true;
+      pnl.classList.add('is-hidden');
+      pnl.setAttribute('inert', '');
+      pnl.setAttribute('aria-hidden', 'true');
+      pnl.removeAttribute('tabindex');
+      pnl.setAttribute('data-beta-hidden', '');
+    }
+    var left = document.querySelectorAll('.bottom-bar-inner [role="tab"]').length;
+    var bar = document.querySelector('.bottom-bar-inner');
+    if (bar) bar.setAttribute('data-tabs', String(left));
+    try {
+      document.documentElement.classList.add('no-visited');
+      if (left <= 1) document.documentElement.classList.add('no-bar');
+    } catch (e) {}
   })();
 
   /* ------------------------------------------------------------------ *
@@ -2809,6 +2850,34 @@
     if (r.demo === true) return true;
     return String(r.id || '').indexOf('demo-') === 0;
   }
+  /* "Open in Google Maps" — keyless Maps URLs API (search + place id). A real
+     <a> (not window.open) so it works in an installed iOS PWA and from the
+     keyboard. Sample/demo places are not real: no link is invented (null). */
+  function mapsSearchUrl(r) {
+    if (!r || isSampleResult(r) || !r.name) return null;
+    var q = String(r.name) + (r.address ? ' ' + String(r.address) : '');
+    var u = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
+    if (r.placeId) u += '&query_place_id=' + encodeURIComponent(String(r.placeId));
+    return u;
+  }
+  function mapsLinkEl(r, cls) {
+    var href = mapsSearchUrl(r);
+    if (!href) return null;
+    var a = el('a', cls);
+    a.href = href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.setAttribute('aria-label', 'Open in Google Maps: ' + r.name + ' (opens in a new tab)');
+    a.appendChild(el('span', 'maps-link-glyph', '↗'));
+    a.lastChild.setAttribute('aria-hidden', 'true');
+    a.appendChild(document.createTextNode('Open in Maps'));
+    // the swipe card owns pointerdown (drag + pointer capture) and Enter/Space
+    // (flip the set): a tap or key on this link must reach the link only.
+    ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'click', 'keydown'].forEach(function (t) {
+      a.addEventListener(t, function (e) { e.stopPropagation(); });
+    });
+    return a;
+  }
   /* Beta: a visitor must never mistake a sample place for a real one, so
      the SAMPLE tag is drawn in demo mode too (it is the only mode where
      every place is a sample). Outside beta the old convention holds. */
@@ -3079,6 +3148,9 @@
       state.distanceCap = capForDistance(state.prefs.distance);
       state.hasMore = false;
       state.nextPage = null;
+      state.sweeper = null;       // a new search drops the old sweep (its late answers are ignored)
+      state.loadingMore = false;
+      sweepNoMatch = 0;
       hideLiveNote();
       deck.showLoading();
 
@@ -3110,8 +3182,10 @@
               return;
             }
             hideLiveNote();
-            state.nextPage = more || null;
-            state.hasMore = !!more;
+            // new API: `more` is the sweeper (refills via refill()); legacy: a page handle
+            state.sweeper = (more && more.sweep) ? more : null;
+            state.nextPage = (more && !more.sweep) ? more : null;
+            state.hasMore = !!state.nextPage;
             deliver(list, origin);
           });
         });
@@ -3124,6 +3198,7 @@
     }
 
     var liveSearchToken = 0;
+    var sweepNoMatch = 0;   // consecutive sweep refills that added no card the filters allow
 
     /* Live: figure out the search origin (typed location, or geolocation).
        cb(null) means "no usable location" — the caller says so. */
@@ -3190,7 +3265,7 @@
       var repeats = matched.filter(function (r) { return seen[r.id]; });
       var ordered = unseen.concat(repeats);
       if (surprisePending) { surprisePending = false; deck.surprise(ordered); }
-      else deck.load(ordered);
+      else deck.load(ordered, unseen.length);
     }
 
     /* Apply the active preferences as filters. Distance cap included. */
@@ -3233,8 +3308,63 @@
       });
     }
 
-    /* Live "Search farther": next page -> append -> re-filter -> deck. */
+    /* ---- Sweep refill (new Places API) ----
+       One probe per call. The deck asks when its un-swiped queue runs low
+       (or empty); the answer is filtered by the active preferences and
+       binary-inserted into the deck's upcoming queue by distance from the
+       USER. Chains while the deck still wants more, but only while probes
+       keep adding cards (3 fruitless ones in a row pause until the person
+       swipes on) unless the person is already waiting at the end. */
+    function sweepInfo() { return state.sweeper ? state.sweeper.info() : null; }
+    function sweepOpen() { var i = sweepInfo(); return !!(i && i.state === 'open'); }
+    function addResults(list) {
+      if (!list || !list.length) return;
+      state.results = state.results.concat(list);
+      state.results.sort(function (a, b) {
+        if (a.distance == null) return 1;
+        if (b.distance == null) return -1;
+        return a.distance - b.distance;
+      });
+    }
+    function refill() {
+      var sw = state.sweeper;
+      if (!sw || state.loadingMore || !sweepOpen()) return;
+      state.loadingMore = true;
+      var tok = liveSearchToken;
+      sw.fetch(function (err, fresh) {
+        if (tok !== liveSearchToken || sw !== state.sweeper) return;   // a newer search replaced this one
+        state.loadingMore = false;
+        if (err) {
+          if (offline.isOffline()) offline.sync();
+          else {
+            showLiveNote(err + ' Showing the places already found.');
+            announce(err + ' No more places for now.');
+            deck.layout();   // the note takes room above the deck: refit it above the tab bar
+          }
+          deck.sweepSettled();
+          return;
+        }
+        addResults(fresh);
+        var matched = filterByPrefs(fresh);
+        deck.insertMore(matched);
+        sweepNoMatch = matched.length ? 0 : sweepNoMatch + 1;
+        if (!sweepOpen()) { deck.sweepSettled(); return; }
+        if (deck.wantsMore() && (deck.isWaiting() || sweepNoMatch < 3)) refill();
+      });
+    }
+
+    /* Live "Search farther": sweep -> widen the radius one step (explicit
+       choice, only offered once the current radius is fully covered); legacy
+       path -> next page. Both: append -> re-filter -> deck. */
     function searchFarther(cb) {
+      if (state.sweeper) {
+        if (!state.sweeper.info().canExtend || state.loadingMore) { if (cb) cb([]); return; }
+        var rel = state.sweeper.extend();
+        sweepNoMatch = 0;
+        addResults(rel);
+        if (cb) cb(filterByPrefs(rel));
+        return;
+      }
       if (!store.getKey() || !state.hasMore || state.loadingMore) { if (cb) cb([]); return; }
       state.loadingMore = true;
       if (state.nextPage && typeof state.nextPage.fetch === 'function') {
@@ -3258,7 +3388,10 @@
         state.loadingMore = false; state.hasMore = false; if (cb) cb([]);
       }
     }
-    function hasFarther() { return !!(store.getKey() && state.hasMore); }
+    function hasFarther() {
+      if (state.sweeper) return !!state.sweeper.info().canExtend;
+      return !!(store.getKey() && state.hasMore);
+    }
 
     /* --- Quiet wash forward into the wizard ---
        Tapping the primary CTA fades the landing out, then shows the
@@ -3348,6 +3481,11 @@
       hideLiveNote: hideLiveNote,
       searchFarther: searchFarther,
       hasFarther: hasFarther,
+      refill: refill,
+      sweepInfo: sweepInfo,
+      sweepOpen: sweepOpen,
+      sweepActive: function () { return !!state.sweeper; },
+      sweepRefillAt: function () { return SWEEP.refillAt; },
       filterByPrefs: filterByPrefs
     };
   })();
@@ -3874,6 +4012,9 @@
 
     var queue = [];
     var idx = 0;
+    var sortEnd = 0;        // queue[0..sortEnd) is the distance-sorted, not-recently-passed run (sweep inserts land here)
+    var sweepOn = false;    // this queue belongs to a live sweep (refills may insert into it)
+    var waitingMore = false; // at the end of the queue, quietly waiting on a sweep refill
     var topCard = null;
     var animating = false;
     var keyHandler = null;
@@ -3913,12 +4054,26 @@
       var k = have > 0 && need > have ? Math.max(0.7, have / need) : 1;
       trio.style.setProperty('--fit', k.toFixed(3));
     }
+    var safeProbe = null;
+    function safeBottom() {   // env(safe-area-inset-bottom) in px (no bar to measure)
+      try {
+        if (!safeProbe) {
+          safeProbe = el('div');
+          safeProbe.setAttribute('aria-hidden', 'true');
+          safeProbe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding-bottom:env(safe-area-inset-bottom,0px)';
+          document.body.appendChild(safeProbe);
+        }
+        return parseFloat(window.getComputedStyle(safeProbe).paddingBottom) || 0;
+      } catch (e) { return 0; }
+    }
+    function viewH() { return (window.visualViewport && window.visualViewport.height) || window.innerHeight; }
     function layout() {
       var wrap = $('deck-wrap'), room = $('room');
       var bar = document.querySelector('.bottom-bar-inner');
       if (!wrap || !room) return;
       var shown = !wrap.hidden && wrap.offsetParent !== null;
       room.classList.toggle('deck-on', shown);
+      var barShown = !!bar && bar.offsetParent !== null;   // hidden when Find is the only tab
       if (!shown || !fitMode || !bar) {
         wrap.classList.remove('deck-fit');
         wrap.style.removeProperty('--deck-avail');
@@ -3926,7 +4081,8 @@
         return;
       }
       var top = wrap.getBoundingClientRect().top + (window.pageYOffset || 0);
-      var avail = Math.floor(bar.getBoundingClientRect().top - top - 10);
+      var floor = barShown ? bar.getBoundingClientRect().top : viewH() - 12 - safeBottom();
+      var avail = Math.floor(floor - top - 10);
       var clamped = avail < 380;          // landscape / tiny: let the page scroll instead
       if (clamped) avail = 380;
       room.classList.toggle('deck-clamped', clamped);
@@ -3960,6 +4116,7 @@
 
     function showLoading() {
       clearRoulette();
+      waitingMore = false; sweepOn = false;
       setMode('deck');
       clear(deckEl);
       if (peekEl) peekEl.hidden = true;
@@ -3974,21 +4131,101 @@
       [btnNo, btnYes, btnInfo].forEach(function (b) { if (b) b.disabled = !on; });
     }
 
-    function load(matched) {
+    function load(matched, unseenCount) {
       clearRoulette();
       queue = matched || [];
+      sortEnd = (typeof unseenCount === 'number') ? unseenCount : queue.length;
       idx = 0;
+      waitingMore = false;
+      sweepOn = !!(find.sweepActive && find.sweepActive());
       history = [];
       updateUndo();
       clear(deckEl);
       setMode('deck');
-      if (!queue.length) { showEnd(true); return; }
+      if (!queue.length) {
+        // a live sweep may still find matches: wait quietly rather than
+        // declaring "nothing matched" on the first 20
+        if (sweepOn && find.sweepOpen()) { showFindingMore(); find.refill(); return; }
+        showEnd(true); return;
+      }
       renderStack(true); // deal the opening hand onto the table
       setControlsEnabled(true);
       announce(queue.length + ' places matched. Showing ' + queue[0].name + ', the nearest.');
       // the wizard's Start button is gone with the wizard — land on the card
       // itself, the same place "Back to swiping" returns you to
       if (topCard) topCard.focus();
+      maybeRefill();
+    }
+
+    /* ---- live sweep hooks (see find.refill) ---- */
+    function remaining() { return Math.max(0, queue.length - idx - 1); }
+    function wantsMore() { return sweepOn && (idx >= queue.length || remaining() < find.sweepRefillAt()); }
+    function isWaiting() { return waitingMore; }
+    function maybeRefill() { if (wantsMore()) find.refill(); }
+
+    /* first index in queue[lo,hi) whose distance is > d (stable: ties go after) */
+    function upperBound(lo, hi, d) {
+      while (lo < hi) {
+        var mid = (lo + hi) >> 1, md = queue[mid].distance;
+        if (md == null || md > d) hi = mid; else lo = mid + 1;
+      }
+      return lo;
+    }
+
+    /* Merge freshly swept places (already filtered by preferences, nearest
+       first) into the upcoming queue by distance from the user. The current
+       card and everything already shown are never touched; places passed on
+       recently go behind the sorted run, like the first deal. */
+    function insertMore(matched) {
+      if (!matched || !matched.length) return;
+      var seen = store.getSeen();
+      if (idx >= queue.length) {
+        // at the end (or waiting at it): lay the new run down and resume
+        var unseenRun = matched.filter(function (r) { return !seen[r.id]; });
+        var repeatRun = matched.filter(function (r) { return seen[r.id]; });
+        var start = queue.length;
+        queue = queue.concat(unseenRun, repeatRun);
+        sortEnd = start + unseenRun.length;
+        idx = start;
+        var was = waitingMore;
+        waitingMore = false;
+        setMode('deck'); renderStack(true); setControlsEnabled(true);
+        if (was) announce('Found more places nearby. Showing ' + queue[idx].name + '.');
+        if (topCard) topCard.focus();
+        return;
+      }
+      for (var k = 0; k < matched.length; k++) {
+        var r = matched[k], lo, hi;
+        if (seen[r.id]) { lo = Math.max(sortEnd, idx + 1); hi = queue.length; }
+        else { lo = idx + 1; hi = Math.max(sortEnd, lo); }
+        var pos = upperBound(lo, hi, r.distance == null ? Infinity : r.distance);
+        queue.splice(pos, 0, r);
+        if (!seen[r.id]) sortEnd = hi + 1;
+      }
+      renderPeek();   // the "coming up" strip; the card in hand is left alone
+    }
+
+    /* The sweep has nothing more to give (complete / budget / stalled /
+       error): if the person is waiting at the end, tell them honestly. */
+    function sweepSettled() {
+      if (!waitingMore) return;
+      waitingMore = false;
+      showEnd(queue.length === 0);
+    }
+
+    /* Quiet "finding more nearby…" state at the end of a live sweep. */
+    function showFindingMore() {
+      waitingMore = true;
+      clearRoulette();
+      setMode('deck');
+      clear(deckEl);
+      if (peekEl) peekEl.hidden = true;
+      var l = el('div', 'deck-loading is-more');
+      l.appendChild(el('span', 'social-spinner', ''));
+      l.appendChild(el('span', null, 'Finding more nearby…'));
+      deckEl.appendChild(l);
+      setControlsEnabled(false);
+      announce('Finding more places nearby.');
     }
 
     function append(matched) {
@@ -4185,6 +4422,8 @@
       var sTag = sampleTagFor(r, 'ov-sample');
       if (sTag) meta.appendChild(sTag);
       ov.appendChild(meta);
+      var mapsA = depth === 0 ? mapsLinkEl(r, 'maps-link') : null;   // top card only; null for sample places
+      if (mapsA) ov.appendChild(mapsA);
       // your own Visited score, if you've eaten here before
       var mine = myRatingFor(r.name);
       if (mine) {
@@ -4413,6 +4652,7 @@
       updateUndo();
       if (h.dir === 'no' && h.id) store.removeSeen(h.id); // un-remember the pass
       idx = h.i;
+      waitingMore = false;
       setMode('deck');
       renderStack();
       setControlsEnabled(true);
@@ -4423,10 +4663,15 @@
 
     function advance() {
       idx++;
-      if (idx >= queue.length) { showEnd(false); return; }
+      if (idx >= queue.length) {
+        // live sweep still searching: hold a quiet state instead of an end
+        if (sweepOn && find.sweepOpen()) { showFindingMore(); find.refill(); return; }
+        showEnd(false); return;
+      }
       renderStack();
       setControlsEnabled(true);
       if (topCard) topCard.focus();
+      maybeRefill();
     }
 
     /* ---- watercolor bloom celebration behind the decision card ----
@@ -4651,12 +4896,14 @@
         }
         actionsEl.appendChild(buildCalendarAction(r));
         actionsEl.appendChild(buildShareAction(r, metaLine, mapsHref));
-        var rate = el('button', 'decision-act', 'I ate here → Rate');
-        rate.type = 'button';
-        rate.addEventListener('click', function () {
-          sheet.openForPlace({ name: r.name, placeId: r.placeId || null, loc: r.location || null, address: r.type || '', cuisines: r.cuisines || [] });
-        });
-        actionsEl.appendChild(rate);
+        if (VISITED_ON) {
+          var rate = el('button', 'decision-act', 'I ate here → Rate');
+          rate.type = 'button';
+          rate.addEventListener('click', function () {
+            sheet.openForPlace({ name: r.name, placeId: r.placeId || null, loc: r.location || null, address: r.type || '', cuisines: r.cuisines || [] });
+          });
+          actionsEl.appendChild(rate);
+        }
 
         // not ready to commit: bank it and keep flicking
         var already = shortlist.some(function (s) { return s.id === r.id; });
@@ -4699,6 +4946,7 @@
       clear(deckEl);
       topCard = null;
       queue = (matched || []).slice();
+      sweepOn = false; waitingMore = false; sortEnd = queue.length;   // the roulette owns this queue
       idx = 0;
       if (!queue.length) { showEnd(true); return; } // zero matches: same graceful end screen
       var pi = Math.floor(Math.random() * queue.length);
@@ -4894,6 +5142,8 @@
       rm.setAttribute('aria-label', 'Remove ' + r.name + ' from shortlist');
       rm.addEventListener('click', function () { removeWithUndo(r); });
       acts.appendChild(rm);
+      var slMaps = mapsLinkEl(r, 'slc-maps maps-link');
+      if (slMaps) acts.appendChild(slMaps);
       card.appendChild(acts);
       return card;
     }
@@ -5292,17 +5542,36 @@
     }
 
     function showEnd(emptyFromStart) {
+      waitingMore = false;
       setMode('end');
       renderEndTweaks(emptyFromStart);
       var title = $('deck-end-title');
       var sub = $('deck-end-sub');
+      var sw = sweepOn ? find.sweepInfo() : null;   // live sweep: honest copy about how far the search got
+      var cnt = queue.length + ' place' + (queue.length === 1 ? '' : 's');
+      var lim = sw ? (sw.calls + ' lookup' + (sw.calls === 1 ? '' : 's')) : '';
       if (emptyFromStart) {
         if (title) title.textContent = 'Nothing matched those filters';
-        if (sub) sub.textContent = 'Try widening your preferences or searching farther.';
+        if (sub) sub.textContent = !sw ? 'Try widening your preferences or searching farther.'
+          : sw.state === 'complete' ? 'Nothing within ' + fmtDist(sw.radius / 1609.344) + ' fits. Try widening your preferences.'
+          : sw.state === 'error' ? sw.err + ' Try widening your preferences.'
+          : 'The search stopped after ' + lim + ' without a match, so there may be more farther out. Try widening your preferences.';
       } else if (shortlist.length) {
         if (title) title.textContent = 'Down to your shortlist';
-        if (sub) sub.textContent = 'You’ve seen everything nearby — ' + shortlist.length +
-          ' place' + (shortlist.length === 1 ? ' is' : 's are') + ' waiting on your shortlist.';
+        if (sub) sub.textContent = (!sw || sw.state === 'complete' ? 'You’ve seen everything nearby — ' : 'You’ve seen ' + cnt + ' — ') +
+          shortlist.length + ' place' + (shortlist.length === 1 ? ' is' : 's are') + ' waiting on your shortlist.' +
+          (sw && sw.state !== 'complete' ? ' The search stopped early, so there may be more farther out.' : '');
+      } else if (sw && sw.state === 'complete') {
+        if (title) title.textContent = 'That’s everywhere within ' + fmtDist(sw.radius / 1609.344).replace(' ', '\u00a0');
+        if (sub) sub.textContent = 'You’ve seen all ' + cnt + ' that matched.';
+      } else if (sw && sw.state === 'error') {
+        if (title) title.textContent = 'That’s all I could load';
+        if (sub) sub.textContent = 'You’ve seen ' + cnt + '. ' + sw.err;
+      } else if (sw) {
+        if (title) title.textContent = sw.state === 'budget' ? 'That’s as far as I searched' : 'The search stopped here';
+        if (sub) sub.textContent = 'You’ve seen ' + cnt + '. ' + (sw.state === 'budget'
+          ? 'The search stopped at its limit of ' + lim + ', so there may be more places farther out.'
+          : 'The search stopped after ' + lim + ' found nothing new, so there may be more farther out.');
       } else {
         if (title) title.textContent = 'That’s everywhere nearby that matched';
         if (sub) sub.textContent = 'You’ve seen every spot within your distance cap.';
@@ -5353,7 +5622,7 @@
       if (shortlistEl) shortlistEl.classList.remove('is-picking');
       clear(deckEl);
       if (peekEl) { peekEl.hidden = true; clear(peekEl.querySelector('.peek-row')); }
-      queue = []; idx = 0; topCard = null; animating = false;
+      queue = []; idx = 0; sortEnd = 0; sweepOn = false; waitingMore = false; topCard = null; animating = false;
       history = []; shortlist = [];
       updateUndo(); updateBadge();
       hydrateHearts();   // hearted places survive "start over"
@@ -5386,7 +5655,9 @@
       var farther = $('end-farther');
       if (farther) farther.addEventListener('click', function () {
         find.searchFarther(function (more) {
-          if (more && more.length) { setMode('deck'); append(more); }
+          if (more && more.length) { insertMore(more); maybeRefill(); }
+          else if (sweepOn && find.sweepOpen()) { showFindingMore(); find.refill(); }
+          else if (sweepOn) showEnd(queue.length === 0);   // re-renders the end copy with the widened radius
           else announce('No more places farther out.');
         });
       });
@@ -5422,6 +5693,7 @@
       var seen = {};
       seen[r.id] = true;
       queue = [r];
+      sweepOn = false; waitingMore = false;
       (rest || []).forEach(function (x) {
         if (!x || seen[x.id]) return;
         seen[x.id] = true;
@@ -5435,7 +5707,7 @@
       onLike(r);
     }
 
-    return { init: init, load: load, append: append, showLoading: showLoading, teardown: teardown, surprise: surprise, shortlistCount: shortlistCount, shareShortlist: shareShortlist, pickFrom: pickFrom, addToShortlist: addToShortlist, removeFromShortlist: removeFromShortlist, inShortlist: inShortlist, hydrateHearts: hydrateHearts, layout: layout };
+    return { init: init, load: load, append: append, insertMore: insertMore, wantsMore: wantsMore, isWaiting: isWaiting, sweepSettled: sweepSettled, showLoading: showLoading, teardown: teardown, surprise: surprise, shortlistCount: shortlistCount, shareShortlist: shareShortlist, pickFrom: pickFrom, addToShortlist: addToShortlist, removeFromShortlist: removeFromShortlist, inShortlist: inShortlist, hydrateHearts: hydrateHearts, layout: layout };
   })();
 
   /* paint a wc-range fill % (shared) */
@@ -5548,9 +5820,9 @@
    *   rankPreference: SearchNearbyRankPreference.DISTANCE })
    * which DOES rank by distance (nearest first) — the old comment here that
    * claimed otherwise was wrong. Its limits: at most 20 places per request
-   * and NO pagination, so `more` is null on this path and the deck hides
-   * "Search farther" (asking the same nearest-20 for a bigger radius would
-   * return the same 20). If the new API throws something that says "not
+   * and NO pagination, so coverage beyond 20 comes from the SWEEP (see
+   * makeSweeper): `more` is the sweeper ({sweep:true, fetch, extend, info}),
+   * and "Search farther" widens its radius. If the new API throws something that says "not
    * available to you" (not enabled / denied / API-restricted key / an
    * unrecognised error) the LEGACY nearbySearch(rankBy DISTANCE) path runs as
    * a fallback for projects that still have it; that path keeps its ~60 place
@@ -5724,8 +5996,8 @@
       try {
         google.maps.importLibrary('places').then(function (places) {
           if (places && places.Place && typeof places.Place.searchNearby === 'function') {
-            searchNew(places, origin).then(function (list) {
-              done(null, list, null);
+            searchNew(places, origin).then(function (res) {
+              done(null, res.list, res.more);
             }, function (e) {
               var code = classifyLive(e);
               if (!LEGACY_RETRY[code]) { done(liveShortText(code), null, null); return; }
@@ -5754,31 +6026,225 @@
       'userRatingCount', 'priceLevel', 'regularOpeningHours', 'utcOffsetMinutes',
       'types', 'primaryType', 'businessStatus', 'photos'];
 
-    function searchNew(places, origin) {
+    var NEARBY_MAX = 20;
+    /* Real Google sometimes returns 19 (or fewer) of a requested 20 in a dense
+       area while many more places exist farther out (measured: 19 results with
+       the 19th at 186 m, 6 probes). So "fewer than 20" does NOT prove the query
+       radius was exhausted. Only a genuinely thin answer (< SAT_MIN) is trusted
+       as "everything in the radius"; anything fuller counts as saturated and
+       only the disc out to its farthest result is treated as complete. */
+    var SAT_MIN = NEARBY_MAX - 5;
+    var FIRST_RADIUS_M = 5000;      // first call + every probe: 5 km query
+    var STALL_LIMIT = 5;
+    var M_PER_MI = 1609.344;
+
+    function nearbyRaw(places, center, radius) {
       var rank = places.SearchNearbyRankPreference;
-      function ask(radius) {
-        return places.Place.searchNearby({
-          fields: NEW_FIELDS,
-          locationRestriction: { center: { lat: origin.lat, lng: origin.lng }, radius: radius },
-          includedTypes: ['restaurant'],
-          maxResultCount: 20,
-          rankPreference: rank ? rank.DISTANCE : 'DISTANCE'
-        });
-      }
+      return places.Place.searchNearby({
+        fields: NEW_FIELDS,
+        locationRestriction: { center: { lat: center.lat, lng: center.lng }, radius: radius },
+        includedTypes: ['restaurant'],
+        maxResultCount: NEARBY_MAX,
+        rankPreference: rank ? rank.DISTANCE : 'DISTANCE'
+      }).then(function (res) { return (res && res.places) || []; });
+    }
+
+    /* A sweep probe is a billed call that must never hang: same 15 s guard
+       as the first search. The promise settles once by construction. */
+    function probeRaw(places, center, radius) {
+      return new Promise(function (resolve, reject) {
+        var t = window.setTimeout(function () { reject({ sweepTimeout: true }); }, SEARCH_TIMEOUT_MS);
+        nearbyRaw(places, center, radius).then(
+          function (a) { window.clearTimeout(t); resolve(a); },
+          function (e) { window.clearTimeout(t); reject(e); });
+      });
+    }
+
+    function searchNew(places, origin) {
+      var calls = 0;
+      function ask(radius) { calls++; return nearbyRaw(places, origin, radius); }
       // 5 km first; a genuinely empty 5 km (rural) gets one 50 km retry.
-      return ask(5000).then(function (res) {
-        var arr = (res && res.places) || [];
-        return arr.length ? res : ask(50000);
-      }).then(function (res) {
-        var arr = ((res && res.places) || []).filter(function (p) {
-          return p && p.businessStatus !== 'CLOSED_PERMANENTLY';
-        });
-        return Promise.all(arr.map(openFlag)).then(function (flags) {
-          var list = arr.map(function (p, i) { return mapPlaceNew(p, origin, flags[i]); });
-          sortNearest(list);
-          return list;
+      var usedRadius = FIRST_RADIUS_M;
+      return ask(FIRST_RADIUS_M).then(function (arr) {
+        if (arr.length) return arr;
+        usedRadius = 50000;
+        return ask(50000);
+      }).then(function (raw) {
+        var sw = makeSweeper(places, origin, calls);
+        return sw.seed(raw, usedRadius).then(function (list) {
+          return { list: list, more: sw };
         });
       });
+    }
+
+    /* ==================================================================
+     * SWEEP — "see every restaurant nearby, closest first".
+     *
+     * Nearby (New) returns at most 20 places per call, NO pagination. With
+     * rankPreference DISTANCE the response is the K closest to the query
+     * centre, so a SATURATED response (20 results, farthest at d20) proves
+     * the disc of radius d20 around that centre is COMPLETE; an UNSATURATED
+     * one (<20) proves the whole query radius is. The sweeper keeps a list
+     * of such "covered discs" and a hex grid of sample points over the
+     * sweep radius around the USER. Each refill: pick the uncovered sample
+     * nearest the user (nudged toward the candidate that would cover the
+     * most uncovered samples, but only among samples within 0.75 x the last
+     * disc radius of the nearest one, so it stays roughly nearest-first),
+     * query Nearby centred there, record the disc, dedupe by place id.
+     * "Complete" = every sample point is inside some covered disc (holes
+     * narrower than the sample spacing, <= R/20, are not detectable).
+     * Distances are ALWAYS from the user (mapPlaceNew(p, origin)). Places
+     * a probe returns beyond the sweep radius are held back, not shown,
+     * and released if the user extends the radius.
+     * Stops: complete | budget (SWEEP.maxCalls) | stalled (5 probes in a
+     * row found no new place id) | error (a probe failed).
+     * ================================================================== */
+    function makeSweeper(places, origin, callsUsed) {
+      var MLAT = 110574;
+      var MLNG = 111320 * Math.cos(origin.lat * Math.PI / 180);
+      var ceilR = Math.max(5000, SWEEP.radius);
+      var R = SWEEP.radius;
+      var known = {}, held = [], discs = [];
+      var calls = callsUsed, state = 'open', errText = '', zeroRun = 0, estR = 150, busy = false;
+      var xs, ys, ds, cov, n = 0, cursor = 0;
+
+      function buildGrid() {
+        var step = Math.max(60, R / 20), rowH = step * 0.8660254;
+        var pts = [], rows = Math.ceil(R / rowH), cols = Math.ceil(R / step) + 1;
+        for (var j = -rows; j <= rows; j++) {
+          for (var i = -cols; i <= cols; i++) {
+            var x = (i + ((j & 1) ? 0.5 : 0)) * step, y = j * rowH;
+            var d = Math.sqrt(x * x + y * y);
+            if (d <= R) pts.push([d, x, y]);
+          }
+        }
+        pts.sort(function (a, b) { return a[0] - b[0]; });
+        n = pts.length;
+        xs = new Float64Array(n); ys = new Float64Array(n); ds = new Float64Array(n); cov = new Uint8Array(n);
+        for (var k = 0; k < n; k++) { ds[k] = pts[k][0]; xs[k] = pts[k][1]; ys[k] = pts[k][2]; }
+        cursor = 0;
+      }
+      function markDisc(dc) {
+        var r2 = dc.r * dc.r;
+        for (var k = 0; k < n; k++) {
+          if (cov[k]) continue;
+          var dx = xs[k] - dc.x, dy = ys[k] - dc.y;
+          if (dx * dx + dy * dy <= r2) cov[k] = 1;
+        }
+      }
+      function anyUncovered() {
+        while (cursor < n && cov[cursor]) cursor++;
+        return cursor < n;
+      }
+      function pickProbe() {
+        if (!anyUncovered()) return null;
+        var first = cursor, lim = ds[first] + 0.75 * estR, r2 = estR * estR;
+        var best = first, bestScore = -1, tried = 0;
+        for (var i = first; i < n && tried < 40 && ds[i] <= lim; i++) {
+          if (cov[i]) continue;
+          tried++;
+          var score = 0;
+          for (var j = first; j < n && ds[j] <= ds[i] + estR; j++) {
+            if (cov[j]) continue;
+            var dx = xs[j] - xs[i], dy = ys[j] - ys[i];
+            if (dx * dx + dy * dy <= r2) score++;
+          }
+          if (score > bestScore) { bestScore = score; best = i; }
+        }
+        return { x: xs[best], y: ys[best] };
+      }
+      function addDisc(x, y, r) {
+        var dc = { x: x, y: y, r: Math.max(1, r * 0.995 - 1) };
+        discs.push(dc);
+        markDisc(dc);
+      }
+      function settleState() {
+        if (!anyUncovered()) state = 'complete';
+        else if (zeroRun >= STALL_LIMIT) state = 'stalled';
+        else if (calls >= SWEEP.maxCalls) state = 'budget';
+      }
+      /* raw Place[] -> fresh, mapped, de-duplicated list (nearest first). */
+      function ingest(raw, keepAll) {
+        var arr = [], newIds = 0;
+        raw.forEach(function (p) {
+          if (!p || !p.id || known[p.id]) return;
+          known[p.id] = 1; newIds++;
+          if (p.businessStatus === 'CLOSED_PERMANENTLY') return;
+          arr.push(p);
+        });
+        return Promise.all(arr.map(openFlag)).then(function (flags) {
+          var fresh = [];
+          arr.forEach(function (p, i) {
+            var r = mapPlaceNew(p, origin, flags[i]);
+            if (!keepAll && r.distance != null && r.distance * M_PER_MI > R) held.push(r);
+            else fresh.push(r);
+          });
+          sortNearest(fresh);
+          return { fresh: fresh, newIds: newIds };
+        });
+      }
+      function discFromRaw(center, raw, queryRadius) {
+        if (raw.length < SAT_MIN) return queryRadius;             // thin answer: whole radius is complete
+        var far = 0;
+        raw.forEach(function (p) {
+          var ll = latLngOf(p && p.location);
+          if (ll) far = Math.max(far, haversineMiles(center, ll) * M_PER_MI);
+        });
+        estR = Math.max(far, 20);
+        return far;                                              // saturated: complete out to d20
+      }
+      function xyOf(c) { return { x: (c.lng - origin.lng) * MLNG, y: (c.lat - origin.lat) * MLAT }; }
+
+      buildGrid();
+      var sweeper = {
+        sweep: true,
+        seed: function (raw, queryRadius) {
+          var c = xyOf(origin);
+          addDisc(c.x, c.y, discFromRaw(origin, raw, queryRadius));
+          return ingest(raw, true).then(function (o) { settleState(); return o.fresh; });
+        },
+        /* One probe (one billed call). cb(err, freshList, info) exactly once. */
+        fetch: function (cb) {
+          function out(e, l) { try { cb(e, l, sweeper.info()); } catch (x) {} }
+          if (state !== 'open' || busy) { out(null, []); return; }
+          var pr = pickProbe();
+          if (!pr) { state = 'complete'; out(null, []); return; }
+          if (calls >= SWEEP.maxCalls) { state = 'budget'; out(null, []); return; }
+          calls++; busy = true;
+          var center = { lat: origin.lat + pr.y / MLAT, lng: origin.lng + pr.x / MLNG };
+          probeRaw(places, center, FIRST_RADIUS_M).then(function (raw) {
+            addDisc(pr.x, pr.y, discFromRaw(center, raw, FIRST_RADIUS_M));
+            return ingest(raw, false);
+          }).then(function (o) {
+            busy = false;
+            zeroRun = o.newIds ? 0 : zeroRun + 1;
+            settleState();
+            out(null, o.fresh);
+          }, function (e) {
+            busy = false; state = 'error';
+            errText = (e && e.sweepTimeout) ? liveShortText('timeout') : liveShortText(classifyLive(e));
+            out(errText, null);
+          });
+        },
+        /* User asked for farther: widen R one step; returns held places now in range. */
+        extend: function () {
+          if (!sweeper.info().canExtend) return [];
+          R = Math.min(ceilR, R + SWEEP.radius);
+          buildGrid();
+          discs.forEach(markDisc);
+          zeroRun = 0; state = 'open';
+          var rel = [], keep = [];
+          held.forEach(function (r) { (r.distance * M_PER_MI <= R ? rel : keep).push(r); });
+          held = keep; sortNearest(rel);
+          settleState();
+          return rel;
+        },
+        info: function () {
+          return { state: state, radius: R, calls: calls, max: SWEEP.maxCalls, err: errText,
+                   discs: discs.length, canExtend: state === 'complete' && R < ceilR && calls < SWEEP.maxCalls };
+        }
+      };
+      return sweeper;
     }
 
     // Place.isOpen() is computed locally from the fields we asked for (it
@@ -6559,6 +7025,7 @@
 
     // Open from a Find result.
     function openForPlace(place) {
+      if (!VISITED_ON) return;
       state.editingId = null;
       state.pendingPlace = place;
       titleEl.textContent = 'Rate ' + (place.name || 'this place');
@@ -6574,6 +7041,7 @@
 
     // Open blank for manual "+ Add a place".
     function openBlank() {
+      if (!VISITED_ON) return;
       state.editingId = null;
       state.pendingPlace = null;
       titleEl.textContent = 'Add a place';
@@ -6589,6 +7057,7 @@
 
     // Open to edit an existing entry.
     function openForEdit(entry) {
+      if (!VISITED_ON) return;
       state.editingId = entry.id;
       state.pendingPlace = null;
       titleEl.textContent = 'Edit ' + entry.name;
@@ -6680,6 +7149,8 @@
     var insightsEl = null; // "Your month in meals" recap (JS-built, above the log)
 
     function load() {
+      /* flag off: the log is not read, seeded or written (storage untouched) */
+      if (!VISITED_ON) { state.visited = []; return; }
       var v = store.getVisited();
       if (BETA) {
         // Beta: a new user has rated nothing, so nothing is seeded, and any

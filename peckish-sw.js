@@ -4,7 +4,7 @@
    online and demo mode keeps working offline. */
 'use strict';
 
-var CACHE = 'peckish-v6';
+var CACHE = 'peckish-v7';
 var CORE = [
   '/eats.html',
   '/assets/css/eats.css',

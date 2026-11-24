@@ -29,7 +29,7 @@
 | `eats.html` | The app page (reuses site chrome: theme script, exhibit-page.css, gallery.js) |
 | `assets/css/eats.css` | All Peckish styling (bubble, swipe deck, prefs, cards, bottom tabs, sheets) |
 | `assets/js/eats.js` | The whole app — vanilla JS, one `'use strict'` IIFE, no deps |
-| `assets/js/eats-config.js` | Site switches: `beta` (Find + Visited only) and the shipped `mapsKey` (empty by default) |
+| `assets/js/eats-config.js` | Site switches: `beta` (Find + Visited only), `visited` (hide/show Visited), and the shipped `mapsKey` (empty by default) |
 | `lab.html` | Holds the Live "Peckish" tile linking here |
 | `sitemap.xml` | Has the `eats.html` entry |
 
@@ -66,6 +66,75 @@ Found by driving the published site (Playwright, 390x844 + 375x667 @2x):
 - Known/left alone: Settings sheet still says "Live data is on" after a failed
   key (the key is kept by design); "Re-rate" opens a sheet titled "Edit ...".
 
+## Visited hidden + "Open in Maps" on the cards (2026-11-24)
+
+**Visited is hidden for now** (no database / cross-device sync yet, so a
+per-browser rating log makes little sense). Reversible switch in
+`assets/js/eats-config.js`: `visited: false` (shipped). `true` (or deleting the
+line) restores Visited exactly as it was. All Visited code is intact.
+
+With `visited:false` (`VISITED_ON` in `eats.js`; `applyVisitedFlag()` runs at
+load, next to `applyBeta()`):
+- The Visited tab is removed from the tab bar and its panel is sealed (hidden +
+  `inert` + `aria-hidden`, plus `data-beta-hidden` so CSS can never paint it).
+  The tab router only knows tabs that exist, so `tabs.activate('visited')` falls
+  back to Find; there is no hash/deep-link router.
+- With beta on, Find is the only tab, so the **whole bar is hidden**
+  (`<html class="no-bar">`): the room's bottom padding drops from 7rem to 2.5rem
+  (+ safe-area), the toast sits lower, and `deck.layout()` sizes the swipe stage
+  to the viewport (`visualViewport.height` - 12px - `env(safe-area-inset-bottom)`)
+  instead of to the bar's top. Measured: deck controls bottom 821/844 (390x844)
+  and 644/667 (375x667), no page scroll. With beta off the other tabs remain and
+  the bar stays.
+- `visited.load()` does not read, seed or write storage, `state.visited = []`.
+  Because everything reads `state.visited`, the "You rated this" pills, match
+  reason chips, cuisine affinity, the landing's "Last time:" line, the backup
+  reminder and the Friends/Feed taste terms all go quiet by themselves.
+  `localStorage['eats-visited']` is never touched (verified present after load).
+- "I ate here -> Rate" on the pick screen is not built; `sheet.openForPlace /
+  openBlank / openForEdit` return early (the sheet is unreachable anyway).
+- Copy: welcome bullet is "Your shortlist stays on this device." (the
+  ratings+shortlist line carries `.v-only`, the new one `.v-off-only`; CSS swaps
+  them on `html.no-visited`); the Privacy note's "Your ratings, shortlist and
+  preferences" drops "ratings" the same way; meta/OG descriptions in `eats.html`
+  no longer promise a rating log. (`peckish.webmanifest` still says "keep a
+  watercolor log" — not in this change's file list; reword when convenient.)
+- Export/import rows and the backup reminder live inside the sealed Visited
+  panel; there are none in Settings.
+
+**To restore Visited:** set `visited: true` in `eats-config.js`. The tab
+returns, the bar comes back (two tabs under beta), the welcome/privacy copy
+reverts, old saved ratings reappear. Also revert the descriptions in
+`eats.html` and the manifest if you want the log advertised again.
+
+**"Open in Maps" button.** A real `<a>` (works in an installed iOS PWA and by
+keyboard) on the front swipe card's info scrap (top card only) and on each
+shortlist card. Built by `mapsSearchUrl()` / `mapsLinkEl()` in `eats.js`:
+
+    https://www.google.com/maps/search/?api=1&query=<encodeURIComponent(name + ' ' + address)>&query_place_id=<encodeURIComponent(placeId)>
+
+(keyless Maps URLs API; `query_place_id` is omitted if a result has no place
+id; `address` is the result's formatted address when present). `target=_blank`,
+`rel="noopener noreferrer"`, visible label "Open in Maps", accessible name
+"Open in Google Maps: <place> (opens in a new tab)". Min 44px high. Hidden for
+sample/demo places (`isSampleResult`): no link is invented. The link stops
+pointer/click/keydown propagation so a tap never flips the card's set, starts a
+drag or captures the pointer, and Enter on it follows the link rather than the
+card's Enter-to-flip. The pick screen already had its own "Open in Maps ·
+Directions" action, so it is unchanged. The info (i) button just flips the card's
+set; there is no separate detail sheet, so the card's info scrap is the detail.
+
+**Verified** (Playwright, chromium, 390x844 + 375x667, Maps API stubbed by route
+interception, fresh storage unless noted): flag false hides every Visited
+surface with old data seeded and left intact; flag true restores tabs, bar, memory
+line, rate button and the Visited list; live-stub deck shows exactly one link,
+href decodes to name + address + place_id, tap and Enter open the link and do not
+cycle the card, tapping the card itself still does; sample (demo) deck has zero
+links; shortlist link is full-width 44px; dark mode checked; zero page errors.
+Not verified: a real Google key; a real iOS PWA.
+
+---
+
 ### Live data that works on a brand-new Google project (2026-11-23)
 **What broke.** A valid key + Find left the deck on *Finding places near you…*
 forever. Causes: (1) no watchdog — if Maps never called back (auth failure,
@@ -96,9 +165,9 @@ primary-type 'restaurant' would drop `italian_restaurant`-primary places. Fields
 regularOpeningHours utcOffsetMinutes types primaryType businessStatus photos` (rating /
 hours are the billed-higher "Enterprise" tier). `Place.isOpen()` supplies the open flag
 locally; periods go through the same `applyHours()` as before. `buildResult()` is now the
-one constructor for live results (legacy + new). **No pagination on the new API**, so
-`more` is `null` and the "Search farther" button hides (asking the same nearest-20 for a
-bigger radius would return the same 20). Place details use
+one constructor for live results (legacy + new). **No pagination on the new API**; coverage beyond the
+nearest 20 now comes from the sweep (see "Full sweep" below, 2026-11-24), whose `more` is the
+sweeper object and whose "Search farther" widens the sweep radius. Place details use
 `new Place({id}).fetchFields(...)` (photos, reviews, phones, hours) with legacy
 `getDetails` as fallback; once the new API has been refused, later cards go straight to legacy.
 Photos use `photo.getURI({maxWidth})`; that URL carries Google's own `key=` parameter, so
@@ -147,6 +216,98 @@ side panel / scrollbar) rather than this page.
 
 **Tested against a STUB of the Maps API only** (Playwright route-injected), never real
 Google — see "What needs YOU" for the real-key smoke test.
+
+### Full sweep: every restaurant nearby, closest first (2026-11-24)
+**Goal.** "See literally all restaurants in your area, closest to farthest." Before,
+live mode did ONE `Place.searchNearby` (20 max, DISTANCE) so the deck held only the 20
+closest places (in Mission SF that reached ~84 m; Google Maps lists 105 within 500 m).
+Correctness was fine, **coverage** was the gap. Nearby (New) caps at 20 and cannot
+page, so coverage now comes from several probes. (Text Search pages to 60 but is only
+roughly distance-ordered and `locationBias` is not a restriction, so it was not used.)
+
+**Algorithm** (`gmaps.makeSweeper` in `eats.js`; new API path only):
+1. First search is unchanged and fast: Nearby at the user, 5 km, 20 nearest (empty -> the
+   one 50 km retry). This is call 1 (2 if the retry fired). It deals the first deck.
+2. Key fact: with `rankPreference DISTANCE` the 20 results are the 20 closest to the
+   query centre, so a **saturated** response (20 results, farthest at d20) proves the disc
+   of radius d20 around that centre is complete; a genuinely **thin** one (fewer than
+   `SAT_MIN` = 15) proves the whole query radius is. Each call records a *covered disc*
+   (centre, d20 or radius). **Real-Google correction (measured 2026-11-24):** Google can
+   return 19 of a requested 20 in a dense area while many more places exist farther out
+   (19th result at 186 m). The first version trusted "<20 = exhausted" and declared
+   coverage after 4 calls with 68 places (42 of the 105 places within 500 m missing). With
+   `SAT_MIN` the same Mission test shows 318 places, 0 missing against the google.com/maps
+   list at 100/200/300/500/800/1500 m, 23 m..1,139 m, stopping honestly at the 30-call budget.
+   Late probes can still surface a place nearer than one already passed (24 of 318 steps
+   went backwards, max 269 m): those are inserted into the upcoming queue, never reordered.
+3. A hex grid of sample points (spacing max(60 m, R/20)) covers the sweep radius R around
+   the USER. A sample is covered when it lies inside any recorded disc.
+4. A refill picks the next probe centre: the uncovered sample nearest the user, nudged to
+   the candidate (among uncovered samples within 0.75 x last d20 of the nearest, max 40)
+   that would cover the most uncovered samples. So it stays roughly nearest-first yet
+   favours new area. It queries Nearby there (5 km, 20, DISTANCE), records the disc,
+   dedupes by place id, and returns the new places.
+5. Every place's `distance` is computed from the USER (`mapPlaceNew(p, origin)`), never
+   from the probe centre. Probe results beyond R are held back (not shown) and released
+   if the person extends the radius.
+6. The deck merges new places into the **upcoming** queue by binary insertion on distance
+   (`deck.insertMore`); the current card and shown cards are never reordered. Places you
+   passed recently (seen-TTL) go behind the sorted run, nearest-first. Filtered-out places
+   still count as known (deduped), and the preference filters run on every batch.
+7. Stops (state shown by `sweeper.info().state`): **complete** (every sample covered),
+   **budget** (`sweepMaxCalls` reached), **stalled** (5 consecutive probes returned no new
+   place id), **error** (a probe failed or timed out: 15 s guard per probe).
+
+**Laziness.** Nothing beyond the first call is fetched up front. When the un-swiped cards
+behind the current one drop below `sweepRefillAt` (6), `find.refill()` runs ONE probe and
+chains while the deck still wants more, but at most 3 probes in a row that add no card the
+preferences allow (unless the person is already waiting at the end). Details (photos /
+reviews) stay lazy per card (`prefetchUpcoming`, 3 cards); the sweep never prefetches them.
+
+**UI.** If the person reaches the end before a refill lands: a quiet *Finding more
+nearby...* state (`.deck-loading.is-more`; fades in after 0.35 s so a fast refill never
+flashes it; static under reduced motion; announced politely), then the deck resumes on the
+first new card. End-of-deck copy is honest and uses the app's units (mi):
+- complete: "That's everywhere within 0.9 mi" + "You've seen all N places that matched."
+- budget: "That's as far as I searched" + "You've seen N places. The search stopped at its
+  limit of K lookups, so there may be more places farther out." (K = calls actually made)
+- stalled / error: "The search stopped here" / "That's all I could load" + the reason
+  (a failed refill keeps the deck, shows the live note, never hangs).
+**Search farther** now means "widen the sweep radius by one step" (explicit choice): shown
+only when the current radius is *complete*, calls remain and R < max(5000 m, sweepRadiusM).
+It spends from the same budget; it never grants extra calls. The legacy path keeps its own
+pagination and button. Surprise-me / Popular picks (their own queues) turn the sweep off for
+that queue.
+
+**Knobs** (`assets/js/eats-config.js`, clamped, documented there): `sweepRadiusM` 1500,
+`sweepMaxCalls` 30, `sweepRefillAt` 6.
+
+**Cost model.** One billed Nearby call per probe (plus the first). Calls per refill = 1.
+Worst case per search session at defaults = **30 calls** (the cap includes the first call
+and any 50 km retry); typical deep swipe in a dense area uses most of the 30, a quiet area
+completes in 1-5 (<20 places inside 5 km = 1 call). Each Start / "Surprise me" / restart is
+a new session with a fresh budget. Fields requested are unchanged (rating + hours are the
+Enterprise tier), so each call costs what the old single call cost.
+Density reality: in a very dense area the 30-call cap ends the sweep before 1500 m
+(probes overlap, so each adds fewer than 20 new places); the deck then says so plainly.
+
+**Known limits.** (a) Ordering is nearest-first within what has been fetched; a late probe
+can reveal a place nearer than one already shown, which is simply shown next (never
+reordered behind you): in the stub test 12 of 149 steps went backwards, max 366 m.
+(b) "Complete" means every sample point is covered; a hole narrower than the sample spacing
+between discs cannot be detected. (c) Real-Google behaviour (Mission District SF: 20-cap,
+no pagination, DISTANCE ranking, 22/42/75/105 places within 100/200/300/500 m) was measured
+by the orchestrator via REST; **this build was verified against a stub only** that
+implements `Place.searchNearby` faithfully (distance rank from the restriction centre,
+radius, maxResultCount 20). A real-key smoke test is still needed.
+
+**Tests (stub, Playwright, 390x844 and 375x667, scratch harness outside the repo).** 150
+synthetic places in 700 m + 40 beyond 1.6 km: first deck = the 20 nearest after exactly 1
+call; 26 calls to complete 1500 m; 150 shown == 150 inside the radius counted
+independently; 0 duplicates; none beyond R; cap 3 -> exactly 3 calls + budget copy;
+19 places -> 1 call, complete; exactly 20 -> probes then honest "stopped, nothing new"; 2nd
+call rejected -> 20 shown, calm message, no hang; legacy two-page path and demo mode
+unchanged; zero page errors.
 
 ### Beta wave 2: deck fits the screen, no sample data as yours, backup, landing, constellation (2026-11-23)
 **1. Swipe deck fits above the tab bar.** Before: at 390x844 the controls sat at
