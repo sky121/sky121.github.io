@@ -5637,8 +5637,10 @@
         // a search is waiting: answer IT now (not after the watchdog)
         var flushed = flushPending(shippedActive() ? 'unavailable' : 'rejected');
         if (shippedKeyFailed()) return;
-        settings.showCode('rejected');
+        // open() first: it writes its own "key saved" line, which would
+        // otherwise overwrite the reason showCode() just set.
         if (!flushed) settings.open();   // nothing on screen explains it yet
+        settings.showCode('rejected');
       };
 
       try {
