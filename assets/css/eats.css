@@ -1959,7 +1959,7 @@ html.evening .ov-reason--friend, html.evening .decision-reason--friend {
   font-family: var(--font-body);
   font-size: 0.82rem;
   font-weight: 500;
-  color: #45a866;
+  color: #1f5a39;   /* 2026-11-24: was #45a866 (2.0:1 on the pale badge) */
   background: rgba(69, 168, 102, 0.1);
   border: 1px solid rgba(69, 168, 102, 0.4);
   border-radius: 999px;
@@ -2048,13 +2048,13 @@ html.evening .slc { background: rgba(233, 227, 211, 0.05); }
 .slc-open.is-closed { color: #a83c55; background: rgba(216, 96, 122, 0.1); border-color: rgba(216, 96, 122, 0.4); }
 html.evening .slc-open { color: #7ed49a; background: rgba(69, 168, 102, 0.16); border-color: rgba(126, 212, 154, 0.4); }
 html.evening .slc-open.is-soon { color: #e8cd7a; background: rgba(205, 184, 120, 0.18); border-color: rgba(205, 184, 120, 0.5); }
-html.evening .slc-open.is-opens { color: #9fc2e0; background: rgba(127, 168, 201, 0.18); border-color: rgba(127, 168, 201, 0.46); }
+html.evening .slc-open.is-opens { color: #b6d3ea; background: rgba(127, 168, 201, 0.18); border-color: rgba(127, 168, 201, 0.46); }
 html.evening .slc-open.is-closed { color: #f0a9ba; background: rgba(216, 96, 122, 0.16); border-color: rgba(216, 96, 122, 0.45); }
 /* fixed fact slots — score+spark / price+cuisine / distance+travel */
 .slc-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-top: 0.25rem; }
 .slc-row .pop-spark { margin: 0; flex: 0 0 auto; }
 .slc-score { font-size: 0.86rem; color: var(--ink); min-width: 0; }
-.slc-star { color: #8a6d24; font-weight: 500; }
+.slc-star { color: #7a5f1c; font-weight: 500; }
 html.evening .slc-star { color: #d9c17a; }
 .slc-fact {
   font-size: 0.82rem;
@@ -2083,13 +2083,15 @@ html.evening .slc-you { color: #d9c98f; }
   font-size: 0.82rem;
   letter-spacing: 0.04em;
   color: var(--paper);
-  background: linear-gradient(135deg, #45a866, #367f4f);
+  background: linear-gradient(135deg, #2f7a4a, #236340);   /* paper text >= 5.9:1 */
   border: 0;
   border-radius: 999px;
   padding: 0.55rem 1rem;
   transition: transform 0.15s ease, filter 0.15s ease;
 }
 .slc-choose:hover { transform: translateY(-1px); filter: brightness(1.06); }
+/* evening: --paper is dark ink, so the button goes light green behind it */
+html.evening .slc-choose { background: linear-gradient(135deg, #62c586, #4fb274); }
 .slc-remove {
   flex: 0 0 auto;
   appearance: none;
@@ -3563,7 +3565,7 @@ html.evening .settings-steps > summary { color: var(--pond-ink); }
 .settings-msg { font-size: 0.88rem; line-height: 1.5; min-height: 1.2rem; }
 .settings-msg.is-error { color: #a83c55; }   /* AA on paper (5.4:1) */
 html.evening .settings-msg.is-error { color: #f0a8bc; }
-.settings-msg.is-ok { color: var(--sage); }
+.settings-msg.is-ok { color: #3f6b3b; }   /* was --sage: 2.1:1 on paper */
 html.evening .settings-msg.is-ok { color: #b6d3af; }
 
 /* ---------- Transient toast (paper pill above the tab bar) ---------- */
@@ -4519,7 +4521,11 @@ html.evening .privacy-note:focus-visible { outline-color: var(--pond-ink); }
 /* the Preferences row shares the top edge with the fixed gear: keep the
    shortlist badge to the gear's left on phones */
 @media (max-width: 36rem) {
-  .deck-wrap .deck-bar { padding-right: 3.2rem; }
+  /* 2026-11-24: the gear is a labelled "Settings" pill (~110px) now, not a
+     44px icon, so reserve its full width or it sits on top of the badge. When
+     the badge shows there is no room left for the italic origin, so it yields. */
+  .deck-wrap .deck-bar { padding-right: 7rem; }
+  .deck-wrap .deck-origin:has(~ .shortlist-badge:not([hidden])) { display: none; }
 }
 .deck-wrap .deck-bar { margin-bottom: 0.3rem; flex-wrap: nowrap; }
 .deck-wrap .deck-origin { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }

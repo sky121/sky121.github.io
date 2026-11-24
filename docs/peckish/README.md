@@ -14,7 +14,7 @@
 > icon *art* changed.
 >
 > Single source of truth so we can pick up exactly where we left off.
-> Last updated: **2026-11-23**.
+> Last updated: **2026-11-24**.
 
 ---
 
@@ -46,6 +46,25 @@
 ---
 
 ## Feature map (what's built)
+
+### QA loop, iteration 1 (2026-11-24) — badge hidden by Settings, contrast, lost error
+Found by driving the published site (Playwright, 390x844 + 375x667 @2x):
+- **Shortlist badge sat under the Settings pill.** The deck-bar reserved 3.2rem
+  for the old 44px icon gear; the labelled "Settings" pill is ~110px, so the green
+  heart badge was fully covered and untappable (the only route to compare view).
+  Fix: `.deck-bar` reserves 7rem on phones and the italic "Near you" origin yields
+  while the badge shows (`eats.css`).
+- **AA contrast (measured with glyphs blanked):** badge count `#45a866` on its pale
+  pill 2.0:1 -> `#1f5a39`; "Choose this one" paper on green 3.5:1 -> darker green
+  (and a lighter green with dark ink in evening, was 4.0:1); `.slc-star` 4.3:1 ->
+  `#7a5f1c`; evening "Opens at" chip 4.4:1 -> `#b6d3ea`; settings "key saved" line
+  (`--sage` on paper, 2.1:1) -> `#3f6b3b`.
+- **Lost failure reason:** with a saved key that Google rejects at boot,
+  `gm_authFailure` set the reason and *then* `settings.open()` overwrote it with
+  "A key is saved on this device." Order swapped so the reason shows.
+- `peckish-sw.js` CACHE bumped `peckish-v5` -> `peckish-v6`.
+- Known/left alone: Settings sheet still says "Live data is on" after a failed
+  key (the key is kept by design); "Re-rate" opens a sheet titled "Edit ...".
 
 ### Live data that works on a brand-new Google project (2026-11-23)
 **What broke.** A valid key + Find left the deck on *Finding places near you…*
