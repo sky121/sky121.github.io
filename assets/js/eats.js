@@ -1,14 +1,15 @@
 /* ==========================================================================
    eats.js — "Tableau" (formerly Peckish) where-to-eat app.
    Vanilla JS, no dependencies (Google Maps JS API loaded lazily at runtime
-   only when the user has supplied a key). No leaked globals besides one
-   Maps loader callback. Demo mode runs with zero console errors / no key.
+   only once a key is connected). No leaked globals besides one Maps loader
+   callback. There is NO demo mode: until a working Google key is connected
+   the key gate (gate module) is the only thing on screen.
 
    Modules (closures within one IIFE):
      - store        localStorage helpers (key, visited)
      - state        in-memory app state
      - distance     haversine util
-     - demo         sample restaurant + visited data
+     - demo         dormant sample dataset (DEMO_ENABLED = false; unreachable)
      - tabs         tablist router (Find / Visited / Friends / Popular)
      - find         Find-tab rendering, controls, pick-for-me, geolocation
      - gmaps        lazy Google Maps + Places integration (current API)
@@ -17,7 +18,8 @@
      - social       MOCK SOCIAL API (friends feed + popular leaderboard)
      - friends      Friends-tab rendering (consumes social.* promises)
      - popular      Popular tab: trending / open near you / loved by your taste
-     - settings     API key panel
+     - gate         full-screen "Connect Google" key gate (first run / no working key)
+     - settings     "Google connection" sheet (status, replace / remove key)
    ========================================================================== */
 (function () {
   'use strict';
@@ -75,7 +77,12 @@
     maxCalls: cfgNum(CFG.sweepMaxCalls, 1, 200, 30),
     refillAt: cfgNum(CFG.sweepRefillAt, 1, 50, 6)
   };
-  var configKeyDead = false;   // the shipped key was refused at runtime -> demo
+  var configKeyDead = false;   // the shipped key was refused at runtime -> key gate
+  /* NO DEMO MODE. The sample dataset below is kept only as dormant code and
+     is unreachable while this is false: demoResults()/demoVisited() return
+     [] and no surface draws a SAMPLE tag. It is a developer constant, not a
+     user setting. Search "DEMO_ENABLED" in docs/peckish/README.md. */
+  var DEMO_ENABLED = false;
   var BETA_HIDDEN = ['feed', 'friends', 'popular'];
   /* VISITED flag (eats-config.js `visited`): false hides every Visited
      surface; anything but an explicit false keeps the old behaviour. */
@@ -99,6 +106,11 @@
         pnl.setAttribute('aria-hidden', 'true');
         pnl.removeAttribute('tabindex');
         pnl.setAttribute('data-beta-hidden', '');
+        // their "Demo / Sample data" banners describe surfaces that are not
+        // in the beta: take the words out of the page along with the panel
+        Array.prototype.slice.call(pnl.querySelectorAll('.social-banner')).forEach(function (b) {
+          if (b.parentNode) b.parentNode.removeChild(b);
+        });
       }
     });
     var bar = document.querySelector('.bottom-bar-inner');
@@ -381,6 +393,7 @@
   var KEY_FEED = 'eats-feed';
   var SEEN_TTL_MS = 6 * 60 * 60 * 1000; // passes are remembered for ~one outing
 
+  var memKey = '';   // a key this browser would not persist: kept for this visit only
   var store = {
     getPrefs: function () {
       try {
@@ -395,19 +408,29 @@
     },
     /* The visitor's own saved key, if any. */
     getUserKey: function () {
-      try { return localStorage.getItem(KEY_GMAPS) || ''; } catch (e) { return ''; }
+      var k = '';
+      try { k = localStorage.getItem(KEY_GMAPS) || ''; } catch (e) {}
+      return k || memKey;
     },
     /* The shipped site key, unless it was refused at runtime. */
     getConfigKey: function () { return configKeyDead ? '' : CONFIG_KEY; },
     /* The key actually in force. Resolution: the visitor's own key wins,
-       else the site's shipped key, else '' (demo mode). */
+       else the site's shipped key, else '' (the key gate is shown). */
     getKey: function () { return this.getUserKey() || this.getConfigKey(); },
     /* True when live data is on only because of the shipped key. */
     usingConfigKey: function () { return !this.getUserKey() && !!this.getConfigKey(); },
+    /* Returns true when the key reached localStorage. When the browser
+       refuses storage (private mode, blocked site data) the key is still
+       held in memory for this visit and false is returned, so the gate can
+       say honestly that it will not be remembered. */
     setKey: function (k) {
-      try { localStorage.setItem(KEY_GMAPS, k); return true; } catch (e) { return false; }
+      memKey = k;
+      try { localStorage.setItem(KEY_GMAPS, k); } catch (e) { return false; }
+      try { if (localStorage.getItem(KEY_GMAPS) === k) { memKey = ''; return true; } } catch (e2) {}
+      return false;
     },
     clearKey: function () {
+      memKey = '';
       try { localStorage.removeItem(KEY_GMAPS); } catch (e) {}
     },
     getVisited: function () {
@@ -542,10 +565,14 @@
   }
 
   /* ------------------------------------------------------------------ *
-   * demo — sample data (San Francisco)
+   * demo — DORMANT sample data (San Francisco). Unreachable while
+   * DEMO_ENABLED is false: nothing below is read by any user-facing path.
    * ------------------------------------------------------------------ */
   // Search origin used for demo distance math (Ferry Building area, SF).
   var DEMO_ORIGIN = { lat: 37.7956, lng: -122.3934 };
+  // Where the one-result key check (probeKey) looks. It only has to be a
+  // valid point on Earth; it is never shown and never used as a search origin.
+  var PROBE_ORIGIN = { lat: 37.7956, lng: -122.3934 };
 
   /* Demo restaurants — extended for the swipe deck. Each carries:
      rating (0-5), reviews, price (1-4), cuisine tag(s), open, distance,
@@ -2624,6 +2651,7 @@
 
   // Pre-built demo result objects (with distance to DEMO_ORIGIN).
   function demoResults() {
+    if (!DEMO_ENABLED) return [];
     return DEMO_RESTAURANTS.map(function (r, i) {
       // Derive open-now from the demo hours + the real clock so the "Open now"
       // filter and the card's status chip always agree (falls back to the
@@ -2667,6 +2695,7 @@
   }
 
   function demoVisited() {
+    if (!DEMO_ENABLED) return [];
     return [
       { id: 'demo-v-1', name: 'Tonkotsu Lane', food: 90, vibe: 75, service: 80, note: 'Tonkotsu was rich and silky. Tiny room, expect a wait.', date: '2026-05-02', loc: 'Embarcadero, SF', demo: true },
       { id: 'demo-v-2', name: 'Little Wren Bakery', food: 95, vibe: 80, service: 70, note: 'The morning bun is unreal. Coffee a touch weak.', date: '2026-04-18', loc: 'Embarcadero, SF', demo: true },
@@ -2924,7 +2953,7 @@
   /* Beta: a visitor must never mistake a sample place for a real one, so
      the SAMPLE tag is drawn in demo mode too (it is the only mode where
      every place is a sample). Outside beta the old convention holds. */
-  function sampleTagsOn() { return BETA || liveMode(); }
+  function sampleTagsOn() { return DEMO_ENABLED && (BETA || liveMode()); }
   function sampleTagFor(r, cls) {
     if (!sampleTagsOn() || !isSampleResult(r)) return null;
     return el('span', 'v-demo-tag' + (cls ? ' ' + cls : ''), 'Sample');
@@ -2932,11 +2961,10 @@
 
   /* ================================================================== *
    * OFFLINE — connectivity signal for the Find tab.
-   * A small paper note appears when the network drops (searches quietly
-   * run on the demo data) and slips away when the connection returns.
-   * Driven by navigator.onLine + the online/offline events; the search
-   * pipeline also asks isOffline() so live mode is never attempted
-   * without a network.
+   * A small paper note appears when the network drops and slips away when
+   * the connection returns. Driven by navigator.onLine + the online/offline
+   * events; the search pipeline also asks isOffline() so a live search is
+   * never attempted without a network (it shows the "You're offline" state).
    * ================================================================== */
   var offline = (function () {
     var note = null;
@@ -2954,7 +2982,7 @@
       var dot = el('span', 'offline-note-dot');
       dot.setAttribute('aria-hidden', 'true');
       note.appendChild(dot);
-      note.appendChild(el('span', 'offline-note-text', 'You’re offline — demo kitchen’s still open'));
+      note.appendChild(el('span', 'offline-note-text', 'You’re offline — reconnect to find places'));
       panel.insertBefore(note, panel.firstChild);
       return note;
     }
@@ -2968,7 +2996,7 @@
       sync();
       window.addEventListener('offline', function () {
         sync();
-        announce('You’re offline — searches will use the demo data.');
+        announce('You’re offline. Reconnect to find places.');
       });
       window.addEventListener('online', function () {
         sync();
@@ -3010,8 +3038,7 @@
 
     /* ---- time-aware hero + quiet memory strip ----
        Computed once per landing show (no timer). The strip only ever states
-       real local facts: your most recent REAL Visited entry (built-in SAMPLE
-       entries are skipped, never shown) and your shortlist size. With nothing
+       real local facts: your most recent Visited entry and your shortlist size. With nothing
        to say it stays hidden and the landing is exactly the plain layout. */
     var STILL_ARCH = 'bowl';   // a bowl of broth: calm, cuisine-neutral, reads as paint
     var landingWasOn = false;
@@ -3032,12 +3059,6 @@
       }
       return best;
     }
-    /* Demo mode must be obvious on the front door: a quiet line under the
-       hero says the places are samples. Gone the moment live data is on. */
-    function syncDemoNote() {
-      var n = $('find-demo-note');
-      if (n) n.hidden = liveMode();
-    }
     var stillPainted = false;
     function paintStill() {
       var host = $('find-still');
@@ -3050,7 +3071,6 @@
       } catch (e) { /* decorative only: no still life is fine */ }
     }
     function refreshLanding() {
-      syncDemoNote();
       paintStill();
       var copy = heroCopy(new Date().getHours());
       var t = $('find-hero-title'), sub = $('find-hero-sub');
@@ -3075,12 +3095,11 @@
       }
     }
 
-    /* ---- live fallback note ----
-       When a live search cannot be completed, the deck must never be an
-       empty screen: it fills with the sample places and says so, once, in
-       one honest line. Same paper slip as the offline note (they are
-       mutually exclusive — offline has its own wording). Cleared the moment
-       a live search succeeds. */
+    /* ---- live note ----
+       One calm paper slip for the non-fatal things (typed place not found,
+       no location, a sweep refill that failed). A live search that cannot
+       finish is NOT a note: it is the deck's own error state (deck.showFailure)
+       with Try again / Fix key. Never any made-up places. */
     var liveNote = null;
     function ensureLiveNote() {
       if (liveNote) return liveNote;
@@ -3217,7 +3236,9 @@
 
     /* ================================================================
      * SEARCH — resolve origin, fetch nearest-first results, hand to deck.
-     * Demo mode runs instantly; live mode resolves geolocation then Places.
+     * Always live: geolocation (or the typed place) -> Google Places. There
+     * is no sample fallback — a search that cannot finish says why, in the
+     * deck area, with Try again (and Fix key when the key is the cause).
      * ================================================================ */
     function startSearch() {
       state.prefs = prefs.current();
@@ -3228,49 +3249,54 @@
       state.loadingMore = false;
       sweepNoMatch = 0;
       hideLiveNote();
+      // No key (should be unreachable: the gate seals the app) -> the gate.
+      if (!store.getKey()) { surprisePending = false; gate.show({ reason: 'nokey' }); return; }
       deck.showLoading();
+      // Offline: do not even try. A friendly state with a retry; the service
+      // worker keeps the shell, so this screen is what an offline reopen shows.
+      if (offline.isOffline()) { offline.sync(); failSearch(null, true); return; }
 
-      if (store.getKey() && !offline.isOffline()) {
-        var searchToken = ++liveSearchToken;
-        resolveOriginLive(function (origin, label) {
-          if (searchToken !== liveSearchToken) return;   // a newer search replaced this one
-          // No location and nothing typed: do NOT quietly search somewhere
-          // else (the demo origin is San Francisco). Say so and hand the
-          // person the location field.
-          if (!origin) { needLocation(); return; }
-          if (label) state.originLabel = label;
-          state.origin = origin;
-          setOriginText($('deck-origin'));
-          gmaps.searchNearby(origin, function (err, list, more) {
-            if (searchToken !== liveSearchToken) return;
-            if (err) {
-              // A live search that cannot finish falls back to the sample
-              // places rather than an empty deck — and says so plainly, on
-              // screen and to screen readers. Every card it deals carries a
-              // SAMPLE tag, so nothing here can be mistaken for real.
-              if (offline.isOffline()) { offline.sync(); hideLiveNote(); loadDemoInto(origin); return; }
-              settings.showError(err);
-              showLiveNote(err + ' Sample places instead.');
-              loadDemoInto(origin);
-              // spoken last so the deck's own "N places matched" line does
-              // not bury the reason the deck is full of sample places
-              announce(err + ' Showing sample places instead.');
-              return;
-            }
-            hideLiveNote();
-            // new API: `more` is the sweeper (refills via refill()); legacy: a page handle
-            state.sweeper = (more && more.sweep) ? more : null;
-            state.nextPage = (more && !more.sweep) ? more : null;
-            state.hasMore = !!state.nextPage;
-            deliver(list, origin);
-          });
+      var searchToken = ++liveSearchToken;
+      resolveOriginLive(function (origin, label) {
+        if (searchToken !== liveSearchToken) return;   // a newer search replaced this one
+        // No location and nothing typed: do NOT quietly search somewhere
+        // else. Say so and hand the person the location field.
+        if (!origin) { needLocation(); return; }
+        if (label) state.originLabel = label;
+        state.origin = origin;
+        setOriginText($('deck-origin'));
+        gmaps.searchNearby(origin, function (err, list, more) {
+          if (searchToken !== liveSearchToken) return;
+          if (err) { failSearch(err, offline.isOffline()); return; }
+          hideLiveNote();
+          // new API: `more` is the sweeper (refills via refill()); legacy: a page handle
+          state.sweeper = (more && more.sweep) ? more : null;
+          state.nextPage = (more && !more.sweep) ? more : null;
+          state.hasMore = !!state.nextPage;
+          deliver(list, origin);
         });
-      } else {
-        // DEMO MODE — instant. (Also the quiet offline path: no network,
-        // no live calls — the demo kitchen is always open.)
-        state.originLabel = state.originLabel || 'near you';
-        loadDemoInto(state.origin || DEMO_ORIGIN);
+      });
+    }
+
+    /* The honest error state: never fake data. `err` is Google's humanised
+       reason (already plain language, never contains the key). */
+    function failSearch(err, isOffline) {
+      surprisePending = false;
+      if (isOffline) {
+        deck.showFailure({
+          title: 'You\u2019re offline',
+          body: 'Tableau needs a connection to look up restaurants near you. Reconnect, then try again.',
+          retry: startSearch
+        });
+        return;
       }
+      var keyFix = keyErrorText(err);
+      deck.showFailure({
+        title: 'Couldn\u2019t reach Google',
+        body: reasonOf(err),
+        retry: startSearch,
+        fixKey: keyFix ? function () { gate.show({ fix: true, cancelable: true, reason: err }); } : null
+      });
     }
 
     var liveSearchToken = 0;
@@ -3305,23 +3331,6 @@
       announce(msg);
       try { window.scrollTo(0, 0); } catch (e) {}   // the note sits at the top; make sure it is in view
       if (inp) { try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); } }
-    }
-
-    /* DEMO: all sample restaurants, re-based near the origin, nearest-first. */
-    function loadDemoInto(origin) {
-      var list = demoResults();
-      if (origin && (origin.lat !== DEMO_ORIGIN.lat || origin.lng !== DEMO_ORIGIN.lng)) {
-        var dLat = origin.lat - DEMO_ORIGIN.lat;
-        var dLng = origin.lng - DEMO_ORIGIN.lng;
-        list.forEach(function (r) {
-          r.location = { lat: r.location.lat + dLat, lng: r.location.lng + dLng };
-          r.distance = haversineMiles(origin, r.location);
-        });
-      }
-      state.hasMore = false;
-      state.nextPage = null;
-      setOriginText($('deck-origin'));
-      deliver(list, origin || DEMO_ORIGIN);
     }
 
     /* Sort nearest-first, apply prefs filters + distance cap, feed the deck. */
@@ -3448,7 +3457,7 @@
           state.loadingMore = false;
           if (err) {
             if (offline.isOffline()) offline.sync();
-            else { settings.showError(err); showLiveNote(err + ' No more live places for now.'); announce(err); }
+            else { showLiveNote(err + ' No more places for now.'); announce(err); }
             state.hasMore = false; if (cb) cb([]); return;
           }
           state.nextPage = more || null;
@@ -3580,7 +3589,6 @@
       showSurprise: showSurprise,
       syncHeaderChrome: syncHeaderChrome,
       refreshLanding: refreshLanding,
-      syncDemoNote: syncDemoNote,
       startSearch: startSearch,
       showLiveNote: showLiveNote,
       hideLiveNote: hideLiveNote,
@@ -3715,21 +3723,13 @@
       });
     }
 
+    /* No count line: there is no local catalogue to measure against (every
+       place is a live Google result), so the element simply stays empty. */
     function updateCount() {
       var countEl = $('prefs-count');
       if (!countEl) return;
-      // The count is measured against the built-in SAMPLE catalog, which says
-      // nothing about real places: with a usable key (live mode) it is hidden
-      // rather than shown as if it were a live number.
-      if (liveMode()) { countEl.textContent = ''; countEl.hidden = true; return; }
-      countEl.hidden = false;
-      // Live preview against the demo catalog (instant, no network) so the
-      // user sees prefs bite immediately. Live mode filters real results too.
-      state.prefs = cur;
-      state.distanceCap = (cur.distance === 'walk') ? 1.2 : (cur.distance === 'drive' ? 5 : null);
-      var pool = demoResults();
-      var n = find.filterByPrefs(pool).length;
-      countEl.textContent = n + ' sample place' + (n === 1 ? '' : 's') + ' match';
+      countEl.textContent = '';
+      countEl.hidden = true;
     }
 
     /* ---- one-at-a-time wizard over the pref groups ----
@@ -4283,6 +4283,45 @@
       cap.setAttribute('aria-hidden', 'true');
       sk.appendChild(cap);
       return sk;
+    }
+
+    /* The honest error state, in the deck area: what failed, in plain words,
+       and the way forward. opts: { title, body, retry, fixKey } — fixKey is
+       only given when the key is the cause. Never deals a card. */
+    function showFailure(opts) {
+      clearRoulette();
+      waitingMore = false; sweepOn = false;
+      queue = []; idx = 0; topCard = null; animating = false;
+      setMode('deck');
+      clear(deckEl);
+      if (peekEl) peekEl.hidden = true;
+      setControlsEnabled(false);
+      if (hintEl) hintEl.style.display = 'none';
+      if (controlsEl) controlsEl.style.display = 'none';
+      var box = el('div', 'deck-error');
+      box.setAttribute('role', 'alert');
+      var dot = el('span', 'deck-error-dot'); dot.setAttribute('aria-hidden', 'true');
+      var title = el('h2', 'deck-error-title', opts.title || 'Couldn\u2019t reach Google');
+      title.id = 'deck-error-title'; title.setAttribute('tabindex', '-1');
+      box.appendChild(dot);
+      box.appendChild(title);
+      box.appendChild(el('p', 'deck-error-body', opts.body || ''));
+      var row = el('div', 'deck-error-actions');
+      var retry = el('button', 'btn-solid', 'Try again');
+      retry.type = 'button';
+      retry.addEventListener('click', function () { if (opts.retry) opts.retry(); });
+      row.appendChild(retry);
+      if (opts.fixKey) {
+        var fix = el('button', 'btn-ghost', 'Fix key');
+        fix.type = 'button';
+        fix.id = 'deck-error-fix';
+        fix.addEventListener('click', function () { opts.fixKey(); });
+        row.appendChild(fix);
+      }
+      box.appendChild(row);
+      deckEl.appendChild(box);
+      layout();
+      try { title.focus({ preventScroll: true }); } catch (e) { title.focus(); }
     }
 
     function setControlsEnabled(on) {
@@ -5912,7 +5951,7 @@
       onLike(r);
     }
 
-    return { init: init, load: load, append: append, insertMore: insertMore, wantsMore: wantsMore, isWaiting: isWaiting, sweepSettled: sweepSettled, showLoading: showLoading, teardown: teardown, surprise: surprise, shortlistCount: shortlistCount, shareShortlist: shareShortlist, pickFrom: pickFrom, addToShortlist: addToShortlist, removeFromShortlist: removeFromShortlist, inShortlist: inShortlist, hydrateHearts: hydrateHearts, layout: layout };
+    return { init: init, load: load, append: append, insertMore: insertMore, wantsMore: wantsMore, isWaiting: isWaiting, sweepSettled: sweepSettled, showLoading: showLoading, showFailure: showFailure, teardown: teardown, surprise: surprise, shortlistCount: shortlistCount, shareShortlist: shareShortlist, pickFrom: pickFrom, addToShortlist: addToShortlist, removeFromShortlist: removeFromShortlist, inShortlist: inShortlist, hydrateHearts: hydrateHearts, layout: layout };
   })();
 
   /* paint a wc-range fill % (shared) */
@@ -5988,6 +6027,19 @@
       'Google answered with something unexpected, so the cause isn’t clear. Try again in a minute; if it repeats, check the key in the Cloud Console (API enabled, billing, referrer list).',
       'Live search failed and Google didn’t say why — try again in a minute.']; }
   };
+  /* Key-related codes: the person can fix these by opening the key gate. */
+  var KEY_CODES = ['shape', 'invalid', 'notenabled', 'billing', 'restricted', 'apiblocked', 'denied', 'rejected', 'unavailable'];
+  function keyErrorText(text) {
+    if (!text) return false;
+    for (var i = 0; i < KEY_CODES.length; i++) if (liveShortText(KEY_CODES[i]) === text) return true;
+    return false;
+  }
+  /* "Couldn't reach Google — check your connection." reads twice under a
+     "Couldn't reach Google" heading, so the heading's own words are dropped. */
+  function reasonOf(text) {
+    var t = String(text || '').replace(/^Couldn.t reach Google\s*[—-]\s*/, '');
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) : 'Google didn\u2019t answer. Try again in a moment.';
+  }
   function liveErrorText(code) { return (LIVE_TEXT[code] || LIVE_TEXT.unknown)()[0]; }
   function liveShortText(code) { return (LIVE_TEXT[code] || LIVE_TEXT.unknown)()[1]; }
 
@@ -6055,6 +6107,7 @@
     // variable only: never logged, never rendered, never stored elsewhere.
     var loadedKey = '';
     var authFailCb = null;   // set while a key is being validated
+    var authDead = false;    // gm_authFailure fired with no proven-good key (this page load)
     var loadFailCb = null;
     var SEARCH_TIMEOUT_MS = 15000;
     var pendingSearches = [];   // settle-functions of live searches in flight
@@ -6073,19 +6126,16 @@
     }
 
     /* The site's shipped key could not be used (script blocked, key refused,
-       referrer not allowed). The visitor did nothing wrong and cannot fix it,
-       so no settings sheet pops open: Tableau quietly drops to sample data,
-       says so once, and releases any search that was waiting on Maps (those
-       callbacks fail inside their own try/catch and take the normal
-       "sample places instead" path). Returns true when it handled it. */
+       referrer not allowed). The visitor did nothing wrong, but there is no
+       fallback data: the shared key is marked dead for this visit, any search
+       that was waiting on Maps is released (it shows the honest error state),
+       and the caller opens the key gate so they can connect their own key.
+       Returns true when it handled it. */
     function shippedKeyFailed() {
       if (!shippedActive()) return false;
       configKeyDead = true;
       var cbs = readyCbs.slice(); readyCbs.length = 0;
       cbs.forEach(function (cb) { try { cb(); } catch (e) {} });
-      try { settings.refreshMode(); find.syncDemoNote(); } catch (e) {}
-      toast('Live restaurants are unavailable right now — showing sample places');
-      announce('Live restaurants are unavailable right now. Showing sample places.');
       return true;
     }
 
@@ -6158,13 +6208,12 @@
     }
     var REJECT_CODES = { invalid: 1, billing: 1, notenabled: 1, restricted: 1, apiblocked: 1, denied: 1, rejected: 1 };
     function rejectKey() {
-      // a search is waiting: answer IT now (not after the watchdog)
+      // a search is waiting: answer IT now (not after the watchdog) — it
+      // shows the honest error state with a Fix key button
       var flushed = flushPending(shippedActive() ? 'unavailable' : 'rejected');
-      if (shippedKeyFailed()) return;
-      // open() first: it writes its own "key saved" line, which would
-      // otherwise overwrite the reason showCode() just set.
-      if (!flushed) settings.open();   // nothing on screen explains it yet
-      settings.showCode('rejected');
+      if (shippedKeyFailed()) { if (!flushed) gate.show({ reason: 'unavailable' }); return; }
+      // nothing on screen explains it yet: the gate says so
+      if (!flushed) gate.show({ fix: true, reason: 'rejected' });
     }
 
     /* Settle only the typed-location lookups still waiting. */
@@ -6224,7 +6273,8 @@
         // fallback, no settings error. (A key save in progress is left to its
         // own probe, which will succeed.)
         if (placesOk) { disableAutocomplete(); settleGeo(GEO_DENIED_MSG, true); return; }
-        if (authFailCb) { var f = authFailCb; authFailCb = null; f('rejected'); return; }
+        authDead = true;   // Google's auth state is per page load: only a reload recovers it
+        if (authFailCb) { authFailCb('rejected'); return; }
         // The Maps SDK also fires this when ONE auxiliary API is not enabled
         // for an otherwise good key (ApiNotActivatedMapError from Geocoding or
         // from the legacy Autocomplete widget). Those must not kill Places.
@@ -6247,14 +6297,12 @@
           state.mapsLoading = false;
           if (loadFailCb) { var g = loadFailCb; loadFailCb = null; g('network'); return; }
           flushPending('network');
-          if (shippedKeyFailed()) return;
-          settings.showCode('network');
+          shippedKeyFailed();
         };
         document.head.appendChild(s);
       } catch (e) {
         state.mapsLoading = false;
         flushPending('network');
-        settings.showCode('network');
       }
     }
 
@@ -7043,11 +7091,12 @@
        The probe asks for ONE result and the `id` field only — the
        cheapest request the API sells — and it is made once per key save. */
     function validateKey(key, done) {
-      var settled = false, timer = null;
+      var settled = false, timer = null, graceTimer = null;
       function finish(code) {
         if (settled) return;
         settled = true;
         if (timer) { window.clearTimeout(timer); timer = null; }
+        if (graceTimer) { window.clearTimeout(graceTimer); graceTimer = null; }
         authFailCb = null;
         loadFailCb = null;
         done(code || null);
@@ -7055,16 +7104,25 @@
       if (!key) { finish('invalid'); return; }
       if (keyLooksWrong(key)) { finish('shape'); return; }
       if (offline.isOffline()) { finish('network'); return; }
-      if (state.mapsLoaded && loadedKey && loadedKey !== key) { finish('reload'); return; }
+      // Google Maps is keyed once per page load, and its auth verdict is
+      // final for that load: a different key, or any retry after Google has
+      // refused one, needs a fresh page (the gate does that for the person).
+      if ((state.mapsLoaded && loadedKey && loadedKey !== key) || (authDead && !placesOk)) { finish('reload'); return; }
       timer = window.setTimeout(function () { finish('network'); }, 12000);
-      authFailCb = finish;
+      // gm_authFailure does not say WHY. The probe running beside it often
+      // does (invalid / billing / not enabled / referrer), so it gets a short
+      // grace window to give the specific answer before "rejected" is used.
+      authFailCb = function () {
+        if (graceTimer) return;
+        graceTimer = window.setTimeout(function () { graceTimer = null; finish('rejected'); }, 2500);
+      };
       loadFailCb = finish;
       loadOnce(key);
       whenReady(function () { probeKey(finish); });
     }
 
     function probeKey(finish) {
-      var origin = state.origin || DEMO_ORIGIN;
+      var origin = state.origin || PROBE_ORIGIN;
       function legacyProbe(places, newCode) {
         try {
           var service = getService(places);
@@ -7821,7 +7879,7 @@
       if (e.cuisines && e.cuisines.length) return e.cuisines[0];
       if (!demoCuisineByName) {
         demoCuisineByName = {};
-        DEMO_RESTAURANTS.forEach(function (r) {
+        (DEMO_ENABLED ? DEMO_RESTAURANTS : []).forEach(function (r) {
           if (r.cuisines && r.cuisines.length) demoCuisineByName[r.name.toLowerCase()] = r.cuisines[0];
         });
       }
@@ -9386,7 +9444,7 @@
     function cuisineAffinity() {
       if (affinityCache) return affinityCache;
       var byName = {};
-      DEMO_RESTAURANTS.forEach(function (d) {
+      (DEMO_ENABLED ? DEMO_RESTAURANTS : []).forEach(function (d) {
         if (d.cuisines && d.cuisines.length) byName[d.name.toLowerCase()] = d.cuisines;
       });
       var sums = {}, counts = {};
@@ -9913,74 +9971,328 @@
   })();
 
   /* ================================================================== *
-   * SETTINGS — API key panel
+   * GATE — the full-screen "Connect Google" screen.
+   *
+   * There is no demo mode: until a key has really worked, this is the only
+   * thing on screen. It is shown on first run, whenever there is no saved or
+   * shipped key, when Google stops accepting the key ("Fix key"), and when
+   * Settings asks to replace the key. Everything else on the page is sealed
+   * (inert + aria-hidden + html.gate-on hides it) while it is open.
+   *
+   * Connect = validate for real (gmaps.validateKey: the Maps script loads
+   * with the key, then ONE tiny Places (New) request runs) and only a pass is
+   * saved. A bad key is never stored and never lets the person in. Google
+   * Maps takes one key per page load and its auth verdict is final for that
+   * load, so a retry after a refusal (or a different key) is handed to a
+   * fresh page through sessionStorage and connects itself on boot.
+   * ================================================================== */
+  var gate = (function () {
+    var KEY_HANDOFF = 'eats-gate-pending';     // sessionStorage: a key typed on the gate, carried across ONE reload
+    var root = null, scrollEl = null, form, input, errEl, statusEl, noteEl, connectBtn, cancelBtn, pasteBtn, toggleBtn, titleEl, eyebrowEl, leadEl, originEl;
+    var open = false, busy = false, opts = {}, lastFocused = null, vvBound = false;
+
+    function isOpen() { return open; }
+
+    /* Siblings of the gate are sealed while it is up (same idea as modal). */
+    function seal(on) {
+      var kids = document.body.children;
+      for (var i = 0; i < kids.length; i++) {
+        var n = kids[i];
+        if (n === root || n.tagName === 'SCRIPT' || n.id === 'live-announce') continue;
+        if (on) {
+          n.setAttribute('inert', '');
+          if (!n.hasAttribute('aria-hidden')) { n.setAttribute('aria-hidden', 'true'); n.setAttribute('data-gate-sealed', ''); }
+        } else {
+          n.removeAttribute('inert');
+          if (n.hasAttribute('data-gate-sealed')) { n.removeAttribute('aria-hidden'); n.removeAttribute('data-gate-sealed'); }
+        }
+      }
+    }
+
+    function setError(text) {
+      errEl.textContent = text || '';
+      errEl.hidden = !text;
+      if (text) {
+        input.setAttribute('aria-invalid', 'true');
+        try { errEl.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+      } else input.removeAttribute('aria-invalid');
+    }
+    function setStatus(text, kind) {
+      statusEl.textContent = text || '';
+      statusEl.className = 'gate-status' + (kind ? ' is-' + kind : '');
+    }
+    function setBusy(on, label) {
+      busy = !!on;
+      connectBtn.setAttribute('aria-disabled', on ? 'true' : 'false');
+      connectBtn.classList.toggle('is-busy', !!on);
+      connectBtn.textContent = on ? (label || 'Checking with Google…') : 'Connect';
+      input.readOnly = !!on;
+      form.setAttribute('aria-busy', on ? 'true' : 'false');
+    }
+
+    /* A reason may be one of the live-failure codes or an already-humanised
+       sentence (what the failed search handed over). */
+    function noteFor(reason) {
+      if (!reason || reason === 'nokey') return '';
+      if (reason === 'unavailable') return 'Tableau’s shared Google connection isn’t working right now. Connect your own key to keep going.';
+      if (LIVE_TEXT[reason]) {
+        return (reason === 'rejected' ? 'Google isn’t accepting the saved key. ' : '') + liveErrorText(reason);
+      }
+      return String(reason);
+    }
+
+    /* The specific failure, in plain words, with the next step. The network
+       and timeout wording differs from the sheet's: here nothing was saved. */
+    function failText(code) {
+      if (code === 'network' || code === 'timeout' || code === 'timeoutload') {
+        return offline.isOffline()
+          ? 'You’re offline. Connect to the internet, then press Connect — nothing was saved.'
+          : 'Couldn’t reach Google — check your connection and press Connect again. Nothing was saved.';
+      }
+      return liveErrorText(code) + ' Nothing was saved.';
+    }
+
+    function readHandoff() {
+      var k = '';
+      try { k = sessionStorage.getItem(KEY_HANDOFF) || ''; sessionStorage.removeItem(KEY_HANDOFF); } catch (e) {}
+      return k;
+    }
+
+    /* With the on-screen keyboard open the layout viewport can stay tall
+       (iOS): pad the bottom of the scroller by what the keyboard covers so
+       the Connect button can always be scrolled into reach. */
+    function layoutForKeyboard() {
+      if (!open || !scrollEl) return;
+      var vv = window.visualViewport;
+      var covered = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+      scrollEl.style.setProperty('--gate-kb', Math.round(covered) + 'px');
+    }
+
+    function show(o) {
+      if (!root) return;
+      o = o || {};
+      var wasOpen = open;
+      if (modal.isOpen()) modal.close();
+      opts = o;
+      var mode = o.fix ? 'fix' : (o.replace ? 'replace' : 'first');
+      titleEl.textContent = mode === 'first' ? 'Connect Google to start'
+        : (mode === 'fix' ? 'Fix your Google connection' : 'Replace your Google key');
+      eyebrowEl.textContent = mode === 'first' ? 'One quick step' : 'Google connection';
+      leadEl.hidden = mode !== 'first';
+      var note = noteFor(o.reason);
+      noteEl.textContent = note;
+      noteEl.hidden = !note;
+      var cancelable = !!o.cancelable;
+      cancelBtn.hidden = !cancelable;
+      cancelBtn.textContent = mode === 'fix' ? 'Back' : 'Cancel';
+      if (!wasOpen) {
+        lastFocused = document.activeElement;
+        input.value = o.prefill || '';
+        setError(''); setStatus('');
+        setBusy(false);
+        input.type = 'password'; toggleBtn.textContent = 'Show key'; toggleBtn.setAttribute('aria-pressed', 'false');
+      } else if (o.prefill) {
+        input.value = o.prefill;
+      }
+      open = true;
+      root.hidden = false;
+      document.documentElement.classList.add('gate-on');
+      document.body.style.overflow = 'hidden';
+      seal(true);
+      try { scrollEl.scrollTop = 0; } catch (e) {}
+      if (!vvBound && window.visualViewport) {
+        vvBound = true;
+        window.visualViewport.addEventListener('resize', layoutForKeyboard);
+        window.visualViewport.addEventListener('scroll', layoutForKeyboard);
+      }
+      layoutForKeyboard();
+      announce(mode === 'first' ? 'Connect Google to start. Paste your Google Maps key to continue.' : (note || titleEl.textContent));
+      window.setTimeout(function () {
+        if (!open) return;
+        // the heading, not the field: no keyboard pops up unasked
+        try { titleEl.focus({ preventScroll: true }); } catch (e) { titleEl.focus(); }
+      }, 30);
+      if (o.auto && o.prefill) connect();
+    }
+
+    function hide() {
+      if (!open) return;
+      open = false;
+      root.hidden = true;
+      document.documentElement.classList.remove('gate-on');
+      document.body.style.overflow = '';
+      seal(false);
+      input.value = '';   // the key is never left sitting in the page
+      var back = lastFocused; lastFocused = null;
+      if (back && back.focus && document.contains(back) && back.offsetParent !== null) { try { back.focus(); } catch (e) {} }
+    }
+
+    function cancel() {
+      if (busy || !opts.cancelable) return;
+      hide();
+    }
+
+    /* The success path: saved, a calm moment, then the Find landing. */
+    function connected(k) {
+      var persisted = store.setKey(k);
+      setBusy(false);
+      connectBtn.textContent = 'Connected';
+      connectBtn.classList.add('is-done');
+      setError('');
+      setStatus(persisted ? 'Connected. Google is ready — taking you to Find…'
+                          : 'Connected for this visit. This browser wouldn’t save the key, so you’ll be asked again next time.', persisted ? 'ok' : 'warn');
+      announce(persisted ? 'Connected. Google is ready.' : 'Connected for this visit only. This browser would not save the key.');
+      busy = true;   // no second tap while the confirmation shows
+      window.setTimeout(function () {
+        busy = false;
+        connectBtn.classList.remove('is-done');
+        hide();
+        settings.refresh();
+        find.showLanding();
+        tabs.activate('find');
+        welcome.maybeShow();
+      }, persisted ? 1100 : 2600);
+    }
+
+    function connect() {
+      if (busy) return;
+      var k = (input.value || '').trim();
+      setError('');
+      if (!k) {
+        setError('Paste your Google Maps key first — it starts with “AIza”.');
+        input.focus();
+        return;
+      }
+      if (keyLooksWrong(k)) {
+        setError(failText('shape'));
+        input.focus();
+        return;
+      }
+      if (offline.isOffline()) { setError(failText('network')); return; }
+      setBusy(true);
+      setStatus('Checking your key with Google — this takes a few seconds.', 'busy');
+      gmaps.validateKey(k, function (code) {
+        if (!open) return;
+        if (!code) { connected(k); return; }
+        if (code === 'reload') {
+          // fresh page, same key: Google's verdict on this page is final
+          var carried = false;
+          try { sessionStorage.setItem(KEY_HANDOFF, k); carried = true; } catch (e) {}
+          if (carried) {
+            setStatus('Starting a fresh check…', 'busy');
+            window.setTimeout(function () { try { location.reload(); } catch (e) {} }, 60);
+            return;
+          }
+          setBusy(false); setStatus('');
+          setError('Google needs a fresh page to try that key. Reload this page, then paste the key again.');
+          return;
+        }
+        setBusy(false);
+        setStatus('');
+        setError(failText(code));
+        announce(liveShortText(code));
+        try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
+      });
+    }
+
+    function init() {
+      root = $('key-gate');
+      if (!root) return;
+      scrollEl = $('gate-scroll'); form = $('gate-form'); input = $('gate-key');
+      errEl = $('gate-error'); statusEl = $('gate-status'); noteEl = $('gate-note');
+      connectBtn = $('gate-connect'); cancelBtn = $('gate-cancel'); pasteBtn = $('gate-paste'); toggleBtn = $('gate-toggle');
+      titleEl = $('gate-title'); eyebrowEl = $('gate-eyebrow'); leadEl = $('gate-lead'); originEl = $('gate-origin');
+      errEl.hidden = true;
+      if (originEl) originEl.textContent = referrerRule();
+
+      form.addEventListener('submit', function (e) { e.preventDefault(); connect(); });
+      input.addEventListener('input', function () { if (errEl.textContent) setError(''); });
+      input.addEventListener('focus', function () {
+        // let the (iOS) keyboard finish opening, then bring the field into view
+        window.setTimeout(function () { try { input.scrollIntoView({ block: 'center', behavior: prefersReducedMotion ? 'auto' : 'smooth' }); } catch (e) {} }, 320);
+      });
+      toggleBtn.addEventListener('click', function () {
+        var showing = input.type === 'text';
+        input.type = showing ? 'password' : 'text';
+        toggleBtn.textContent = showing ? 'Show key' : 'Hide key';
+        toggleBtn.setAttribute('aria-pressed', showing ? 'false' : 'true');
+        input.focus();
+      });
+      if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+        pasteBtn.hidden = false;
+        pasteBtn.addEventListener('click', function () {
+          navigator.clipboard.readText().then(function (t) {
+            t = String(t || '').trim();
+            if (!t) { setError('The clipboard is empty — copy your key in the Google Cloud Console first.'); return; }
+            input.value = t;
+            setError('');
+            setStatus('Pasted. Press Connect to check it.', '');
+            connectBtn.focus();
+          }, function () {
+            setStatus('');
+            setError('Couldn’t read the clipboard here — press and hold in the box and choose Paste.');
+            input.focus();
+          });
+        });
+      }
+      cancelBtn.addEventListener('click', cancel);
+      document.addEventListener('keydown', function (e) { if (open && e.key === 'Escape') { e.preventDefault(); cancel(); } });
+      connectBtn.addEventListener('click', function (e) { if (busy) e.preventDefault(); });
+    }
+
+    return { init: init, show: show, hide: hide, isOpen: isOpen, readHandoff: readHandoff };
+  })();
+
+  /* ================================================================== *
+   * SETTINGS — "Google connection" sheet
+   * Shows that Tableau is connected (the key's first and last characters
+   * only, never the key), and lets the person replace it (re-opens the
+   * gate) or remove it (confirm, clear, back to the gate).
    * ================================================================== */
   var settings = (function () {
     var backdrop = $('settings-backdrop');
-    var input = $('key-input');
-    var msg = $('settings-msg');
     var navBtn = $('settings-open');
     var modeEl = $('settings-mode');
-    var saveBtn = null;
-    var ownOpen = false;   // the "use my own key" disclosure (shipped-key mode)
-    var introEl = null, introOrig = '';
-    var INTRO_SHIPPED = 'Optional: paste your own Google Maps API key and Tableau will use it instead of the shared one \u2014 your own Google quota, your own settings.';
 
-    function refreshMode() {
+    /* AIza........1234 — the prefix and the last four, nothing in between. */
+    function maskKey(k) {
+      k = String(k || '');
+      if (k.length < 12) return '••••';
+      return k.slice(0, 4) + '••••••••' + k.slice(-4);
+    }
+
+    function refresh() {
+      var mine = store.getUserKey();
+      var shared = !mine && !!store.getConfigKey();
       var has = !!store.getKey();
-      var shipped = !!CONFIG_KEY && !configKeyDead;      // a site key is on offer
-      var mine = !!store.getUserKey();
       if (navBtn) navBtn.classList.toggle('is-live', has);
       if (modeEl) {
-        modeEl.textContent = !has
-          ? (configKeyDead ? 'Live restaurants are unavailable right now — showing sample data.'
-                           : 'Sample data is on — 18 hand-written places, no key needed.')
-          : (mine && shipped ? 'Live data is on — using your own key.'
-                             : 'Live data is on — results come from Google Places.');
+        modeEl.textContent = has ? 'Connected to Google' : 'Not connected';
         modeEl.className = 'settings-mode' + (has ? ' is-live' : '');
       }
-      // shipped-key mode: say "live is on", never ask for a key up front,
-      // and keep the own-key form behind a disclosure.
-      var liveOn = $('settings-liveon'), tog = $('own-key-toggle'), body = $('own-key-body');
-      var title = $('settings-title'), clr = $('key-clear');
-      if (liveOn) liveOn.hidden = !(shipped && !mine);
-      if (tog) tog.hidden = !(shipped && !mine);
-      if (body) body.hidden = shipped && !mine && !ownOpen;
-      if (tog) tog.setAttribute('aria-expanded', ownOpen ? 'true' : 'false');
-      if (title) title.textContent = shipped ? 'Settings' : 'Use live data';
-      if (clr) clr.textContent = shipped ? 'Remove my key' : 'Use sample data';
-      var hint = $('key-clear-name'); if (hint) hint.textContent = clr ? clr.textContent.replace(/^./, function (c) { return c.toUpperCase(); }) : '';
-      if (introEl) introEl.textContent = shipped ? INTRO_SHIPPED : introOrig;
-      if (find && find.syncDemoNote) find.syncDemoNote();
+      var line = $('settings-conn-line'), sub = $('settings-conn-sub');
+      if (line) line.textContent = mine ? 'Your key: ' + maskKey(mine)
+        : (shared ? 'Using Tableau’s shared key' : 'No key saved');
+      if (sub) sub.textContent = mine
+        ? 'Saved only in this browser. Only the first and last few characters are shown here.'
+        : (shared ? 'Restaurants come from Google through the site’s own key. You can use your own instead.' : '');
+      var rm = $('key-remove'), rp = $('key-replace');
+      if (rm) rm.hidden = !mine;
+      if (rp) rp.textContent = shared ? 'Use my own key' : 'Replace key';
     }
 
-    function setMsg(text, kind) {
-      if (!msg) return;
-      msg.textContent = text || '';
-      msg.className = 'settings-msg' + (kind ? ' is-' + kind : '');
-    }
-    function showError(text) {
-      setMsg(text || liveErrorText('unknown'), 'error');
-    }
-    /* The whole app reports live failures by CODE, so every surface says the
-       same sentence for the same failure — never one generic message. */
-    function showCode(code) {
-      setMsg(liveErrorText(code), code === 'reload' ? 'ok' : 'error');
-    }
-    function busy(on) {
-      if (!saveBtn) return;
-      saveBtn.disabled = !!on;
-      saveBtn.textContent = on ? 'Checking…' : 'Save key';
+    function showConfirm(on) {
+      var c = $('settings-confirm'), a = $('settings-actions');
+      if (c) c.hidden = !on;
+      if (a) a.hidden = !!on;
     }
 
-    function open(where) {
+    function openSheet(where) {
       if (!backdrop) return;
-      var mine = store.getUserKey();
-      if (input) input.value = mine || '';
-      setMsg(mine ? 'A key is saved on this device.' : '', mine ? 'ok' : '');
-      refreshMode();
-      var first = input;
-      if (CONFIG_KEY && !configKeyDead && !mine && !ownOpen) first = $('own-key-toggle');
+      if (gate.isOpen()) return;   // the gate is the only screen while it is up
+      refresh();
+      showConfirm(false);
+      var first = $('key-replace');
       var pn = $('privacy-note');
       if (where === 'privacy' && pn) first = pn;
       modal.open(backdrop, first);
@@ -9992,90 +10304,50 @@
 
     function init() {
       if (!backdrop) return;
-      if (navBtn) navBtn.addEventListener('click', function () { open(); });
-      introEl = backdrop.querySelector('.settings-intro');
-      introOrig = introEl ? introEl.textContent : '';
-      var ownTog = $('own-key-toggle');
-      if (ownTog) ownTog.addEventListener('click', function () {
-        ownOpen = !ownOpen;
-        refreshMode();
-        if (ownOpen && input) input.focus();
-      });
+      if (navBtn) navBtn.addEventListener('click', function () { openSheet(); });
       $('settings-close').addEventListener('click', close);
       backdrop.addEventListener('click', function (e) { if (e.target === backdrop) close(); });
 
-      saveBtn = $('key-save');
-      saveBtn.addEventListener('click', function () {
-        var k = (input.value || '').trim();
-        if (!k) { setMsg('Paste a key first.', 'error'); return; }
-        // A string that cannot be a Google key never becomes a request.
-        if (keyLooksWrong(k)) {
-          showCode('shape');
-          announce(liveErrorText('shape'));
-          return;
-        }
-        if (!store.setKey(k)) {
-          setMsg('Could not save — this browser is blocking storage.', 'error');
-          return;
-        }
-        refreshMode();
-        busy(true);
-        setMsg('Checking this key with Google…', '');
-        gmaps.validateKey(k, function (code) {
-          busy(false);
-          if (!code) {
-            setMsg('Key accepted — live data is on.', 'ok');
-            announce('Key accepted. Tableau is on live data.');
-            refreshMode();
-            find.hideLiveNote();
-            window.setTimeout(close, 900);
-            return;
-          }
-          // A key that cannot work as saved goes back out again, so the app
-          // is never left half-live. Transient failures (quota, network,
-          // needing a reload) keep the key — it is probably fine.
-          var keep = (code === 'quota' || code === 'network' || code === 'reload');
-          if (!keep) store.clearKey();
-          setMsg(liveErrorText(code) + (keep ? '' : ' Tableau stays on sample data.'),
-            code === 'reload' ? 'ok' : 'error');
-          announce(liveShortText(code) + (keep ? '' : ' Staying on sample data.'));
-          refreshMode();
-        });
+      $('key-replace').addEventListener('click', function () {
+        close();
+        gate.show({ replace: true, cancelable: true });
       });
-
-      $('key-clear').addEventListener('click', function () {
+      $('key-remove').addEventListener('click', function () {
+        showConfirm(true);
+        var no = $('key-remove-no'); if (no) no.focus();
+      });
+      $('key-remove-no').addEventListener('click', function () {
+        showConfirm(false);
+        var rm = $('key-remove'); if (rm) rm.focus();
+      });
+      $('key-remove-yes').addEventListener('click', function () {
         store.clearKey();
-        if (input) input.value = '';
-        var stillLive = !!store.getKey();   // the shipped key takes over
-        setMsg(stillLive ? 'Your key has been removed — Tableau is using its shared live key.'
-                         : 'Back on sample data — your key has been removed from this browser.', 'ok');
-        announce(stillLive ? 'Your key has been removed. Live data stays on.'
-                           : 'Sample data is on. Your key has been removed from this browser.');
-        ownOpen = false;
-        refreshMode();
+        refresh();
+        showConfirm(false);
+        close();
         find.hideLiveNote();
         find.showLanding();
+        if (store.getKey()) {
+          // the site's shared key takes over: nothing more to ask
+          toast('Your key was removed. Tableau is using its shared key.');
+          announce('Your key was removed. Tableau is using its shared key.');
+          return;
+        }
+        announce('Your key was removed from this browser.');
+        gate.show({ reason: 'nokey' });
       });
-
-      refreshMode();
-
-      // If a key already exists, warm up the loader + autocomplete.
-      if (store.getKey()) {
-        gmaps.loadOnce(store.getKey());
-        var locInput = $('loc-input');
-        if (locInput) gmaps.attachAutocomplete(locInput);
-      }
+      refresh();
     }
 
-    return { init: init, open: open, showError: showError, showCode: showCode, refreshMode: refreshMode };
+    return { init: init, open: openSheet, refresh: refresh };
   })();
 
   /* ================================================================== *
    * WELCOME — the first-run sheet (once per browser, localStorage flag)
    * Reuses the shared modal() choreography: focus moves in, Tab is
    * trapped, Escape / the close button / a backdrop tap dismiss it, focus
-   * goes back. Says plainly what Tableau does, what it does with your
-   * location, and whether results are live or samples.
+   * goes back. Says plainly what Tableau does and what it does with your
+   * location. Shown after the key gate, the first time Find is reached.
    * ================================================================== */
   var welcome = (function () {
     var KEY_WELCOME = 'eats-welcomed';
@@ -10093,23 +10365,13 @@
     }
 
     function fill() {
-      var live = liveMode();
       var loc = $('welcome-loc'), mode = $('welcome-mode');
-      if (loc) loc.textContent = live
-        ? 'It asks for your location only when you tap Find, and only to find places near you.'
-        : 'It only asks for your location when live results are on \u2014 in demo mode it never does.';
+      if (loc) loc.textContent = 'It asks for your location only when you tap Find, and only to find places near you.';
       if (mode) {
         clear(mode);
-        mode.className = 'welcome-mode ' + (live ? 'is-live' : 'is-demo');
-        if (live) {
-          mode.appendChild(el('strong', null, 'Live results are on.'));
-          mode.appendChild(document.createTextNode(' Places come from Google, near you.'));
-        } else {
-          mode.appendChild(el('span', 'v-demo-tag', 'Sample'));
-          mode.appendChild(document.createTextNode(' '));
-          mode.appendChild(el('strong', null, 'Demo mode.'));
-          mode.appendChild(document.createTextNode(' The places you\u2019ll see are samples, not real restaurants.'));
-        }
+        mode.className = 'welcome-mode is-live';
+        mode.appendChild(el('strong', null, 'Connected to Google.'));
+        mode.appendChild(document.createTextNode(' Places come from Google, near you.'));
       }
     }
 
@@ -10144,6 +10406,7 @@
 
     function maybeShow() {
       init();
+      if (gate.isOpen()) return;
       if (!seen()) open();
     }
 
@@ -10160,6 +10423,7 @@
     visited.init();
     if (!BETA) { friends.init(); popular.init(); }
     settings.init();
+    gate.init();
     find.init();
     offline.init();
     // places hearted in the Feed on an earlier visit go back on the shortlist
@@ -10167,12 +10431,28 @@
     find.refreshLanding();
     // the Feed is the front door; in the beta there is no Feed, Find is
     tabs.activate(BETA ? 'find' : 'feed');
-    welcome.maybeShow();
+
+    // KEY GATE: no working key -> the gate is the only screen. A key typed on
+    // the gate just before a reload (Google's per-page auth verdict) is
+    // re-checked here without the person retyping it.
+    var carried = gate.readHandoff();
+    if (carried) {
+      gate.show({ prefill: carried, auto: true, cancelable: !!store.getKey() });
+    } else if (!store.getKey()) {
+      gate.show({ reason: 'nokey' });
+    } else {
+      // a saved or shipped key exists: warm up Google Maps in the background
+      gmaps.loadOnce(store.getKey());
+      var locInput = $('loc-input');
+      if (locInput) gmaps.attachAutocomplete(locInput);
+      welcome.maybeShow();
+    }
 
     // PWA: register the Tableau service worker (legacy filename
     // peckish-sw.js), scoped to '/eats' so it
     // never controls the rest of the portfolio. Network-first, so online
-    // visitors always get fresh files; offline reopens keep demo mode alive.
+    // visitors always get fresh files; offline reopens keep the shell (the
+    // Find screen then says it is offline rather than showing anything fake).
     try {
       if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
         // Update flow: when a NEW worker replaces the one controlling this

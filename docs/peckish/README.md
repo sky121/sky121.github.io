@@ -5,8 +5,8 @@
 > **swipe a Tinder-style deck** of nearby restaurants (closest first, expanding
 > outward) → land on one. Or open the app on its front door, the **Feed** — a
 > full-bleed vertical snap feed of watercolor food posts, every one anchored to
-> a real place. Plus a private **Visited** rating log and demo **Friends** +
-> **Popular** tabs.
+> a real place. Plus a private **Visited** rating log and placeholder **Friends** +
+> **Popular** tabs (sealed off in the beta).
 >
 > **Filenames stay legacy on purpose:** `eats.html`, `peckish-sw.js`,
 > `peckish.webmanifest`, `peckish-icon-*.png`, `og-peckish.png` keep their names
@@ -14,14 +14,21 @@
 > icon *art* changed.
 >
 > Single source of truth so we can pick up exactly where we left off.
-> Last updated: **2026-11-24**.
+> Last updated: **2026-11-25**.
+>
+> **There is no demo mode any more (2026-11-25).** Tableau asks for a working
+> Google key before it shows anything (see "No demo mode + the key gate" right
+> below). Every older section further down that talks about "demo mode",
+> "sample places", the "Use sample data" button, the SAMPLE fallback deck, the
+> `#find-demo-note` line or the offline "demo kitchen" note describes behaviour
+> that has been **removed**; it is kept only as history.
 
 ---
 
 ## Status: LIVE (Lab project)
 
 - **Play it:** https://sky121.github.io/eats.html — reached from the **Lab** (`lab.html`), the "Tableau" tile.
-- Fully usable in **demo mode** right now (sample data, no setup). Two things turn on the "real" features and need *you* (see "What needs you" below): a **Google Maps API key** (live restaurants) and a **backend** (real Friends + Popular).
+- **Needs a Google Maps key to start** (no demo mode): the first screen is the "Connect Google" key gate. Visitors paste their own key, or you ship a site key in `eats-config.js` (see the owner checklist below). Real Friends + Popular still need a **backend** (not built; sealed off in the beta).
 
 ### Files (committed to `master`)
 | File | What it is |
@@ -33,13 +40,148 @@
 | `lab.html` | Holds the Live "Peckish" tile linking here |
 | `sitemap.xml` | Has the `eats.html` entry |
 
+
+---
+
+## No demo mode + the key gate (2026-11-25)
+
+**Owner's words:** "we should not have demo mode, make user put in key to start."
+Root cause: on a phone the key could fail to save or be rejected and the app
+silently fell back to SAMPLE places, so it felt broken without saying why.
+Now the product **never shows sample places**; either Google answers or the app
+says exactly why it could not.
+
+### What changed
+- **Key gate** (`#key-gate`, `gate` module in `eats.js`): a full-screen,
+  watercolor "Connect Google to start" screen. It is the only thing on screen
+  (everything else is `inert` + `aria-hidden` + `visibility:hidden` via
+  `html.gate-on`) on first run and any time there is no working key. One
+  sentence on what Tableau is, why a key is needed, "the key stays in this
+  browser, never sent to the site's author", a 3-step "get a key in about two
+  minutes" guide (real link to the Cloud Console credentials page,
+  `target=_blank rel="noopener noreferrer"`; enable **exactly Maps JavaScript
+  API + Places API (New)**; Geocoding is optional and not needed; restrict by
+  HTTP referrer to the origin shown live from `location.origin + '/*'`; billing
+  must be attached), a labelled password field (autocomplete off, spellcheck
+  off, 16px so iOS does not zoom), **Paste** (only shown when
+  `navigator.clipboard.readText` exists; a denied read says what to do instead),
+  **Show/Hide key**, and a 54px **Connect** button.
+- **Connect validates for real** with the existing machinery
+  (`gmaps.validateKey` -> Maps script load -> ONE 1-result `id`-only
+  `Place.searchNearby`). Only a pass writes `eats-gmaps-key`. On a pass: a calm
+  green "Connected" confirmation (~1.1 s) -> Find landing -> the one-time
+  welcome sheet. On a failure the field stays filled, the key is never saved and
+  the app is never entered; the message is specific, ends "Nothing was saved.",
+  and has the next step: invalid key / billing not attached / Places API (New)
+  not enabled / API restrictions leave it out / **referrer mismatch (names the
+  exact origin to allow)** / quota / refused-without-reason / offline / network
+  (all wording lives in `LIVE_TEXT`, one place). A `gm_authFailure` during
+  validation gets a 2.5 s grace window so the probe's more specific reason wins.
+- **Google keys one Maps script per page load and its auth verdict is final for
+  that load.** So a retry after Google refused a key, or a different key after
+  Maps loaded, is handed to a fresh page: the key is carried across ONE reload in
+  `sessionStorage['eats-gate-pending']`, read-and-deleted on boot, and the gate
+  re-checks it automatically ("Starting a fresh check..."). If `sessionStorage`
+  is blocked it says to reload and paste again. (Billing fixed in the Console and
+  the same key retried needs no reload: the probe is just re-run.)
+- **Blocked storage** (private mode / blocked site data / iOS quirks): `store.setKey`
+  keeps the key in memory for the visit and returns `false`; the gate says
+  "Connected for this visit. This browser wouldn't save the key, so you'll be
+  asked again next time." (This is the failure mode behind the owner's phone report.)
+- **Resolution order is unchanged:** key saved on the device > `TABLEAU_CONFIG.mapsKey`
+  (site key, `''` by default). A configured site key that works skips the gate;
+  if it is refused at runtime it is marked dead for that visit and the gate opens
+  ("Tableau's shared Google connection isn't working right now. Connect your own key").
+- **Settings sheet = "Google connection"**: "Connected to Google", the key as
+  `AIza` + 8 dots + last 4 (never the whole key), **Replace key** (reopens the
+  gate in-place, Cancel/Escape returns, key untouched until the new one passes),
+  **Remove key** (inline confirm "Keep it / Yes, remove" -> clears storage ->
+  gate). With only a site key it reads "Using Tableau's shared key" and offers
+  "Use my own key" (no Remove). The Privacy note stays (reworded, no demo).
+  The "how to get a key" guide exists once (in the gate) and is reused by first
+  connect, Replace and Fix.
+- **Failure states (never fake data):** a live search that cannot finish renders
+  an honest error in the deck area (`deck.showFailure`, `role="alert"`, heading
+  focused): **"Couldn't reach Google"** + the plain reason, **Try again**, and
+  **Fix key** (opens the gate, cancelable, with the reason) when the cause is the
+  key (invalid / billing / API not enabled / restricted / API-blocked / denied /
+  rejected / shared key unavailable). Quota, timeout, network and unknown get
+  Try again only. **Offline:** a friendly "You're offline" state with Try again
+  (no request is made; the service worker still serves the shell). Sweep refill
+  failures keep the places already found and say so in the existing slip.
+  Geolocation denied is unchanged: back to the landing with the typed-location
+  field (no silent San Francisco). A dead saved key at boot (gm_authFailure with
+  no prior success and nothing on screen to explain it) opens the gate with the
+  reason; the saved key is kept until replaced or removed.
+- **Hardening kept:** `placesOk` rule (a stray auxiliary `gm_authFailure` after any
+  successful new-API call never kills the session); text-search typed locations;
+  cuisine-aware probing; the full sweep; Open in Maps; photo credits; Visited
+  hidden flag; shortlist/decision. `authDead` (new) records an authoritative
+  `gm_authFailure` (no proven-good key) so the next validate asks for a fresh page.
+
+### What was deleted vs left unreachable
+- **Deleted:** the "Use sample data" / "Save & check key" settings form, the
+  shipped-key disclosure (`own-key-toggle`, `settings-liveon`), the sample
+  fallback (`loadDemoInto`), the Find landing demo line (`#find-demo-note`,
+  `syncDemoNote`), the prefs "N sample places match" count (the line is now
+  always empty/hidden), the offline "demo kitchen" copy, the "Demo mode" welcome
+  line and the demo/sample privacy copy, `find-demo-note` / `settings-liveon` CSS.
+  The Feed/Friends/Popular "Demo ... Sample data" banners are stripped from the
+  sealed beta panels at boot.
+- **Left unreachable (cannot be proven dead across `beta:false`):** the sample
+  dataset (`DEMO_RESTAURANTS`, `demoResults()`, `demoVisited()`, the mock
+  Friends/Popular feeds) and the SAMPLE-tag helpers. A single constant
+  `var DEMO_ENABLED = false;` (top of `eats.js`, **not** user-togglable) makes
+  `demoResults()` / `demoVisited()` return `[]`, `sampleTagsOn()` false and the
+  name-lookup helpers ignore the dataset, so no code path can reach it.
+  `PROBE_ORIGIN` (SF coordinates) is only the point a 1-result key check looks
+  at; it is never shown or searched from.
+- **Restoring demo mode (developer only):** set `DEMO_ENABLED = true` and
+  re-add a fallback call to `demoResults()` in `find.startSearch` (the old
+  `loadDemoInto` re-bases the set near the origin) plus the gate bypass in
+  `boot`. Not recommended; the product decision is "no demo".
+- `beta:false` re-enables the Feed, Friends and Popular tabs, which are
+  placeholder-data surfaces (sample creators / friends). That conflicts with the
+  no-demo rule, so keep `beta: true` until real data exists.
+
+### Owner checklist for the Google key
+1. Google Cloud Console > create/pick a project > **attach billing**.
+2. Enable **Maps JavaScript API** and **Places API (New)**. Geocoding API is
+   optional (only a fallback for typed places) and is not needed.
+3. Credentials > Create API key. Application restriction: **Websites**, add
+   `https://sky121.github.io/*` (add `http://localhost:8000/*` only on a separate
+   dev key). API restriction: Maps JavaScript API + Places API (New).
+4. Quotas: cap daily requests for those two APIs at a number you accept paying
+   for; set a billing budget with email alerts. Each swipe-deck search is a few
+   Nearby calls (one to start, more as the sweep refills; `sweepMaxCalls`, default 30,
+   is the per-session cap).
+5. To ship a site key so visitors skip the gate: put it in `eats-config.js`
+   `mapsKey` (it is public by design - the referrer + API restrictions are the
+   protection). Visitors can still "Use my own key" in Settings.
+
+### How it was verified (2026-11-25, Maps-API stubs, never a real key)
+Playwright at 390x844, 375x667 and 360x740, light + dark: gate on fresh storage
+(nothing else reachable: gear/landing `visibility:hidden` + `inert`, 25 Tab
+presses stay inside, Escape does not dismiss), no horizontal overflow, keyboard-open
+emulation (half-height viewport, Connect reachable), Paste/Show, success path ->
+landing -> live deck with zero sample/demo text in the DOM and no `demo-` ids, invalid /
+billing / API-not-enabled / referrer / quota / denied / bad-shape / offline each show
+their specific message and do not save or enter, retry-after-refusal reload handoff,
+mid-session failures (invalid, billing, quota, network, offline) with Try again / Fix key,
+dead key at boot, aux `gm_authFailure` after success stays live, Remove/Replace,
+shared site key, blocked storage; plus the typed-location and sweep suites.
+The one known stale assertion (`(g) 19 places`) fails against `SAT_MIN` as before.
+Not verifiable here: real Google behaviour (which of `gm_authFailure` vs a rejected
+promise arrives first for billing / referrer problems), a real iOS keyboard, and
+the installed-PWA storage partition on the owner's phone.
+
 ---
 
 ## How to resume / develop
 
 - **Run locally:** from repo root, `python3 -m http.server`, open `http://localhost:8000/eats.html` (serve over HTTP, not `file://`).
 - **No build step** — plain HTML/CSS/JS. `node --check assets/js/eats.js` to lint JS.
-- **Architecture (`eats.js`):** single IIFE; closures roughly: `store` (localStorage) + `feedStore` (the Feed's two lists), `state`, `distance` (haversine), `demo` (sample data), `foodArt` (the Feed's canvas painter), `feed` (the snap feed), `tabs` (bottom-bar router, roving-tabindex a11y), `find` (bubble → prefs → swipe deck), `gmaps` (lazy Google Maps/Places, current API), `sheet` (rating sheet), `visited` (CRUD), `social` (mock Friends/Popular API), `settings` (key). Watercolor chrome comes from `exhibit-page.css`; `gallery.js` provides the theme + wash drift.
+- **Architecture (`eats.js`):** single IIFE; closures roughly: `store` (localStorage) + `feedStore` (the Feed's two lists), `state`, `distance` (haversine), `demo` (dormant sample dataset, `DEMO_ENABLED = false`), `foodArt` (the Feed's canvas painter), `feed` (the snap feed), `tabs` (bottom-bar router, roving-tabindex a11y), `find` (bubble → prefs → swipe deck), `gmaps` (lazy Google Maps/Places, current API), `sheet` (rating sheet), `visited` (CRUD), `social` (mock Friends/Popular API), `gate` (full-screen "Connect Google" screen), `settings` ("Google connection" sheet). Watercolor chrome comes from `exhibit-page.css`; `gallery.js` provides the theme + wash drift.
 - **localStorage keys:** `eats-gmaps-key` (the API key — never committed), `eats-prefs` (last swipe preferences), `eats-visited` (the rating log), `eats-seen` (recently passed places, 6 h TTL), `eats-feed` (the Feed's follows + hearted places — see the Feed section). `sh-theme` (shared site light/dark).
 - **Ratings scale:** everything is **0–100 whole numbers** (Food/Vibe/Service → averaged Overall; Google's 0–5 is mapped ×20 for display).
 
