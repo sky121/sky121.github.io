@@ -9989,6 +9989,10 @@
   var gate = (function () {
     var KEY_HANDOFF = 'eats-gate-pending';     // sessionStorage: a key typed on the gate, carried across ONE reload
     var root = null, scrollEl = null, form, input, errEl, statusEl, noteEl, connectBtn, cancelBtn, pasteBtn, toggleBtn, titleEl, eyebrowEl, leadEl, originEl;
+    var guideEl = null, copyBtn = null, copiedEl = null, copiedTimer = 0;
+    /* Failures that are fixed in the Google Cloud Console: the guide opens
+       itself for these. An invalid / mistyped key leaves it closed. */
+    var CLOUD_FIX = { billing: 1, notenabled: 1, restricted: 1, apiblocked: 1, denied: 1, rejected: 1 };
     var open = false, busy = false, opts = {}, lastFocused = null, vvBound = false;
 
     function isOpen() { return open; }
@@ -10085,6 +10089,11 @@
       var cancelable = !!o.cancelable;
       cancelBtn.hidden = !cancelable;
       cancelBtn.textContent = mode === 'fix' ? 'Back' : 'Cancel';
+      if (guideEl) {
+        if (!wasOpen) guideEl.open = false;
+        if (o.reason && CLOUD_FIX[o.reason]) guideEl.open = true;
+        if (copiedEl) copiedEl.textContent = '';
+      }
       if (!wasOpen) {
         lastFocused = document.activeElement;
         input.value = o.prefill || '';
@@ -10191,7 +10200,12 @@
         setStatus('');
         setError(failText(code));
         announce(liveShortText(code));
+        if (guideEl && CLOUD_FIX[code]) guideEl.open = true;
         try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
+        if (guideEl && CLOUD_FIX[code]) {
+          // bring the (now open) guide into view without losing the message
+          try { guideEl.scrollIntoView({ block: 'nearest', behavior: 'auto' }); } catch (e) {}
+        }
       });
     }
 
@@ -10203,7 +10217,33 @@
       connectBtn = $('gate-connect'); cancelBtn = $('gate-cancel'); pasteBtn = $('gate-paste'); toggleBtn = $('gate-toggle');
       titleEl = $('gate-title'); eyebrowEl = $('gate-eyebrow'); leadEl = $('gate-lead'); originEl = $('gate-origin');
       errEl.hidden = true;
-      if (originEl) originEl.textContent = referrerRule();
+      guideEl = $('gate-guide'); copyBtn = $('gate-copy'); copiedEl = $('gate-copied');
+      if (originEl) {
+        // the rule may only wrap after a "/", never inside a word
+        var rule = referrerRule();
+        originEl.textContent = '';
+        var parts = rule.split('/');
+        for (var pi = 0; pi < parts.length; pi++) {
+          originEl.appendChild(document.createTextNode(parts[pi] + (pi < parts.length - 1 ? '/' : '')));
+          if (pi < parts.length - 1) originEl.appendChild(document.createElement('wbr'));
+        }
+        originEl.setAttribute('data-rule', rule);
+      }
+      if (copyBtn && originEl && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        copyBtn.hidden = false;
+        copyBtn.addEventListener('click', function () {
+          var done = function () {
+            if (!copiedEl) return;
+            copiedEl.textContent = 'Copied';
+            window.clearTimeout(copiedTimer);
+            copiedTimer = window.setTimeout(function () { copiedEl.textContent = ''; }, 2200);
+          };
+          try {
+            var p = navigator.clipboard.writeText(originEl.getAttribute('data-rule') || '');
+            if (p && typeof p.then === 'function') p.then(done, function () {});
+          } catch (e) { /* no clipboard here: stay quiet */ }
+        });
+      }
 
       form.addEventListener('submit', function (e) { e.preventDefault(); connect(); });
       input.addEventListener('input', function () { if (errEl.textContent) setError(''); });

@@ -5129,15 +5129,74 @@ html.gate-on body > *:not(.key-gate):not(.wash-field):not(script):not(#live-anno
 }
 html.evening .gate-note { background: rgba(217, 139, 160, 0.18); }
 
-.gate-guide { display: flex; flex-direction: column; gap: 0.55rem; }
+/* The guide is a native disclosure: collapsed by default, Enter/Space toggle it. */
+.gate-guide {
+  border-top: 1px solid var(--card-line);
+  padding-top: 0.2rem;
+}
+.gate-guide-sum {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-height: 48px;
+  border-radius: 10px;
+}
+.gate-guide-sum::-webkit-details-marker { display: none; }
+.gate-guide-sum::after {
+  content: "";
+  flex: none;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-right: 0.3rem;
+  border-right: 2px solid var(--pond-ink);
+  border-bottom: 2px solid var(--pond-ink);
+  transform: rotate(45deg) translateY(-2px);
+}
+.gate-guide[open] > .gate-guide-sum::after { transform: rotate(225deg); }
+.gate-guide-sum:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
+html.evening .gate-guide-sum:focus-visible { outline-color: var(--pond-ink); }
 .gate-guide-title {
   margin: 0;
   font-family: var(--font-display);
   font-style: italic;
   font-weight: 500;
-  font-size: 1.3rem;
+  font-size: 1.2rem;
+  line-height: 1.2;
   color: var(--ink);
 }
+.gate-guide .gate-steps { margin-top: 0.5rem; }
+.gate-origin-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.2rem 0.6rem; margin-top: 0.25rem; }
+.gate-steps .gate-origin {
+  /* wraps only at the <wbr> after a "/", never mid-word */
+  word-break: normal;
+  overflow-wrap: normal;
+  font-size: 0.8em;
+  max-width: 100%;
+}
+.gate-copy {
+  appearance: none;
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.84rem;
+  color: var(--pond-ink);
+  background: transparent;
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+}
+.gate-copy[hidden] { display: none; }
+.gate-copy:hover { border-color: var(--pond-ink); }
+.gate-copy:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
+html.evening .gate-copy:focus-visible { outline-color: var(--pond-ink); }
+.gate-copied { font-size: 0.84rem; color: #3f6b3b; }
+html.evening .gate-copied { color: #b6d3af; }
+.gate-copied:empty { display: none; }
 .gate-steps {
   list-style: none;
   counter-reset: gate;
@@ -5190,7 +5249,6 @@ html.evening .gate-steps a:focus-visible { outline-color: var(--pond-ink); }
   background: var(--chip-bg);
   padding: 0.12rem 0.38rem;
   border-radius: 5px;
-  word-break: break-all;
 }
 
 .gate-form { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.2rem; }
@@ -5312,6 +5370,18 @@ html.evening .gate-connect.is-done { background: radial-gradient(120% 140% at 30
 }
 .gate-foot a:hover { color: var(--pond-ink); }
 .gate-foot a:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; border-radius: 8px; }
+@media (max-height: 760px) {
+  /* keep field + Paste/Show + Connect above the fold on small phones */
+  .gate-scroll { padding-top: calc(0.9rem + env(safe-area-inset-top, 0px)); padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px) + var(--gate-kb, 0px)); }
+  .gate-card { gap: 0.7rem; padding: 1.1rem 1.05rem 0.9rem; }
+  .gate-title { font-size: clamp(1.7rem, 7.4vw, 2.1rem); }
+  .gate-lead { font-size: 1.08rem; line-height: 1.3; }
+  .gate-why { font-size: 0.84rem; line-height: 1.45; padding: 0.5rem 0.7rem; }
+  .gate-form { gap: 0.45rem; }
+  .gate-input { min-height: 48px; }
+  .gate-tool { min-height: 44px; }
+  .gate-connect { min-height: 50px; }
+}
 @media (max-height: 560px) {
   .gate-scroll { padding-top: 0.8rem; }
   .gate-card { padding: 1.1rem 1rem 1rem; gap: 0.8rem; }

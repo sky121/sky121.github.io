@@ -669,39 +669,14 @@
           <p class="gate-eyebrow" id="gate-eyebrow">One quick step</p>
           <h2 class="gate-title" id="gate-title" tabindex="-1">Connect Google to start</h2>
           <p class="gate-lead" id="gate-lead">
-            Tableau helps you decide where to eat. It shows real restaurants near you, one card at a time,
-            until you land on one.
+            Real restaurants near you, one card at a time, until you land on one.
           </p>
           <p class="gate-why">
-            To look places up it uses your own Google Maps key. <strong>The key stays in this browser</strong>
-            &mdash; it is never sent to the person who made Tableau, only to Google when you search.
+            It uses your own Google Maps key. <strong>The key stays in this browser</strong>
+            &mdash; only Google ever sees it, when you search.
           </p>
 
           <p class="gate-note" id="gate-note" role="alert" hidden></p>
-
-          <div class="gate-guide">
-            <h3 class="gate-guide-title" id="gate-guide-title">Get a key in about two minutes</h3>
-            <ol class="gate-steps" aria-labelledby="gate-guide-title">
-              <li>
-                <span class="gate-step-h">Open Google Cloud.</span>
-                Go to the
-                <a href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank" rel="noopener noreferrer">Credentials page<span class="visually-hidden"> (opens in a new tab)</span></a>,
-                pick or create a project, and make sure <strong>billing is attached</strong>
-                (Google asks for it, even though light use stays inside its free monthly credit).
-              </li>
-              <li>
-                <span class="gate-step-h">Create a key and turn on two APIs.</span>
-                Choose <em>Create credentials &rarr; API key</em>, then enable exactly
-                <strong>Maps JavaScript API</strong> and <strong>Places API (New)</strong>.
-                The Geocoding API is optional &mdash; you don&rsquo;t need it.
-              </li>
-              <li>
-                <span class="gate-step-h">Lock it to this site.</span>
-                Under <em>Application restrictions</em> pick <em>Websites</em> and add
-                <code class="gate-origin" id="gate-origin">/*</code>
-              </li>
-            </ol>
-          </div>
 
           <form class="gate-form" id="gate-form" novalidate autocomplete="off">
             <label class="gate-label" for="gate-key">Your Google Maps API key</label>
@@ -731,6 +706,36 @@
             <button type="submit" class="gate-connect" id="gate-connect">Connect</button>
             <button type="button" class="gate-cancel" id="gate-cancel" hidden>Not now</button>
           </form>
+
+          <!-- Collapsed by default so a person who already has a key never scrolls
+               past it. Opens by itself when a connect failure is fixed in Google Cloud. -->
+          <details class="gate-guide" id="gate-guide">
+            <summary class="gate-guide-sum"><span class="gate-guide-title" id="gate-guide-title">Need a key? Get one in about two minutes</span></summary>
+            <ol class="gate-steps" aria-labelledby="gate-guide-title">
+              <li>
+                <span class="gate-step-h">Open Google Cloud.</span>
+                Go to the
+                <a href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank" rel="noopener noreferrer">Credentials page<span class="visually-hidden"> (opens in a new tab)</span></a>,
+                pick or create a project, and make sure <strong>billing is attached</strong>
+                (Google asks for it, even though light use stays inside its free monthly credit).
+              </li>
+              <li>
+                <span class="gate-step-h">Create a key and turn on two APIs.</span>
+                Choose <em>Create credentials &rarr; API key</em>, then enable exactly
+                <strong>Maps JavaScript API</strong> and <strong>Places API (New)</strong>.
+                The Geocoding API is optional &mdash; you don&rsquo;t need it.
+              </li>
+              <li>
+                <span class="gate-step-h">Lock it to this site.</span>
+                Under <em>Application restrictions</em> pick <em>Websites</em> and add this website:
+                <span class="gate-origin-row">
+                  <code class="gate-origin" id="gate-origin">/*</code>
+                  <button type="button" class="gate-copy" id="gate-copy" hidden>Copy<span class="visually-hidden"> website rule</span></button>
+                  <span class="gate-copied" id="gate-copied" role="status" aria-live="polite"></span>
+                </span>
+              </li>
+            </ol>
+          </details>
 
           <p class="gate-foot"><a href="lab.html">&larr; Back to the Lab</a></p>
         </div>

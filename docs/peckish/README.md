@@ -66,6 +66,19 @@ says exactly why it could not.
   off, 16px so iOS does not zoom), **Paste** (only shown when
   `navigator.clipboard.readText` exists; a denied read says what to do instead),
   **Show/Hide key**, and a 54px **Connect** button.
+- **Gate layout (2026-11-25, key-first):** order is heading, one-line value
+  statement, one-line privacy note, then the key field + Paste / Show key +
+  Connect (all above the fold at 390x844, 375x667, 360x740), then the "Need a
+  key? Get one in about two minutes" guide as a native `<details id="gate-guide">`
+  (collapsed by default, Enter/Space/tap, no height animation so reduced motion
+  is moot). It re-collapses on each fresh open and auto-opens (`CLOUD_FIX` in the
+  gate module) when a connect error or a Fix-key reason is fixed in Google Cloud
+  (billing, API not enabled, referrer mismatch, API-blocked, denied, rejected);
+  an invalid/mistyped key leaves it closed. Same component serves first connect,
+  Replace and Fix. The referrer chip (`#gate-origin`) has `<wbr>` after each `/`
+  and `word-break: normal`, so it can wrap only at slashes, never mid-word; a
+  44px **Copy** button beside it (hidden when `navigator.clipboard.writeText`
+  is missing; failures are silent) announces "Copied" through an aria-live region.
 - **Connect validates for real** with the existing machinery
   (`gmaps.validateKey` -> Maps script load -> ONE 1-result `id`-only
   `Place.searchNearby`). Only a pass writes `eats-gmaps-key`. On a pass: a calm
