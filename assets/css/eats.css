@@ -4785,3 +4785,292 @@ html.evening .maps-link:focus-visible { outline-color: #9fc2e0; }
   padding: 0.7rem 0.1rem;   /* >=44px tap height without moving the line */
   margin: -0.7rem 0;
 }
+
+/* ==========================================================================
+   UI/UX POLISH PASS (2026-11-24) — everything below overrides earlier rules
+   on purpose (last in the file, same specificity or higher). Sections:
+   1 focus  2 prefs dock  3 sheet buttons  4 skeleton  5 landing  6 painted
+   marks  7 card meta  8 smoothness  9 small-text floor
+   ========================================================================== */
+
+/* ---------- 1. Focus: one refined ring, never on programmatic focus ----------
+   Screen changes move focus to a heading/legend/card (tabindex=-1) so screen
+   readers land in the right place. For touch/mouse people that must not draw
+   a ring (a heavy black box around "What are you in the mood for?"); for real
+   keyboard use (<html class="is-kb">, set in eats.js) it is the same
+   pond-deep 2px ring with an offset as every control. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--pond-deep);
+  outline-offset: 3px;
+}
+html.evening :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline-color: var(--pond-ink); }
+:focus:not(:focus-visible) { outline: none; }
+html:not(.is-kb) [tabindex="-1"]:focus,
+html:not(.is-kb) .swipe-card:focus,
+html:not(.is-kb) .eats-panel:focus,
+html:not(.is-kb) :is(button, a, summary):focus-visible { outline: none; }
+html.is-kb [tabindex="-1"]:focus-visible,
+html.is-kb .swipe-card:focus-visible {
+  outline: 2px solid var(--pond-deep);
+  outline-offset: 4px;
+  border-radius: 10px;
+}
+html.evening.is-kb [tabindex="-1"]:focus-visible,
+html.evening.is-kb .swipe-card:focus-visible { outline-color: var(--pond-ink); }
+/* the whole-panel Tab stop is a landmark, not a control: a soft inset ring */
+html.is-kb .eats-panel:focus-visible { outline-offset: -3px; border-radius: 14px; }
+
+/* ---------- 2. Preferences: sticky bottom dock ---------- */
+.prefs-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  /* bleed to the room's 1.25rem gutters so the frost spans the screen */
+  margin: 0.2rem -1.25rem 0;
+  padding: 1.4rem 1.25rem calc(0.7rem + env(safe-area-inset-bottom, 0px));
+}
+.prefs-dock::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: rgba(246, 241, 231, 0.9);
+  background: color-mix(in srgb, var(--paper) 90%, transparent);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  backdrop-filter: blur(10px) saturate(1.2);
+  /* soft top fade instead of a hard edge */
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 1.25rem);
+  mask-image: linear-gradient(180deg, transparent 0, #000 1.25rem);
+}
+.prefs-dock .prefs-stepnav { gap: 0.5rem; }
+.prefs-dock .prefs-stepnav .btn-ghost { min-height: 44px; padding: 0.45rem 0.9rem; }
+.prefs-dock .step-back, .prefs-dock .step-next { flex: 0 0 auto; }
+.prefs-dock .step-where { flex: 1 1 auto; text-align: center; font-size: 0.78rem; letter-spacing: 0.12em; }
+.prefs-dock .prefs-actions { margin-top: 0; padding-bottom: 0; flex-wrap: nowrap; }
+.prefs-dock .prefs-actions .btn-solid { flex: 1.15 1 0; }
+.prefs-dock .prefs-actions .btn-surprise { flex: 1 1 0; white-space: nowrap; }
+.prefs-form { gap: 1rem; }
+.prefs-count { margin: 0; }
+
+/* ---------- 3. Sheet buttons: one line, one size ---------- */
+.sheet-actions { gap: 0.6rem; }
+.sheet-actions .btn-ghost, .sheet-actions .btn-solid,
+.deck-end-actions .btn-ghost, .deck-end-actions .btn-solid {
+  min-height: 48px;
+  white-space: nowrap;
+  letter-spacing: 0.08em;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+.sheet-actions .btn-ghost, .sheet-actions .btn-solid { flex: 1 1 0; }
+.sheet { overscroll-behavior: contain; animation-duration: 0.25s; }
+.sheet-backdrop { overscroll-behavior: contain; }
+.settings-install-ic {
+  display: inline-block;
+  vertical-align: -0.22em;
+  margin-right: 0.2rem;
+  fill: none;
+  stroke: var(--pond-ink);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---------- 4. Loading skeleton (first search + "finding more") ----------
+   The same scatter as a real card — two photo tiles, a review scrap, the info
+   scrap — as soft watercolor washes with a slow paper-light sweep. Fully
+   static under prefers-reduced-motion. */
+.deck-loading.deck-skel {
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0 0.15rem;
+}
+.skel-trio {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas: "a b" "c c" "i i";
+  gap: 0.7rem 0.8rem;
+  width: 100%;
+  align-items: start;
+}
+.skel-block {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  border-radius: 16px;
+  border: 1px solid rgba(46, 58, 72, 0.08);
+  box-shadow: 0 12px 24px -16px rgba(46, 58, 72, 0.45);
+  background:
+    radial-gradient(70% 90% at 22% 24%, rgba(127, 168, 201, 0.34) 0%, rgba(127, 168, 201, 0) 70%),
+    radial-gradient(60% 80% at 82% 78%, rgba(162, 146, 196, 0.3) 0%, rgba(162, 146, 196, 0) 70%),
+    rgba(239, 231, 216, 0.85);
+}
+.skel-block::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, rgba(255, 251, 240, 0) 20%, rgba(255, 251, 240, 0.6) 50%, rgba(255, 251, 240, 0) 80%);
+  transform: translateX(-100%);
+  animation: skel-sweep 1.9s ease-in-out infinite;
+}
+@keyframes skel-sweep { to { transform: translateX(100%); } }
+.skel-a { grid-area: a; height: clamp(6rem, 19vh, 9.5rem); transform: rotate(-1.6deg); }
+.skel-b { grid-area: b; height: clamp(6rem, 19vh, 9.5rem); transform: rotate(1.4deg) translateY(0.6rem); }
+.skel-b::after { animation-delay: 0.25s; }
+.skel-c { grid-area: c; width: 68%; justify-self: center; height: clamp(3.4rem, 9vh, 4.6rem); margin-top: 0.5rem; transform: rotate(0.5deg); }
+.skel-c::after { animation-delay: 0.5s; }
+.skel-info {
+  grid-area: i;
+  width: 88%;
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem;
+  background: rgba(251, 247, 238, 0.95);
+  transform: rotate(0.6deg);
+}
+.skel-info::after { animation-delay: 0.75s; }
+.skel-line {
+  display: block;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: rgba(74, 114, 153, 0.2);
+}
+.skel-line--name { width: 62%; height: 1rem; background: rgba(74, 114, 153, 0.26); }
+.skel-line--meta { width: 84%; }
+.skel-line--chip { width: 34%; height: 1.1rem; background: rgba(162, 146, 196, 0.3); }
+.skel-cap {
+  margin: 0.55rem 0 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--ink-soft);
+}
+html.evening .skel-block {
+  border-color: rgba(233, 227, 211, 0.1);
+  background:
+    radial-gradient(70% 90% at 22% 24%, rgba(127, 168, 201, 0.36) 0%, rgba(127, 168, 201, 0) 70%),
+    radial-gradient(60% 80% at 82% 78%, rgba(162, 146, 196, 0.32) 0%, rgba(162, 146, 196, 0) 70%),
+    rgba(52, 60, 78, 0.92);
+}
+html.evening .skel-block::after {
+  background: linear-gradient(100deg, rgba(233, 227, 211, 0) 20%, rgba(233, 227, 211, 0.14) 50%, rgba(233, 227, 211, 0) 80%);
+}
+html.evening .skel-info { background: rgba(43, 49, 64, 0.96); }
+html.evening .skel-line { background: rgba(159, 194, 224, 0.2); }
+html.evening .skel-line--name { background: rgba(159, 194, 224, 0.28); }
+html.evening .skel-line--chip { background: rgba(162, 146, 196, 0.32); }
+/* the gentle "finding more nearby" version: quieter, slower */
+.deck-skel.is-more .skel-trio { opacity: 0.72; }
+.deck-skel.is-more .skel-block::after { animation-duration: 3.2s; }
+@media (prefers-reduced-motion: reduce) {
+  .skel-block::after { animation: none; display: none; }
+}
+
+/* ---------- 5. Landing: one composed screen ----------
+   The block fills the viewport (hero up top, the painted bowl centred in the
+   quiet band, the button + quiet link sitting in the thumb zone) instead of
+   stopping two-thirds of the way down. 100svh = the visible height with the
+   browser toolbar showing, so the button is never under it. */
+.eats-room.find-landing-on .find-landing {
+  min-height: max(28rem, calc(100vh - 4rem - env(safe-area-inset-bottom, 0px)));
+  min-height: max(28rem, calc(100svh - 4rem - env(safe-area-inset-bottom, 0px)));
+}
+html:not(.no-bar) .eats-room.find-landing-on .find-landing {
+  min-height: max(28rem, calc(100vh - 8.5rem));
+  min-height: max(28rem, calc(100svh - 8.5rem));
+}
+.find-landing { padding-bottom: 0.75rem; }
+.find-still { margin: 0.5rem 0 1.2rem; }
+.find-still-art { max-height: 17rem; max-width: 84%; }
+.find-cta { padding-bottom: 0.4rem; }
+
+/* ---------- 6. Painted marks (replace emoji used as UI chrome) ---------- */
+.decision-spark { display: block; margin: 0 auto; width: 44px; height: 44px; overflow: visible; }
+.decision-spark .ds-wash { fill: rgba(205, 184, 120, 0.26); }
+.decision-spark .ds-star { fill: #cdb878; stroke: #8a7330; stroke-width: 0.8; stroke-linejoin: round; }
+.decision-spark .ds-star--s { fill: #a292c4; stroke: #6f5f9a; }
+html.evening .decision-spark .ds-wash { fill: rgba(205, 184, 120, 0.2); }
+html.evening .decision-spark .ds-star { fill: #e2cf8f; stroke: #bfa95d; }
+html.evening .decision-spark .ds-star--s { fill: #b9abdb; stroke: #8f80bb; }
+
+.deck-end-glyph { display: block; margin: 0 auto 0.2rem; width: 64px; height: 48px; font-size: 0; opacity: 1; overflow: visible; }
+.deck-end-glyph .de-wash { fill: rgba(127, 168, 201, 0.26); }
+.deck-end-glyph .de-line { fill: none; stroke: var(--pond-deep); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.deck-end-glyph .de-line--in { opacity: 0.55; }
+html.evening .deck-end-glyph .de-wash { fill: rgba(159, 194, 224, 0.16); }
+html.evening .deck-end-glyph .de-line { stroke: var(--pond-ink); }
+
+/* ---------- 7. Card meta: dots only BETWEEN items ---------- */
+.ov-it { display: inline-flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
+.ov-it > .ov-dot { flex: none; }
+.ov-it.is-ls { transform: translateX(calc(-1 * var(--slot, 0px))); }
+.ov-it.is-ls > .ov-dot { visibility: hidden; }
+
+/* ---------- 8. Smoothness: snappy taps, gentle <=250ms transitions ---------- */
+button, a, summary, label, [role="button"], .pref-chip, .seg-btn, .swipe-card {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.swipe-card { touch-action: pan-y; }
+.btn-solid, .btn-ghost, .decision-act, .end-chip { transition: transform 0.12s ease, filter 0.18s ease, color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease; }
+.btn-solid:active, .btn-ghost:active, .decision-act:active, .end-chip:active { transform: scale(0.98); }
+.btn-solid[disabled], .btn-ghost[disabled] { opacity: 0.55; cursor: default; }
+/* no rubber-band of the page while the deck is on stage; sheets don't chain */
+html:has(.eats-room.deck-swiping) { overscroll-behavior-y: none; }
+html:has(.sheet-backdrop:not([hidden])) { overscroll-behavior: none; }
+.deck-wrap, .deck, .deck-end, .decision, .shortlist { overscroll-behavior: contain; }
+.find-landing.is-leaving { transition-duration: 0.2s; }
+.prefs-wrap.is-washing-in { animation-duration: 0.22s; }
+.pref-group.is-step { animation-duration: 0.22s; }
+.decision-card, .deck-end-card { animation-duration: 0.25s; }
+@media (prefers-reduced-motion: reduce) {
+  .btn-solid:active, .btn-ghost:active, .decision-act:active, .end-chip:active { transform: none; }
+  .prefs-wrap.is-washing-in, .find-landing.is-leaving { animation: none; transition: none; }
+  .sheet { animation: none; }
+}
+
+/* ---------- 9. Small-text floor: nothing under 12px ---------- */
+.peek-label, .peek-dist, .pref-legend, .step-where { font-size: max(0.75rem, 12px); }
+
+/* prefs: wrap fills the rest of the screen (min-height set in eats.js) so the
+   dock rests on the bottom edge; with the tab bar hidden the room's bottom
+   padding is cancelled so the frost is flush with the screen edge. */
+.prefs-wrap { display: flex; flex-direction: column; }
+.prefs-wrap .prefs-form { flex: 1 1 auto; }
+.prefs-dock { margin-top: auto; }
+html.no-bar .prefs-wrap { margin-bottom: calc(-2.5rem - env(safe-area-inset-bottom, 0px)); }
+html:not(.no-bar) .prefs-dock { bottom: calc(5.9rem + env(safe-area-inset-bottom, 0px)); }
+
+/* ---------- 10. Decision screen: status pills share one centred line ---------- */
+.decision-chip, .v-demo-tag.decision-sample {
+  vertical-align: middle;
+  margin: 0 0.25rem 1.3rem;
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+html.evening .decision-spark .ds-wash { fill: rgba(226, 207, 143, 0.3); }
+
+/* ---------- 9b. Small-text floor, part 2: every label that could be read is >= 12px ---------- */
+.results-back, .decision-eyebrow, .field-label, .eats-room .room-label,
+.trio-by, .trio-score, .slc-open, .slc-sample, .v-demo-tag, .ov-badge,
+.ov-reason, .ov-reason-text, .trio-tag { font-size: 0.75rem; }
+.trio-tag { padding: 0.2rem 0.55rem; letter-spacing: 0.1em; }
+.pref-chip { min-width: 44px; }
+
+.pref-opt { opacity: 1; }   /* was .75: 3.3:1 on paper */
+
+/* the swipe card is only an invisible drag surface: in the evening theme it still
+   drew a faint frame (inset highlight + shadow) behind the scatter */
+html.evening .swipe-card { box-shadow: none; }
+.trio-review { padding-top: 1.95rem; }   /* the 12px tag no longer collides with the quote */
+
+@media (max-width: 400px) { .eats-room .room-label { letter-spacing: 0.26em; } }   /* keeps the eyebrow clear of the Settings pill at 375px */
