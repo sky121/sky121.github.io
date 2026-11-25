@@ -47,8 +47,9 @@
     </div>
 
     <!-- Settings pill: a real gear + an always-visible label (the bare glyph
-         used to read as a brightness toggle). Also holds Back to the Lab + key setup. -->
-    <button class="corner-gear" id="settings-open" type="button" aria-haspopup="dialog" aria-label="Settings &mdash; live data &amp; menu">
+         used to read as a brightness toggle). Opens the "Google connection"
+         sheet (key status, replace / remove) + Back to the Lab. -->
+    <button class="corner-gear" id="settings-open" type="button" aria-haspopup="dialog" aria-label="Settings &mdash; Google connection &amp; menu">
       <svg class="corner-gear-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"></circle>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -63,8 +64,9 @@
       <!-- ===================== FEED PANEL =====================
            The app's front door: a full-bleed vertical snap feed of
            watercolor food art, one post per viewport. Every post is
-           anchored to a real place in the current pool (demo or live);
-           the creators and follower counts are sample data and say so.
+           anchored to a real place in the current pool; the creators and
+           follower counts are placeholders and say so (beta keeps this
+           panel sealed).
            There is no video here and never was — the art is painted
            procedurally to a canvas and only breathes (a drifting wash,
            a slow push, faint steam), and holds perfectly still under
@@ -120,7 +122,6 @@
           <div class="find-hero">
             <h2 class="find-hero-title" id="find-hero-title">Where to, tonight?</h2>
             <p class="find-hero-sub" id="find-hero-sub">A quiet nudge toward dinner.</p>
-            <p class="find-demo-note" id="find-demo-note" hidden><span class="v-demo-tag">Sample</span> Demo mode &mdash; the places shown are samples, not real restaurants.</p>
           </div>
 
           <!-- decorative painted still life (foodArt, deterministic, no data) —
@@ -607,57 +608,29 @@
       >
         <div class="sheet-grip" aria-hidden="true"></div>
         <header class="sheet-head">
-          <h2 class="sheet-title" id="settings-title">Use live data</h2>
+          <h2 class="sheet-title" id="settings-title">Google connection</h2>
           <button class="sheet-close" id="settings-close" type="button" aria-label="Close">&times;</button>
         </header>
 
         <div class="sheet-body">
           <p class="settings-mode" id="settings-mode" role="status" aria-live="polite"></p>
 
-          <p class="settings-liveon" id="settings-liveon" hidden>
-            <strong>Live restaurants are on.</strong> Tableau looks up real places near you
-            &mdash; there is nothing to set up.
-          </p>
-
-          <button type="button" class="settings-own-toggle" id="own-key-toggle" aria-expanded="false" aria-controls="own-key-body" hidden>
-            Use my own Google Maps key instead
-          </button>
-
-          <div class="settings-own" id="own-key-body">
-          <p class="settings-intro">
-            Tableau runs on <strong>sample data</strong> by default &mdash; nothing to set up.
-            Add your own <strong>Google Maps API key</strong> and the deck fills with real
-            restaurants near you, with their real hours and photos.
-          </p>
-
-          <p class="settings-privacy">
-            Your key is written to <strong>this browser&rsquo;s localStorage</strong> and nowhere else.
-            It is never sent to this site&rsquo;s author, never logged, and never leaves your device
-            except in your own requests to Google. &ldquo;<span id="key-clear-name">Use sample data</span>&rdquo; deletes it.
-          </p>
-
-          <details class="settings-steps">
-            <summary>How to get a key &mdash; about two minutes</summary>
-            <ol class="settings-guide">
-              <li>In the <strong>Google Cloud Console</strong>, create (or pick) a project.</li>
-              <li>Attach a <strong>billing account</strong> to it (Places needs one, even inside the free monthly credit).</li>
-              <li>Enable the <strong>Maps JavaScript API</strong> and <strong>Places API (New)</strong> &mdash; and the <strong>Geocoding API</strong> if you want to type a place instead of using your location.</li>
-              <li>Create an <strong>API key</strong> &mdash; it looks like <code>AIza&hellip;</code>, 39 characters.</li>
-              <li>Restrict it to HTTP referrers: <code>https://sky121.github.io/*</code></li>
-            </ol>
-          </details>
-
-          <label class="field">
-            <span class="field-label">Google Maps API key</span>
-            <input type="password" id="key-input" class="field-input" placeholder="AIza..." autocomplete="off" spellcheck="false" />
-          </label>
-
-          <p class="settings-msg" id="settings-msg" role="status" aria-live="polite"></p>
-
-          <div class="sheet-actions">
-            <button type="button" class="btn-ghost" id="key-clear">Use sample data</button>
-            <button type="button" class="btn-solid" id="key-save">Save key</button>
+          <div class="settings-conn" id="settings-conn">
+            <p class="settings-conn-line" id="settings-conn-line"></p>
+            <p class="settings-conn-sub" id="settings-conn-sub"></p>
           </div>
+
+          <div class="sheet-actions" id="settings-actions">
+            <button type="button" class="btn-ghost" id="key-remove">Remove key</button>
+            <button type="button" class="btn-solid" id="key-replace">Replace key</button>
+          </div>
+
+          <div class="settings-confirm" id="settings-confirm" role="group" aria-labelledby="settings-confirm-q" hidden>
+            <p class="settings-confirm-q" id="settings-confirm-q">Remove your key from this browser? Tableau will ask for a key again before it shows any places.</p>
+            <div class="sheet-actions">
+              <button type="button" class="btn-ghost" id="key-remove-no">Keep it</button>
+              <button type="button" class="btn-solid btn-danger" id="key-remove-yes">Yes, remove</button>
+            </div>
           </div>
 
           <section class="privacy-note" id="privacy-note" tabindex="-1" aria-labelledby="privacy-title">
@@ -665,26 +638,104 @@
             <p class="privacy-text">
               Tableau has no accounts and no analytics or tracking of its own, and nothing you do here
               is sent to this site&rsquo;s author. Your <span class="v-only">ratings, </span>shortlist and preferences live only in
-              this browser&rsquo;s storage, on this device. When live results are on, tapping Find asks
-              your browser for your location and sends it &mdash; along with any place you type into
-              &ldquo;search a specific location&rdquo; &mdash; to Google, only to fetch nearby
-              restaurants; Google&rsquo;s own terms and privacy policy apply to that, and to the places
-              and photos it returns. Loading the page&rsquo;s fonts, and Google Maps when live results
-              are on, contacts Google&rsquo;s servers like any website that uses them. Sample mode never
-              asks for your location. The site is hosted on GitHub Pages, which may keep ordinary
-              server logs.
+              this browser&rsquo;s storage, on this device &mdash; and so does your Google key, which is never
+              sent to this site&rsquo;s author. Tapping Find asks your browser for your location and
+              sends it &mdash; along with any place you type into &ldquo;search a specific
+              location&rdquo; &mdash; to Google, only to fetch nearby restaurants; Google&rsquo;s own
+              terms and privacy policy apply to that, and to the places and photos it returns. Loading
+              the page&rsquo;s fonts and Google Maps contacts Google&rsquo;s servers like any website
+              that uses them. The site is hosted on GitHub Pages, which may keep ordinary server logs.
             </p>
           </section>
 
           <p class="settings-install">
             <svg class="settings-install-ic" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="7" y="3" width="10" height="18" rx="2.5"></rect><path d="M11 18h2"></path></svg> Tip: <strong>add Tableau to your home screen</strong> (browser menu &rarr; Add to Home Screen)
-            for the full-screen app feel &mdash; sample data even works offline.
+            for the full-screen app feel.
           </p>
 
           <p class="settings-backlink"><a href="lab.html">&larr; Back to the Lab</a></p>
         </div>
       </div>
     </div>
+
+    <!-- ===================== KEY GATE =====================
+         Full-screen "Connect Google" screen. Shown on first run and any time
+         there is no working key; everything else on the page is sealed
+         (inert + hidden) while it is up. The "how to get a key" guide lives
+         here once and is reused for first connect, Replace key and Fix key. -->
+    <section class="key-gate" id="key-gate" aria-labelledby="gate-title" hidden>
+      <div class="gate-scroll" id="gate-scroll">
+        <div class="gate-card">
+          <p class="gate-eyebrow" id="gate-eyebrow">One quick step</p>
+          <h2 class="gate-title" id="gate-title" tabindex="-1">Connect Google to start</h2>
+          <p class="gate-lead" id="gate-lead">
+            Tableau helps you decide where to eat. It shows real restaurants near you, one card at a time,
+            until you land on one.
+          </p>
+          <p class="gate-why">
+            To look places up it uses your own Google Maps key. <strong>The key stays in this browser</strong>
+            &mdash; it is never sent to the person who made Tableau, only to Google when you search.
+          </p>
+
+          <p class="gate-note" id="gate-note" role="alert" hidden></p>
+
+          <div class="gate-guide">
+            <h3 class="gate-guide-title" id="gate-guide-title">Get a key in about two minutes</h3>
+            <ol class="gate-steps" aria-labelledby="gate-guide-title">
+              <li>
+                <span class="gate-step-h">Open Google Cloud.</span>
+                Go to the
+                <a href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank" rel="noopener noreferrer">Credentials page<span class="visually-hidden"> (opens in a new tab)</span></a>,
+                pick or create a project, and make sure <strong>billing is attached</strong>
+                (Google asks for it, even though light use stays inside its free monthly credit).
+              </li>
+              <li>
+                <span class="gate-step-h">Create a key and turn on two APIs.</span>
+                Choose <em>Create credentials &rarr; API key</em>, then enable exactly
+                <strong>Maps JavaScript API</strong> and <strong>Places API (New)</strong>.
+                The Geocoding API is optional &mdash; you don&rsquo;t need it.
+              </li>
+              <li>
+                <span class="gate-step-h">Lock it to this site.</span>
+                Under <em>Application restrictions</em> pick <em>Websites</em> and add
+                <code class="gate-origin" id="gate-origin">/*</code>
+              </li>
+            </ol>
+          </div>
+
+          <form class="gate-form" id="gate-form" novalidate autocomplete="off">
+            <label class="gate-label" for="gate-key">Your Google Maps API key</label>
+            <input
+              type="password"
+              id="gate-key"
+              name="tableau-maps-key"
+              class="gate-input"
+              placeholder="AIza&hellip;"
+              autocomplete="off"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
+              enterkeyhint="go"
+              data-lpignore="true"
+              data-1p-ignore
+              aria-describedby="gate-error gate-status"
+            />
+            <div class="gate-tools">
+              <button type="button" class="gate-tool" id="gate-paste" hidden>Paste</button>
+              <button type="button" class="gate-tool" id="gate-toggle" aria-controls="gate-key" aria-pressed="false">Show key</button>
+            </div>
+
+            <p class="gate-error" id="gate-error" role="alert"></p>
+            <p class="gate-status" id="gate-status" role="status" aria-live="polite"></p>
+
+            <button type="submit" class="gate-connect" id="gate-connect">Connect</button>
+            <button type="button" class="gate-cancel" id="gate-cancel" hidden>Not now</button>
+          </form>
+
+          <p class="gate-foot"><a href="lab.html">&larr; Back to the Lab</a></p>
+        </div>
+      </div>
+    </section>
 
     <!-- ===================== FIRST-RUN SHEET ===================== -->
     <div class="sheet-backdrop" id="welcome-backdrop" hidden>

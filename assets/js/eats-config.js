@@ -4,10 +4,12 @@
 
    beta
      true  = first public beta: only Find + Visited are shown. The Feed,
-             Friends and Popular tabs are demo/sample-data surfaces; they are
+             Friends and Popular tabs are placeholder-data surfaces; they are
              removed from the tab bar (and the accessibility tree), the app
              opens on Find, and nothing links into them. Fully reversible.
-     false = the full five-tab app (Feed opens first).
+     false = the full five-tab app (Feed opens first). NOTE: that brings back
+             the placeholder Feed / Friends / Popular data, which conflicts with
+             the "no demo, no sample data" rule - keep true until real data exists.
 
    visited
      false = the Visited tab is hidden everywhere (tab, panel, "rate this
@@ -23,9 +25,10 @@
    mapsKey
      A site-wide Google Maps key so visitors get live restaurants without
      making their own. '' (the default, and what must be committed until you
-     have one) means demo mode, exactly as before.
+     have one) means every visitor sees the "Connect Google" key gate first
+     (there is no demo mode).
      Resolution order at runtime: a key the visitor saved in settings wins,
-     else this one, else demo mode.
+     else this one, else the key gate.
 
    sweepRadiusM / sweepMaxCalls / sweepRefillAt   (live mode only)
      The "see every restaurant nearby" sweep. Google's Nearby Search returns
