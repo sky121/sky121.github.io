@@ -47,6 +47,76 @@
 
 ## Feature map (what's built)
 
+### UI/UX polish pass (2026-11-24) — focus, sticky dock, skeletons, "Keep looking"
+Found by driving the live flow (Playwright, 390x844 + 375x667 @2x, light + evening,
+demo + stubbed live Maps). No identity changes, no new features; `eats.html`,
+`eats.css` (new block appended at the END of the file, "UI/UX POLISH PASS"),
+`eats.js`, this doc.
+- **Focus ring.** Screen changes move focus to a heading/legend/card
+  (`tabindex=-1`); when nothing was focused Chrome treats that as keyboard focus and
+  drew a heavy black box around "What are you in the mood for?". A tiny modality
+  tracker in `eats.js` toggles `<html class="is-kb">` on navigation keys (removed on
+  any pointer/touch). CSS: no ring for programmatic focus without `is-kb`; with it,
+  and for every control, one ring: 2px `--pond-deep` (evening `--pond-ink`), 3-4px
+  offset (a global `:where(...)` catch-all so no control falls back to the UA ring).
+- **Preferences dock.** Back / "N of 9" / Continue + Start swiping / Surprise me are
+  one sticky `.prefs-dock` (frosted paper, soft top fade, safe-area padding). The wrap
+  is given the rest of the viewport as `min-height` (`fitPrefsDock()` in `find`) so the
+  dock rests on the bottom edge even when the step is short, and flush with the page
+  bottom (the room's bottom padding is cancelled with the tab bar hidden). Measured:
+  Start/Surprise/Continue bottoms <= viewport at 375x667 and 390x844 on steps 1/5/9
+  and when scrolled to the bottom. With the tab bar showing (`beta:false`) the dock
+  sits just above it (not the shipped config; a thin gap remains).
+- **Settings buttons.** "Save & check key" -> "Save key" (busy label "Checking...");
+  both bottom buttons are `nowrap`, 48px, equal width. Validation is unchanged.
+- **No emoji chrome.** The decision screen's sparkle emoji and the end-of-deck
+  plate/fork emoji, and the install-tip phone emoji, are inline `aria-hidden` SVG in
+  the palette (gold + wisteria sparkle; pond line-art place setting) with evening
+  variants. The text glyph `✦` (Surprise me) stays. Feed/Friends/Popular still carry
+  a few glyphs, but those surfaces are hidden under `beta`.
+- **End-of-deck copy + "Keep looking".** Budget stop reads "You've seen N places. I
+  stopped searching here to keep things light — there may be more farther out." (no
+  "lookups"). A primary **Keep looking** button appears ONLY at a budget stop, and on
+  a user tap grants the sweeper one more batch of `sweepMaxCalls` calls
+  (`sweeper.grant()` -> `find.grantMore()`), shows the gentle "finding more" skeleton
+  and resumes the deck by itself (`insertMore`). Up to **3 extensions** (4x the base
+  budget, e.g. 30 -> 120 calls at most); after that the button is gone and the copy
+  says "I've searched about as far as I can for now — there may be more farther out."
+  Nothing is ever granted automatically. Completed sweeps keep "That's everywhere
+  within X mi."; stalled/error copy was reworded too. Exactly one primary on the end
+  card: Keep looking, else Compare shortlist, else Start over. Settings/key-setup
+  errors still say "Places API (New)" etc. on purpose: they are instructions for the
+  person setting up their own key.
+- **Skeletons.** First search: `skeletonEl()` draws the real card's scatter (two
+  photo tiles, review scrap, info scrap with name/meta/chip bars) as watercolor
+  washes with a slow paper-light sweep (transform-only), a visible caption, a
+  visually-hidden `role=status` line, `aria-busy` on the deck, and an `announce()`.
+  "Finding more nearby" reuses it at 72% opacity and a slower sweep (no role, the
+  existing announce speaks). Fully static under `prefers-reduced-motion`.
+- **Landing.** Landing fills the viewport (`100svh`): hero up top, bowl enlarged and
+  centred in the band, CTA + "search a specific location" in the thumb zone. Measured
+  at 375x667: CTA 498-558px and the quiet link ends at 609px of 667 (was 426-486); at
+  390x844 the bowl grew 184 -> 272px and the CTA moved 539 -> 675px, so the dead band
+  under the link shrank from ~25% to ~7% of the screen.
+- **Card meta.** Each separator dot now belongs to the item AFTER it (`.ov-it`), and
+  `tidyMeta()` hides the dot of any item that wraps onto the start of a line (layout
+  neutral: transform shift, no re-flow). No more "Mexican Restaurant ·".
+- **Smoothness.** Screen transitions are <= 250ms (prefs wash 0.22s, step 0.22s,
+  decision/end card 0.25s, sheet 0.25s), none under reduced motion;
+  `touch-action: manipulation` + no tap highlight on controls; sheets and the deck
+  use `overscroll-behavior: contain`/`none`; drag caches the card width on
+  pointerdown (no layout read per frame). Press feedback on buttons (scale .98).
+- **Other fixes.** Evening theme drew a faint frame around the invisible drag
+  surface (box-shadow removed); decision "Sample" + status pills share one centred
+  line; `$` chip meets 44px width; all labels that were <12px (Sample tag, trio tag,
+  status badge, reasons, eyebrow, field label, peek strip, room label) are now 12px;
+  `(optional)` no longer at .75 opacity (3.3:1 -> AA); review scrap clears its tag.
+
+Left alone: shared `skip-link` is 41.6px tall (only visible on focus, lives in
+`exhibit-page.css`); at 320px wide the review scrap shows one line (scatter
+fitting, pre-existing); Feed/Friends/Popular glyphs (hidden under beta).
+
+
 ### QA loop, iteration 1 (2026-11-24) — badge hidden by Settings, contrast, lost error
 Found by driving the published site (Playwright, 390x844 + 375x667 @2x):
 - **Shortlist badge sat under the Settings pill.** The deck-bar reserved 3.2rem

@@ -40,6 +40,22 @@
   var prefersReducedMotion = false;
   try { prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
 
+  /* Input modality: <html class="is-kb"> while the last thing the person did
+     was press a navigation key, removed on any pointer/touch. CSS uses it so
+     headings, panels and cards that receive PROGRAMMATIC focus (screen
+     changes) never draw a ring for touch/mouse users, while real keyboard
+     users still get the brand-coloured ring. */
+  (function trackModality() {
+    var root = document.documentElement;
+    var KB = { Tab: 1, ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, Enter: 1, ' ': 1, Home: 1, End: 1, PageUp: 1, PageDown: 1, Escape: 1 };
+    document.addEventListener('keydown', function (e) {
+      if (KB[e.key] && !e.metaKey && !e.ctrlKey && !e.altKey) root.classList.add('is-kb');
+    }, true);
+    ['pointerdown', 'mousedown', 'touchstart'].forEach(function (t) {
+      document.addEventListener(t, function () { root.classList.remove('is-kb'); }, true);
+    });
+  })();
+
   /* ------------------------------------------------------------------ *
    * SITE CONFIG (assets/js/eats-config.js) — BETA flag + shipped Maps key.
    * BETA: only Find + Visited are real; Feed / Friends / Popular are
@@ -3130,11 +3146,33 @@
       if (prefsWrap) prefsWrap.hidden = false;
       prefs.render();
       syncHeaderChrome();
+      fitPrefsDock();
       if (focusFirst) {
         var title = prefsWrap && prefsWrap.querySelector('.prefs-title');
         if (title) { title.setAttribute('tabindex', '-1'); title.focus(); }
       }
     }
+    /* Preferences: the wizard's action dock is sticky at the bottom. Short
+       content would leave it floating mid-screen, so the wrap is given the
+       rest of the viewport as its minimum height and the dock rests on the
+       bottom edge (CSS: .prefs-dock sits at margin-top:auto). */
+    var dockQueued = false;
+    function fitPrefsDock() {
+      if (!prefsWrap || prefsWrap.hidden) return;
+      prefsWrap.style.minHeight = '';
+      var top = prefsWrap.getBoundingClientRect().top + (window.pageYOffset || 0);
+      var h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+      prefsWrap.style.minHeight = Math.max(0, Math.round(h - top)) + 'px';
+    }
+    function queueFitDock() {
+      if (dockQueued) return;
+      dockQueued = true;
+      window.requestAnimationFrame(function () { dockQueued = false; fitPrefsDock(); });
+    }
+    window.addEventListener('resize', queueFitDock);
+    window.addEventListener('orientationchange', queueFitDock);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', queueFitDock);
+
     function showDeck() {
       hideAll();
       surprisePending = false;
@@ -3426,6 +3464,16 @@
         state.loadingMore = false; state.hasMore = false; if (cb) cb([]);
       }
     }
+    /* "Keep looking" (end of deck, budget stop): grant the sweep one more
+       batch of calls. Only ever called from a user tap. */
+    function grantMore() {
+      var sw = state.sweeper;
+      if (!sw || typeof sw.grant !== 'function' || state.loadingMore) return false;
+      if (!sw.grant()) return false;
+      sweepNoMatch = 0;
+      hideLiveNote();
+      return true;
+    }
     function hasFarther() {
       if (state.sweeper) return !!state.sweeper.info().canExtend;
       return !!(store.getKey() && state.hasMore);
@@ -3538,6 +3586,7 @@
       hideLiveNote: hideLiveNote,
       searchFarther: searchFarther,
       hasFarther: hasFarther,
+      grantMore: grantMore,
       refill: refill,
       sweepInfo: sweepInfo,
       sweepOpen: sweepOpen,
@@ -4116,6 +4165,25 @@
       var k = have > 0 && need > have ? Math.max(0.7, have / need) : 1;
       trio.style.setProperty('--fit', k.toFixed(3));
     }
+    /* Hide the separator dot of any meta item that wrapped onto the start of
+       a line (see buildCard). Layout-neutral: the item is shifted back by the
+       dot's slot with a transform, so hiding it can never re-flow the row.
+       Runs once per card render and on resize/font load — never per frame. */
+    function tidyMeta(card) {
+      var meta = card && card.querySelector('.ov-meta');
+      if (!meta) return;
+      var its = meta.querySelectorAll('.ov-it');
+      var lefts = [], i;
+      for (i = 0; i < its.length; i++) lefts.push(its[i].offsetLeft);
+      for (i = 0; i < its.length; i++) {
+        var ls = i > 0 && its[i].firstChild.className === 'ov-dot' && lefts[i] <= lefts[i - 1];
+        its[i].classList.toggle('is-ls', ls);
+        if (ls) its[i].style.setProperty('--slot', (its[i].children[1].offsetLeft - its[i].firstChild.offsetLeft) + 'px');
+      }
+    }
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () { var tc = document.querySelector('#deck .swipe-card[data-depth="0"]'); if (tc) tidyMeta(tc); });
+    }
     var safeProbe = null;
     function safeBottom() {   // env(safe-area-inset-bottom) in px (no bar to measure)
       try {
@@ -4152,6 +4220,7 @@
       wrap.style.setProperty('--deck-avail', avail + 'px');
       wrap.classList.add('deck-fit');
       fitTrio();
+      if (topCard) tidyMeta(topCard);
     }
     function queueLayout() {
       if (layoutQueued) return;
@@ -4166,6 +4235,7 @@
       var onDeck = mode === 'deck';
       fitMode = onDeck;
       if (deckEl) deckEl.style.display = onDeck ? '' : 'none';
+      if (deckEl && !onDeck) deckEl.removeAttribute('aria-busy');
       if (hintEl) hintEl.style.display = onDeck ? '' : 'none';
       if (controlsEl) controlsEl.style.display = onDeck ? '' : 'none';
       if (!onDeck && peekEl) peekEl.hidden = true; // renderPeek re-shows on deck
@@ -4182,11 +4252,37 @@
       setMode('deck');
       clear(deckEl);
       if (peekEl) peekEl.hidden = true;
-      var l = el('div', 'deck-loading');
-      l.appendChild(el('span', 'social-spinner', ''));
-      l.appendChild(el('span', null, 'Finding places near you…'));
-      deckEl.appendChild(l);
+      deckEl.appendChild(skeletonEl('Finding places near you…', false));
+      deckEl.setAttribute('aria-busy', 'true');
       setControlsEnabled(false);
+      announce('Finding places near you.');
+    }
+
+    /* Skeleton placeholder in the deck stage: the same scatter as a real card
+       (two photo tiles, a review scrap, the info scrap) as soft watercolor
+       washes. Static under prefers-reduced-motion (CSS). The visually-hidden
+       line is the accessible status text. `gentle` = the quieter "finding
+       more" version at the end of a sweep. */
+    function skeletonEl(text, gentle) {
+      var sk = el('div', 'deck-loading deck-skel' + (gentle ? ' is-more' : ''));
+      if (!gentle) sk.setAttribute('role', 'status');
+      var say = el('span', 'visually-hidden', text);
+      sk.appendChild(say);
+      var art = el('div', 'skel-trio');
+      art.setAttribute('aria-hidden', 'true');
+      art.appendChild(el('span', 'skel-block skel-a'));
+      art.appendChild(el('span', 'skel-block skel-b'));
+      art.appendChild(el('span', 'skel-block skel-c'));
+      var info = el('span', 'skel-block skel-info');
+      info.appendChild(el('span', 'skel-line skel-line--name'));
+      info.appendChild(el('span', 'skel-line skel-line--meta'));
+      info.appendChild(el('span', 'skel-line skel-line--chip'));
+      art.appendChild(info);
+      sk.appendChild(art);
+      var cap = el('p', 'skel-cap', text);
+      cap.setAttribute('aria-hidden', 'true');
+      sk.appendChild(cap);
+      return sk;
     }
 
     function setControlsEnabled(on) {
@@ -4282,10 +4378,8 @@
       setMode('deck');
       clear(deckEl);
       if (peekEl) peekEl.hidden = true;
-      var l = el('div', 'deck-loading is-more');
-      l.appendChild(el('span', 'social-spinner', ''));
-      l.appendChild(el('span', null, 'Finding more nearby…'));
-      deckEl.appendChild(l);
+      deckEl.appendChild(skeletonEl('Finding more places nearby…', true));
+      deckEl.setAttribute('aria-busy', 'true');
       setControlsEnabled(false);
       announce('Finding more places nearby.');
     }
@@ -4303,6 +4397,7 @@
        a plain fade under prefers-reduced-motion). */
     function renderStack(deal) {
       clear(deckEl);
+      deckEl.removeAttribute('aria-busy');
       for (var d = 2; d >= 0; d--) {
         var i = idx + d;
         if (i >= queue.length) continue;
@@ -4319,6 +4414,7 @@
       if (topCard) prefetchUpcoming();
       renderPeek(deal);
       layout();
+      if (topCard) tidyMeta(topCard);
     }
 
     function onDealEnd(e) {
@@ -4466,31 +4562,37 @@
       var ov = el('div', 'trio-info');
       ov.appendChild(el('h3', 'ov-name', r.name));
       var meta = el('div', 'ov-meta');
+      // Items are separated by a dot that belongs to the item AFTER it
+      // (.ov-it = dot + content), so a dot can never be stranded at the end
+      // of a line; tidyMeta() hides the dot of any item that wraps to the
+      // start of a line. Separators therefore only ever sit between items.
+      function metaItem(child) {
+        var w = el('span', 'ov-it');
+        if (meta.querySelector('.ov-it')) {
+          var d = el('span', 'ov-dot', '·');
+          d.setAttribute('aria-hidden', 'true');
+          w.appendChild(d);
+        }
+        w.appendChild(child);
+        meta.appendChild(w);
+      }
       if (r.rating) {
         var rt = el('span', 'ov-rating');
         rt.appendChild(el('span', 'ov-star', '★ '));
         rt.appendChild(document.createTextNode(fmtScore(r.rating * 20)));
         if (r.reviews) rt.appendChild(document.createTextNode(' (' + r.reviews.toLocaleString() + ')'));
-        meta.appendChild(rt);
+        metaItem(rt);
       }
-      if (r.price) {
-        meta.appendChild(el('span', 'ov-dot', '·'));
-        meta.appendChild(el('span', 'ov-price', priceStr(r.price)));
-      }
-      if (r.type) {
-        meta.appendChild(el('span', 'ov-dot', '·'));
-        meta.appendChild(el('span', 'ov-cuisine', r.type));
-      }
+      if (r.price) metaItem(el('span', 'ov-price', priceStr(r.price)));
+      if (r.type) metaItem(el('span', 'ov-cuisine', r.type));
       if (r.distance != null) {
         // "away" dropped here — the travel chip right after says it better.
-        // dist · travel live in one non-wrapping group so a narrow screen
-        // never strands the separator dot at the end of a line.
-        meta.appendChild(el('span', 'ov-dot', '·'));
+        // dist · travel live in one non-wrapping group.
         var dg = el('span', 'ov-distgroup');
         dg.appendChild(el('span', 'ov-dist', fmtDist(r.distance)));
         dg.appendChild(el('span', 'ov-dot', '·'));
         dg.appendChild(el('span', 'ov-travel', fmtTravel(r.distance)));
-        meta.appendChild(dg);
+        metaItem(dg);
       }
       var chip = openChipEl(r, 'ov-badge');
       if (chip) meta.appendChild(chip);
@@ -4626,14 +4728,14 @@
 
     function attachDrag(card) {
       var startX = 0, startY = 0, dx = 0, dy = 0, dragging = false, moved = false, pid = null;
-      var raf = null;
+      var raf = null, cardW = 320;   // card width cached on pointerdown: no layout read per frame
       var THRESH = 0.28;
       var yesStamp = card.querySelector('.stamp-yes');
       var noStamp = card.querySelector('.stamp-no');
 
       function paint() {
         raf = null;
-        var w = card.offsetWidth || 320;
+        var w = cardW;
         var rot = (dx / w) * 16;
         card.style.transform = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + rot + 'deg)';
         var p = Math.max(-1, Math.min(1, dx / (w * THRESH)));
@@ -4646,6 +4748,7 @@
         if (animating) return;
         if (e.button != null && e.button !== 0) return;
         dragging = true; moved = false;
+        cardW = card.offsetWidth || 320;
         startX = e.clientX; startY = e.clientY; dx = 0; dy = 0;
         pid = e.pointerId;
         card.classList.add('is-dragging');
@@ -4664,7 +4767,7 @@
         dragging = false;
         card.classList.remove('is-dragging');
         try { card.releasePointerCapture(pid); } catch (err) {}
-        var w = card.offsetWidth || 320;
+        var w = cardW;
         var commit = Math.abs(dx) > w * THRESH;
         if (!moved) { cycleSegment(card); resetCard(); return; }
         if (commit) fling(dx > 0 ? 'yes' : 'no');
@@ -5633,18 +5736,22 @@
       var sub = $('deck-end-sub');
       var sw = sweepOn ? find.sweepInfo() : null;   // live sweep: honest copy about how far the search got
       var cnt = queue.length + ' place' + (queue.length === 1 ? '' : 's');
-      var lim = sw ? (sw.calls + ' lookup' + (sw.calls === 1 ? '' : 's')) : '';
+      // "Keep looking" is offered only when the stop was the search budget
+      // and the person may still grant another batch (a few times at most).
+      var canMore = !!(sw && sw.state === 'budget' && sw.canGrant);
+      var STOP_WHY = 'I stopped searching here to keep things light — there may be more farther out.';
+      var STOP_LAST = 'I’ve searched about as far as I can for now — there may be more farther out.';
       if (emptyFromStart) {
         if (title) title.textContent = 'Nothing matched those filters';
         if (sub) sub.textContent = !sw ? 'Try widening your preferences or searching farther.'
           : sw.state === 'complete' ? 'Nothing within ' + fmtDist(sw.radius / 1609.344) + ' fits. Try widening your preferences.'
           : sw.state === 'error' ? sw.err + ' Try widening your preferences.'
-          : 'The search stopped after ' + lim + ' without a match, so there may be more farther out. Try widening your preferences.';
+          : (canMore ? 'Nothing fit yet. ' + STOP_WHY : 'Nothing fit within what I searched. ' + STOP_LAST) + ' You can also widen your preferences.';
       } else if (shortlist.length) {
         if (title) title.textContent = 'Down to your shortlist';
         if (sub) sub.textContent = (!sw || sw.state === 'complete' ? 'You’ve seen everything nearby — ' : 'You’ve seen ' + cnt + ' — ') +
           shortlist.length + ' place' + (shortlist.length === 1 ? ' is' : 's are') + ' waiting on your shortlist.' +
-          (sw && sw.state !== 'complete' ? ' The search stopped early, so there may be more farther out.' : '');
+          (sw && sw.state !== 'complete' && sw.state !== 'error' ? ' ' + (canMore ? STOP_WHY : STOP_LAST) : '');
       } else if (sw && sw.state === 'complete') {
         if (title) title.textContent = 'That’s everywhere within ' + fmtDist(sw.radius / 1609.344).replace(' ', '\u00a0');
         if (sub) sub.textContent = 'You’ve seen all ' + cnt + ' that matched.';
@@ -5654,19 +5761,25 @@
       } else if (sw) {
         if (title) title.textContent = sw.state === 'budget' ? 'That’s as far as I searched' : 'The search stopped here';
         if (sub) sub.textContent = 'You’ve seen ' + cnt + '. ' + (sw.state === 'budget'
-          ? 'The search stopped at its limit of ' + lim + ', so there may be more places farther out.'
-          : 'The search stopped after ' + lim + ' found nothing new, so there may be more farther out.');
+          ? (canMore ? STOP_WHY : STOP_LAST)
+          : 'I stopped after a stretch with nothing new — there may be more farther out.');
       } else {
         if (title) title.textContent = 'That’s everywhere nearby that matched';
         if (sub) sub.textContent = 'You’ve seen every spot within your distance cap.';
       }
       var farther = $('end-farther');
       if (farther) farther.style.display = find.hasFarther() ? '' : 'none';
+      var moreBtn = $('end-more');
+      if (moreBtn) moreBtn.style.display = canMore ? '' : 'none';
       var slBtn = $('end-shortlist');
       if (slBtn) {
         slBtn.style.display = shortlist.length ? '' : 'none';
         slBtn.textContent = 'Compare shortlist (' + shortlist.length + ')';
       }
+      // exactly one primary action: Keep looking, else the shortlist, else Start over
+      function kind(b, solid) { if (b) { b.classList.toggle('btn-solid', solid); b.classList.toggle('btn-ghost', !solid); } }
+      kind(slBtn, !canMore);
+      kind($('end-restart'), !canMore && !shortlist.length);
       announce(emptyFromStart ? 'No places matched your preferences.' : 'You have reached the end of the deck.');
       var t = $('deck-end-title');
       if (t) { t.setAttribute('tabindex', '-1'); t.focus(); }
@@ -5727,6 +5840,14 @@
       if (slPickBtn) slPickBtn.addEventListener('click', pickForMe);
       var endSl = $('end-shortlist');
       if (endSl) endSl.addEventListener('click', showShortlist);
+      // "Keep looking" at a budget stop: ONE more batch of search calls,
+      // only because the person tapped; the deck resumes by itself.
+      var endMore = $('end-more');
+      if (endMore) endMore.addEventListener('click', function () {
+        if (!find.grantMore()) { showEnd(queue.length === 0); return; }
+        showFindingMore();
+        find.refill();
+      });
       updateUndo(); updateBadge();
 
       var keep = $('decision-keep');
@@ -6231,6 +6352,7 @@
     var SAT_MIN = NEARBY_MAX - 5;
     var FIRST_RADIUS_M = 5000;      // first call + every probe: 5 km query
     var STALL_LIMIT = 5;
+    var MAX_EXTENSIONS = 3;         // user-granted extra batches of sweepMaxCalls ("Keep looking")
     var M_PER_MI = 1609.344;
 
     /* ---- cuisine-aware probing ----
@@ -6342,6 +6464,10 @@
       var R = SWEEP.radius;
       var known = {}, held = [], discs = [];
       var calls = callsUsed, state = 'open', errText = '', zeroRun = 0, estR = 150, busy = false;
+      /* The call budget starts at sweepMaxCalls. On the person's explicit
+         "Keep looking" it grows by one more batch (never automatically), up
+         to MAX_EXTENSIONS times, so spend is always bounded and chosen. */
+      var budget = SWEEP.maxCalls, extensions = 0;
       var xs, ys, ds, cov, n = 0, cursor = 0;
 
       function buildGrid() {
@@ -6397,7 +6523,7 @@
       function settleState() {
         if (!anyUncovered()) state = 'complete';
         else if (zeroRun >= STALL_LIMIT) state = 'stalled';
-        else if (calls >= SWEEP.maxCalls) state = 'budget';
+        else if (calls >= budget) state = 'budget';
       }
       /* raw Place[] -> fresh, mapped, de-duplicated list (nearest first). */
       function ingest(raw, keepAll) {
@@ -6445,7 +6571,7 @@
           if (state !== 'open' || busy) { out(null, []); return; }
           var pr = pickProbe();
           if (!pr) { state = 'complete'; out(null, []); return; }
-          if (calls >= SWEEP.maxCalls) { state = 'budget'; out(null, []); return; }
+          if (calls >= budget) { state = 'budget'; out(null, []); return; }
           calls++; busy = true;
           var center = { lat: origin.lat + pr.y / MLAT, lng: origin.lng + pr.x / MLNG };
           probeRaw(places, center, FIRST_RADIUS_M, types).then(function (raw) {
@@ -6475,9 +6601,20 @@
           settleState();
           return rel;
         },
+        /* "Keep looking": grant one more batch of calls (explicit user tap
+           only). Returns true when the budget grew and the sweep is open again. */
+        grant: function () {
+          if (state !== 'budget' || extensions >= MAX_EXTENSIONS) return false;
+          extensions++;
+          budget += SWEEP.maxCalls;
+          state = 'open';
+          settleState();
+          return state === 'open';
+        },
         info: function () {
-          return { state: state, types: types.slice(), radius: R, calls: calls, max: SWEEP.maxCalls, err: errText,
-                   discs: discs.length, canExtend: state === 'complete' && R < ceilR && calls < SWEEP.maxCalls };
+          return { state: state, types: types.slice(), radius: R, calls: calls, max: budget, err: errText,
+                   discs: discs.length, canExtend: state === 'complete' && R < ceilR && calls < budget,
+                   canGrant: state === 'budget' && extensions < MAX_EXTENSIONS, extensions: extensions };
         }
       };
       return sweeper;
@@ -9833,7 +9970,7 @@
     function busy(on) {
       if (!saveBtn) return;
       saveBtn.disabled = !!on;
-      saveBtn.textContent = on ? 'Checking with Google…' : 'Save & check key';
+      saveBtn.textContent = on ? 'Checking…' : 'Save key';
     }
 
     function open(where) {

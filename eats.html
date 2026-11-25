@@ -229,20 +229,23 @@
 
             <p class="prefs-count" id="prefs-count" role="status" aria-live="polite"></p>
 
-            <!-- one-at-a-time wizard nav: skip through steps, or bail out
-                 to the search at ANY point with the always-there buttons -->
-            <div class="prefs-stepnav">
-              <button type="button" class="btn-ghost step-back" id="step-back">&larr; Back</button>
-              <span class="step-where" id="step-where"></span>
-              <button type="button" class="btn-ghost step-next" id="step-next">Continue &rarr;</button>
-            </div>
+            <!-- one-at-a-time wizard nav + the always-there escape hatches, kept
+                 in one sticky bottom dock so the primary action is never below
+                 the fold (frosted paper, safe-area aware) -->
+            <div class="prefs-dock" id="prefs-dock">
+              <div class="prefs-stepnav">
+                <button type="button" class="btn-ghost step-back" id="step-back">&larr; Back</button>
+                <span class="step-where" id="step-where"></span>
+                <button type="button" class="btn-ghost step-next" id="step-next">Continue &rarr;</button>
+              </div>
 
-            <div class="prefs-actions">
-              <button type="submit" class="btn-solid" id="prefs-start">Start swiping</button>
-              <button type="button" class="btn-ghost btn-surprise" id="prefs-surprise">
-                <span class="surprise-spark" aria-hidden="true">&#10022;</span>
-                Surprise me
-              </button>
+              <div class="prefs-actions">
+                <button type="submit" class="btn-solid" id="prefs-start">Start swiping</button>
+                <button type="button" class="btn-ghost btn-surprise" id="prefs-surprise">
+                  <span class="surprise-spark" aria-hidden="true">&#10022;</span>
+                  Surprise me
+                </button>
+              </div>
             </div>
           </form>
         </div>
@@ -289,7 +292,11 @@
           <!-- DECISION / MATCH screen -->
           <div class="decision" id="decision" hidden role="group" aria-label="Your pick for tonight">
             <div class="decision-card">
-              <span class="decision-spark" aria-hidden="true">&#10024;</span>
+              <svg class="decision-spark" viewBox="0 0 48 48" width="44" height="44" aria-hidden="true" focusable="false">
+                <circle class="ds-wash" cx="24" cy="25" r="17"></circle>
+                <path class="ds-star" d="M24 5c1.3 8.6 4.9 12.4 14 14-9.1 1.6-12.7 5.4-14 14-1.3-8.6-4.9-12.4-14-14 9.1-1.6 12.7-5.4 14-14z"></path>
+                <path class="ds-star ds-star--s" d="M38 31c.6 3.7 2.1 5.3 6 6-3.9.7-5.4 2.3-6 6-.6-3.7-2.1-5.3-6-6 3.9-.7 5.4-2.3 6-6z"></path>
+              </svg>
               <p class="decision-eyebrow">Tonight</p>
               <h2 class="decision-name" id="decision-name"></h2>
               <p class="decision-meta" id="decision-meta"></p>
@@ -301,10 +308,17 @@
           <!-- END OF DECK screen -->
           <div class="deck-end" id="deck-end" hidden role="group" aria-label="End of the deck">
             <div class="deck-end-card">
-              <span class="deck-end-glyph" aria-hidden="true">&#127869;</span>
+              <svg class="deck-end-glyph" viewBox="0 0 64 48" width="64" height="48" aria-hidden="true" focusable="false">
+                <ellipse class="de-wash" cx="32" cy="26" rx="21" ry="15"></ellipse>
+                <circle class="de-line" cx="32" cy="24" r="12.5"></circle>
+                <circle class="de-line de-line--in" cx="32" cy="24" r="8"></circle>
+                <path class="de-line" d="M10 8v9a3 3 0 0 0 3 3v20M10 8v8M13 8v8M16 8v9a3 3 0 0 1-3 3"></path>
+                <path class="de-line" d="M54 8c-3 2.5-4 7-4 12h4v20"></path>
+              </svg>
               <h2 class="deck-end-title" id="deck-end-title">That&rsquo;s everywhere nearby that matched</h2>
               <p class="deck-end-sub" id="deck-end-sub">You&rsquo;ve seen every spot within your distance cap.</p>
               <div class="deck-end-actions">
+                <button class="btn-solid" id="end-more" type="button" style="display:none">Keep looking</button>
                 <button class="btn-solid" id="end-shortlist" type="button" style="display:none">Compare shortlist</button>
                 <button class="btn-ghost" id="end-widen" type="button">Widen preferences</button>
                 <button class="btn-ghost" id="end-farther" type="button">Search farther</button>
@@ -642,7 +656,7 @@
 
           <div class="sheet-actions">
             <button type="button" class="btn-ghost" id="key-clear">Use sample data</button>
-            <button type="button" class="btn-solid" id="key-save">Save &amp; check key</button>
+            <button type="button" class="btn-solid" id="key-save">Save key</button>
           </div>
           </div>
 
@@ -663,7 +677,7 @@
           </section>
 
           <p class="settings-install">
-            &#128242; Tip: <strong>add Tableau to your home screen</strong> (browser menu &rarr; Add to Home Screen)
+            <svg class="settings-install-ic" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="7" y="3" width="10" height="18" rx="2.5"></rect><path d="M11 18h2"></path></svg> Tip: <strong>add Tableau to your home screen</strong> (browser menu &rarr; Add to Home Screen)
             for the full-screen app feel &mdash; sample data even works offline.
           </p>
 
