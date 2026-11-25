@@ -40,15 +40,39 @@
                        (about 0.9 mi). Clamped to 300..20000. A user who
                        reaches the end can extend it in steps of this size
                        up to max(5000, sweepRadiusM).
-       sweepMaxCalls   hard cap on Nearby calls per search session (the
-                       first call included). Default 30. Clamped to 1..200.
-                       At the cap the deck ends with a plain message that
-                       the search stopped at its limit.
+       sweepMaxCalls   cap on Nearby calls per search session (the first
+                       call included). Default 6. Clamped to 1..200. At the
+                       cap the deck ends with a plain message that the
+                       search stopped at its limit, and offers "Keep
+                       looking": each tap grants ANOTHER sweepMaxCalls
+                       calls, at most 3 times. So the absolute worst case
+                       per search is 6 + 3 x 6 = 24 calls (~$0.84 at the
+                       estimated $0.035 a call), and only if the person
+                       keeps asking.
        sweepRefillAt   fetch more when fewer than this many un-swiped cards
                        remain behind the current one. Default 6. Clamped to
                        1..50. Lower = fewer calls wasted on people who stop
                        early; higher = less chance of waiting at the end.
-     Worst case spend per search session = sweepMaxCalls calls (30 default).
+     Worst case spend per search session = sweepMaxCalls x 4 calls (24 by
+     default), because "Keep looking" can grant three more batches.
+
+   detailsDelayMs
+     How long a card must stay in front before its Place Details (photos,
+     reviews, phone: one billed call) are requested. Default 600, clamped
+     0..5000. Fast swipe-throughs cost nothing; raise it to spend less.
+
+   costSearchUsd / costDetailsUsd / costPhotoUsd / dailyBudgetUsd
+     The client-side SPENDING GUARD. Tableau counts every billed Google call
+     this device makes (searches, details, photo loads; localStorage key
+     `eats-usage`, reset each local day) and prices them with these rates.
+     The rates are ESTIMATES of the site owner's own Google bill, not Google's
+     real prices (check Google's pricing page and Billing reports, which are
+     the source of truth). Defaults: search 0.035, details 0.025, photo 0.007
+     (US dollars per call). At or over dailyBudgetUsd (default 1.00) NOTHING
+     more is requested from Google on this device until tomorrow, unless the
+     person taps "Raise by $1" (stored for that day). It cannot see other
+     browsers or devices, so it does not replace a quota cap in the Cloud
+     Console (see below). The key-validation call is counted but never blocked.
 
    !!! READ BEFORE PASTING A KEY HERE !!!
    A browser Maps key is PUBLIC BY DESIGN: anyone can read it from this file
@@ -58,8 +82,11 @@
         (add http://localhost:8000/* only on a separate dev key).
      2. API restriction: Places API (New) + Maps JavaScript API, nothing else.
      3. Quotas: cap the daily requests for those APIs at a number you are
-        happy to pay for in the worst case.
-     4. Billing: set a budget with email alerts on the project.
+        happy to pay for in the worst case (APIs & Services -> Places API
+        (New) -> Quotas). This is the only limit that actually stops Google
+        from billing you.
+     4. Billing: set a budget with email alerts on the project. A budget
+        alert only emails you; it does NOT stop spending.
    Never use an unrestricted key here, and never reuse a key from a project
    that has other APIs enabled.
    ========================================================================== */
@@ -68,6 +95,11 @@ window.TABLEAU_CONFIG = {
   visited: false,
   mapsKey: '',
   sweepRadiusM: 1500,
-  sweepMaxCalls: 30,
-  sweepRefillAt: 6
+  sweepMaxCalls: 6,
+  sweepRefillAt: 6,
+  detailsDelayMs: 600,
+  costSearchUsd: 0.035,
+  costDetailsUsd: 0.025,
+  costPhotoUsd: 0.007,
+  dailyBudgetUsd: 1.00
 };
