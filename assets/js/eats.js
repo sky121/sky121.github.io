@@ -74,7 +74,12 @@
   }
   var SWEEP = {
     radius: cfgNum(CFG.sweepRadiusM, 300, 20000, 1500),
-    maxCalls: cfgNum(CFG.sweepMaxCalls, 1, 200, 30),
+    /* sweepMaxCalls: Nearby calls per search session (the first call
+       included). Default 6 (was 30: a full Find cost ~$1). "Keep looking"
+       grants another sweepMaxCalls, at most MAX_EXTENSIONS (3) times, so the
+       absolute worst case is 6 + 3 x 6 = 24 calls per search (~$0.84 at the
+       estimated $0.035/call). */
+    maxCalls: cfgNum(CFG.sweepMaxCalls, 1, 200, 6),
     refillAt: cfgNum(CFG.sweepRefillAt, 1, 50, 6)
   };
   var configKeyDead = false;   // the shipped key was refused at runtime -> key gate
@@ -537,6 +542,110 @@
   })();
 
   /* ------------------------------------------------------------------ *
+   * USAGE — the client-side SPENDING GUARD.
+   *
+   * Every billed Google call this page makes is counted in localStorage
+   * `eats-usage` = {day:'YYYY-MM-DD' (local), search:n, details:n, photos:n,
+   * raised:usd}. The counts are turned into dollars with the rate knobs in
+   * eats-config.js (costSearchUsd / costDetailsUsd / costPhotoUsd). These are
+   * ESTIMATES of the owner's own Google bill, not authoritative: Google's
+   * Billing reports are the source of truth. Before any billed call the
+   * page asks usage.blocked(); at or over dailyBudgetUsd (plus whatever the
+   * person raised it by today) nothing more is requested from Google. It is a
+   * safety net on THIS device only — another browser, another device, or
+   * cleared site data each start their own count — so the Google Cloud quota
+   * cap (see the key gate and docs/peckish/README.md "Cost model") is the
+   * real ceiling.
+   *   search  = one Place.searchNearby / searchByText / legacy nearbySearch
+   *             call (probes and the key-validation call included)
+   *   details = one fetchFields / getDetails call
+   *   photos  = one distinct photo URL actually assigned for display
+   * Storage is wrapped in try/catch with an in-memory fallback; a new local
+   * day starts a fresh object.
+   * ------------------------------------------------------------------ */
+  var KEY_USAGE = 'eats-usage';
+  function cfgUsd(v, dflt) {
+    v = Number(v);
+    return (isFinite(v) && v >= 0) ? v : dflt;
+  }
+  var COST = {
+    search: cfgUsd(CFG.costSearchUsd, 0.035),
+    details: cfgUsd(CFG.costDetailsUsd, 0.025),
+    photos: cfgUsd(CFG.costPhotoUsd, 0.007),
+    budget: cfgUsd(CFG.dailyBudgetUsd, 1.00)
+  };
+  var usage = (function () {
+    var mem = null;
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function today() {
+      var d = new Date();
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    }
+    function whole(v) { v = Number(v); return (isFinite(v) && v >= 0) ? Math.floor(v) : 0; }
+    function blank(day) { return { day: day, search: 0, details: 0, photos: 0, raised: 0 }; }
+    function clean(o, day) {
+      if (!o || typeof o !== 'object' || o.day !== day) return null;
+      var r = Number(o.raised);
+      return { day: day, search: whole(o.search), details: whole(o.details), photos: whole(o.photos),
+               raised: (isFinite(r) && r > 0) ? r : 0 };
+    }
+    function read() {
+      var day = today(), o = null;
+      try {
+        var raw = localStorage.getItem(KEY_USAGE);
+        if (raw) o = clean(JSON.parse(raw), day);
+      } catch (e) { o = null; }
+      if (!o) o = clean(mem, day);
+      if (!o) o = blank(day);
+      mem = o;
+      return o;
+    }
+    function write(o) {
+      mem = o;
+      try { localStorage.setItem(KEY_USAGE, JSON.stringify(o)); } catch (e) {}
+    }
+    function dollars(o) {
+      return o.search * COST.search + o.details * COST.details + o.photos * COST.photos;
+    }
+    function fmt(usd) { return '$' + (Math.round(usd * 100) / 100).toFixed(2); }
+    return {
+      /* a copy of today's numbers plus the estimate and the current limit */
+      snapshot: function () {
+        var o = read();
+        return { day: o.day, search: o.search, details: o.details, photos: o.photos, raised: o.raised,
+                 spend: dollars(o), limit: COST.budget + o.raised };
+      },
+      blocked: function () {
+        var o = read();
+        return dollars(o) >= COST.budget + o.raised - 1e-9;
+      },
+      count: function (kind, n) {
+        if (kind !== 'search' && kind !== 'details' && kind !== 'photos') return;
+        var o = read();
+        o[kind] += (n == null ? 1 : n);
+        write(o);
+      },
+      raise: function (usd) {
+        var o = read();
+        o.raised += usd;
+        write(o);
+      },
+      reset: function () { write(blank(today())); },
+      fmt: fmt,
+      /* the same message, short enough for the slip over the deck */
+      noteText: function () {
+        return 'Spending guard reached \u2014 about ' + fmt(dollars(read())) +
+          ' estimated today. No more Google requests until tomorrow, or raise it.';
+      },
+      guardText: function () {
+        return 'You’ve reached today’s spending guard — about ' + fmt(dollars(read())) +
+          ' estimated on this device. Nothing more is requested from Google until tomorrow, or raise the guard.';
+      }
+    };
+  })();
+  var GUARD_STOP = { guardStop: true };   // the rejection a blocked billed call gets
+
+  /* ------------------------------------------------------------------ *
    * distance — haversine (miles)
    * ------------------------------------------------------------------ */
   function haversineMiles(a, b) {
@@ -723,6 +832,7 @@
      the art in place — no broken tile, no error, no layout shift. Used by
      every surface that shows a place picture so live and demo modes look and
      fail the same way. */
+  var photoSeen = {};   // photo URLs already assigned for display this page session
   function paintThumb(node, url, artCss) {
     if (!node) return;
     node.style.background = artCss;
@@ -730,6 +840,14 @@
     if (!url) return;
     var safe = String(url).replace(/["\\]/g, '');
     if (!/^https?:\/\//i.test(safe)) return;  // only ever load real http(s) photos
+    /* Each distinct photo URL is one billed load (~$0.007): counted once when
+       it is first assigned (a repeat is served from the browser's cache), and
+       not loaded at all once the spending guard is at its limit. */
+    if (!photoSeen[safe]) {
+      if (usage.blocked()) return false;   // stays watercolor (callers may say so)
+      photoSeen[safe] = 1;
+      usage.count('photos');
+    }
     var img = new Image();
     img.onload = function () {
       node.style.background = 'url("' + safe + '") center / cover';
@@ -3117,24 +3235,55 @@
       retry.type = 'button';
       retry.hidden = true;
       liveNote.appendChild(retry);
+      // spending-guard variant: a calm "Raise by $1" (primary) and "Not now"
+      var raise = el('button', 'live-note-raise', 'Raise by $1');
+      raise.type = 'button'; raise.hidden = true;
+      liveNote.appendChild(raise);
+      var notNow = el('button', 'live-note-dismiss', 'Not now');
+      notNow.type = 'button'; notNow.hidden = true;
+      liveNote.appendChild(notNow);
       var off = $('offline-note');
       panel.insertBefore(liveNote, off ? off.nextSibling : panel.firstChild);
       return liveNote;
     }
     /* retry (optional): a function — the note then carries a calm
        "Try again" button that runs it. */
-    function showLiveNote(text, retry) {
+    function showLiveNote(text, retry, guard) {
       var n = ensureLiveNote();
       if (!n) return;
       n.querySelector('.live-note-text').textContent = text;
+      n.classList.toggle('is-guard', !!guard);
       var b = n.querySelector('.live-note-retry');
       if (b) {
         b.hidden = !retry;
         b.onclick = retry ? function () { hideLiveNote(); retry(); } : null;
       }
+      var rz = n.querySelector('.live-note-raise'), nn = n.querySelector('.live-note-dismiss');
+      if (rz) { rz.hidden = !guard; rz.onclick = guard ? function () { raiseGuard(guard.onRaise); } : null; }
+      if (nn) { nn.hidden = !guard; nn.onclick = guard ? function () { hideLiveNote(); deck.layout(); } : null; }
       n.hidden = false;
     }
     function hideLiveNote() { if (liveNote) liveNote.hidden = true; }
+
+    /* ---- spending guard (see USAGE) ----
+       "Raise by $1" lifts today's limit by one dollar (persisted in the usage
+       object for the day) and carries on from where the guard stopped. */
+    var GUARD_STEP_USD = 1;
+    function raiseGuard(then) {
+      usage.raise(GUARD_STEP_USD);
+      hideLiveNote();
+      announce('Spending guard raised by $1 for today.');
+      if (then) then();
+      else deck.afterRaise();
+    }
+    /* A calm slip over the deck/landing: used when a billed call was stopped
+       while there is still something on screen (details, a refill, a typed
+       place). `onRaise` (optional) overrides what happens after the raise. */
+    function guardNote(onRaise) {
+      showLiveNote(usage.noteText(), null, { onRaise: onRaise || null });
+      announce(usage.guardText());
+      deck.layout();
+    }
 
     /* When true, the next batch of results goes to the Surprise-me roulette
        instead of the swipe deck ("Surprise me" on the Preferences screen). */
@@ -3251,6 +3400,8 @@
       hideLiveNote();
       // No key (should be unreachable: the gate seals the app) -> the gate.
       if (!store.getKey()) { surprisePending = false; gate.show({ reason: 'nokey' }); return; }
+      // spending guard: at the limit nothing is requested; say so, in the deck
+      if (usage.blocked()) { surprisePending = false; deck.showGuard({ raise: function () { raiseGuard(startSearch); }, notNow: function () { showPrefs(true); } }); return; }
       deck.showLoading();
       // Offline: do not even try. A friendly state with a retry; the service
       // worker keeps the shell, so this screen is what an offline reopen shows.
@@ -3282,6 +3433,10 @@
        reason (already plain language, never contains the key). */
     function failSearch(err, isOffline) {
       surprisePending = false;
+      if (err === liveShortText('guard')) {   // the guard tripped between the check and the call
+        deck.showGuard({ raise: function () { raiseGuard(startSearch); }, notNow: function () { showPrefs(true); } });
+        return;
+      }
       if (isOffline) {
         deck.showFailure({
           title: 'You\u2019re offline',
@@ -3433,6 +3588,8 @@
         var matched = filterByPrefs(fresh);
         deck.insertMore(matched);
         sweepNoMatch = matched.length ? 0 : sweepNoMatch + 1;
+        var swi = sweepInfo();
+        if (swi && swi.state === 'guard') guardNote();   // the guard stopped this probe: say so, calmly
         if (!sweepOpen()) { deck.sweepSettled(); return; }
         if (deck.wantsMore() && (deck.isWaiting() || sweepNoMatch < 3)) refill();
       });
@@ -3472,6 +3629,11 @@
       } else {
         state.loadingMore = false; state.hasMore = false; if (cb) cb([]);
       }
+    }
+    /* After "Raise by $1": reopen a sweep the guard had stopped. */
+    function resumeSweep() {
+      var sw = state.sweeper;
+      return !!(sw && typeof sw.resume === 'function' && sw.resume());
     }
     /* "Keep looking" (end of deck, budget stop): grant the sweep one more
        batch of calls. Only ever called from a user tap. */
@@ -3557,6 +3719,11 @@
                 // Calm and honest: say what happened once, keep the typed
                 // text, offer a retry. The key sheet is not touched — a failed
                 // lookup is not a key problem, and the other searches still work.
+                if (err && err === liveShortText('guard')) {
+                  guardNote(function () { if (form.requestSubmit) form.requestSubmit(); else form.dispatchEvent(new Event('submit', { cancelable: true })); });
+                  try { window.scrollTo(0, 0); } catch (x) {}
+                  return;
+                }
                 var msg = err || 'Couldn\u2019t find that place \u2014 try a street, neighbourhood or city.';
                 showLiveNote(msg, function () { if (form.requestSubmit) form.requestSubmit(); else form.dispatchEvent(new Event('submit', { cancelable: true })); });
                 announce(msg);
@@ -3595,6 +3762,9 @@
       searchFarther: searchFarther,
       hasFarther: hasFarther,
       grantMore: grantMore,
+      guardNote: guardNote,
+      raiseGuard: raiseGuard,
+      resumeSweep: resumeSweep,
       refill: refill,
       sweepInfo: sweepInfo,
       sweepOpen: sweepOpen,
@@ -4324,6 +4494,53 @@
       try { title.focus({ preventScroll: true }); } catch (e) { title.focus(); }
     }
 
+    /* The spending guard stopped a search before it started: the same calm
+       deck-area state as a failure, with the guard's own two buttons.
+       opts: { raise, notNow }. Nothing is requested from Google. */
+    function showGuard(opts) {
+      clearRoulette(); cancelDetails();
+      waitingMore = false; sweepOn = false;
+      queue = []; idx = 0; topCard = null; animating = false;
+      setMode('deck');
+      clear(deckEl);
+      if (peekEl) peekEl.hidden = true;
+      setControlsEnabled(false);
+      if (hintEl) hintEl.style.display = 'none';
+      if (controlsEl) controlsEl.style.display = 'none';
+      var box = el('div', 'deck-error deck-guard');
+      box.setAttribute('role', 'alert');
+      var dot = el('span', 'deck-error-dot'); dot.setAttribute('aria-hidden', 'true');
+      var title = el('h2', 'deck-error-title', 'Paused for today');
+      title.id = 'deck-error-title'; title.setAttribute('tabindex', '-1');
+      box.appendChild(dot);
+      box.appendChild(title);
+      box.appendChild(el('p', 'deck-error-body', usage.guardText()));
+      var row = el('div', 'deck-error-actions');
+      var raise = el('button', 'btn-solid', 'Raise by $1');
+      raise.type = 'button'; raise.id = 'guard-raise';
+      raise.addEventListener('click', function () { if (opts && opts.raise) opts.raise(); });
+      row.appendChild(raise);
+      var no = el('button', 'btn-ghost', 'Not now');
+      no.type = 'button'; no.id = 'guard-notnow';
+      no.addEventListener('click', function () { if (opts && opts.notNow) opts.notNow(); });
+      row.appendChild(no);
+      box.appendChild(row);
+      deckEl.appendChild(box);
+      layout();
+      try { title.focus({ preventScroll: true }); } catch (e) { title.focus(); }
+    }
+
+    /* "Raise by $1" was tapped (the limit is already lifted): carry on from
+       where the guard stopped — reopen the sweep, ask for the card in front's
+       details again, and wake a waiting end screen. */
+    function afterRaise() {
+      find.resumeSweep();
+      var atEnd = endEl && !endEl.hidden;
+      if (atEnd && sweepOn && find.sweepOpen()) { showFindingMore(); find.refill(); return; }
+      maybeRefill();
+      scheduleDetails();
+    }
+
     function setControlsEnabled(on) {
       [btnNo, btnYes, btnInfo].forEach(function (b) { if (b) b.disabled = !on; });
     }
@@ -4450,7 +4667,7 @@
         deckEl.appendChild(card);
       }
       topCard = deckEl.querySelector('.swipe-card[data-depth="0"]');
-      if (topCard) prefetchUpcoming();
+      if (topCard) scheduleDetails(); else cancelDetails();
       renderPeek(deal);
       layout();
       if (topCard) tidyMeta(topCard);
@@ -4495,8 +4712,9 @@
         item.setAttribute('data-id', r.id);
         item.setAttribute('data-name', r.name);
         var thumb = el('span', 'peek-thumb');
-        var seg = (r.segments && r.segments.food) || {};
-        paintThumb(thumb, seg.photoUrl || r.photoUrl, panelArt(r, 'vibe', 0));
+        // painted watercolor only: a photo here would be a billed load for a
+        // place nobody has reached yet
+        paintThumb(thumb, null, panelArt(r, 'vibe', 0));
         item.appendChild(thumb);
         item.appendChild(el('span', 'peek-dist', fmtDist(r.distance)));
         if (deal && !prefersReducedMotion) {
@@ -4514,7 +4732,16 @@
        next set. Pools are interleaved round-robin, and when one category
        runs dry the others backfill its slot so every set holds three real
        things (e.g. one review + three vibe shots still fills every page). */
+    /* Is this live card still waiting for its photos and reviews? 'loading'
+       (waiting out the short delay, or the request is out), 'paused' (the
+       spending guard stopped the call), or '' (settled, whatever came back). */
+    function detailsPhase(r) {
+      if (!r || r.demo || !r.placeId) return '';
+      if (r.detailsGuard) return 'paused';
+      return (!r.detailsLoaded || r.detailsBusy) ? 'loading' : '';
+    }
     function mediaPlaylist(r) {
+      var phase = detailsPhase(r);
       var segs = r.segments || {};
       var pools = { vibe: [], food: [], review: [] };
       var livePhotos = (!r.demo && r.photos && r.photos.length) ? r.photos : null;
@@ -4533,7 +4760,8 @@
               got++;
             }
           }
-          if (!got) pools[k].push({ kind: k, art: ki, tag: 'No photo' });
+          if (!got) pools[k].push({ kind: k, art: ki, phase: phase,
+            tag: phase === 'loading' ? 'Loading photo' : (phase === 'paused' ? 'Photo paused' : 'No photo') });
         } else if (seg.photoUrl) {
           pools[k].push({ kind: k, photoUrl: seg.photoUrl, caption: seg.caption || '' });
         } else {
@@ -4544,7 +4772,7 @@
       });
       var quotes = (segs.reviews && segs.reviews.quotes) || [];
       quotes.slice(0, 3).forEach(function (q) { pools.review.push({ kind: 'review', quote: q }); });
-      if (!pools.review.length) pools.review.push({ kind: 'review', quote: null });
+      if (!pools.review.length) pools.review.push({ kind: 'review', quote: null, phase: phase });
 
       // round-robin interleave until every pool is dry
       var flat = [];
@@ -4721,13 +4949,16 @@
         b.style.background = '';
         b.style.animationDelay = '';
         if (!item) { b.className = 'trio-block trio-review'; continue; }
-        b.className = 'trio-block trio-' + item.kind;
+        b.className = 'trio-block trio-' + item.kind + (item.phase === 'loading' ? ' is-loading' : '');
         if (item.kind === 'review') {
           var q = item.quote;
           var qt = q && typeof q.text === 'string' ? q.text.trim() : '';
           // never a quote mark pair around nothing: no words -> a plain line
           if (qt) b.appendChild(el('p', 'trio-quote', '“' + qt + '”'));
-          else b.appendChild(el('p', 'trio-quote', q ? 'Rated, no written review.' : 'No reviews yet — be the first to rate it.'));
+          else b.appendChild(el('p', 'trio-quote', q ? 'Rated, no written review.'
+            : item.phase === 'loading' ? 'Loading reviews…'
+            : item.phase === 'paused' ? 'Reviews are paused by the spending guard.'
+            : 'No reviews yet — be the first to rate it.'));
           if (q && (q.score > 0 || q.by)) {
             var by = el('p', 'trio-by');
             if (q.score > 0) by.appendChild(el('span', 'trio-score', '★ ' + fmtScore(q.score)));
@@ -4737,7 +4968,11 @@
         } else {
           // the watercolor panel IS the placeholder; a photo replaces it
           // only once it has loaded, and never if it fails.
-          paintThumb(b, item.photoUrl, panelArt(r, item.kind, item.art || 0));
+          // photo URLs are requested ONLY for the card in front: back cards
+          // (depth 1-2) and unseen pages (they are painted on the tap that
+          // reveals them) stay painted watercolor and load nothing.
+          var painted = paintThumb(b, card.dataset.depth === '0' ? item.photoUrl : null, panelArt(r, item.kind, item.art || 0));
+          if (painted === false) item = { kind: item.kind, tag: 'Photo paused', caption: item.caption };   // the guard stopped this load
           if (item.caption) b.appendChild(el('span', 'trio-cap', item.caption));
           var cr = item.by ? photoCreditEl(item, 'trio-attr', false) : null;
           if (cr) b.appendChild(cr);
@@ -5140,6 +5375,19 @@
           advance();
         });
         actionsEl.appendChild(save);
+      }
+      /* A pick is a committed choice: if it was liked before its details had
+         arrived (a like inside the short delay), fetch them now so the Call
+         link appears. Same one-call-per-place memo as everywhere else. */
+      if (store.getKey() && !r.demo && r.placeId && !r.phone) {
+        requestDetails(r, function () {
+          if (!r.phone || !actionsEl || !decisionEl || decisionEl.hidden) return;
+          var nmNow = $('decision-name');
+          if (!nmNow || nmNow.textContent !== r.name || actionsEl.querySelector('a[href^="tel:"]')) return;
+          var call2 = el('a', 'decision-act', 'Call');
+          call2.href = 'tel:' + r.phone;
+          actionsEl.insertBefore(call2, actionsEl.children[1] || null);
+        });
       }
       var dst = openState(r);
       var why = dReasons.map(function (x) { return x.text; }).join('; ');
@@ -5778,6 +6026,7 @@
       // "Keep looking" is offered only when the stop was the search budget
       // and the person may still grant another batch (a few times at most).
       var canMore = !!(sw && sw.state === 'budget' && sw.canGrant);
+      var guardStop = !!(sw && sw.state === 'guard');
       var STOP_WHY = 'I stopped searching here to keep things light — there may be more farther out.';
       var STOP_LAST = 'I’ve searched about as far as I can for now — there may be more farther out.';
       if (emptyFromStart) {
@@ -5809,7 +6058,14 @@
       var farther = $('end-farther');
       if (farther) farther.style.display = find.hasFarther() ? '' : 'none';
       var moreBtn = $('end-more');
-      if (moreBtn) moreBtn.style.display = canMore ? '' : 'none';
+      if (moreBtn) {
+        moreBtn.style.display = (canMore || guardStop) ? '' : 'none';
+        moreBtn.textContent = guardStop ? 'Raise by $1' : 'Keep looking';
+      }
+      if (guardStop) {   // the calm, honest reason replaces the usual copy
+        if (title) title.textContent = 'Paused for today';
+        if (sub) sub.textContent = 'You\u2019ve seen ' + cnt + '. ' + usage.guardText();
+      }
       var slBtn = $('end-shortlist');
       if (slBtn) {
         slBtn.style.display = shortlist.length ? '' : 'none';
@@ -5824,27 +6080,85 @@
       if (t) { t.setAttribute('tabindex', '-1'); t.focus(); }
     }
 
-    /* ---- live: lazily prefetch details for upcoming cards ----
-       Only the top card and the next two are fetched, so we never request
-       data for cards the user won't see. Cached per place via detailsLoaded.
+    /* ---- live: lazy Place Details for the card in front ----
+       Details (reviews, photos, phone) are one billed call per place, so they
+       are requested ONLY for the card actually in front, and only once it has
+       stayed on top for DETAILS_DELAY_MS: a fast swipe-through never pays for
+       a card nobody looked at. Nothing is fetched ahead. While it loads (or
+       waits out the delay) the card shows its painted placeholder tiles
+       marked "Loading"; the answer is applied in place, without rebuilding
+       the stack. Memoised by place id inside gmaps.fetchDetails (Undo, the
+       shortlist and re-dealt cards never pay twice), and r.detailsLoaded stops
+       a failed place from being retried in a loop.
        Live-only path: cannot run without a key + network. */
-    function prefetchUpcoming() {
-      if (!store.getKey()) return; // demo cards already carry everything
-      for (var d = 0; d < 3; d++) {
-        var i = idx + d;
-        if (i >= queue.length) break;
-        var r = queue[i];
-        if (r && !r.detailsLoaded) {
-          (function (rr) {
-            rr.detailsLoaded = true; // mark in-flight to avoid duplicate fetches
-            gmaps.fetchDetails(rr, function (err, enriched) {
-              if (err || !enriched) return;
-              var node = deckEl.querySelector('.swipe-card[data-id="' + rr.id + '"]');
-              if (node) renderStack();
-            });
-          })(queue[i]);
-        }
+    var DETAILS_DELAY_MS = cfgNum(CFG.detailsDelayMs, 0, 5000, 600);   // eats-config.js detailsDelayMs
+    var detailsTimer = null, detailsFor = null;
+    function cancelDetails() {
+      if (detailsTimer) { window.clearTimeout(detailsTimer); detailsTimer = null; }
+      detailsFor = null;
+    }
+    function openSig(r) { return r.open + '|' + r.openH + '|' + r.closeH; }
+    /* A card's own data changed (details arrived): repaint the card in front
+       in place — pages, bars and tiles — leaving drags and animations alone. */
+    function refreshCardFor(r) {
+      var card = deckEl && deckEl.querySelector('.swipe-card[data-id="' + r.id + '"]');
+      if (!card || card._data !== r) return;
+      card._pages = mediaPlaylist(r);
+      if (card._page >= card._pages.length) card._page = 0;
+      var bars = card.querySelector('.seg-bars');
+      if (bars) {
+        clear(bars);
+        for (var bi = 0; bi < card._pages.length; bi++) bars.appendChild(el('span', 'seg-bar'));
       }
+      renderTrio(card, false);
+    }
+    /* callbacks waiting on a place's details (the pick screen's Call link) */
+    function drainAfter(r) {
+      var a = r._after; r._after = null;
+      if (a) a.forEach(function (f) { try { f(); } catch (e) {} });
+    }
+    function applyDetailsResult(r, before, err, why) {
+      r.detailsBusy = false;
+      if (why === 'guard') { r.detailsGuard = true; r.detailsLoaded = false; find.guardNote(); }
+      else if (err) { /* stays marked loaded: one honest try per place, no retry loop */ }
+      var card = (deckEl && fitMode !== false) ? deckEl.querySelector('.swipe-card[data-id="' + r.id + '"]') : null;
+      if (card) {
+        if (!err && openSig(r) !== before && !animating && !card.classList.contains('is-dragging')) renderStack();
+        else refreshCardFor(r);
+      }
+      drainAfter(r);
+    }
+    function requestDetails(r, after) {
+      if (!r) return;
+      if (after) (r._after = r._after || []).push(after);
+      if (r.detailsLoaded || r.detailsBusy) { if (!r.detailsBusy) drainAfter(r); return; }
+      r.detailsGuard = false;
+      if (gmaps.hasDetails(r)) {          // already paid for this page session: free
+        var b0 = openSig(r);
+        r.detailsLoaded = true;
+        gmaps.fetchDetails(r, function (err) { applyDetailsResult(r, b0, err); });
+        return;
+      }
+      r.detailsLoaded = true; r.detailsBusy = true;   // mark in-flight: no duplicate fetches
+      var before = openSig(r);
+      refreshCardFor(r);                   // flips the tiles to their "Loading" look
+      gmaps.fetchDetails(r, function (err, enriched, why) { applyDetailsResult(r, before, err || !enriched, why); });
+    }
+    function scheduleDetails() {
+      if (!store.getKey()) return; // demo cards already carry everything
+      var r = topCard && topCard._data;
+      if (!r || r.demo || !r.placeId || r.detailsLoaded || r.detailsBusy) { cancelDetails(); return; }
+      if (gmaps.hasDetails(r)) { cancelDetails(); requestDetails(r); return; }   // free: no wait
+      if (detailsTimer && detailsFor === r.id) return;   // already counting down for this card
+      cancelDetails();
+      detailsFor = r.id;
+      detailsTimer = window.setTimeout(function () {
+        detailsTimer = null; detailsFor = null;
+        var cur = topCard && topCard._data;
+        if (cur !== r || fitMode === false || !topCard.parentNode) return;   // moved on: costs nothing
+        if (document.hidden) return;
+        requestDetails(r);
+      }, DETAILS_DELAY_MS);
     }
 
     function passTop() { if (!animating && topCard) fling('no'); }
@@ -5852,6 +6166,7 @@
     function infoTop() { if (topCard) cycleSegment(topCard); }
 
     function teardown() {
+      cancelDetails();
       clearRoulette();
       if (rouletteEl) rouletteEl.classList.remove('is-landed');
       slPicking = false;
@@ -5883,11 +6198,16 @@
       // only because the person tapped; the deck resumes by itself.
       var endMore = $('end-more');
       if (endMore) endMore.addEventListener('click', function () {
+        var swi = find.sweepInfo();
+        if (swi && swi.state === 'guard') { find.raiseGuard(); return; }
         if (!find.grantMore()) { showEnd(queue.length === 0); return; }
         showFindingMore();
         find.refill();
       });
       updateUndo(); updateBadge();
+      // a card that was waiting out its details delay while the tab was
+      // hidden is asked for when the tab comes back
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) scheduleDetails(); });
 
       var keep = $('decision-keep');
       if (keep) keep.addEventListener('click', keepLooking);
@@ -5951,7 +6271,7 @@
       onLike(r);
     }
 
-    return { init: init, load: load, append: append, insertMore: insertMore, wantsMore: wantsMore, isWaiting: isWaiting, sweepSettled: sweepSettled, showLoading: showLoading, showFailure: showFailure, teardown: teardown, surprise: surprise, shortlistCount: shortlistCount, shareShortlist: shareShortlist, pickFrom: pickFrom, addToShortlist: addToShortlist, removeFromShortlist: removeFromShortlist, inShortlist: inShortlist, hydrateHearts: hydrateHearts, layout: layout };
+    return { init: init, load: load, append: append, insertMore: insertMore, wantsMore: wantsMore, isWaiting: isWaiting, sweepSettled: sweepSettled, showLoading: showLoading, showFailure: showFailure, showGuard: showGuard, afterRaise: afterRaise, teardown: teardown, surprise: surprise, shortlistCount: shortlistCount, shareShortlist: shareShortlist, pickFrom: pickFrom, addToShortlist: addToShortlist, removeFromShortlist: removeFromShortlist, inShortlist: inShortlist, hydrateHearts: hydrateHearts, layout: layout };
   })();
 
   /* paint a wc-range fill % (shared) */
@@ -6017,6 +6337,7 @@
     timeoutload: function () { return [
       'Google Maps didn’t finish loading. Either the connection is poor, or Google is quietly refusing the key (billing missing, a referrer restriction, or a mistyped key). Try again; if it repeats, check the key in the Cloud Console.',
       'Google Maps didn’t load in time — check your connection, then the key’s billing and referrer settings.']; },
+    guard: function () { var t = usage.guardText(); return [t, t]; },
     unavailable: function () { return [
       'Live restaurants are unavailable right now.',
       'Live restaurants are unavailable right now.']; },
@@ -6045,6 +6366,7 @@
 
   function classifyLive(x) {
     if (x == null) return 'unknown';
+    if (x.guardStop === true) return 'guard';   // our own spending guard, not Google
     var t = typeof x;
     var str = (t === 'string') ? x
       : [x.message, x.name, x.status, x.code, x.reason].join(' ');
@@ -6385,10 +6707,15 @@
 
     /* ---- NEW: Place.searchNearby, nearest first, up to 20 ---- */
     // Fields requested: every one is used below. regularOpeningHours +
-    // utcOffsetMinutes feed the shared real-hours code; photos give a thumb.
+    // utcOffsetMinutes feed the shared real-hours code (so Place Details does
+    // NOT ask for them again). 'photos' is NOT requested: a search result never
+    // shows a photo (the card's photos come from the one Details call).
+    // Billing is by the highest tier in the mask: rating / priceLevel /
+    // userRatingCount / regularOpeningHours are all Enterprise, so none of
+    // them can be dropped to make the call cheaper without losing a feature.
     var NEW_FIELDS = ['id', 'displayName', 'location', 'formattedAddress', 'rating',
       'userRatingCount', 'priceLevel', 'regularOpeningHours', 'utcOffsetMinutes',
-      'types', 'primaryType', 'businessStatus', 'photos'];
+      'types', 'primaryType', 'businessStatus'];
 
     var NEARBY_MAX = 20;
     /* Real Google sometimes returns 19 (or fewer) of a requested 20 in a dense
@@ -6440,6 +6767,9 @@
 
     function nearbyRaw(places, center, radius, types) {
       var rank = places.SearchNearbyRankPreference;
+      // spending guard: the ONE gate every Nearby search and sweep probe passes
+      if (usage.blocked()) return Promise.reject(GUARD_STOP);
+      usage.count('search');
       return places.Place.searchNearby({
         fields: NEW_FIELDS,
         locationRestriction: { center: { lat: center.lat, lng: center.lng }, radius: radius },
@@ -6569,6 +6899,7 @@
         markDisc(dc);
       }
       function settleState() {
+        if (state === 'guard') return;   // only resume() leaves the guard state
         if (!anyUncovered()) state = 'complete';
         else if (zeroRun >= STALL_LIMIT) state = 'stalled';
         else if (calls >= budget) state = 'budget';
@@ -6620,6 +6951,8 @@
           var pr = pickProbe();
           if (!pr) { state = 'complete'; out(null, []); return; }
           if (calls >= budget) { state = 'budget'; out(null, []); return; }
+          // spending guard: no billed probe at or over today's limit
+          if (usage.blocked()) { state = 'guard'; out(null, []); return; }
           calls++; busy = true;
           var center = { lat: origin.lat + pr.y / MLAT, lng: origin.lng + pr.x / MLNG };
           probeRaw(places, center, FIRST_RADIUS_M, types).then(function (raw) {
@@ -6631,7 +6964,9 @@
             settleState();
             out(null, o.fresh);
           }, function (e) {
-            busy = false; state = 'error';
+            busy = false;
+            if (e && e.guardStop) { calls--; state = 'guard'; out(null, []); return; }
+            state = 'error';
             errText = (e && e.sweepTimeout) ? liveShortText('timeout') : liveShortText(classifyLive(e));
             out(errText, null);
           });
@@ -6648,6 +6983,13 @@
           held = keep; sortNearest(rel);
           settleState();
           return rel;
+        },
+        /* The person raised the spending guard: reopen a sweep it had stopped. */
+        resume: function () {
+          if (state !== 'guard') return false;
+          state = 'open';
+          settleState();
+          return state === 'open';
         },
         /* "Keep looking": grant one more batch of calls (explicit user tap
            only). Returns true when the budget grew and the sweep is open again. */
@@ -6702,6 +7044,8 @@
           type: 'restaurant'
         };
         var first = true;
+        if (usage.blocked()) { done(liveShortText('guard'), null, null); return; }
+        usage.count('search');
         service.nearbySearch(request, function (results, status, pagination) {
           var isFirst = first; first = false;
           handlePage(places, origin, results, status, pagination, done, isFirst);
@@ -6742,6 +7086,8 @@
               settled = true; window.clearTimeout(t);
               cb(e, l, m);
             };
+            if (usage.blocked()) { settled = true; window.clearTimeout(t); pendingMoreCb = null; cb(liveShortText('guard'), null, null); return; }
+            usage.count('search');
             pagination.nextPage();
           }
         };
@@ -6967,13 +7313,9 @@
           loc = { lat: p.geometry.location.lat(), lng: p.geometry.location.lng() };
         }
       } catch (e) {}
+      // No search thumbnail is built (a photo URL is a billed load; the card's
+      // photos come from the one lazy Details call for the card in front).
       var photoUrl = null, photoCr = null;
-      try {
-        if (p.photos && p.photos.length && typeof p.photos[0].getUrl === 'function') {
-          photoUrl = p.photos[0].getUrl({ maxWidth: 400, maxHeight: 400 });
-          photoCr = creditLegacy(p.photos[0]);
-        }
-      } catch (e) {}
       var out = buildResult({
         id: p.place_id,
         name: p.name,
@@ -7012,13 +7354,8 @@
 
     // Map a NEW-API Place (fields per NEW_FIELDS) to the same result shape.
     function mapPlaceNew(p, origin, openNow) {
+      // No search thumbnail (see mapPlace): photos arrive with Details only.
       var photoUrl = null, photoCr = null;
-      try {
-        if (p.photos && p.photos.length && typeof p.photos[0].getURI === 'function') {
-          photoUrl = p.photos[0].getURI({ maxWidth: 400, maxHeight: 400 });
-          photoCr = creditNew(p.photos[0]);
-        }
-      } catch (e) {}
       // primaryType first ("italian_restaurant"), then the rest; a bare
       // "restaurant" label is noise next to a specific one.
       var all = [];
@@ -7126,6 +7463,7 @@
       function legacyProbe(places, newCode) {
         try {
           var service = getService(places);
+          usage.count('search');   // counted, never blocked: the key check must always run
           service.nearbySearch({
             location: { lat: origin.lat, lng: origin.lng },
             rankBy: places.RankBy ? places.RankBy.DISTANCE : undefined,
@@ -7142,6 +7480,7 @@
       try {
         google.maps.importLibrary('places').then(function (places) {
           if (places.Place && typeof places.Place.searchNearby === 'function') {
+            usage.count('search');   // counted, never blocked: the key check must always run
             places.Place.searchNearby({
               fields: ['id'],
               locationRestriction: {
@@ -7231,6 +7570,8 @@
           google.maps.importLibrary('places').then(function (places) {
             if (settled) return;
             if (!(places && places.Place && typeof places.Place.searchByText === 'function')) { viaGeocoder(); return; }
+            if (usage.blocked()) { fin(liveShortText('guard'), null, null); return; }
+            usage.count('search');
             places.Place.searchByText({
               textQuery: query,
               fields: ['id', 'displayName', 'formattedAddress', 'location'],
@@ -7297,42 +7638,81 @@
     }
 
     /* fetchDetails — lazily enrich ONE result's card segments with Place
-       Details (photos + reviews + phone + opening hours). Called by the deck
-       only for the top card and the next two, so we never fetch data for
-       cards the user won't see. Minimal fields are requested. Cached per
-       place via the result's `detailsLoaded` flag (set by the caller).
+       Details (photos + reviews + phone). The deck calls it ONLY for the card
+       actually in front, after it has stayed there ~600 ms (no prefetch
+       ahead), so fast swipe-throughs cost nothing.
+
+       MEMOISED PER PLACE ID for the whole page session: the enrichment
+       (photo URLs, reviews, phone) is cached by id, so Undo, the shortlist,
+       a card dealt again after a new search, or two callers for one place
+       never pay for a second Details call; a request already in flight is
+       joined, not repeated. Failures are not cached (the deck marks the card
+       so it is not retried in a loop).
+
+       Field mask (new API): photos, reviews, phone. Opening hours and the UTC
+       offset are NOT requested: the search already returned them (NEW_FIELDS)
+       and asking again would only pay for the same data twice. The legacy
+       getDetails path still asks for opening_hours, because the legacy search
+       carries only open_now.
 
        Google does NOT label photos as "vibe" vs "food" (no categories exist),
        so live photos are shown with neutral labels, de-duplicated, and
-       credited to their authors. Reviews fill the Reviews
-       segment; any segment with no data collapses gracefully in the deck.
+       credited to their authors. Reviews fill the Reviews segment; any
+       segment with no data collapses gracefully in the deck.
 
-       NOTE: live-only; cannot be exercised here without a key + network. */
+       done(err, r, why): why === 'guard' when the spending guard (not Google)
+       stopped the call.
+
+       NOTE: live-only; cannot be exercised here without a key + network
+       (tests use a stub). */
+    var detailsCache = {};     // placeId -> bundle {phone, hours, urls, revs}  (memory only: URLs carry the key)
+    var detailsWait = {};      // placeId -> [done...] while a request is in flight
+    function applyBundle(r, b) {
+      r.phone = b.phone || r.phone || null;
+      if (b.hours) { try { applyHours(r, b.hours.oh, b.hours.offset); } catch (e) {} }
+      applySegments(r, b.urls, b.revs);
+    }
     function fetchDetails(r, done) {
       if (!r || !r.placeId) { done && done(null, null); return; }
+      var id = r.placeId;
+      if (detailsCache[id]) { applyBundle(r, detailsCache[id]); done && done(null, r); return; }
+      if (detailsWait[id]) { detailsWait[id].push({ r: r, done: done }); return; }
+      if (usage.blocked()) { done && done(liveShortText('guard'), null, 'guard'); return; }
+      detailsWait[id] = [{ r: r, done: done }];
+      function settle(err, bundle) {
+        var waiters = detailsWait[id] || []; delete detailsWait[id];
+        if (!err && bundle) detailsCache[id] = bundle;
+        waiters.forEach(function (w) {
+          try {
+            if (err) { if (w.done) w.done(err, null); return; }
+            applyBundle(w.r, bundle);
+            if (w.done) w.done(null, w.r);
+          } catch (e) {}
+        });
+      }
       whenReady(function () {
         try {
           google.maps.importLibrary('places').then(function (places) {
             if (!newApiOff && places && places.Place && typeof places.Place.prototype.fetchFields === 'function') {
-              detailsNew(places, r, function (err) {
-                if (!err) { done && done(null, r); return; }
+              detailsNew(places, r, function (err, bundle) {
+                if (!err) { settle(null, bundle); return; }
                 var code = err.code;
-                if (!LEGACY_RETRY[code]) { done && done(liveShortText(code), null); return; }
-                detailsLegacy(places, r, function (e2) {
-                  if (e2) { done && done(liveShortText(code), null); return; }
+                if (!LEGACY_RETRY[code]) { settle(liveShortText(code), null); return; }
+                detailsLegacy(places, r, function (e2, b2) {
+                  if (e2) { settle(liveShortText(code), null); return; }
                   newApiOff = true;
-                  done && done(null, r);
+                  settle(null, b2);
                 });
               });
             } else {
-              detailsLegacy(places, r, function (e2) {
-                if (e2) done && done(e2, null); else done && done(null, r);
-              });
+              detailsLegacy(places, r, function (e2, b2) { settle(e2 || null, b2); });
             }
-          }).catch(function (e) { done && done(humanizeError(e), null); });
-        } catch (e) { done && done(humanizeError(e), null); }
+          }).catch(function (e) { settle(humanizeError(e), null); });
+        } catch (e) { settle(humanizeError(e), null); }
       });
     }
+    // true when this place's details are already in memory (no request needed)
+    function hasDetails(r) { return !!(r && r.placeId && detailsCache[r.placeId]); }
 
     // Clip at a word boundary with an ellipsis (never mid-word).
     function clipWords(t, max) {
@@ -7350,13 +7730,17 @@
       return t.replace(/\s+/g, ' ');
     }
 
+    // Card photos: three at most, at the smallest size that still looks sharp
+    // on a phone (each photo load is billed, ~$0.007).
+    var MAX_PHOTOS = 3;
+    var PHOTO_W = 480, PHOTO_H = 600;
     // photos -> distinct live photo list (Google gives no categories, so
     // nothing is labelled vibe/food); reviews -> quotes that have words.
     // photos: [{url, by, uri}]
     function applySegments(r, photos, reviews) {
       var seen = {}, uniq = [];
       (photos || []).forEach(function (ph) {
-        if (ph && ph.url && !seen[ph.url] && uniq.length < 4) { seen[ph.url] = 1; uniq.push(ph); }
+        if (ph && ph.url && !seen[ph.url] && uniq.length < MAX_PHOTOS) { seen[ph.url] = 1; uniq.push(ph); }
       });
       if (uniq.length) {
         r.photos = uniq;
@@ -7377,85 +7761,78 @@
       } catch (e) {}
     }
 
-    /* NEW: new Place({id}).fetchFields — minimal fields, all used. cb(null)
-       on success, cb({code}) on failure. */
+    /* NEW: new Place({id}).fetchFields — minimal fields, all used. cb(null,
+       bundle) on success, cb({code}) on failure. One billed Details call. */
     function detailsNew(places, r, cb) {
       var place;
       try { place = new places.Place({ id: r.placeId }); } catch (e) { cb({ code: classifyLive(e) }); return; }
+      usage.count('details');
       place.fetchFields({
-        fields: ['photos', 'reviews', 'nationalPhoneNumber', 'internationalPhoneNumber',
-          'regularOpeningHours', 'utcOffsetMinutes']
+        fields: ['photos', 'reviews', 'nationalPhoneNumber', 'internationalPhoneNumber']
       }).then(function () {
         placesOk = true;
-        r.phone = place.internationalPhoneNumber || place.nationalPhoneNumber || r.phone || null;
-        return openFlag(place);
-      }).then(function (flag) {
+        var bundle = { phone: place.internationalPhoneNumber || place.nationalPhoneNumber || null,
+                       hours: null, urls: [], revs: [] };
         try {
-          var rh = place.regularOpeningHours;
-          applyHours(r, { periods: rh && rh.periods, openNow: (typeof flag === 'boolean') ? flag : undefined },
-            place.utcOffsetMinutes);
-        } catch (e) {}
-        var urls = [];
-        try {
-          // four at most, card-sized (the URL carries Google's key param;
-          // memory only — never persisted)
+          // MAX_PHOTOS at most, card-sized (the URL carries Google's key param;
+          // memory only — never persisted). Building a URL is not a load: the
+          // photo is requested only when a tile actually shows it.
           // (authorAttributions rides along with the 'photos' field)
-          (place.photos || []).slice(0, 6).forEach(function (ph) {
+          (place.photos || []).slice(0, MAX_PHOTOS).forEach(function (ph) {
             if (typeof ph.getURI !== 'function') return;
             var cr = creditNew(ph);
-            urls.push({ url: ph.getURI({ maxWidth: 640, maxHeight: 800 }), by: cr && cr.by, uri: cr && cr.uri });
+            bundle.urls.push({ url: ph.getURI({ maxWidth: PHOTO_W, maxHeight: PHOTO_H }), by: cr && cr.by, uri: cr && cr.uri });
           });
         } catch (e) {}
-        var revs = [];
         try {
           (place.reviews || []).forEach(function (rv) {
-            revs.push({
+            bundle.revs.push({
               by: rv.authorAttribution && rv.authorAttribution.displayName,
               rating: rv.rating,
               text: reviewTextOf(rv)
             });
           });
         } catch (e) {}
-        applySegments(r, urls, revs);
-        cb(null);
+        cb(null, bundle);
       }, function (e) { cb({ code: classifyLive(e) }); });
     }
 
-    /* LEGACY: PlacesService.getDetails. cb(null) or cb(errorText). */
+    /* LEGACY: PlacesService.getDetails. cb(errorText) or cb(null, bundle). */
     function detailsLegacy(places, r, cb) {
       var service;
       try { service = getService(places); } catch (e) { cb(humanizeError(e)); return; }
+      if (usage.blocked()) { cb(liveShortText('guard')); return; }
+      usage.count('details');
       service.getDetails({
         placeId: r.placeId,
         // Minimal, and every field is used: opening_hours carries the
-        // real `periods` the status chip needs; utc_offset_minutes is
-        // how we know those hours belong on this browser's clock.
+        // real `periods` the status chip needs (the legacy search only has
+        // open_now); utc_offset_minutes is how we know those hours belong on
+        // this browser's clock.
         fields: ['photos', 'reviews', 'formatted_phone_number', 'international_phone_number',
-          'opening_hours', 'utc_offset_minutes', 'name']
+          'opening_hours', 'utc_offset_minutes']
       }, function (place, status) {
         var P = places;
         if (status !== P.PlacesServiceStatus.OK || !place) { cb(humanizeStatus(status)); return; }
-        r.phone = place.international_phone_number || place.formatted_phone_number || r.phone || null;
+        var bundle = { phone: place.international_phone_number || place.formatted_phone_number || null,
+                       hours: null, urls: [], revs: [] };
         // REAL HOURS: Details carries `periods`, so a live place stops being a
         // binary open/shut flag and starts saying "Closes at 9:30pm".
+        if (place.opening_hours) {
+          bundle.hours = { oh: place.opening_hours,
+            offset: (place.utc_offset_minutes != null) ? place.utc_offset_minutes : place.utc_offset };
+        }
         try {
-          applyHours(r, place.opening_hours,
-            (place.utc_offset_minutes != null) ? place.utc_offset_minutes : place.utc_offset);
-        } catch (e) {}
-        var urls = [];
-        try {
-          (place.photos || []).slice(0, 6).forEach(function (ph) {
+          (place.photos || []).slice(0, MAX_PHOTOS).forEach(function (ph) {
             if (typeof ph.getUrl !== 'function') return;
             var cr = creditLegacy(ph);
-            urls.push({ url: ph.getUrl({ maxWidth: 640, maxHeight: 800 }), by: cr && cr.by, uri: cr && cr.uri });
+            bundle.urls.push({ url: ph.getUrl({ maxWidth: PHOTO_W, maxHeight: PHOTO_H }), by: cr && cr.by, uri: cr && cr.uri });
           });
         } catch (e) {}
-        var revs = [];
         try {
-          (place.reviews || []).forEach(function (rv) { revs.push({ by: rv.author_name, rating: rv.rating, text: reviewTextOf(rv) }); });
+          (place.reviews || []).forEach(function (rv) { bundle.revs.push({ by: rv.author_name, rating: rv.rating, text: reviewTextOf(rv) }); });
         } catch (e) {}
-        applySegments(r, urls, revs);
-        cb(null);
+        cb(null, bundle);
       });
     }
 
@@ -7465,7 +7842,8 @@
       searchNearby: searchNearby,
       locate: locate,
       attachAutocomplete: attachAutocomplete,
-      fetchDetails: fetchDetails
+      fetchDetails: fetchDetails,
+      hasDetails: hasDetails
     };
   })();
 
@@ -10321,6 +10699,22 @@
       if (rp) rp.textContent = shared ? 'Use my own key' : 'Replace key';
     }
 
+    /* "Today on this device": counts, an honest estimate, and the guard limit. */
+    function refreshUsage() {
+      var u = usage.snapshot();
+      var counts = $('usage-counts'), est = $('usage-est');
+      function n(v, one, many) { return v + ' ' + (v === 1 ? one : many); }
+      if (counts) counts.textContent = n(u.search, 'search', 'searches') + ' \u00b7 ' +
+        n(u.details, 'details call', 'details calls') + ' \u00b7 ' + n(u.photos, 'photo', 'photos');
+      if (est) est.textContent = 'About ' + usage.fmt(u.spend) + ' (estimate) \u00b7 guard limit ' + usage.fmt(u.limit) +
+        (u.raised > 0 ? ' (raised by ' + usage.fmt(u.raised) + ')' : '');
+    }
+    function showUsageConfirm(on) {
+      var c = $('usage-confirm'), b = $('usage-reset');
+      if (c) c.hidden = !on;
+      if (b) { b.hidden = !!on; b.setAttribute('aria-expanded', on ? 'true' : 'false'); }
+    }
+
     function showConfirm(on) {
       var c = $('settings-confirm'), a = $('settings-actions');
       if (c) c.hidden = !on;
@@ -10331,6 +10725,8 @@
       if (!backdrop) return;
       if (gate.isOpen()) return;   // the gate is the only screen while it is up
       refresh();
+      refreshUsage();
+      showUsageConfirm(false);
       showConfirm(false);
       var first = $('key-replace');
       var pn = $('privacy-note');
@@ -10360,6 +10756,16 @@
         showConfirm(false);
         var rm = $('key-remove'); if (rm) rm.focus();
       });
+      var ur = $('usage-reset'), uy = $('usage-reset-yes'), un = $('usage-reset-no');
+      if (ur) ur.addEventListener('click', function () { showUsageConfirm(true); if (un) un.focus(); });
+      if (un) un.addEventListener('click', function () { showUsageConfirm(false); if (ur) ur.focus(); });
+      if (uy) uy.addEventListener('click', function () {
+        usage.reset();
+        refreshUsage();
+        showUsageConfirm(false);
+        if (ur) ur.focus();
+        announce('Today\u2019s count was reset on this device.');
+      });
       $('key-remove-yes').addEventListener('click', function () {
         store.clearKey();
         refresh();
@@ -10379,7 +10785,7 @@
       refresh();
     }
 
-    return { init: init, open: openSheet, refresh: refresh };
+    return { init: init, open: openSheet, refresh: refresh, refreshUsage: refreshUsage };
   })();
 
   /* ================================================================== *

@@ -262,8 +262,8 @@ html.evening :focus-visible {
   animation: panel-fade 0.24s ease;
 }
 .live-note-text { line-height: 1.35; }
-.live-note-retry[hidden] { display: none; }
-.live-note-retry {
+.live-note-retry[hidden], .live-note-dismiss[hidden] { display: none; }
+.live-note-retry, .live-note-dismiss {
   flex: none;
   appearance: none;
   cursor: pointer;
@@ -278,8 +278,32 @@ html.evening :focus-visible {
   min-height: 44px;
   min-width: 44px;
 }
-.live-note-retry:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
-html.evening .live-note-retry { color: var(--pond); border-color: var(--pond); }
+.live-note-retry:focus-visible, .live-note-dismiss:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
+html.evening .live-note-retry, html.evening .live-note-dismiss { color: var(--pond); border-color: var(--pond); }
+.live-note-raise[hidden] { display: none; }
+.live-note-raise {
+  flex: none;
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #fff;
+  background: var(--pond-deep);
+  border: 1px solid var(--pond-deep);
+  border-radius: 999px;
+  padding: 0 0.95rem;
+  min-height: 44px;
+  min-width: 44px;
+}
+.live-note-raise:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 2px; }
+/* spending-guard slip: the sentence is long, so it takes the full row and the
+   two buttons sit beneath it */
+.live-note.is-guard { flex-wrap: wrap; justify-content: flex-start; gap: 0.35rem 0.6rem; padding: 0.4rem 0.7rem; margin-bottom: 0.4rem; font-size: 0.8rem; line-height: 1.35; }
+.live-note.is-guard .live-note-text { flex: 1 1 calc(100% - 1.4rem); }
+.live-note.is-guard .live-note-raise,
+.live-note.is-guard .live-note-dismiss { margin-top: 0.1rem; }
+html.evening .live-note-raise { background: var(--pond); border-color: var(--pond); color: #1d2530; }
 .live-note-dot {
   width: 0.6rem;
   height: 0.6rem;
@@ -5466,3 +5490,64 @@ html.evening .btn-solid.btn-danger {
   background: radial-gradient(120% 140% at 30% 20%, #b0506a 0%, #8f3a52 80%);
   color: #fff;
 }
+
+/* ---------- Cost controls: lazy details + spending guard ---------- */
+
+/* A card whose photos/reviews are still on their way: the painted tiles keep
+   their place and a slow wash passes over them (no motion when reduced). */
+.trio-block.is-loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(100deg, rgba(255, 251, 240, 0) 20%, rgba(255, 251, 240, 0.28) 50%, rgba(255, 251, 240, 0) 80%);
+  transform: translateX(-100%);
+  animation: skel-sweep 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .trio-block.is-loading::after { animation: none; display: none; }
+}
+
+/* settings: "Today on this device" */
+.usage-note {
+  border-top: 1px solid var(--card-line);
+  padding-top: 0.9rem;
+  margin-top: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.usage-title {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.25rem;
+  color: var(--ink);
+  margin: 0 0 0.1rem;
+}
+.usage-counts, .usage-est { margin: 0; font-size: 0.93rem; line-height: 1.5; color: var(--ink); }
+.usage-est { font-weight: 500; }
+.usage-fine { margin: 0.1rem 0 0; font-size: 0.82rem; line-height: 1.55; color: var(--ink-soft); }
+.usage-reset[hidden], .usage-confirm[hidden] { display: none; }
+.usage-reset {
+  align-self: flex-start;
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 44px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: var(--pond-ink, var(--pond-deep));
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.usage-reset:focus-visible { outline: 2px solid var(--pond-deep); outline-offset: 3px; border-radius: 4px; }
+html.evening .usage-reset:focus-visible { outline-color: var(--pond-ink); }
+.usage-confirm { display: flex; flex-direction: column; gap: 0.7rem; }
+.usage-confirm-q { margin: 0; font-size: 0.93rem; line-height: 1.55; color: var(--ink); }
+
+/* gate: the quota-cap recommendation inside step 2 */
+.gate-cost { display: block; margin-top: 0.35rem; font-size: 0.9em; color: var(--ink-soft); }

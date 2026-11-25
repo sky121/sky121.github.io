@@ -633,6 +633,23 @@
             </div>
           </div>
 
+          <!-- Spending guard readout: this device's own count of billed Google
+               calls today, turned into an ESTIMATE. Google's Billing is the truth. -->
+          <section class="usage-note" id="usage-note" aria-labelledby="usage-title">
+            <h3 class="usage-title" id="usage-title">Today on this device</h3>
+            <p class="usage-counts" id="usage-counts"></p>
+            <p class="usage-est" id="usage-est"></p>
+            <p class="usage-fine">Tableau counts the Google requests this device makes and prices them with rough rates, so it can pause before a surprise bill. These are estimates only &mdash; Google&rsquo;s Billing reports are the source of truth.</p>
+            <button type="button" class="usage-reset" id="usage-reset" aria-expanded="false" aria-controls="usage-confirm">Reset today&rsquo;s count</button>
+            <div class="usage-confirm" id="usage-confirm" role="group" aria-labelledby="usage-confirm-q" hidden>
+              <p class="usage-confirm-q" id="usage-confirm-q">Reset today&rsquo;s count to zero? This only clears this device&rsquo;s estimate &mdash; Google keeps its own.</p>
+              <div class="sheet-actions">
+                <button type="button" class="btn-ghost" id="usage-reset-no">Keep it</button>
+                <button type="button" class="btn-solid" id="usage-reset-yes">Yes, reset</button>
+              </div>
+            </div>
+          </section>
+
           <section class="privacy-note" id="privacy-note" tabindex="-1" aria-labelledby="privacy-title">
             <h3 class="privacy-title" id="privacy-title">Privacy</h3>
             <p class="privacy-text">
@@ -724,6 +741,9 @@
                 Choose <em>Create credentials &rarr; API key</em>, then enable exactly
                 <strong>Maps JavaScript API</strong> and <strong>Places API (New)</strong>.
                 The Geocoding API is optional &mdash; you don&rsquo;t need it.
+                <span class="gate-cost">A budget alert only emails you; it does not stop spending. To cap it, open
+                <em>APIs &amp; Services &rarr; Places API (New) &rarr; Quotas</em> and set a daily request limit
+                you&rsquo;re happy to pay for.</span>
               </li>
               <li>
                 <span class="gate-step-h">Lock it to this site.</span>

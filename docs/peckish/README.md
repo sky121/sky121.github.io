@@ -14,7 +14,7 @@
 > icon *art* changed.
 >
 > Single source of truth so we can pick up exactly where we left off.
-> Last updated: **2026-11-25**.
+> Last updated: **2026-11-25** (cost pass: see "Cost model and the spending guard").
 >
 > **There is no demo mode any more (2026-11-25).** Tableau asks for a working
 > Google key before it shows anything (see "No demo mode + the key gate" right
@@ -164,10 +164,16 @@ says exactly why it could not.
 3. Credentials > Create API key. Application restriction: **Websites**, add
    `https://sky121.github.io/*` (add `http://localhost:8000/*` only on a separate
    dev key). API restriction: Maps JavaScript API + Places API (New).
-4. Quotas: cap daily requests for those two APIs at a number you accept paying
-   for; set a billing budget with email alerts. Each swipe-deck search is a few
-   Nearby calls (one to start, more as the sweep refills; `sweepMaxCalls`, default 30,
-   is the per-session cap).
+4. **Set a daily quota cap** (this is the only thing that actually stops Google
+   billing you): APIs & Services > Places API (New) > Quotas, set a daily request
+   limit you accept paying for in the worst case. A **billing budget alert only
+   emails you - it does not stop spending**; set one as well, but do not rely on it.
+   Each swipe-deck search is a few Nearby calls (one to start, more as the sweep
+   refills; `sweepMaxCalls`, default 6, is the per-session cap, up to 24 with
+   "Keep looking"). Tableau also has its own client-side spending guard
+   (see "Cost model and the spending guard" below); it is a safety net on one
+   device, not a replacement for the quota cap. The key gate's guide (step 2) says
+   the same in two sentences.
 5. To ship a site key so visitors skip the gate: put it in `eats-config.js`
    `mapsKey` (it is public by design - the referrer + API restrictions are the
    protection). Visitors can still "Use my own key" in Settings.
@@ -187,6 +193,121 @@ The one known stale assertion (`(g) 19 places`) fails against `SAT_MIN` as befor
 Not verifiable here: real Google behaviour (which of `gm_authFailure` vs a rejected
 promise arrives first for billing / referrer problems), a real iOS keyboard, and
 the installed-PWA storage partition on the owner's phone.
+
+---
+
+## Cost model and the spending guard (2026-11-25)
+
+**Why.** The owner hit a $10 Google budget in testing (a billed request per swiped card
+adds up). This pass cuts the number of billed calls per card and adds a client-side
+safety net. **All unit prices below are ESTIMATES** (Places API (New), not verified
+against Google's price list; Google's Billing reports are the source of truth):
+Nearby Search with rating/price/hours ~$0.035 per call, Place Details with
+reviews/photos ~$0.025 per call, one Place Photo load ~$0.007.
+
+**What changed (user-visible behaviour in brackets).**
+1. `sweepMaxCalls` 30 -> **6**. "Keep looking" grants `sweepMaxCalls` (6) more, at most
+   `MAX_EXTENSIONS` = 3 times, so the absolute worst case is **24 Nearby calls per search
+   (~$0.84)**, and only if the person keeps asking.
+2. **Details are lazy and debounced.** `fetchFields` runs only for the card actually in
+   front, ~600 ms after it becomes the top card (`DETAILS_DELAY_MS`), so a fast
+   swipe-through costs nothing; nothing is fetched ahead. Memoised by place id for the
+   page session (`detailsCache` / in-flight `detailsWait` in `gmaps.fetchDetails`): Undo,
+   the shortlist, and a re-dealt card after a new search never pay twice. While details
+   load the card keeps its painted tiles, marked "Loading photo" / "Loading reviews..."
+   with a slow wash (static under reduced motion). A like inside the 600 ms window still
+   fetches that place's details (once) so the pick screen gets its Call link.
+3. **Photos.** Three per card (was four), requested at maxWidth 480 / maxHeight 600 (was
+   640x800); the 400x400 search thumbnail is no longer built or loaded (and `photos` is
+   dropped from the search field mask). A photo URL is assigned only to a tile that is
+   actually shown: the front card's current page. Back cards, unseen pages (painted on the
+   tap that reveals them) and the "Coming up" strip (painted watercolor + distance only)
+   load nothing. Photo credits are unchanged.
+4. **Field masks.** Search (Nearby): `id, displayName, location, formattedAddress, rating,
+   userRatingCount, priceLevel, regularOpeningHours, utcOffsetMinutes, types, primaryType,
+   businessStatus` (no `photos`). Details (new API): `photos, reviews,
+   nationalPhoneNumber, internationalPhoneNumber`: **hours and UTC offset are no longer
+   re-requested**, the search already carried them. Honest note: Google bills a request by
+   the highest tier in its mask, and `reviews` already puts Details in the top tier, so
+   dropping the hours fields saves payload, not dollars; the dollar savings come from
+   fewer calls. Likewise none of rating / price / hours can be dropped from Nearby to make
+   it cheaper without losing a feature. The legacy `getDetails` path still asks for
+   `opening_hours` (the legacy search only has `open_now`).
+
+**Per-card and per-Find figures (estimates, stub-measured counts; same unit prices both
+sides; 150-place dense cluster, Find then swipe 40 cards, 390x844):**
+
+| | Before (PR #65) | After |
+|---|---|---|
+| Nearby calls, Find + 40 swipes | 3 (defaults 30 cap) | 3 (cap 6) |
+| Details calls, 40 cards swiped fast (~250 ms/card) | 45 | 0 while swiping (1 for the card you stop on) |
+| Photo requests, 40 cards swiped fast | 155 | 0 (2 for the card you stop on) |
+| Details calls, 40 cards each read ~1 s | 45 | 41 |
+| Photo requests, 40 cards each read ~1 s | 141 | 82 |
+| Estimated spend, 40 fast | ~$2.32 | ~$0.14 |
+| Estimated spend, 40 each read | ~$2.22 | ~$1.70 |
+| Per card actually looked at | ~$0.053 | ~$0.040 (1 details + 2 photos) |
+| Per card flicked past (<600 ms) | ~$0.053 | $0 |
+| One full Find (all calls the cap allows) | $1.05 (30 calls) | $0.21 (6 calls); worst case $0.84 |
+
+Read the middle rows honestly: a card that stays in front costs one Details call plus the
+two photo tiles on its first page (~$0.039) whatever the build; the saving is that cards you
+flick past cost nothing, nothing is fetched ahead, and a Find is a fifth of the price.
+A session that lingers on every card is still ~$0.04 a card. If that is too much, the
+levers are `detailsDelayMs` (config, default 600) and `dailyBudgetUsd`.
+
+**The spending guard (client side).** Every billed call is counted in localStorage
+`eats-usage` = `{day:'YYYY-MM-DD' (local), search:n, details:n, photos:n, raised:usd}`
+(a new local day starts a fresh object; storage wrapped in try/catch with an in-memory
+fallback). A search is counted per `Place.searchNearby` / `searchByText` / legacy
+`nearbySearch` call (sweep probes, the 50 km retry and the key-validation call included),
+a details call per `fetchFields` / `getDetails`, a photo per distinct photo URL actually
+assigned for display (a repeat is a browser-cache hit and is not counted again). Before
+any billed call `usage.blocked()` is checked: at or over `dailyBudgetUsd` (plus any raise)
+nothing is requested. The person sees a calm state, never an error:
+- A new Find at the limit -> in-deck "Paused for today" with the exact sentence "You've
+  reached today's spending guard - about $X.XX estimated on this device. Nothing more is
+  requested from Google until tomorrow, or raise the guard.", a primary **Raise by $1**
+  (stored in the same usage object for the day) and a secondary **Not now** (back to
+  Preferences).
+- Mid-deck (a refill or a card's details blocked) -> a compact slip over the deck with the
+  same two buttons; cards already loaded stay swipeable, tiles say "Photo paused" /
+  "Reviews are paused by the spending guard" rather than a false "No photo". At the end of
+  the deck the end screen says the same and its primary button becomes **Raise by $1**.
+- A typed place that cannot be looked up for the same reason shows the slip on the landing.
+- **Settings > Google connection > "Today on this device"**: searches / details calls /
+  photos, "About $X.XX (estimate)", the guard limit (and any raise), a "Reset today's
+  count" link (asks first), and a line saying Google's Billing reports are the source of
+  truth.
+- The key-validation call at the gate is counted but **never blocked**.
+
+**What the guard does NOT guarantee.** It lives in one browser: another browser, device,
+a private window, or cleared site data has its own count (reset also clears it). It prices
+calls with the config rates, which are guesses. It cannot see Autocomplete or Geocoder
+fallback requests (not counted), nor requests made by anyone else holding the key. A call
+already in flight when the limit is crossed still completes (the guard can overshoot by
+one call). It is a safety net for the owner's own testing, not a billing control: the
+**Google Cloud daily quota cap** (APIs & Services > Places API (New) > Quotas) is the real
+ceiling, and a billing budget alert does not stop spending.
+
+**Knobs** (`assets/js/eats-config.js`): `sweepMaxCalls` (6), `costSearchUsd` (0.035),
+`costDetailsUsd` (0.025), `costPhotoUsd` (0.007), `dailyBudgetUsd` (1.00), `detailsDelayMs`
+(600, clamped 0..5000). Rates are estimates you can change when Google's prices change; set
+`dailyBudgetUsd` very high to make the guard effectively inert (tests do), `0` to block
+every billed call. Constants in `eats.js`: `MAX_EXTENSIONS` 3, `MAX_PHOTOS` 3,
+`PHOTO_W/PHOTO_H` 480/600, `GUARD_STEP_USD` 1.
+
+**Verified (stubs only, no real Google request; scratch harness outside the repo,
+390x844 + 375x667, light + dark):** fast swiping triggers zero details/photo calls; one
+details call after resting past the delay; the same place never gets a second details call
+across Undo, forward, like, shortlist and a re-search that deals it again as a new object;
+only the front card's first page requests photos (480x600), the third photo only after the
+tap that reveals it; the "Coming up" strip and back cards request none; default 6 calls then
+"Keep looking" adds exactly 6, three times, 24 total, then the button is gone; guard blocks
+the call after the limit, persists across reload, "Raise by $1" resumes, a new (faked) day
+resets, counters equal the stub's request counts exactly, the key-validation call runs with
+a zero budget; Settings row, reset confirm; zero page errors. The earlier sweep / typed /
+gate suites pass unchanged except stale expectations (listed in the PR).
 
 ---
 
@@ -235,7 +356,7 @@ demo + stubbed live Maps). No identity changes, no new features; `eats.html`,
   a user tap grants the sweeper one more batch of `sweepMaxCalls` calls
   (`sweeper.grant()` -> `find.grantMore()`), shows the gentle "finding more" skeleton
   and resumes the deck by itself (`insertMore`). Up to **3 extensions** (4x the base
-  budget, e.g. 30 -> 120 calls at most); after that the button is gone and the copy
+  budget: 6 -> 24 calls at most since 2026-11-25; it was 30 -> 120); after that the button is gone and the copy
   says "I've searched about as far as I can for now — there may be more farther out."
   Nothing is ever granted automatically. Completed sweeps keep "That's everywhere
   within X mi."; stalled/error copy was reworded too. Exactly one primary on the end
@@ -466,7 +587,8 @@ roughly distance-ordered and `locationBias` is not a restriction, so it was not 
    (19th result at 186 m). The first version trusted "<20 = exhausted" and declared
    coverage after 4 calls with 68 places (42 of the 105 places within 500 m missing). With
    `SAT_MIN` the same Mission test shows 318 places, 0 missing against the google.com/maps
-   list at 100/200/300/500/800/1500 m, 23 m..1,139 m, stopping honestly at the 30-call budget.
+   list at 100/200/300/500/800/1500 m, 23 m..1,139 m, stopping honestly at the then 30-call budget
+   (the default is 6 since 2026-11-25; see "Cost model").
    Late probes can still surface a place nearer than one already passed (24 of 318 steps
    went backwards, max 269 m): those are inserted into the upcoming queue, never reordered.
 3. A hex grid of sample points (spacing max(60 m, R/20)) covers the sweep radius R around
@@ -491,15 +613,17 @@ roughly distance-ordered and `locationBias` is not a restriction, so it was not 
 behind the current one drop below `sweepRefillAt` (6), `find.refill()` runs ONE probe and
 chains while the deck still wants more, but at most 3 probes in a row that add no card the
 preferences allow (unless the person is already waiting at the end). Details (photos /
-reviews) stay lazy per card (`prefetchUpcoming`, 3 cards); the sweep never prefetches them.
+reviews) are lazy for the one card in front only (debounced `scheduleDetails`, no prefetch
+ahead since 2026-11-25); the sweep never prefetches them.
 
 **UI.** If the person reaches the end before a refill lands: a quiet *Finding more
 nearby...* state (`.deck-loading.is-more`; fades in after 0.35 s so a fast refill never
 flashes it; static under reduced motion; announced politely), then the deck resumes on the
 first new card. End-of-deck copy is honest and uses the app's units (mi):
 - complete: "That's everywhere within 0.9 mi" + "You've seen all N places that matched."
-- budget: "That's as far as I searched" + "You've seen N places. The search stopped at its
-  limit of K lookups, so there may be more places farther out." (K = calls actually made)
+- budget: "That's as far as I searched" + "You've seen N places. I stopped searching here to
+  keep things light — there may be more farther out." (reworded 2026-11-24; no call count
+  is printed), with a "Keep looking" button while extensions remain.
 - stalled / error: "The search stopped here" / "That's all I could load" + the reason
   (a failed refill keeps the deck, shows the live note, never hangs).
 **Search farther** now means "widen the sweep radius by one step" (explicit choice): shown
@@ -509,16 +633,18 @@ pagination and button. Surprise-me / Popular picks (their own queues) turn the s
 that queue.
 
 **Knobs** (`assets/js/eats-config.js`, clamped, documented there): `sweepRadiusM` 1500,
-`sweepMaxCalls` 30, `sweepRefillAt` 6.
+`sweepMaxCalls` 6 (was 30 until 2026-11-25), `sweepRefillAt` 6.
 
 **Cost model.** One billed Nearby call per probe (plus the first). Calls per refill = 1.
-Worst case per search session at defaults = **30 calls** (the cap includes the first call
-and any 50 km retry); typical deep swipe in a dense area uses most of the 30, a quiet area
+Worst case per search session at defaults = **6 calls**, or **24** if the person keeps
+tapping "Keep looking" (the cap includes the first call and any 50 km retry); a quiet area
 completes in 1-5 (<20 places inside 5 km = 1 call). Each Start / "Surprise me" / restart is
 a new session with a fresh budget. Fields requested are unchanged (rating + hours are the
-Enterprise tier), so each call costs what the old single call cost.
-Density reality: in a very dense area the 30-call cap ends the sweep before 1500 m
-(probes overlap, so each adds fewer than 20 new places); the deck then says so plainly.
+Enterprise tier), so each call costs what the old single call cost. The full cost picture,
+including details/photos and the spending guard, is in "Cost model and the spending guard".
+Density reality: in a very dense area the 6-call cap ends the sweep well before 1500 m
+(probes overlap, so each adds fewer than 20 new places; 6 calls reached ~100 places in the
+stub test); the deck then says so plainly and offers "Keep looking".
 
 **Known limits.** (a) Ordering is nearest-first within what has been fetched; a late probe
 can reveal a place nearer than one already shown, which is simply shown next (never
@@ -1376,6 +1502,9 @@ the shortlist compare cards. Requests stay modest: search thumbs at 400×400,
 detail photos capped at **four** at 640×800, and `getUrl()` only *builds* a
 string — no image is fetched until a surface actually paints it, so places that
 never render never cost a photo request.
+**Since 2026-11-25 (cost pass):** search thumbs are no longer built at all, detail photos
+are capped at **three** at **480x600**, and only the card in front paints photo URLs (back
+cards, unseen pages and the "Coming up" strip stay painted watercolor). See "Cost model".
 
 **3. Key onboarding, and one sentence per failure**
 The settings sheet opens as **one screen**: what mode you're in, what a key
@@ -1741,8 +1870,9 @@ when you click find — feels kinda childish").
 ### "Coming up" peek strip + softer deal-in (2026-07-16)
 A display-only preview beneath the swipe deck (`ensurePeek`/`renderPeek` in
 the deck closure, called from `renderStack`): tiny circular watercolor
-thumbs of the **next up-to-3 places** in the queue (food photo when one
-exists, else `panelArt` pigment) with the distance in tiny type under each,
+thumbs of the **next up-to-3 places** in the queue (painted `panelArt` pigment
+only since 2026-11-25 - the old food-photo thumbs were billed loads for places nobody
+had reached) with the distance in tiny type under each,
 labeled "coming up" in small caps. Updates as cards are swiped; hides when
 nothing's ahead and whenever the deck view isn't active. Strictly
 decorative: `aria-hidden` (announce() already reports counts),
@@ -2033,10 +2163,10 @@ Fixed **bottom tab bar** (Find / Visited / Friends / Popular, icons + labels, sa
 2. **Real Friends + Popular:** these are inherently multi-user, so they need a **shared backend + accounts** (Firebase or Supabase, both have free tiers and work from a static site). When you're ready, the swap is contained to the `social` resolvers. This also unlocks: friend connections, real cross-user trending (true day/month/year), and syncing your Visited log across devices.
 
 ### Live-data caveats (already handled in code, good to know)
-- Google **doesn't label photos** as "vibe" vs "food" — the Places API has no photo categories at all. Live places therefore show up to four **distinct** photos (identical URLs de-duped, never the same photo in two tiles) under neutral tags (`PHOTO`, `MORE PHOTOS`; `NO PHOTO` over the painted watercolor when there is none). The painted `VIBE` / `FOOD` tags remain for sample places only, where the art genuinely is vibe/food. (Before 2026-11-24 a plate of tacos could be tagged VIBE and a kitchen counter FOOD.)
+- Google **doesn't label photos** as "vibe" vs "food" — the Places API has no photo categories at all. Live places therefore show up to three **distinct** photos (four before 2026-11-25) (identical URLs de-duped, never the same photo in two tiles) under neutral tags (`PHOTO`, `MORE PHOTOS`; `NO PHOTO` over the painted watercolor when there is none). The painted `VIBE` / `FOOD` tags remain for sample places only, where the art genuinely is vibe/food. (Before 2026-11-24 a plate of tacos could be tagged VIBE and a kitchen counter FOOD.)
 - **Photo attributions** (Places terms): the new API's `photo.authorAttributions[]` (`displayName`, `uri`) and the legacy `photo.html_attributions[]` (parsed in an inert `DOMParser`, text + `href` only) are shown as a small "Photo: <name>" line on the photo tile and on the shortlist compare card (link only when the uri is `https`, `rel="noopener noreferrer"`). Absent attributions render nothing. No extra field is needed — `authorAttributions` ships inside the `photos` field already in `NEW_FIELDS` / `fetchFields`. The tiny decorative thumbs (peek strip, Popular rows) carry no line.
 - **Review quotes**: a review's `text` may be a string, `{text}`, null (ratings-only reviews are common) or only `originalText`. The card picks reviews with non-empty trimmed text; if none has words it shows a plain "Rated, no written review." line with the rating (never an empty `“”`), and with no reviews at all the existing "No reviews yet" line. Long text is clipped at a word boundary with an ellipsis (180 chars).
-- Photos/reviews/phone need a per-place **Place Details** call — the deck lazily fetches details only for the top card + next two (cached) to save quota.
+- Photos/reviews/phone need a per-place **Place Details** call — since 2026-11-25 the deck fetches details only for the card actually in front, ~600 ms after it lands (no prefetch ahead), memoised per place id for the page session. See "Cost model and the spending guard".
 - (legacy path) `open now` in distance-ranked search is only a **binary** flag (that is all `nearbySearch` carries; the new search also carries `regularOpeningHours`) — the real `periods` arrive with the per-place Details call, and until they do a live card shows *Open now* / *Closed* with **no invented time**. **phone/Call** isn't in nearby results either, so it appears only when details supply it.
 - Hours are reasoned in the **browser's** timezone; a place whose `utc_offset_minutes` differs falls back to the binary state rather than printing another zone's clock.
 - Saving a key spends **one** cheapest-tier Places request to validate it, so a bad key fails in the sheet instead of silently on the deck.
